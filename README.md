@@ -118,7 +118,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for scaling strategies.
 
 ## 📝 License
 
-[Your License Here]
+-
 
 ## 🤝 Contributing
 
@@ -126,4 +126,4 @@ Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guideli
 
 ## 📧 Contact
 
-[Your Contact Information]
+-
