@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subjects - MySmartNotes</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .subjects-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .subject-card {
+            background: white;
+            border: 2px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .subject-card:hover {
+            border-color: var(--color-primary);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .subject-card .color-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            position: absolute;
+            top: var(--spacing-md);
+            left: var(--spacing-md);
+        }
+
+        .subject-card h3 {
+            margin: var(--spacing-md) 0;
+            color: var(--color-text);
+            font-size: 1.1rem;
+        }
+
+        .subject-card p {
+            color: var(--color-text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: var(--spacing-md);
+            line-height: 1.4;
+        }
+
+        .subject-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-md);
+            padding-top: var(--spacing-md);
+            border-top: 1px solid var(--color-border);
+        }
+
+        .subject-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-top: var(--spacing-md);
+        }
+
+        .subject-actions button {
+            flex: 1;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-edit {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-delete {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: var(--color-primary-dark);
+        }
+
+        .btn-delete:hover {
+            background: #ff5252;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-content h2 {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .form-group {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: var(--spacing-sm);
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: var(--spacing-md);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-sm);
+        }
+
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .color-option:hover,
+        .color-option.selected {
+            border-color: var(--color-text);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-lg);
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: var(--spacing-md);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-save {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: var(--color-border);
+            color: var(--color-text);
+        }
+
+        .btn-save:hover {
+            background: var(--color-primary-dark);
+        }
+
+        .btn-cancel:hover {
+            background: #e0e0e0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-xl);
+            color: var(--color-text-secondary);
+        }
+
+        .empty-state svg {
+            width: 100px;
+            height: 100px;
+            margin-bottom: var(--spacing-lg);
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-left">
+                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <ul class="nav-links">
+                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                    <li><a href="subjects.html" class="nav-link active">Subjects</a></li>
+                    <li><a href="lectures.html" class="nav-link">Lectures</a></li>
+                    <li><a href="upload.html" class="nav-link">Upload</a></li>
+                </ul>
+            </div>
+            <div class="nav-right">
+                <a href="chat.html" class="nav-link">💬 Chat</a>
+                <a href="settings.html" class="nav-link">⚙️ Settings</a>
+                <button onclick="logout()" class="btn btn-outline" style="border: none; cursor: pointer;">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container" style="padding-top: var(--spacing-xl);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-xl);">
+            <h1>Subjects & Courses</h1>
+            <button onclick="showCreateModal()" class="btn btn-primary">+ New Subject</button>
+        </div>
+
+        <!-- Subjects Grid -->
+        <div id="subjectsGrid" class="subjects-container"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m0 0h6" />
+            </svg>
+            <h2>No subjects yet</h2>
+            <p>Create your first subject to start organizing your lectures</p>
+            <button onclick="showCreateModal()" class="btn btn-primary">Create Subject</button>
+        </div>
+    </main>
+
+    <!-- Create/Edit Subject Modal -->
+    <div id="subjectModal" class="modal">
+        <div class="modal-content">
+            <h2 id="modalTitle">Create Subject</h2>
+            <form onsubmit="saveSubject(event)">
+                <div class="form-group">
+                    <label for="subjectName">Subject Name *</label>
+                    <input type="text" id="subjectName" required placeholder="e.g., Physics 101">
+                </div>
+
+                <div class="form-group">
+                    <label for="subjectDescription">Description</label>
+                    <textarea id="subjectDescription" placeholder="What is this subject about?"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Color</label>
+                    <div class="color-picker">
+                        <div class="color-option selected" style="background: #3b82f6;" onclick="selectColor('#3b82f6', this)"></div>
+                        <div class="color-option" style="background: #ec4899;" onclick="selectColor('#ec4899', this)"></div>
+                        <div class="color-option" style="background: #f59e0b;" onclick="selectColor('#f59e0b', this)"></div>
+                        <div class="color-option" style="background: #10b981;" onclick="selectColor('#10b981', this)"></div>
+                        <div class="color-option" style="background: #8b5cf6;" onclick="selectColor('#8b5cf6', this)"></div>
+                        <div class="color-option" style="background: #06b6d4;" onclick="selectColor('#06b6d4', this)"></div>
+                    </div>
+                </div>
+
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Save Subject</button>
+                    <button type="button" onclick="closeModal()" class="btn-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const TOKEN_KEY = 'token';
+        let subjects = [];
+        let selectedColor = '#3b82f6';
+        let editingSubjectId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem(TOKEN_KEY);
+            if (!token) {
+                window.location.href = '/index.html';
+                return;
+            }
+            loadSubjects();
+        });
+
+        function selectColor(color, element) {
+            document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedColor = color;
+        }
+
+        async function loadSubjects() {
+            try {
+                const response = await fetch('/subjects', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to load subjects');
+                subjects = await response.json();
+                renderSubjects();
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+            }
+        }
+
+        function renderSubjects() {
+            const grid = document.getElementById('subjectsGrid');
+            const emptyState = document.getElementById('emptyState');
+
+            if (subjects.length === 0) {
+                grid.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            grid.style.display = 'grid';
+            emptyState.style.display = 'none';
+
+            grid.innerHTML = subjects.map(subject => `
+                <div class="subject-card">
+                    <div class="color-indicator" style="background: ${subject.color}"></div>
+                    <h3>${subject.name}</h3>
+                    <p>${subject.description || 'No description'}</p>
+                    <div class="subject-stats">
+                        <span>📚 Lectures: 0</span>
+                        <span>📝 Items: 0</span>
+                    </div>
+                    <div class="subject-actions">
+                        <button class="btn-edit" onclick="editSubject(${subject.id})">Edit</button>
+                        <button class="btn-delete" onclick="deleteSubject(${subject.id})">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showCreateModal() {
+            editingSubjectId = null;
+            document.getElementById('modalTitle').textContent = 'Create Subject';
+            document.getElementById('subjectName').value = '';
+            document.getElementById('subjectDescription').value = '';
+            selectedColor = '#3b82f6';
+            document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+            document.querySelector('.color-option[style*="#3b82f6"]').classList.add('selected');
+            document.getElementById('subjectModal').classList.add('active');
+        }
+
+        function editSubject(id) {
+            const subject = subjects.find(s => s.id === id);
+            if (!subject) return;
+
+            editingSubjectId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Subject';
+            document.getElementById('subjectName').value = subject.name;
+            document.getElementById('subjectDescription').value = subject.description || '';
+            selectedColor = subject.color;
+
+            document.querySelectorAll('.color-option').forEach(el => {
+                el.classList.toggle('selected', el.style.background === subject.color);
+            });
+
+            document.getElementById('subjectModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('subjectModal').classList.remove('active');
+        }
+
+        async function saveSubject(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('subjectName').value;
+            const description = document.getElementById('subjectDescription').value;
+
+            try {
+                const method = editingSubjectId ? 'PUT' : 'POST';
+                const url = editingSubjectId ? `/subjects/${editingSubjectId}` : '/subjects';
+
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description,
+                        color: selectedColor
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to save subject');
+
+                closeModal();
+                loadSubjects();
+            } catch (error) {
+                alert('Error saving subject: ' + error.message);
+            }
+        }
+
+        async function deleteSubject(id) {
+            if (!confirm('Are you sure you want to delete this subject? All associated lectures will be deleted.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/subjects/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to delete subject');
+
+                loadSubjects();
+            } catch (error) {
+                alert('Error deleting subject: ' + error.message);
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem(TOKEN_KEY);
+            window.location.href = '/index.html';
+        }
+    </script>
+</body>
+</html>

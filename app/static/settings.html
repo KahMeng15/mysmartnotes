@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .settings-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .settings-section {
+            margin-bottom: var(--spacing-2xl);
+            padding: var(--spacing-lg);
+            border: 1px solid var(--color-light-gray);
+            border-radius: var(--radius-lg);
+        }
+
+        .settings-section h3 {
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .settings-grid {
+            display: grid;
+            gap: var(--spacing-lg);
+        }
+
+        .toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-md) 0;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background: var(--color-light-gray);
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            transition: background var(--transition-base);
+        }
+
+        .toggle-switch.active {
+            background: var(--color-primary);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left var(--transition-base);
+        }
+
+        .toggle-switch.active::after {
+            left: 26px;
+        }
+
+        .danger-zone {
+            background: rgba(231, 76, 60, 0.05);
+            border: 1px solid rgba(231, 76, 60, 0.2);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <ul class="navbar-nav">
+                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                    <li><a href="lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="chat.html" class="nav-link">Chat</a></li>
+                    <li><a href="settings.html" class="nav-link active">Settings</a></li>
+                </ul>
+                <div class="avatar" onclick="logout()">👤</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <div class="container" style="padding-top: var(--spacing-2xl); padding-bottom: var(--spacing-2xl);">
+        <h1 style="margin-bottom: var(--spacing-2xl);">Settings</h1>
+
+        <div class="settings-container">
+            <!-- Profile Settings -->
+            <div class="settings-section">
+                <h3>👤 Profile Settings</h3>
+                <form id="profileForm" onsubmit="updateProfile(event)" class="settings-grid">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="fullName">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="username" disabled>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Profile</button>
+                </form>
+            </div>
+
+            <!-- Privacy Settings -->
+            <div class="settings-section">
+                <h3>🔒 Privacy</h3>
+                <div class="settings-grid">
+                    <div class="toggle">
+                        <div>
+                            <div style="font-weight: 600;">Allow analytics</div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Help us improve by sharing usage data</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleAnalytics()"></div>
+                    </div>
+                    <div class="toggle">
+                        <div>
+                            <div style="font-weight: 600;">Email notifications</div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Get updates about your learning progress</div>
+                        </div>
+                        <div class="toggle-switch active" onclick="toggleNotifications()"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Storage & Cache -->
+            <div class="settings-section">
+                <h3>💾 Storage</h3>
+                <div class="settings-grid">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-md);">
+                            <div>
+                                <div style="font-weight: 600;">Storage Used</div>
+                                <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Your data storage</div>
+                            </div>
+                            <div style="font-weight: 600; color: var(--color-primary);">2.5 GB / 10 GB</div>
+                        </div>
+                        <div style="height: 8px; background: var(--color-light-gray); border-radius: var(--radius-full); overflow: hidden;">
+                            <div style="height: 100%; width: 25%; background: var(--color-primary);"></div>
+                        </div>
+                    </div>
+                    <button onclick="clearCache()" class="btn btn-outline">Clear Cache</button>
+                </div>
+            </div>
+
+            <!-- App Settings -->
+            <div class="settings-section">
+                <h3>⚙️ Application</h3>
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label>Theme</label>
+                        <select>
+                            <option>Light</option>
+                            <option>Dark</option>
+                            <option>System</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Default AI Provider</label>
+                        <select>
+                            <option>Gemini</option>
+                            <option>Hugging Face</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Preferences</button>
+                </div>
+            </div>
+
+            <!-- Security -->
+            <div class="settings-section">
+                <h3>🔐 Security</h3>
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label>Current Password</label>
+                        <input type="password" id="currentPassword">
+                    </div>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" id="newPassword">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" id="confirmPassword">
+                    </div>
+                    <button onclick="changePassword()" class="btn btn-primary">Change Password</button>
+                </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="settings-section danger-zone">
+                <h3 style="color: var(--color-error);">⚠️ Danger Zone</h3>
+                <p style="color: var(--color-gray); margin-bottom: var(--spacing-lg);">These actions cannot be undone.</p>
+                <div style="display: flex; gap: var(--spacing-md); flex-wrap: wrap;">
+                    <button onclick="downloadData()" class="btn btn-outline">📥 Download My Data</button>
+                    <button onclick="deleteAccount()" class="btn btn-secondary">🗑️ Delete Account</button>
+                </div>
+            </div>
+
+            <!-- About -->
+            <div class="settings-section">
+                <h3>ℹ️ About</h3>
+                <div style="color: var(--color-gray); font-size: var(--font-size-sm);">
+                    <p><strong>MySmartNotes</strong> v1.0.0</p>
+                    <p>An AI-powered study companion to help you learn efficiently.</p>
+                    <p style="margin-top: var(--spacing-lg);">
+                        <a href="#" style="color: var(--color-primary);">Terms of Service</a> • 
+                        <a href="#" style="color: var(--color-primary);">Privacy Policy</a> • 
+                        <a href="#" style="color: var(--color-primary);">Contact Support</a>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Logout -->
+            <button onclick="logout()" class="btn btn-outline btn-block" style="margin-top: var(--spacing-2xl);">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+        window.addEventListener('load', () => {
+            if (!token) window.location.href = 'index.html';
+            loadSettings();
+        });
+
+        function loadSettings() {
+            document.getElementById('fullName').value = user.full_name || '';
+            document.getElementById('email').value = user.email || '';
+            document.getElementById('username').value = user.username || '';
+        }
+
+        async function updateProfile(event) {
+            event.preventDefault();
+            try {
+                const response = await fetch(`${API_URL}/users/profile`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        full_name: document.getElementById('fullName').value
+                    })
+                });
+                if (response.ok) {
+                    alert('Profile updated successfully');
+                }
+            } catch (error) {
+                alert('Error updating profile: ' + error.message);
+            }
+        }
+
+        function toggleAnalytics() {
+            const toggle = event.target;
+            toggle.classList.toggle('active');
+        }
+
+        function toggleNotifications() {
+            const toggle = event.target;
+            toggle.classList.toggle('active');
+        }
+
+        function clearCache() {
+            localStorage.clear();
+            alert('Cache cleared');
+            window.location.href = 'index.html';
+        }
+
+        function changePassword() {
+            const current = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirm = document.getElementById('confirmPassword').value;
+
+            if (!current || !newPass || !confirm) {
+                alert('Please fill in all password fields');
+                return;
+            }
+
+            if (newPass !== confirm) {
+                alert('Passwords do not match');
+                return;
+            }
+
+            alert('Password change feature coming soon');
+        }
+
+        function downloadData() {
+            alert('Download data feature coming soon');
+        }
+
+        function deleteAccount() {
+            if (!confirm('Are you sure? This cannot be undone.')) return;
+            if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) return;
+            
+            alert('Account deletion coming soon');
+        }
+
+        function logout() {
+            if (confirm('Logout?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
+</body>
+</html>

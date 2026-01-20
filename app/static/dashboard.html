@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .subject-card {
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            min-height: 150px;
+        }
+
+        .subject-card-color {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+        }
+
+        .subject-card-content {
+            padding: var(--spacing-lg);
+        }
+
+        .subject-name {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .subject-stats {
+            font-size: var(--font-size-sm);
+            color: var(--color-gray);
+            display: flex;
+            gap: var(--spacing-lg);
+        }
+
+        .lecture-list {
+            list-style: none;
+        }
+
+        .lecture-item {
+            padding: var(--spacing-md);
+            border-bottom: 1px solid var(--color-light-gray);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background var(--transition-base);
+        }
+
+        .lecture-item:hover {
+            background: var(--color-background);
+        }
+
+        .lecture-title {
+            font-weight: 500;
+        }
+
+        .lecture-date {
+            font-size: var(--font-size-sm);
+            color: var(--color-gray);
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .action-btn {
+            padding: var(--spacing-xl);
+            text-align: center;
+            border-radius: var(--radius-lg);
+            transition: all var(--transition-base);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-4px);
+        }
+
+        .icon {
+            font-size: var(--font-size-3xl);
+            margin-bottom: var(--spacing-md);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <ul class="navbar-nav">
+                    <li><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
+                    <li><a href="lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="chat.html" class="nav-link">Chat</a></li>
+                    <li><a href="settings.html" class="nav-link">Settings</a></li>
+                </ul>
+                <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
+                    <span id="userDisplay" style="font-size: var(--font-size-sm);"></span>
+                    <div class="avatar" onclick="logout()">👤</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container" style="padding-top: var(--spacing-2xl);">
+        <!-- Welcome Section -->
+        <div style="margin-bottom: var(--spacing-2xl);">
+            <h1>Welcome back, <span id="userName">Student</span>! 👋</h1>
+            <p style="color: var(--color-gray); font-size: var(--font-size-lg);">Let's continue your learning journey</p>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="dashboard-grid">
+            <div class="card card-stat">
+                <div class="card-stat-value">5</div>
+                <div class="card-stat-label">Total Subjects</div>
+                <div class="card-stat-delta positive">✓ Active</div>
+            </div>
+            <div class="card card-stat">
+                <div class="card-stat-value">24</div>
+                <div class="card-stat-label">Lectures Uploaded</div>
+                <div class="card-stat-delta positive">+3 this week</div>
+            </div>
+            <div class="card card-stat">
+                <div class="card-stat-value">12.5h</div>
+                <div class="card-stat-label">Study Time</div>
+                <div class="card-stat-delta positive">+2.5h this week</div>
+            </div>
+            <div class="card card-stat">
+                <div class="card-stat-value">48</div>
+                <div class="card-stat-label">Questions Asked</div>
+                <div class="card-stat-delta positive">+8 this week</div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <h2 style="margin-top: var(--spacing-2xl);">Quick Actions</h2>
+        <div class="quick-actions">
+            <a href="upload.html" class="card action-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none;">
+                <div class="icon">📤</div>
+                <div style="font-weight: 600;">Upload Lecture</div>
+            </a>
+            <a href="lectures.html" class="card action-btn" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-decoration: none;">
+                <div class="icon">📚</div>
+                <div style="font-weight: 600;">My Lectures</div>
+            </a>
+            <a href="chat.html" class="card action-btn" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; text-decoration: none;">
+                <div class="icon">💬</div>
+                <div style="font-weight: 600;">Ask AI</div>
+            </a>
+            <a href="subjects.html" class="card action-btn" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; text-decoration: none;">
+                <div class="icon">📋</div>
+                <div style="font-weight: 600;">Subjects</div>
+            </a>
+        </div>
+
+        <!-- Recent Subjects -->
+        <h2 style="margin-top: var(--spacing-2xl); margin-bottom: var(--spacing-lg);">Your Subjects</h2>
+        <div class="dashboard-grid" id="subjectsGrid">
+            <!-- Subjects will be loaded here -->
+            <div class="card" style="padding: var(--spacing-2xl); text-align: center; color: var(--color-gray);">
+                <p>Loading subjects...</p>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <h2 style="margin-top: var(--spacing-2xl); margin-bottom: var(--spacing-lg);">Recent Lectures</h2>
+        <div class="card">
+            <ul class="lecture-list" id="recentLectures">
+                <li style="padding: var(--spacing-lg); text-align: center; color: var(--color-gray);">
+                    Loading lectures...
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Create Subject Modal -->
+    <div id="subjectModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create New Subject</h3>
+                <button class="modal-close" onclick="closeModal('subjectModal')">&times;</button>
+            </div>
+            <form id="subjectForm" onsubmit="createSubject(event)">
+                <div class="form-group">
+                    <label>Subject Name</label>
+                    <input type="text" id="subjectName" required>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="subjectDescription"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Color</label>
+                    <input type="color" id="subjectColor" value="#4ECDC4">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Create Subject</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        const token = localStorage.getItem('token');
+
+        // Check authentication
+        window.addEventListener('load', () => {
+            if (!token) {
+                window.location.href = 'index.html';
+            }
+            loadUserInfo();
+            loadSubjects();
+            loadRecentLectures();
+        });
+
+        function loadUserInfo() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            document.getElementById('userName').textContent = user.username || 'Student';
+            document.getElementById('userDisplay').textContent = user.username || 'User';
+        }
+
+        async function loadSubjects() {
+            try {
+                const response = await fetch(`${API_URL}/subjects`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const subjects = await response.json();
+                    displaySubjects(subjects);
+                }
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+            }
+        }
+
+        function displaySubjects(subjects) {
+            const grid = document.getElementById('subjectsGrid');
+            if (!subjects || subjects.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: var(--spacing-2xl); color: var(--color-gray);">
+                        <p>No subjects yet. <a href="javascript:openModal('subjectModal')" style="color: var(--color-primary);">Create one</a></p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = subjects.map((subject, index) => `
+                <div class="card subject-card" onclick="selectSubject(${subject.id})">
+                    <div class="subject-card-color" style="background: ${subject.color}"></div>
+                    <div class="subject-card-content">
+                        <div class="subject-name">${subject.name}</div>
+                        <div class="subject-stats">
+                            <span>📚 0 lectures</span>
+                            <span>🎯 0 tasks</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function loadRecentLectures() {
+            try {
+                const response = await fetch(`${API_URL}/lectures`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const lectures = await response.json();
+                    displayRecentLectures(lectures.slice(0, 5));
+                }
+            } catch (error) {
+                console.error('Error loading lectures:', error);
+            }
+        }
+
+        function displayRecentLectures(lectures) {
+            const list = document.getElementById('recentLectures');
+            if (!lectures || lectures.length === 0) {
+                list.innerHTML = `
+                    <li style="padding: var(--spacing-lg); text-align: center; color: var(--color-gray);">
+                        No lectures yet. <a href="upload.html" style="color: var(--color-primary);">Upload your first lecture</a>
+                    </li>
+                `;
+                return;
+            }
+
+            list.innerHTML = lectures.map(lecture => `
+                <li class="lecture-item">
+                    <div>
+                        <div class="lecture-title">📄 ${lecture.title}</div>
+                        <div class="lecture-date">${new Date(lecture.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <button onclick="openLecture(${lecture.id})" class="btn btn-primary btn-small">Open</button>
+                </li>
+            `).join('');
+        }
+
+        async function createSubject(event) {
+            event.preventDefault();
+            try {
+                const response = await fetch(`${API_URL}/subjects`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        name: document.getElementById('subjectName').value,
+                        description: document.getElementById('subjectDescription').value,
+                        color: document.getElementById('subjectColor').value
+                    })
+                });
+
+                if (response.ok) {
+                    closeModal('subjectModal');
+                    loadSubjects();
+                }
+            } catch (error) {
+                alert('Error creating subject: ' + error.message);
+            }
+        }
+
+        function selectSubject(id) {
+            window.location.href = `lectures.html?subject=${id}`;
+        }
+
+        function openLecture(id) {
+            window.location.href = `lecture.html?id=${id}`;
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('show');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .chat-container {
+            display: flex;
+            height: calc(100vh - 80px);
+            gap: var(--spacing-lg);
+        }
+
+        .chat-sidebar {
+            width: 280px;
+            background: var(--color-white);
+            border-right: 1px solid var(--color-light-gray);
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+        }
+
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--color-background);
+        }
+
+        .chat-header {
+            padding: var(--spacing-lg);
+            background: var(--color-white);
+            border-bottom: 1px solid var(--color-light-gray);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .message {
+            display: flex;
+            gap: var(--spacing-md);
+            max-width: 70%;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-radius: var(--radius-lg);
+            word-wrap: break-word;
+        }
+
+        .message.ai .message-content {
+            background: var(--color-white);
+            color: var(--color-dark);
+            border: 1px solid var(--color-light-gray);
+        }
+
+        .message.user .message-content {
+            background: var(--color-primary);
+            color: var(--color-white);
+        }
+
+        .message-time {
+            font-size: var(--font-size-xs);
+            color: var(--color-gray);
+            padding: 0 var(--spacing-sm);
+            display: flex;
+            align-items: flex-end;
+        }
+
+        .chat-input-area {
+            padding: var(--spacing-lg);
+            background: var(--color-white);
+            border-top: 1px solid var(--color-light-gray);
+        }
+
+        .chat-input-form {
+            display: flex;
+            gap: var(--spacing-md);
+        }
+
+        .chat-input-form input {
+            flex: 1;
+            border-radius: var(--radius-full);
+            padding: var(--spacing-md) var(--spacing-lg);
+        }
+
+        .chat-input-form button {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-size-lg);
+        }
+
+        .lecture-selector {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .lecture-selector label {
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .lecture-selector select {
+            width: 100%;
+        }
+
+        .chat-conversation {
+            display: none;
+        }
+
+        .chat-conversation.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--color-gray);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <ul class="navbar-nav">
+                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                    <li><a href="lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="chat.html" class="nav-link active">Chat</a></li>
+                    <li><a href="settings.html" class="nav-link">Settings</a></li>
+                </ul>
+                <div class="avatar" onclick="logout()">👤</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Chat Container -->
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <div class="chat-sidebar">
+            <h3 style="margin-bottom: var(--spacing-lg);">Select Lecture</h3>
+            <div class="lecture-selector">
+                <select id="lectureSelect" onchange="selectLecture(this.value)">
+                    <option value="">Choose a lecture...</option>
+                </select>
+            </div>
+            <div id="conversationList" style="margin-top: var(--spacing-lg);">
+                <!-- Conversations will appear here -->
+            </div>
+        </div>
+
+        <!-- Main Chat -->
+        <div class="chat-main">
+            <!-- Header -->
+            <div class="chat-header">
+                <h3 id="chatTitle">Select a lecture to start</h3>
+                <p style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions about your lecture content</p>
+            </div>
+
+            <!-- Messages -->
+            <div class="chat-messages" id="messagesContainer">
+                <div class="empty-state">
+                    <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);">💬</div>
+                    <p>Select a lecture to begin asking questions</p>
+                </div>
+            </div>
+
+            <!-- Input -->
+            <div class="chat-input-area">
+                <div class="chat-input-form">
+                    <input type="text" id="messageInput" placeholder="Ask a question about this lecture..." disabled>
+                    <button type="button" id="sendBtn" class="btn btn-primary" disabled onclick="sendMessage()">→</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        const token = localStorage.getItem('token');
+        let selectedLectureId = null;
+        let messages = [];
+
+        window.addEventListener('load', () => {
+            if (!token) window.location.href = 'index.html';
+            loadLectures();
+            setupMessageInput();
+        });
+
+        async function loadLectures() {
+            try {
+                const response = await fetch(`${API_URL}/lectures`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const lectures = await response.json();
+                    const select = document.getElementById('lectureSelect');
+                    lectures.forEach(lecture => {
+                        const option = document.createElement('option');
+                        option.value = lecture.id;
+                        option.textContent = lecture.title;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading lectures:', error);
+            }
+        }
+
+        function selectLecture(lectureId) {
+            if (!lectureId) return;
+            selectedLectureId = lectureId;
+            messages = [];
+            
+            const lectureTitle = document.getElementById('lectureSelect').options[document.getElementById('lectureSelect').selectedIndex].text;
+            document.getElementById('chatTitle').textContent = lectureTitle;
+            
+            document.getElementById('messageInput').disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+            
+            displayMessages();
+            document.getElementById('messageInput').focus();
+        }
+
+        function setupMessageInput() {
+            document.getElementById('messageInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || !selectedLectureId) return;
+            
+            // Add user message
+            messages.push({
+                role: 'user',
+                content: message,
+                time: new Date()
+            });
+            
+            input.value = '';
+            displayMessages();
+            
+            // Show loading
+            messages.push({
+                role: 'ai',
+                content: 'Thinking...',
+                time: new Date(),
+                loading: true
+            });
+            displayMessages();
+            
+            try {
+                const response = await fetch(`${API_URL}/chat/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        lecture_id: selectedLectureId,
+                        message: message
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    messages.pop(); // Remove loading message
+                    messages.push({
+                        role: 'ai',
+                        content: data.response,
+                        time: new Date()
+                    });
+                } else {
+                    messages.pop();
+                    messages.push({
+                        role: 'ai',
+                        content: 'Sorry, I encountered an error. Please try again.',
+                        time: new Date()
+                    });
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                messages.pop();
+                messages.push({
+                    role: 'ai',
+                    content: 'Error: ' + error.message,
+                    time: new Date()
+                });
+            }
+            
+            displayMessages();
+        }
+
+        function displayMessages() {
+            const container = document.getElementById('messagesContainer');
+            
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);">💬</div>
+                        <p>Start asking questions about this lecture</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = messages.map((msg, idx) => `
+                <div class="message ${msg.role}">
+                    <div class="message-content">
+                        ${msg.content}
+                    </div>
+                    <div class="message-time">
+                        ${msg.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                </div>
+            `).join('');
+            
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function logout() {
+            if (confirm('Logout?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
+</body>
+</html>

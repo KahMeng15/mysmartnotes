@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .study-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-2xl);
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            padding: var(--spacing-xl);
+            border-radius: var(--radius-lg);
+            color: white;
+        }
+
+        .study-progress {
+            text-align: center;
+        }
+
+        .progress-ring {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto var(--spacing-md);
+        }
+
+        .flashcard {
+            perspective: 1000px;
+            height: 300px;
+            cursor: pointer;
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .flashcard-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        .flashcard.flipped .flashcard-inner {
+            transform: rotateY(180deg);
+        }
+
+        .flashcard-front,
+        .flashcard-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-2xl);
+            font-size: var(--font-size-xl);
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .flashcard-front {
+            background: linear-gradient(135deg, var(--color-primary), #2DB4A4);
+            color: white;
+        }
+
+        .flashcard-back {
+            background: linear-gradient(135deg, var(--color-secondary), #FF8080);
+            color: white;
+            transform: rotateY(180deg);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: var(--spacing-md);
+            margin: var(--spacing-2xl) 0;
+        }
+
+        .btn-control {
+            padding: var(--spacing-md) var(--spacing-lg);
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all var(--transition-base);
+        }
+
+        .btn-wrong {
+            background: var(--color-error);
+            color: white;
+        }
+
+        .btn-correct {
+            background: var(--color-success);
+            color: white;
+        }
+
+        .btn-skip {
+            background: var(--color-light-gray);
+            color: var(--color-gray);
+        }
+
+        .btn-control:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .study-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .stat-card {
+            background: white;
+            border: 1px solid var(--color-light-gray);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            color: var(--color-primary);
+        }
+
+        .stat-label {
+            font-size: var(--font-size-sm);
+            color: var(--color-gray);
+            margin-top: var(--spacing-xs);
+        }
+
+        .finish-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: var(--spacing-2xl);
+            border-radius: var(--radius-lg);
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .modal-content h2 {
+            margin-bottom: var(--spacing-md);
+        }
+
+        .emoji-large {
+            font-size: 48px;
+            margin: var(--spacing-md) 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <ul class="navbar-nav">
+                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                    <li><a href="lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="chat.html" class="nav-link">Chat</a></li>
+                    <li><a href="settings.html" class="nav-link">Settings</a></li>
+                </ul>
+                <div class="avatar" onclick="logout()">👤</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Study Header -->
+    <div class="study-header">
+        <div>
+            <h1>Study Flashcards</h1>
+            <p id="subjectName" style="opacity: 0.9;">Loading...</p>
+        </div>
+        <div class="study-progress">
+            <div class="stat-value"><span id="cardCount">0</span>/10</div>
+            <div class="stat-label">Cards</div>
+        </div>
+        <button onclick="exitStudy()" class="btn btn-outline" style="background: white; color: var(--color-primary);">Exit Study</button>
+    </div>
+
+    <!-- Content -->
+    <div class="container" style="padding-bottom: var(--spacing-2xl);">
+        <!-- Study Stats -->
+        <div class="study-stats">
+            <div class="stat-card">
+                <div class="stat-value" id="correctCount">0</div>
+                <div class="stat-label">Correct</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="wrongCount">0</div>
+                <div class="stat-label">Incorrect</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="skipCount">0</div>
+                <div class="stat-label">Skipped</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="percentageCorrect">0%</div>
+                <div class="stat-label">Accuracy</div>
+            </div>
+        </div>
+
+        <!-- Flashcard -->
+        <div class="flashcard" id="flashcard" onclick="flipCard()">
+            <div class="flashcard-inner">
+                <div class="flashcard-front">
+                    <span id="cardQuestion">Click to reveal answer</span>
+                </div>
+                <div class="flashcard-back">
+                    <span id="cardAnswer">Answer will appear here</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hint -->
+        <div style="text-align: center; color: var(--color-gray); font-size: var(--font-size-sm); margin-bottom: var(--spacing-lg);">
+            💡 Click the card to reveal the answer
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button onclick="markWrong()" class="btn-control btn-wrong">❌ I got it wrong</button>
+            <button onclick="skipCard()" class="btn-control btn-skip">⏭️ Skip</button>
+            <button onclick="markCorrect()" class="btn-control btn-correct">✅ I got it right</button>
+        </div>
+
+        <!-- Progress Bar -->
+        <div style="background: var(--color-light-gray); height: 8px; border-radius: var(--radius-full); overflow: hidden; margin-top: var(--spacing-2xl);">
+            <div id="progressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); transition: width 0.3s ease;"></div>
+        </div>
+    </div>
+
+    <!-- Finish Modal -->
+    <div id="finishModal" class="finish-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="emoji-large">🎉</div>
+            <h2>Study Session Complete!</h2>
+            <div style="margin: var(--spacing-lg) 0;">
+                <p><strong id="finalCorrect">0</strong> out of <strong id="finalTotal">10</strong> correct</p>
+                <p style="color: var(--color-gray); margin-top: var(--spacing-md); font-size: var(--font-size-sm);">Great job! Keep practicing to improve your score.</p>
+            </div>
+            <div style="display: flex; gap: var(--spacing-md); margin-top: var(--spacing-lg);">
+                <button onclick="restartStudy()" class="btn btn-primary btn-block">Study Again</button>
+                <button onclick="goToDashboard()" class="btn btn-outline btn-block">Dashboard</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        const token = localStorage.getItem('token');
+        const urlParams = new URLSearchParams(window.location.search);
+        const subjectId = urlParams.get('subject');
+
+        let flashcards = [];
+        let currentIndex = 0;
+        let stats = {
+            correct: 0,
+            wrong: 0,
+            skipped: 0,
+            total: 0
+        };
+
+        window.addEventListener('load', () => {
+            if (!token) window.location.href = 'index.html';
+            loadFlashcards();
+        });
+
+        async function loadFlashcards() {
+            try {
+                const response = await fetch(`${API_URL}/flashcards?subject_id=${subjectId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to load flashcards');
+                
+                const data = await response.json();
+                flashcards = data.flashcards || [];
+                stats.total = flashcards.length;
+                
+                if (flashcards.length === 0) {
+                    alert('No flashcards available for this subject');
+                    window.location.href = 'dashboard.html';
+                    return;
+                }
+
+                displayCard();
+                updateStats();
+            } catch (error) {
+                alert('Error loading flashcards: ' + error.message);
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        function displayCard() {
+            if (currentIndex >= flashcards.length) {
+                finishStudy();
+                return;
+            }
+
+            const card = flashcards[currentIndex];
+            document.getElementById('cardQuestion').textContent = card.question;
+            document.getElementById('cardAnswer').textContent = card.answer;
+            document.getElementById('cardCount').textContent = currentIndex + 1;
+            document.getElementById('subjectName').textContent = card.subject || 'Flashcard Study';
+            document.getElementById('flashcard').classList.remove('flipped');
+            
+            updateProgressBar();
+        }
+
+        function flipCard() {
+            document.getElementById('flashcard').classList.toggle('flipped');
+        }
+
+        function markCorrect() {
+            stats.correct++;
+            nextCard();
+        }
+
+        function markWrong() {
+            stats.wrong++;
+            nextCard();
+        }
+
+        function skipCard() {
+            stats.skipped++;
+            nextCard();
+        }
+
+        function nextCard() {
+            currentIndex++;
+            displayCard();
+            updateStats();
+        }
+
+        function updateStats() {
+            document.getElementById('correctCount').textContent = stats.correct;
+            document.getElementById('wrongCount').textContent = stats.wrong;
+            document.getElementById('skipCount').textContent = stats.skipped;
+            
+            const answered = stats.correct + stats.wrong;
+            const percentage = answered > 0 ? Math.round((stats.correct / answered) * 100) : 0;
+            document.getElementById('percentageCorrect').textContent = percentage + '%';
+        }
+
+        function updateProgressBar() {
+            const progress = (currentIndex / stats.total) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+        }
+
+        function finishStudy() {
+            document.getElementById('finalCorrect').textContent = stats.correct;
+            document.getElementById('finalTotal').textContent = stats.total;
+            document.getElementById('finishModal').style.display = 'flex';
+        }
+
+        function restartStudy() {
+            currentIndex = 0;
+            stats = { correct: 0, wrong: 0, skipped: 0, total: stats.total };
+            document.getElementById('finishModal').style.display = 'none';
+            displayCard();
+            updateStats();
+        }
+
+        function exitStudy() {
+            if (confirm('Exit study session?')) {
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        function goToDashboard() {
+            window.location.href = 'dashboard.html';
+        }
+
+        function logout() {
+            if (confirm('Logout?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
+</body>
+</html>

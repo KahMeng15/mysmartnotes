@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Lecture - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .upload-area {
+            border: 2px dashed var(--color-primary);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-2xl);
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition-base);
+            background: rgba(78, 205, 196, 0.05);
+        }
+
+        .upload-area:hover,
+        .upload-area.drag-over {
+            background: rgba(78, 205, 196, 0.1);
+            border-color: var(--color-primary-dark);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--color-light-gray);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            margin-top: var(--spacing-md);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--color-primary);
+            transition: width var(--transition-base);
+        }
+
+        .file-list {
+            margin-top: var(--spacing-lg);
+        }
+
+        .file-item {
+            padding: var(--spacing-md);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .subject-helper {
+            display: flex;
+            gap: var(--spacing-md);
+            align-items: center;
+        }
+
+        .subject-select-wrapper {
+            flex: 1;
+        }
+
+        .btn-create-subject {
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-create-subject:hover {
+            background: var(--color-primary-dark);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-content h3 {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .modal-content input {
+            width: 100%;
+            padding: var(--spacing-md);
+            margin-top: var(--spacing-sm);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            font-family: inherit;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-lg);
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: var(--spacing-md);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-save {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: var(--color-border);
+            color: var(--color-text);
+        }
+
+        .btn-save:hover {
+            background: var(--color-primary-dark);
+        }
+
+        .btn-cancel:hover {
+            background: #e0e0e0;
+        }
+
+        .info-box {
+            margin-top: var(--spacing-2xl);
+            padding: var(--spacing-lg);
+            background: rgba(52, 152, 219, 0.1);
+            border-radius: var(--radius-lg);
+            border-left: 4px solid #3498db;
+        }
+
+        .info-box h4 {
+            color: #3498db;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .info-box ul {
+            color: var(--color-gray);
+            font-size: var(--font-size-sm);
+            margin-left: var(--spacing-lg);
+        }
+
+        .info-box li {
+            margin-bottom: var(--spacing-sm);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <ul class="navbar-nav">
+                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                    <li><a href="lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="upload.html" class="nav-link active">Upload</a></li>
+                    <li><a href="chat.html" class="nav-link">Chat</a></li>
+                </ul>
+                <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
+                    <a href="settings.html" class="nav-link">Settings</a>
+                    <div class="avatar" onclick="logout()">👤</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container" style="padding-top: var(--spacing-2xl); max-width: 800px;">
+        <a href="dashboard.html" style="color: var(--color-primary); margin-bottom: var(--spacing-lg); display: inline-block;">← Back to Dashboard</a>
+
+        <h1 style="margin-bottom: var(--spacing-md);">Upload Lecture</h1>
+        <p style="color: var(--color-gray); margin-bottom: var(--spacing-2xl);">Upload your lecture slides or notes for processing</p>
+
+        <div class="card">
+            <form id="uploadForm" onsubmit="handleUpload(event)">
+                <!-- Subject Selection -->
+                <div class="form-group">
+                    <label>Subject *</label>
+                    <div class="subject-helper">
+                        <div class="subject-select-wrapper">
+                            <select id="subjectSelect" required>
+                                <option value="">Loading subjects...</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn-create-subject" onclick="showCreateSubjectModal()">+ New</button>
+                    </div>
+                </div>
+
+                <!-- Lecture Title -->
+                <div class="form-group">
+                    <label>Lecture Title *</label>
+                    <input type="text" id="lectureTitle" placeholder="e.g., Calculus I - Chapter 3" required>
+                </div>
+
+                <!-- File Upload -->
+                <div class="form-group">
+                    <label>Upload File *</label>
+                    <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon">📁</div>
+                        <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Drag and drop your file here</div>
+                        <div style="color: var(--color-gray); font-size: var(--font-size-sm);">or click to browse</div>
+                        <div style="color: var(--color-gray); font-size: var(--font-size-xs); margin-top: var(--spacing-md);">
+                            Supported: PDF, PPTX, PNG, JPG (Max 50MB)
+                        </div>
+                        <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx,.png,.jpg,.jpeg" onchange="handleFileSelect(event)">
+                    </div>
+                    <div id="fileList" class="file-list"></div>
+                </div>
+
+                <!-- Progress -->
+                <div id="progressContainer" style="display: none;">
+                    <p style="font-size: var(--font-size-sm); color: var(--color-gray);">Uploading...</p>
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-md);">
+                    <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Upload Lecture</button>
+                    <a href="dashboard.html" class="btn btn-outline btn-block" style="text-decoration: none; text-align: center;">Cancel</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Info -->
+        <div class="info-box">
+            <h4>💡 Processing Info</h4>
+            <ul>
+                <li>Text will be extracted automatically from your files</li>
+                <li>Images and diagrams will be preserved</li>
+                <li>Processing typically takes a few minutes</li>
+                <li>You'll get a notification when it's done</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Create Subject Modal -->
+    <div id="subjectModal" class="modal">
+        <div class="modal-content">
+            <h3>Create New Subject</h3>
+            <form onsubmit="createSubject(event)">
+                <div class="form-group">
+                    <label for="newSubjectName">Subject Name</label>
+                    <input type="text" id="newSubjectName" required placeholder="e.g., Physics 101">
+                </div>
+                <div class="form-group">
+                    <label for="newSubjectDescription">Description</label>
+                    <input type="text" id="newSubjectDescription" placeholder="Optional description">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Create Subject</button>
+                    <button type="button" onclick="closeCreateSubjectModal()" class="btn-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const TOKEN_KEY = 'token';
+        const token = localStorage.getItem(TOKEN_KEY);
+        let selectedFile = null;
+
+        window.addEventListener('load', () => {
+            if (!token) {
+                window.location.href = 'index.html';
+                return;
+            }
+            loadSubjects();
+        });
+
+        function showCreateSubjectModal() {
+            document.getElementById('subjectModal').classList.add('active');
+        }
+
+        function closeCreateSubjectModal() {
+            document.getElementById('subjectModal').classList.remove('active');
+            document.getElementById('newSubjectName').value = '';
+            document.getElementById('newSubjectDescription').value = '';
+        }
+
+        async function createSubject(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('newSubjectName').value;
+            const description = document.getElementById('newSubjectDescription').value;
+
+            try {
+                const response = await fetch('/subjects', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description,
+                        color: '#3b82f6'
+                    })
+                });
+
+                if (response.ok) {
+                    closeCreateSubjectModal();
+                    await loadSubjects();
+                    alert('Subject created successfully!');
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + (error.detail || 'Failed to create subject'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function loadSubjects() {
+            try {
+                const response = await fetch('/subjects', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const subjects = await response.json();
+                    const select = document.getElementById('subjectSelect');
+                    select.innerHTML = '<option value="">Select a subject...</option>';
+                    subjects.forEach(subject => {
+                        const option = document.createElement('option');
+                        option.value = subject.id;
+                        option.textContent = subject.name;
+                        select.appendChild(option);
+                    });
+                } else {
+                    document.getElementById('subjectSelect').innerHTML = '<option value="">Error loading subjects</option>';
+                }
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+                document.getElementById('subjectSelect').innerHTML = '<option value="">Error loading subjects</option>';
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            document.getElementById('uploadArea').classList.add('drag-over');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            document.getElementById('uploadArea').classList.remove('drag-over');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            document.getElementById('uploadArea').classList.remove('drag-over');
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect({ target: { files } });
+            }
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                selectedFile = files[0];
+                displayFile(selectedFile);
+            }
+        }
+
+        function displayFile(file) {
+            const fileList = document.getElementById('fileList');
+            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+            fileList.innerHTML = `
+                <div class="file-item">
+                    <div>
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">📄 ${file.name}</div>
+                        <div style="font-size: 0.9rem; color: var(--color-gray);">${sizeMB} MB</div>
+                    </div>
+                    <button type="button" onclick="clearFile()" class="btn btn-outline">Remove</button>
+                </div>
+            `;
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileList').innerHTML = '';
+        }
+
+        async function handleUpload(event) {
+            event.preventDefault();
+
+            if (!selectedFile) {
+                alert('Please select a file');
+                return;
+            }
+
+            const subjectId = document.getElementById('subjectSelect').value;
+            if (!subjectId) {
+                alert('Please select a subject');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('title', document.getElementById('lectureTitle').value);
+            formData.append('subject_id', subjectId);
+
+            try {
+                document.getElementById('progressContainer').style.display = 'block';
+                const response = await fetch('/lectures/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    alert('Lecture uploaded successfully!');
+                    window.location.href = 'dashboard.html';
+                } else {
+                    const error = await response.json();
+                    alert('Upload failed: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                document.getElementById('progressContainer').style.display = 'none';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem(TOKEN_KEY);
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
+                document.getElementById('progressContainer').style.display = 'none';
+            }
+        }
+
+        function logout() {
+            if (confirm('Logout?')) {
+                localStorage.removeItem(TOKEN_KEY);
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
+</body>
+</html>

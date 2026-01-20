@@ -1,317 +1,251 @@
 # 📁 Project File Structure
 
-Complete directory structure for MySmartNotes project.
+Simplified single-application directory structure for MySmartNotes.
 
-## Development Structure (Bare Metal)
+## Project Structure
 
-```text
+```
 /mysmartnotes
- ├── README.md                      # Project overview and quick start
- ├── .env.example                   # Environment variables template
- ├── .env                           # Local environment (gitignored)
- ├── .gitignore                     # Git ignore rules
- ├── requirements-dev.txt           # Development dependencies
- │
- ├── /docs                          # Documentation
- │    ├── ARCHITECTURE.md
- │    ├── FILE_STRUCTURE.md
- │    ├── DATABASE.md
- │    ├── DATA_STRUCTURES.md
- │    ├── ACTION_FLOWS.md
- │    ├── DEVELOPMENT.md
- │    ├── DEPLOYMENT.md
- │    ├── SECURITY.md
- │    ├── MONITORING.md
- │    ├── ADVANCED_FEATURES.md
- │    └── TROUBLESHOOTING.md
- │
- ├── /services                      # Microservices
- │    │
- │    ├── /frontend                 # Streamlit UI Service
- │    │    ├── app.py              # Main Streamlit application
- │    │    ├── requirements.txt    # Frontend dependencies
- │    │    ├── config.py           # Frontend configuration
- │    │    ├── /pages              # Streamlit pages
- │    │    │    ├── 01_dashboard.py
- │    │    │    ├── 02_revision.py
- │    │    │    ├── 03_tutor_chat.py
- │    │    │    ├── 04_quiz_zone.py
- │    │    │    └── 05_past_papers.py
- │    │    ├── /components         # Reusable UI components
- │    │    │    ├── sidebar.py
- │    │    │    ├── subject_panel.py
- │    │    │    ├── lecture_panel.py
- │    │    │    └── chat_interface.py
- │    │    └── /utils              # Frontend utilities
- │    │         ├── api_client.py  # API Gateway client
- │    │         ├── websocket_client.py
- │    │         └── session_manager.py
- │    │
- │    ├── /api_gateway              # FastAPI Gateway Service
- │    │    ├── main.py             # FastAPI application entry point
- │    │    ├── requirements.txt    # API dependencies
- │    │    ├── config.py           # API configuration
- │    │    ├── /routers            # API route handlers
- │    │    │    ├── __init__.py
- │    │    │    ├── auth.py        # Authentication endpoints
- │    │    │    ├── subjects.py    # Subject CRUD
- │    │    │    ├── lectures.py    # Lecture CRUD & upload
- │    │    │    ├── documents.py   # Generated documents
- │    │    │    ├── chat.py        # Chat endpoints
- │    │    │    ├── tasks.py       # Task status tracking
- │    │    │    └── share.py       # Share link management
- │    │    ├── /middleware         # Custom middleware
- │    │    │    ├── __init__.py
- │    │    │    ├── auth.py        # JWT authentication
- │    │    │    ├── cors.py        # CORS configuration
- │    │    │    ├── logging.py     # Request logging
- │    │    │    └── rate_limit.py  # Rate limiting
- │    │    ├── /websockets         # WebSocket handlers
- │    │    │    ├── __init__.py
- │    │    │    ├── connection_manager.py
- │    │    │    ├── chat_handler.py
- │    │    │    └── progress_handler.py
- │    │    └── /utils              # API utilities
- │    │         ├── validators.py
- │    │         ├── responses.py
- │    │         └── file_handler.py
- │    │
- │    ├── /workers                  # Celery Worker Service
- │    │    ├── celery_app.py       # Celery configuration
- │    │    ├── requirements.txt    # Worker dependencies
- │    │    ├── config.py           # Worker configuration
- │    │    ├── /tasks              # Celery tasks
- │    │    │    ├── __init__.py
- │    │    │    ├── ocr_tasks.py   # OCR and vision processing
- │    │    │    ├── ai_tasks.py    # LLM and embedding tasks
- │    │    │    ├── generation_tasks.py  # Document generation
- │    │    │    ├── search_tasks.py      # Web search tasks
- │    │    │    ├── quiz_tasks.py        # Quiz generation
- │    │    │    └── flashcard_tasks.py   # Flashcard generation
- │    │    ├── /processors         # Processing logic
- │    │    │    ├── __init__.py
- │    │    │    ├── pdf_processor.py
- │    │    │    ├── image_processor.py
- │    │    │    ├── layout_detector.py
- │    │    │    ├── ocr_engine.py
- │    │    │    └── text_cleaner.py
- │    │    └── /generators         # Document generators
- │    │         ├── __init__.py
- │    │         ├── cheat_sheet_generator.py
- │    │         ├── quiz_generator.py
- │    │         └── flashcard_generator.py
- │    │
- │    └── /shared                   # Shared code across services
- │         ├── __init__.py
- │         ├── models.py           # SQLAlchemy models
- │         ├── schemas.py          # Pydantic schemas
- │         ├── database.py         # Database connections
- │         ├── chroma_client.py    # ChromaDB client
- │         ├── redis_client.py     # Redis client
- │         ├── ollama_client.py    # Ollama client
- │         ├── utils.py            # Shared utilities
- │         ├── constants.py        # Application constants
- │         └── config.py           # Shared configuration
- │
- ├── /data                          # Persistent data (mounted as volumes)
- │    ├── /uploads                 # User uploads organized by subject
- │    │    └── <subject_id>/
- │    │         └── <lecture_id>/
- │    │              ├── original.pdf
- │    │              ├── /pages    # Extracted page images
- │    │              └── /figures  # Cropped diagrams
- │    ├── /generated               # Output documents
- │    │    └── <subject_id>/
- │    │         └── <lecture_id>/
- │    │              ├── cheat_sheet.docx
- │    │              ├── quiz.pdf
- │    │              └── flashcards.json
- │    ├── /chroma_db               # ChromaDB persistence
- │    │    └── <collection_id>/
- │    ├── /postgres_data           # PostgreSQL data (if running locally)
- │    ├── /redis_data              # Redis persistence
- │    └── /backups                 # Database backups
- │
- ├── /docker                        # Docker configuration
- │    ├── docker-compose.yml       # Full stack orchestration
- │    ├── docker-compose.dev.yml   # Development overrides
- │    ├── docker-compose.prod.yml  # Production overrides
- │    ├── docker-compose.infra.yml # Infrastructure only (Redis, PostgreSQL)
- │    ├── Dockerfile.frontend      # Frontend service image
- │    ├── Dockerfile.gateway       # API Gateway image
- │    ├── Dockerfile.worker        # Worker service image
- │    ├── nginx.conf               # Nginx configuration
- │    └── /ssl                     # SSL certificates (production)
- │
- ├── /scripts                       # Utility scripts
- │    ├── init_db.py               # Database initialization
- │    ├── migrate_db.py            # Database migrations
- │    ├── start_dev.sh             # Start all services locally
- │    ├── stop_dev.sh              # Stop all services
- │    ├── health_check.py          # Service health checks
- │    ├── backup_db.sh             # Backup databases
- │    ├── restore_db.sh            # Restore from backup
- │    └── seed_data.py             # Seed test data
- │
- ├── /tests                         # Test suite
- │    ├── __init__.py
- │    ├── conftest.py              # Pytest configuration
- │    ├── /unit                    # Unit tests
- │    │    ├── test_models.py
- │    │    ├── test_schemas.py
- │    │    ├── test_processors.py
- │    │    └── test_generators.py
- │    ├── /integration             # Integration tests
- │    │    ├── test_api_endpoints.py
- │    │    ├── test_workflows.py
- │    │    └── test_websockets.py
- │    └── /fixtures                # Test fixtures
- │         ├── sample.pdf
- │         ├── sample.pptx
- │         └── test_data.json
- │
- └── /logs                          # Application logs (gitignored)
-      ├── frontend.log
-      ├── api_gateway.log
-      ├── celery_worker.log
-      └── /archived                # Archived logs
+├── README.md                           # Quick start & overview
+├── requirements.txt                    # Python dependencies
+├── main.py                             # Entry point - run this!
+├── config.py                           # Configuration & environment
+├── .env.example                        # Environment template
+├── .gitignore                          # Git ignore rules
+├── Dockerfile                          # Docker image definition
+├── docker-compose.yml                  # Single-service compose file
+│
+├── /docs                               # Documentation
+│   ├── INDEX.md
+│   ├── ARCHITECTURE.md
+│   ├── DATABASE.md
+│   ├── DEVELOPMENT.md
+│   ├── DEPLOYMENT.md
+│   ├── FILE_STRUCTURE.md
+│   ├── RESOURCE_REQUIREMENTS.md
+│   ├── TROUBLESHOOTING.md
+│   ├── ACTION_FLOWS.md
+│   ├── ADVANCED_FEATURES.md
+│   ├── SECURITY.md
+│   ├── MONITORING.md
+│   └── DATA_STRUCTURES.md
+│
+├── /app                                # Application code
+│   ├── __init__.py
+│   ├── main.py                        # FastAPI app
+│   ├── config.py                      # Settings
+│   │
+│   ├── /routers                       # API endpoints
+│   │   ├── __init__.py
+│   │   ├── auth.py                    # Login/register
+│   │   ├── subjects.py                # Subject CRUD
+│   │   ├── lectures.py                # Lecture upload
+│   │   ├── documents.py               # Document generation
+│   │   ├── chat.py                    # Chat interface
+│   │   └── tasks.py                   # Task status
+│   │
+│   ├── /models                        # Database models (SQLAlchemy)
+│   │   ├── __init__.py
+│   │   └── db.py                      # All ORM models
+│   │
+│   ├── /schemas                       # Request/response schemas (Pydantic)
+│   │   ├── __init__.py
+│   │   └── schemas.py                 # All data models
+│   │
+│   ├── /processing                    # Core logic
+│   │   ├── __init__.py
+│   │   ├── ocr.py                     # PDF/PPTX processing, OCR
+│   │   ├── ai_client.py               # Gemini/HF API calls
+│   │   ├── embeddings.py              # Vector embeddings (sentence-transformers)
+│   │   ├── generators.py              # Document generation (docx, pdf)
+│   │   └── search.py                  # Web search (DuckDuckGo)
+│   │
+│   ├── /utils                         # Utility functions
+│   │   ├── __init__.py
+│   │   ├── db.py                      # Database session management
+│   │   ├── auth.py                    # JWT token utilities
+│   │   ├── tasks.py                   # Background task queue
+│   │   ├── websocket.py               # WebSocket connection manager
+│   │   └── file_handler.py            # File upload/download utilities
+│   │
+│   └── /static                        # Frontend assets
+│       ├── index.html                 # Main page
+│       ├── style.css                  # Styling
+│       ├── app.js                     # Frontend logic
+│       └── /assets                    # Images, icons, fonts
+│           ├── logo.png
+│           ├── favicon.ico
+│           └── ...
+│
+├── /data (Docker volume)              # Runtime data (created automatically)
+│   ├── app.db                         # SQLite database
+│   ├── /uploads                       # User uploaded files
+│   │   └── lecture_<id>/
+│   │       ├── original.pdf
+│   │       └── /pages                 # Extracted page images
+│   ├── /generated                     # Generated documents
+│   │   └── cheat_sheet_<timestamp>.docx
+│   ├── /embeddings                    # Vector embedding backups
+│   │   └── lecture_<id>.json
+│   └── /backups                       # Database backups
+│       └── app_<date>.db
+│
+├── /scripts                           # Utility scripts
+│   ├── init_db.py                     # Initialize database
+│   ├── backup_db.py                   # Backup database
+│   ├── seed_data.py                   # Add test data
+│   └── health_check.py                # Verify service is running
+│
+├── /tests                             # Test suite
+│   ├── __init__.py
+│   ├── conftest.py                    # Pytest configuration
+│   ├── /unit                          # Unit tests
+│   │   ├── test_models.py
+│   │   ├── test_schemas.py
+│   │   ├── test_processing.py
+│   │   └── test_api.py
+│   ├── /integration                   # Integration tests
+│   │   ├── test_upload_workflow.py
+│   │   ├── test_chat.py
+│   │   └── test_document_generation.py
+│   └── /fixtures                      # Test data
+│       ├── sample.pdf
+│       ├── sample.pptx
+│       └── test_data.json
+│
+└── /logs                              # Application logs (gitignored)
+    └── app.log
 ```
 
-## Docker Container Structure
+## Quick Start
 
-When running in Docker, the file structure is mapped as follows:
+```bash
+# Local development
+python main.py
 
-```
-Container Volumes:
-  nginx:
-    - ./docker/nginx.conf → /etc/nginx/nginx.conf
-    - ./data/generated → /usr/share/nginx/html/downloads
+# Docker
+docker-compose up
 
-  frontend:
-    - ./services/frontend → /app (code)
-    - ./services/shared → /app/shared
-
-  api_gateway:
-    - ./services/api_gateway → /app (code)
-    - ./services/shared → /app/shared
-    - ./data/uploads → /data/uploads
-
-  celery_worker:
-    - ./services/workers → /app (code)
-    - ./services/shared → /app/shared
-    - ./data → /data (full access for processing)
-
-  postgres:
-    - postgres_data → /var/lib/postgresql/data (named volume)
-
-  redis:
-    - redis_data → /data (named volume)
-
-  chroma:
-    - ./data/chroma_db → /chroma/chroma
-
-  ollama:
-    - ollama_models → /root/.ollama (named volume)
-```
-
-## File Naming Conventions
-
-### Upload Files
-```
-Format: <subject_id>/<lecture_id>/<filename>
-Example: 123/456/original.pdf
-```
-
-### Generated Documents
-```
-Format: <subject_id>/<lecture_id>/<document_type>_<timestamp>.<ext>
-Example: 123/456/cheat_sheet_20260113_143022.docx
-```
-
-### Cropped Figures
-```
-Format: slide_<page_number>_fig_<figure_number>.png
-Example: slide_05_fig_02.png
-```
-
-### Log Files
-```
-Format: <service_name>_<date>.log
-Example: celery_worker_20260113.log
+# Docker (production)
+docker run -p 8000:8000 -v $(pwd)/data:/app/data -e GEMINI_API_KEY=$KEY mysmartnotes
 ```
 
 ## Important Paths
 
-| Path | Purpose | Access |
-|------|---------|--------|
-| `/data/uploads` | User uploaded files | API Gateway, Workers |
-| `/data/generated` | Generated documents | Workers, nginx |
-| `/data/chroma_db` | Vector embeddings | Workers, API Gateway |
-| `/services/shared` | Shared code | All services |
-| `/logs` | Application logs | All services |
-| `/scripts` | Utility scripts | Host machine |
+| Path | Purpose | Example |
+|------|---------|---------|
+| `/app` | Main application code | All Python code here |
+| `/app/static` | Frontend (HTML/CSS/JS) | Served at `/static/` |
+| `/data/app.db` | SQLite database | Single file database |
+| `/data/uploads` | User uploaded files | PDF, PPTX files |
+| `/data/generated` | Generated documents | DOCX, PDF, JSON files |
+| `/data/embeddings` | Embedding cache | JSON backups |
+| `/data/backups` | Database backups | SQLite backups |
 
-## Environment-Specific Paths
+## File Naming Conventions
 
-### Development (Bare Metal)
-```bash
-# Services run from their respective directories
-cd services/frontend && streamlit run app.py
-cd services/api_gateway && uvicorn main:app
-cd services/workers && celery -A celery_app worker
-
-# Data stored in project root
-./data/uploads
-./data/generated
+### Database File
+```
+app.db                          # Single SQLite database
 ```
 
-### Production (Docker)
-```bash
-# Services run in containers
-# Data stored in Docker volumes
-docker volume ls  # View all volumes
-docker-compose exec api_gateway ls /data/uploads  # Access from container
+### Uploaded Files
+```
+/data/uploads/lecture_<id>/original.pdf
+/data/uploads/lecture_<id>/pages/page_001.png
 ```
 
-## .gitignore Recommendations
+### Generated Documents
+```
+/data/generated/cheat_sheet_<lecture_id>_<timestamp>.docx
+/data/generated/quiz_<lecture_id>_<timestamp>.pdf
+/data/generated/flashcards_<lecture_id>_<timestamp>.json
+```
 
-```gitignore
+### Embedding Cache
+```
+/data/embeddings/lecture_<id>.json
+```
+
+### Logs
+```
+/logs/app.log                   # Main application log
+```
+
+## Environment Variables (.env)
+
+```bash
+# Server
+DATABASE_URL=sqlite:///./data/app.db
+JWT_SECRET_KEY=your-secret-key-here
+JWT_ALGORITHM=HS256
+
+# External APIs
+GEMINI_API_KEY=your-gemini-key
+HUGGINGFACE_API_KEY=your-hf-key  # Optional alternative
+
+# File paths
+UPLOAD_PATH=/data/uploads
+GENERATED_PATH=/data/generated
+EMBEDDINGS_PATH=/data/embeddings
+
+# Server settings
+HOST=0.0.0.0
+PORT=8000
+DEBUG=False
+WORKERS=4
+```
+
+## .gitignore
+
+```
 # Environment
 .env
-*.env
+.env.local
 !.env.example
 
 # Data
-/data/*
-!/data/.gitkeep
+/data/
+!data/.gitkeep
 
 # Logs
-/logs/*
-!/logs/.gitkeep
+/logs/
+*.log
 
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
+.venv/
 venv/
-env/
 
 # IDE
 .vscode/
 .idea/
 *.swp
-*.swo
-
-# Docker
-.dockerignore
 
 # OS
 .DS_Store
-Thumbs.db
-
-# Backups
-*.bak
-*.backup
 ```
+
+## Single File Execution
+
+The entire application runs from a single command:
+
+```bash
+python main.py
+```
+
+This:
+1. Initializes the SQLite database (if needed)
+2. Starts FastAPI server on port 8000
+3. Loads LLM API credentials
+4. Prepares background task executor
+5. Serves static frontend files
+6. Opens WebSocket for real-time updates
+
+**No need to start separate services!**
+
+---
+
+For architecture details, see [ARCHITECTURE.md](ARCHITECTURE.md).  
+For development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).

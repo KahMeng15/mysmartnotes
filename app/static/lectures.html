@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Lectures - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .lectures-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: var(--spacing-lg);
+            margin-top: var(--spacing-lg);
+        }
+
+        .lecture-card {
+            cursor: pointer;
+            position: relative;
+        }
+
+        .lecture-thumbnail {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-size-4xl);
+        }
+
+        .lecture-card-body {
+            padding: var(--spacing-lg);
+        }
+
+        .lecture-title {
+            font-weight: 600;
+            margin-bottom: var(--spacing-sm);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .lecture-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: var(--font-size-sm);
+            color: var(--color-gray);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .lecture-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+            flex-wrap: wrap;
+        }
+
+        .filter-select {
+            min-width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <ul class="navbar-nav">
+                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                    <li><a href="lectures.html" class="nav-link active">My Lectures</a></li>
+                    <li><a href="chat.html" class="nav-link">Chat</a></li>
+                    <li><a href="settings.html" class="nav-link">Settings</a></li>
+                </ul>
+                <div class="avatar" onclick="logout()">👤</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <div class="container" style="padding-top: var(--spacing-2xl);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-lg);">
+            <h1>My Lectures</h1>
+            <a href="upload.html" class="btn btn-primary">+ Upload Lecture</a>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-bar">
+            <select id="subjectFilter" onchange="filterLectures()" class="filter-select">
+                <option value="">All Subjects</option>
+            </select>
+            <input type="text" id="searchInput" placeholder="Search lectures..." onkeyup="filterLectures()" style="flex: 1; min-width: 200px;">
+            <select id="sortSelect" onchange="filterLectures()" class="filter-select">
+                <option value="recent">Most Recent</option>
+                <option value="oldest">Oldest First</option>
+                <option value="name">Name (A-Z)</option>
+            </select>
+        </div>
+
+        <!-- Lectures Grid -->
+        <div class="lectures-grid" id="lecturesGrid">
+            <div style="grid-column: 1/-1; text-align: center; padding: var(--spacing-2xl); color: var(--color-gray);">
+                <p>Loading lectures...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        const token = localStorage.getItem('token');
+        let allLectures = [];
+
+        window.addEventListener('load', () => {
+            if (!token) window.location.href = 'index.html';
+            loadLectures();
+            loadSubjects();
+        });
+
+        async function loadLectures() {
+            try {
+                const response = await fetch(`${API_URL}/lectures`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    allLectures = await response.json();
+                    displayLectures(allLectures);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('lecturesGrid').innerHTML = '<div style="grid-column: 1/-1;">Error loading lectures</div>';
+            }
+        }
+
+        async function loadSubjects() {
+            try {
+                const response = await fetch(`${API_URL}/subjects`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const subjects = await response.json();
+                    const select = document.getElementById('subjectFilter');
+                    subjects.forEach(subject => {
+                        const option = document.createElement('option');
+                        option.value = subject.id;
+                        option.textContent = subject.name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function filterLectures() {
+            let filtered = allLectures;
+
+            // Subject filter
+            const subjectId = document.getElementById('subjectFilter').value;
+            if (subjectId) {
+                filtered = filtered.filter(l => l.subject_id == subjectId);
+            }
+
+            // Search
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            if (search) {
+                filtered = filtered.filter(l => l.title.toLowerCase().includes(search));
+            }
+
+            // Sort
+            const sort = document.getElementById('sortSelect').value;
+            if (sort === 'recent') {
+                filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            } else if (sort === 'oldest') {
+                filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            } else if (sort === 'name') {
+                filtered.sort((a, b) => a.title.localeCompare(b.title));
+            }
+
+            displayLectures(filtered);
+        }
+
+        function displayLectures(lectures) {
+            const grid = document.getElementById('lecturesGrid');
+            if (!lectures || lectures.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: var(--spacing-2xl); color: var(--color-gray);">
+                        <p>No lectures found. <a href="upload.html" style="color: var(--color-primary);">Upload your first lecture</a></p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = lectures.map(lecture => `
+                <div class="card lecture-card">
+                    <div class="lecture-thumbnail">📄</div>
+                    <div class="lecture-card-body">
+                        <div class="lecture-title">${lecture.title}</div>
+                        <div class="lecture-meta">
+                            <span>${lecture.file_type || 'PDF'}</span>
+                            <span>${new Date(lecture.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <div class="lecture-actions">
+                            <button onclick="openLecture(${lecture.id})" class="btn btn-primary btn-small" style="flex: 1;">Open</button>
+                            <button onclick="deleteLecture(${lecture.id})" class="btn btn-secondary btn-small">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openLecture(id) {
+            window.location.href = `lecture.html?id=${id}`;
+        }
+
+        async function deleteLecture(id) {
+            if (!confirm('Delete this lecture?')) return;
+            try {
+                const response = await fetch(`${API_URL}/lectures/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    loadLectures();
+                }
+            } catch (error) {
+                alert('Error deleting lecture');
+            }
+        }
+
+        function logout() {
+            if (confirm('Logout?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
+</body>
+</html>

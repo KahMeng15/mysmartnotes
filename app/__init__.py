@@ -1,0 +1,1 @@
+"""MySmartNotes App"""

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .stat-box {
+            background: white;
+            border: 1px solid var(--color-light-gray);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            text-align: center;
+        }
+
+        .stat-icon {
+            font-size: 32px;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .stat-value {
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .stat-label {
+            font-size: var(--font-size-sm);
+            color: var(--color-gray);
+        }
+
+        .chart-container {
+            background: white;
+            border: 1px solid var(--color-light-gray);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-2xl);
+            position: relative;
+            height: 300px;
+        }
+
+        .chart-title {
+            font-weight: 600;
+            margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--color-light-gray);
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-2xl);
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: var(--spacing-sm) var(--spacing-md);
+            border: 1px solid var(--color-light-gray);
+            background: white;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all var(--transition-base);
+        }
+
+        .filter-btn.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+
+        .progress-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--spacing-md) 0;
+            border-bottom: 1px solid var(--color-light-gray);
+        }
+
+        .progress-item:last-child {
+            border-bottom: none;
+        }
+
+        .progress-label {
+            flex: 1;
+        }
+
+        .progress-bar-sm {
+            height: 6px;
+            background: var(--color-light-gray);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            margin: var(--spacing-xs) 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+            border-radius: var(--radius-full);
+        }
+
+        .subject-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: var(--spacing-lg);
+        }
+
+        .subject-card {
+            background: white;
+            border: 1px solid var(--color-light-gray);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition-base);
+        }
+
+        .subject-card:hover {
+            border-color: var(--color-primary);
+            box-shadow: var(--shadow-md);
+        }
+
+        .subject-emoji {
+            font-size: 40px;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .subject-name {
+            font-weight: 600;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .subject-meta {
+            font-size: var(--font-size-sm);
+            color: var(--color-gray);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <ul class="navbar-nav">
+                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                    <li><a href="lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="chat.html" class="nav-link">Chat</a></li>
+                    <li><a href="settings.html" class="nav-link">Settings</a></li>
+                </ul>
+                <div class="avatar" onclick="logout()">👤</div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <div class="container" style="padding-top: var(--spacing-2xl); padding-bottom: var(--spacing-2xl);">
+        <h1 style="margin-bottom: var(--spacing-lg);">Learning Analytics</h1>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <button class="filter-btn active" onclick="filterBy('week')">This Week</button>
+            <button class="filter-btn" onclick="filterBy('month')">This Month</button>
+            <button class="filter-btn" onclick="filterBy('all')">All Time</button>
+        </div>
+
+        <!-- Key Stats -->
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-icon">📚</div>
+                <div class="stat-value">24</div>
+                <div class="stat-label">Total Lectures</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-icon">⏱️</div>
+                <div class="stat-value">12.5h</div>
+                <div class="stat-label">Study Time</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-icon">✅</div>
+                <div class="stat-value">92%</div>
+                <div class="stat-label">Avg Quiz Score</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-value">7</div>
+                <div class="stat-label">Day Streak</div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--spacing-lg); margin-bottom: var(--spacing-2xl);">
+            <!-- Study Time Chart -->
+            <div class="chart-container">
+                <div class="chart-title">📊 Study Time by Day</div>
+                <canvas id="studyTimeChart"></canvas>
+            </div>
+
+            <!-- Quiz Performance Chart -->
+            <div class="chart-container">
+                <div class="chart-title">📈 Quiz Performance</div>
+                <canvas id="quizChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Subject Performance -->
+        <div class="chart-container" style="height: auto;">
+            <div class="chart-title">📖 Subject Progress</div>
+            <div style="padding: var(--spacing-lg) 0;">
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Mathematics</div>
+                        <div class="progress-bar-sm">
+                            <div class="progress-fill" style="width: 85%;"></div>
+                        </div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-gray); margin-top: var(--spacing-xs);">8 lectures • 92% avg</div>
+                    </div>
+                </div>
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Physics</div>
+                        <div class="progress-bar-sm">
+                            <div class="progress-fill" style="width: 72%;"></div>
+                        </div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-gray); margin-top: var(--spacing-xs);">6 lectures • 87% avg</div>
+                    </div>
+                </div>
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Chemistry</div>
+                        <div class="progress-bar-sm">
+                            <div class="progress-fill" style="width: 65%;"></div>
+                        </div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-gray); margin-top: var(--spacing-xs);">5 lectures • 79% avg</div>
+                    </div>
+                </div>
+                <div class="progress-item">
+                    <div class="progress-label">
+                        <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Biology</div>
+                        <div class="progress-bar-sm">
+                            <div class="progress-fill" style="width: 58%;"></div>
+                        </div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-gray); margin-top: var(--spacing-xs);">5 lectures • 76% avg</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div style="background: white; border: 1px solid var(--color-light-gray); border-radius: var(--radius-lg); padding: var(--spacing-lg); margin-bottom: var(--spacing-2xl);">
+            <div class="chart-title">📅 Recent Activity</div>
+            <div style="padding: var(--spacing-lg) 0;">
+                <div class="progress-item">
+                    <div>
+                        <div style="font-weight: 600;">Completed Quiz: Calculus</div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Today • 95% score</div>
+                    </div>
+                    <div style="color: var(--color-success); font-weight: 600;">✓</div>
+                </div>
+                <div class="progress-item">
+                    <div>
+                        <div style="font-weight: 600;">Studied: Linear Algebra</div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Yesterday • 1.5 hours</div>
+                    </div>
+                    <div style="color: var(--color-primary); font-weight: 600;">📚</div>
+                </div>
+                <div class="progress-item">
+                    <div>
+                        <div style="font-weight: 600;">Generated: Quantum Physics Notes</div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-gray);">2 days ago</div>
+                    </div>
+                    <div style="color: var(--color-secondary); font-weight: 600;">📄</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Options -->
+        <div style="text-align: center; padding: var(--spacing-lg);">
+            <button onclick="exportPDF()" class="btn btn-outline" style="margin-right: var(--spacing-md);">📥 Export as PDF</button>
+            <button onclick="shareProgress()" class="btn btn-outline">📤 Share Progress</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const API_URL = '';
+        const token = localStorage.getItem('token');
+
+        window.addEventListener('load', () => {
+            if (!token) window.location.href = 'index.html';
+            initializeCharts();
+        });
+
+        function initializeCharts() {
+            // Study Time Chart
+            const studyCtx = document.getElementById('studyTimeChart').getContext('2d');
+            new Chart(studyCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Study Hours',
+                        data: [2, 2.5, 1.8, 3, 2.2, 1.5, 0],
+                        borderColor: '#4ECDC4',
+                        backgroundColor: 'rgba(78, 205, 196, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#999' }
+                        },
+                        x: {
+                            ticks: { color: '#999' }
+                        }
+                    }
+                }
+            });
+
+            // Quiz Performance Chart
+            const quizCtx = document.getElementById('quizChart').getContext('2d');
+            new Chart(quizCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                    datasets: [{
+                        label: 'Average Score (%)',
+                        data: [82, 88, 92, 95],
+                        backgroundColor: '#FF6B6B'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { color: '#999' }
+                        },
+                        x: {
+                            ticks: { color: '#999' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function filterBy(period) {
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            // Reload analytics for selected period
+        }
+
+        function exportPDF() {
+            alert('Export to PDF coming soon');
+        }
+
+        function shareProgress() {
+            alert('Share progress feature coming soon');
+        }
+
+        function logout() {
+            if (confirm('Logout?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
+</body>
+</html>
