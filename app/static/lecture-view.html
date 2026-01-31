@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lecture View - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .lecture-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: var(--spacing-2xl);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .lecture-header h1 {
+            margin: 0 0 var(--spacing-md) 0;
+            font-size: 2rem;
+        }
+
+        .lecture-meta {
+            display: flex;
+            gap: var(--spacing-2xl);
+            flex-wrap: wrap;
+            font-size: var(--font-size-sm);
+            opacity: 0.9;
+        }
+
+        .lecture-meta-item {
+            display: flex;
+            gap: var(--spacing-md);
+            align-items: center;
+        }
+
+        .lecture-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: var(--spacing-2xl);
+        }
+
+        .lecture-main {
+            min-width: 0;
+        }
+
+        .lecture-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-lg);
+        }
+
+        .section-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            border: 1px solid var(--color-border);
+        }
+
+        .section-title {
+            font-weight: 600;
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .extracted-text {
+            line-height: 1.6;
+            color: var(--color-text);
+            max-height: 500px;
+            overflow-y: auto;
+            padding: var(--spacing-md);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
+        }
+
+        .extracted-text-preview {
+            color: var(--color-gray);
+            font-size: var(--font-size-xs);
+            margin-top: var(--spacing-md);
+        }
+
+        .sidebar-item {
+            padding: var(--spacing-lg);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+        }
+
+        .sidebar-label {
+            font-size: var(--font-size-xs);
+            color: var(--color-gray);
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .sidebar-value {
+            font-weight: 500;
+            color: var(--color-text);
+            word-break: break-word;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: var(--spacing-md);
+        }
+
+        .action-buttons .btn {
+            flex: 1;
+        }
+
+        @media (max-width: 968px) {
+            .lecture-content {
+                grid-template-columns: 1fr;
+            }
+
+            .lecture-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .lecture-meta {
+                flex-direction: column;
+                gap: var(--spacing-md);
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: var(--spacing-2xl);
+            color: var(--color-gray);
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-md);
+            border-left: 4px solid #c33;
+        }
+
+        .progress-container {
+            padding: var(--spacing-lg);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            margin: var(--spacing-md) 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-primary-dark));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-full);
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-running { background: #d1ecf1; color: #0c5460; }
+        .status-completed { background: #d4edda; color: #155724; }
+        .status-failed { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <ul class="navbar-nav">
+                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                    <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="upload.html" class="nav-link">Upload</a></li>
+                    <li><a href="chat.html" class="nav-link">Chat</a></li>
+                </ul>
+                <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
+                    <a href="settings.html" class="nav-link">Settings</a>
+                    <div class="avatar" onclick="logout()">👤</div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container">
+        <a href="my-lectures.html" style="color: var(--color-primary); margin-top: var(--spacing-xl); margin-bottom: var(--spacing-lg); display: inline-block;">← Back to Lectures</a>
+
+        <div id="loadingContainer" class="loading">
+            <div style="font-size: 2rem; margin-bottom: var(--spacing-md);">📖</div>
+            <p>Loading lecture...</p>
+        </div>
+
+        <div id="lectureContainer" style="display: none;">
+            <!-- Lecture Header -->
+            <div class="lecture-header">
+                <h1 id="lectureTitle">Lecture Title</h1>
+                <div class="lecture-meta">
+                    <div class="lecture-meta-item">
+                        <span>📁</span>
+                        <span id="lectureDate">Date</span>
+                    </div>
+                    <div class="lecture-meta-item">
+                        <span>💾</span>
+                        <span id="lectureSize">Size</span>
+                    </div>
+                    <div class="lecture-meta-item">
+                        <span>📄</span>
+                        <span id="lectureType">Type</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="lecture-content">
+                <!-- Main Content -->
+                <div class="lecture-main">
+                    <div class="section-card">
+                        <div class="section-title">📝 Extracted Text</div>
+                        
+                        <!-- Status Badge -->
+                        <div id="extractionStatus" style="display: none;">
+                            <div id="statusBadge" class="status-badge status-pending">Pending</div>
+                        </div>
+
+                        <!-- Progress Container -->
+                        <div id="progressContainer" style="display: none;" class="progress-container">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                                <span style="font-weight: 600; font-size: var(--font-size-sm);">Processing lecture...</span>
+                                <span id="progressPercent" style="font-size: var(--font-size-sm); color: var(--color-gray);">0%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="progressFill" class="progress-fill"></div>
+                            </div>
+                            <p id="progressMessage" style="font-size: var(--font-size-xs); color: var(--color-gray); margin: 0;">Extracting text from document...</p>
+                        </div>
+
+                        <!-- Error Container -->
+                        <div id="errorContainer" style="display: none;">
+                            <div class="error-message">
+                                <strong>⚠️ Processing Failed</strong>
+                                <p id="errorDetails" style="margin: var(--spacing-md) 0 0 0; font-size: var(--font-size-sm);">Failed to extract text from document</p>
+                            </div>
+                        </div>
+
+                        <!-- Extracted Text -->
+                        <div id="extractedText" class="extracted-text">
+                            <p style="color: var(--color-gray); text-align: center; padding: var(--spacing-lg);">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="lecture-sidebar">
+                    <!-- Quick Info -->
+                    <div class="section-card">
+                        <div class="section-title">ℹ️ Info</div>
+                        <div class="sidebar-item">
+                            <div class="sidebar-label">File Name</div>
+                            <div class="sidebar-value" id="fileName">-</div>
+                        </div>
+                        <div class="sidebar-item" style="margin-top: var(--spacing-md);">
+                            <div class="sidebar-label">Subject</div>
+                            <div class="sidebar-value" id="subjectName">-</div>
+                        </div>
+                        <div class="sidebar-item" style="margin-top: var(--spacing-md);">
+                            <div class="sidebar-label">Uploaded</div>
+                            <div class="sidebar-value" id="uploadedDate">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="section-card">
+                        <div class="section-title">⚡ Actions</div>
+                        <div class="action-buttons">
+                            <button class="btn btn-primary" onclick="generateFlashcards()">📇 Flashcards</button>
+                        </div>
+                        <div class="action-buttons" style="margin-top: var(--spacing-md);">
+                            <button class="btn btn-outline" onclick="deleteLecture()">🗑️ Delete</button>
+                        </div>
+                    </div>
+
+                    <!-- Chat Section -->
+                    <div class="section-card">
+                        <div class="section-title">💬 Quick Chat</div>
+                        <div id="chatPreview" style="font-size: var(--font-size-sm); color: var(--color-gray); padding: var(--spacing-md); background: var(--color-background); border-radius: var(--radius-md); margin-bottom: var(--spacing-md); max-height: 200px; overflow-y: auto;">
+                            <p style="text-align: center;">No messages yet</p>
+                        </div>
+                        <form onsubmit="sendMessage(event)" style="display: flex; gap: var(--spacing-sm);">
+                            <input type="text" id="chatInput" placeholder="Ask about this lecture..." style="flex: 1; padding: var(--spacing-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-sm);">
+                            <button type="submit" class="btn btn-primary" style="width: auto; padding: 0 var(--spacing-lg);">Send</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="errorContainer" style="display: none; margin-top: var(--spacing-2xl);">
+            <div class="error-message" id="errorMessage">Error loading lecture</div>
+        </div>
+    </div>
+
+    <script>
+        const TOKEN_KEY = 'token';
+        const token = localStorage.getItem(TOKEN_KEY);
+        let lectureId = null;
+        let lectureData = null;
+        let pollingInterval = null;
+
+        window.addEventListener('load', () => {
+            if (!token) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            lectureId = params.get('id');
+
+            if (!lectureId) {
+                showError('No lecture ID provided');
+                return;
+            }
+
+            loadLecture();
+        });
+
+        async function loadLecture() {
+            try {
+                const response = await fetch(`/lectures/${lectureId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load lecture');
+                }
+
+                lectureData = await response.json();
+                displayLecture();
+                checkExtractionStatus();
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        function displayLecture() {
+            document.getElementById('loadingContainer').style.display = 'none';
+            document.getElementById('lectureContainer').style.display = 'block';
+
+            document.getElementById('lectureTitle').textContent = lectureData.title;
+            document.getElementById('lectureDate').textContent = new Date(lectureData.created_at).toLocaleDateString();
+            document.getElementById('lectureSize').textContent = (lectureData.file_size / 1024 / 1024).toFixed(2) + ' MB';
+            document.getElementById('lectureType').textContent = lectureData.file_type.toUpperCase();
+
+            document.getElementById('fileName').textContent = lectureData.file_name;
+            document.getElementById('subjectName').textContent = lectureData.subject?.name || 'Unknown';
+            document.getElementById('uploadedDate').textContent = new Date(lectureData.created_at).toLocaleDateString();
+
+            updateExtractedText();
+        }
+
+        function updateExtractedText() {
+            const textContainer = document.getElementById('extractedText');
+            if (lectureData.extracted_text) {
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('errorContainer').style.display = 'none';
+                document.getElementById('extractionStatus').style.display = 'none';
+                textContainer.innerHTML = `<p>${lectureData.extracted_text.replace(/\n/g, '<br>')}</p>`;
+                if (pollingInterval) clearInterval(pollingInterval);
+            }
+        }
+
+        async function checkExtractionStatus() {
+            if (lectureData.extracted_text) {
+                console.log('✅ Extracted text already exists');
+                return;
+            }
+
+            try {
+                console.log(`📡 Checking extraction status for lecture ${lectureId}...`);
+                const response = await fetch(`/search/task?lecture_id=${lectureId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    const task = await response.json();
+                    console.log('📊 Task status:', task);
+                    document.getElementById('extractionStatus').style.display = 'block';
+                    
+                    if (task.status === 'pending') {
+                        console.log('⏳ Task is pending');
+                        showPending();
+                        startPolling();
+                    } else if (task.status === 'running') {
+                        console.log('⚙️ Task is running');
+                        showRunning();
+                        startPolling();
+                    } else if (task.status === 'completed') {
+                        console.log('✅ Task completed, reloading lecture...');
+                        reloadLecture();
+                    } else if (task.status === 'failed') {
+                        console.log('❌ Task failed');
+                        showFailed();
+                    }
+                } else {
+                    console.warn(`⚠️ Task endpoint returned status ${response.status}`);
+                }
+            } catch (error) {
+                console.error('❌ Error checking task status:', error);
+            }
+        }
+
+        function showPending() {
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('errorContainer').style.display = 'none';
+            document.getElementById('statusBadge').textContent = 'Pending';
+            document.getElementById('statusBadge').className = 'status-badge status-pending';
+            document.getElementById('progressPercent').textContent = '5%';
+            document.getElementById('progressFill').style.width = '5%';
+            document.getElementById('progressMessage').textContent = 'Waiting to process...';
+        }
+
+        function showRunning() {
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('errorContainer').style.display = 'none';
+            document.getElementById('statusBadge').textContent = 'Processing';
+            document.getElementById('statusBadge').className = 'status-badge status-running';
+            document.getElementById('progressPercent').textContent = '50%';
+            document.getElementById('progressFill').style.width = '50%';
+            document.getElementById('progressMessage').textContent = 'Extracting text from document...';
+        }
+
+        function showFailed() {
+            document.getElementById('progressContainer').style.display = 'none';
+            document.getElementById('errorContainer').style.display = 'block';
+            document.getElementById('statusBadge').textContent = 'Failed';
+            document.getElementById('statusBadge').className = 'status-badge status-failed';
+            document.getElementById('errorDetails').textContent = 'Text extraction failed. Please try re-uploading the lecture.';
+            if (pollingInterval) clearInterval(pollingInterval);
+        }
+
+        function startPolling() {
+            pollingInterval = setInterval(pollStatus, 2000);
+        }
+
+        async function pollStatus() {
+            try {
+                console.log(`🔄 Polling task status for lecture ${lectureId}...`);
+                const response = await fetch(`/search/task?lecture_id=${lectureId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    const task = await response.json();
+                    console.log('📊 Poll result:', task);
+
+                    if (task.status === 'completed') {
+                        console.log('✅ Task completed during poll, reloading lecture...');
+                        clearInterval(pollingInterval);
+                        reloadLecture();
+                    } else if (task.status === 'failed') {
+                        console.log('❌ Task failed during poll');
+                        clearInterval(pollingInterval);
+                        showFailed();
+                    }
+                } else {
+                    console.warn(`⚠️ Poll returned status ${response.status}`);
+                }
+            } catch (error) {
+                console.error('❌ Error polling status:', error);
+            }
+        }
+
+        async function reloadLecture() {
+            try {
+                console.log(`🔄 Reloading lecture ${lectureId}...`);
+                const response = await fetch(`/lectures/${lectureId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    lectureData = await response.json();
+                    console.log('📚 Lecture reloaded:', lectureData);
+                    console.log('📝 Extracted text length:', lectureData.extracted_text?.length || 'NULL');
+                    
+                    updateExtractedText();
+                    document.getElementById('progressContainer').style.display = 'none';
+                    document.getElementById('errorContainer').style.display = 'none';
+                    document.getElementById('extractionStatus').style.display = 'none';
+                    
+                    if (lectureData.extracted_text) {
+                        console.log('✅ Text extraction successful!');
+                    } else {
+                        console.warn('⚠️ Lecture reloaded but extracted_text is still NULL');
+                    }
+                } else {
+                    console.error(`❌ Reload failed with status ${response.status}`);
+                }
+            } catch (error) {
+                console.error('❌ Error reloading lecture:', error);
+            }
+        }
+
+        async function generateFlashcards() {
+            if (!lectureId) return;
+
+            try {
+                const response = await fetch(`/documents/flashcards/${lectureId}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    alert('Flashcards generated! Redirecting...');
+                    window.location.href = 'flashcards.html';
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + (error.detail || 'Failed to generate flashcards'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function sendMessage(event) {
+            event.preventDefault();
+
+            const message = document.getElementById('chatInput').value.trim();
+            if (!message || !lectureId) return;
+
+            try {
+                const response = await fetch(`/chat/ask/${lectureId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ question: message })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('chatInput').value = '';
+                    
+                    const preview = document.getElementById('chatPreview');
+                    preview.innerHTML = `
+                        <div style="margin-bottom: var(--spacing-md); padding: var(--spacing-md); background: var(--color-primary); color: white; border-radius: var(--radius-md);">
+                            <strong>You:</strong> ${message}
+                        </div>
+                        <div style="padding: var(--spacing-md); background: #f0f0f0; border-radius: var(--radius-md);">
+                            <strong>Assistant:</strong> ${data.answer}
+                        </div>
+                    `;
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + (error.detail || 'Failed to send message'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('loadingContainer').style.display = 'none';
+            document.getElementById('lectureContainer').style.display = 'none';
+            document.getElementById('errorContainer').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        function logout() {
+            localStorage.removeItem(TOKEN_KEY);
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

@@ -16,13 +16,17 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    """Hash a password"""
-    return pwd_context.hash(password)
+    """Hash a password. Bcrypt has a 72-byte limit, so truncate."""
+    # Bcrypt has a 72-byte limit on password length
+    truncated = password[:72]
+    return pwd_context.hash(truncated)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify a password against its hash. Bcrypt has a 72-byte limit, so truncate."""
+    # Bcrypt has a 72-byte limit on password length
+    truncated = plain_password[:72]
+    return pwd_context.verify(truncated, hashed_password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

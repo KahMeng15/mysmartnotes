@@ -2,9 +2,14 @@
 import os
 import pytesseract
 from pdf2image import convert_from_path
-from pptx import Presentation
 from PIL import Image
 import logging
+
+try:
+    from pptx import Presentation
+    HAS_PPTX = True
+except ImportError:
+    HAS_PPTX = False
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +39,9 @@ class OCRProcessor:
     @staticmethod
     def extract_from_pptx(file_path: str) -> str:
         """Extract text from PowerPoint presentation"""
+        if not HAS_PPTX:
+            logger.error("python-pptx module not available. Install with: pip install python-pptx")
+            raise ImportError("python-pptx is not installed. Please install it with: pip install python-pptx")
         try:
             logger.info(f"Extracting text from PPTX: {file_path}")
             prs = Presentation(file_path)

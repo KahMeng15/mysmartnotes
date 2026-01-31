@@ -82,6 +82,8 @@ class Lecture(LectureBase):
     file_size: int
     file_name: str
     user_id: int
+    page_count: int = 0
+    extracted_text: str | None = None
     created_at: datetime
     updated_at: datetime
     

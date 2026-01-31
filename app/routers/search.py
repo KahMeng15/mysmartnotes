@@ -222,3 +222,64 @@ async def get_task_status(
         )
     
     return status_info
+
+
+@router.get("/task")
+async def get_lecture_task_status(
+    lecture_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get status of OCR task for a lecture"""
+    from app.utils.tasks import tasks_tracking
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Verify lecture belongs to user
+    lecture = db.query(Lecture).filter(
+        Lecture.id == lecture_id,
+        Lecture.user_id == current_user.id
+    ).first()
+    
+    if not lecture:
+        logger.warning(f"Lecture {lecture_id} not found for user {current_user.id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lecture not found"
+        )
+    
+    # Try to find task by lecture_id pattern (ocr_<user_id>_<lecture_id>_<hash>)
+    task_id_pattern = f"ocr_{current_user.id}_{lecture_id}"
+    logger.info(f"Looking for task matching pattern: {task_id_pattern}")
+    logger.info(f"Active tasks in tracking: {list(tasks_tracking.keys())}")
+    
+    # Get all tasks and find one matching this pattern
+    status_info = None
+    for key in tasks_tracking:
+        if key.startswith(task_id_pattern):
+            status_info = tasks_tracking[key]
+            logger.info(f"Found active task: {key} with status: {status_info}")
+            break
+    
+    if status_info:
+        logger.info(f"Returning active task status: {status_info}")
+        return status_info
+    
+    # No active task
+    logger.info(f"No active task. Lecture extracted_text: {'EXISTS' if lecture.extracted_text else 'NULL'}")
+    if lecture.extracted_text:
+        # Text exists, extraction is complete
+        logger.info(f"Text exists, returning completed status")
+        return {
+            "task_id": None,
+            "status": "completed",
+            "progress": 100
+        }
+    else:
+        # No text and no active task - return pending status (not completed!)
+        logger.warning(f"No text and no active task! Returning pending status to retry")
+        return {
+            "task_id": None,
+            "status": "pending",
+            "progress": 0
+        }

@@ -120,38 +120,59 @@ async def upload_lecture(
         try:
             # Lazy import to avoid startup issues
             from app.utils.tasks import OCRTask
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            logger.info(f"Starting OCR processing for lecture {lecture_id}, file: {file_path}")
             
             # Extract text
             ocr_result = OCRTask.process_file(file_path)
             extracted_text = ocr_result.get("extracted_text", "")
             chunks = ocr_result.get("chunks", [])
             
+            logger.info(f"OCR extracted {len(extracted_text)} characters in {len(chunks)} chunks")
+            
             # Update lecture with extracted text
-            db_session = db.session
-            lecture = db_session.query(Lecture).filter(Lecture.id == lecture_id).first()
-            if lecture:
-                lecture.extracted_text = extracted_text
-                db_session.commit()
+            from app.utils.db import SessionLocal
+            db_session = SessionLocal()
+            try:
+                lecture = db_session.query(Lecture).filter(Lecture.id == lecture_id).first()
+                if lecture:
+                    lecture.extracted_text = extracted_text
+                    db_session.commit()
+                    logger.info(f"Successfully saved extracted text for lecture {lecture_id}")
+                else:
+                    logger.error(f"Lecture {lecture_id} not found")
+            finally:
+                db_session.close()
             
             # TODO: Generate and store embeddings
             # This would require saving embeddings to a separate table
             
             return {"status": "success", "extracted_text_length": len(extracted_text)}
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error processing lecture: {e}", exc_info=True)
             return {"status": "error", "error": str(e)}
     
     # Submit background task (lazy import)
     try:
         from app.utils.tasks import TaskManager
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Submitting OCR task {task_id} for lecture {db_lecture.id}")
         TaskManager.submit_task(
             task_id,
             process_lecture,
             db_lecture.id,
             file_path
         )
-    except ImportError:
-        # If tasks module unavailable, just skip background processing
-        pass
+        logger.info(f"OCR task {task_id} submitted successfully")
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error submitting OCR task: {e}", exc_info=True)
     
     # Return lecture with task info
     response = dict(db_lecture.__dict__)
@@ -166,6 +187,9 @@ async def get_lecture(
     db: Session = Depends(get_db)
 ):
     """Get a specific lecture"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     lecture = db.query(Lecture).filter(
         Lecture.id == lecture_id,
         Lecture.user_id == current_user.id
@@ -177,6 +201,7 @@ async def get_lecture(
             detail="Lecture not found"
         )
     
+    logger.info(f"GET lecture {lecture_id}: extracted_text length = {len(lecture.extracted_text) if lecture.extracted_text else 'NULL'}")
     return lecture
 
 

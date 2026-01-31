@@ -106,7 +106,7 @@
                 <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
-                    <li><a href="lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
                     <li><a href="chat.html" class="nav-link">Chat</a></li>
                     <li><a href="settings.html" class="nav-link">Settings</a></li>
                 </ul>
@@ -157,7 +157,7 @@
                 <div class="icon">📤</div>
                 <div style="font-weight: 600;">Upload Lecture</div>
             </a>
-            <a href="lectures.html" class="card action-btn" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-decoration: none;">
+            <a href="my-lectures.html" class="card action-btn" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-decoration: none;">
                 <div class="icon">📚</div>
                 <div style="font-weight: 600;">My Lectures</div>
             </a>
@@ -337,11 +337,11 @@
         }
 
         function selectSubject(id) {
-            window.location.href = `lectures.html?subject=${id}`;
+            window.location.href = `my-lectures.html?subject=${id}`;
         }
 
         function openLecture(id) {
-            window.location.href = `lecture.html?id=${id}`;
+            window.location.href = `lecture-view.html?id=${id}`;
         }
 
         function openModal(id) {

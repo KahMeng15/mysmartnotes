@@ -496,7 +496,6 @@ textarea {
   background: var(--color-white);
   border-radius: var(--radius-lg);
   padding: var(--spacing-2xl);
-  max-width: 500px;
   width: 90%;
   box-shadow: var(--shadow-xl);
 }

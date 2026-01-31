@@ -78,7 +78,7 @@
                 <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="lectures.html" class="nav-link active">My Lectures</a></li>
+                    <li><a href="my-lectures.html" class="nav-link active">My Lectures</a></li>
                     <li><a href="chat.html" class="nav-link">Chat</a></li>
                     <li><a href="settings.html" class="nav-link">Settings</a></li>
                 </ul>
@@ -219,7 +219,7 @@
         }
 
         function openLecture(id) {
-            window.location.href = `lecture.html?id=${id}`;
+            window.location.href = `lecture-view.html?id=${id}`;
         }
 
         async function deleteLecture(id) {
