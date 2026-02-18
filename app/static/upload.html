@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Lecture - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <style>
         .upload-area {
@@ -181,6 +184,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Navigation -->
     <nav class="navbar">
@@ -203,10 +207,13 @@
 
     <!-- Main Content -->
     <div class="container" style="padding-top: var(--spacing-2xl); max-width: 800px;">
-        <a href="dashboard.html" style="color: var(--color-primary); margin-bottom: var(--spacing-lg); display: inline-block;">← Back to Dashboard</a>
+        <a href="dashboard.html"
+            style="color: var(--color-primary); margin-bottom: var(--spacing-lg); display: inline-block;">← Back to
+            Dashboard</a>
 
         <h1 style="margin-bottom: var(--spacing-md);">Upload Lecture</h1>
-        <p style="color: var(--color-gray); margin-bottom: var(--spacing-2xl);">Upload your lecture slides or notes for processing</p>
+        <p style="color: var(--color-gray); margin-bottom: var(--spacing-2xl);">Upload your lecture slides or notes for
+            processing</p>
 
         <div class="card">
             <form id="uploadForm" onsubmit="handleUpload(event)">
@@ -219,7 +226,8 @@
                                 <option value="">Loading subjects...</option>
                             </select>
                         </div>
-                        <button type="button" class="btn-create-subject" onclick="showCreateSubjectModal()">+ New</button>
+                        <button type="button" class="btn-create-subject" onclick="showCreateSubjectModal()">+
+                            New</button>
                     </div>
                 </div>
 
@@ -232,14 +240,19 @@
                 <!-- File Upload -->
                 <div class="form-group">
                     <label>Upload File *</label>
-                    <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)"
+                        ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
+                        onclick="document.getElementById('fileInput').click()">
                         <div class="upload-icon">📁</div>
-                        <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Drag and drop your file here</div>
+                        <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Drag and drop your file here
+                        </div>
                         <div style="color: var(--color-gray); font-size: var(--font-size-sm);">or click to browse</div>
-                        <div style="color: var(--color-gray); font-size: var(--font-size-xs); margin-top: var(--spacing-md);">
+                        <div
+                            style="color: var(--color-gray); font-size: var(--font-size-xs); margin-top: var(--spacing-md);">
                             Supported: PDF, PPTX, PNG, JPG (Max 50MB)
                         </div>
-                        <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx,.png,.jpg,.jpeg" onchange="handleFileSelect(event)">
+                        <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx,.png,.jpg,.jpeg"
+                            onchange="handleFileSelect(event)">
                     </div>
                     <div id="fileList" class="file-list"></div>
                 </div>
@@ -255,7 +268,8 @@
                 <!-- Submit -->
                 <div style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-md);">
                     <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Upload Lecture</button>
-                    <a href="dashboard.html" class="btn btn-outline btn-block" style="text-decoration: none; text-align: center;">Cancel</a>
+                    <a href="dashboard.html" class="btn btn-outline btn-block"
+                        style="text-decoration: none; text-align: center;">Cancel</a>
                 </div>
             </form>
         </div>
@@ -318,7 +332,7 @@
 
         async function createSubject(event) {
             event.preventDefault();
-            
+
             const name = document.getElementById('newSubjectName').value;
             const description = document.getElementById('newSubjectDescription').value;
 
@@ -448,11 +462,18 @@
                 });
 
                 if (response.ok) {
-                    alert('Lecture uploaded successfully!');
-                    window.location.href = 'dashboard.html';
+                    const result = await response.json();
+                    alert('Lecture uploaded and processed successfully!');
+                    window.location.href = `lecture-view.html?id=${result.id}`;
                 } else {
-                    const error = await response.json();
-                    alert('Upload failed: ' + (error.detail || 'Unknown error'));
+                    try {
+                        const error = await response.json();
+                        alert('Upload failed: ' + (error.detail || 'Unknown error'));
+                    } catch (e) {
+                        const text = await response.text();
+                        console.error('Response text:', text);
+                        alert('Upload failed: HTTP ' + response.status + ' - ' + (text || 'Unknown error'));
+                    }
                 }
             } catch (error) {
                 alert('Error: ' + error.message);
@@ -467,17 +488,5 @@
         }
     </script>
 </body>
-</html>
-                document.getElementById('progressContainer').style.display = 'none';
-            }
-        }
 
-        function logout() {
-            if (confirm('Logout?')) {
-                localStorage.removeItem(TOKEN_KEY);
-                window.location.href = 'index.html';
-            }
-        }
-    </script>
-</body>
 </html>

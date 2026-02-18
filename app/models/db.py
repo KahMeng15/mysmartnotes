@@ -57,6 +57,9 @@ class Lecture(Base):
     file_size = Column(Integer)
     page_count = Column(Integer, default=0)
     extracted_text = Column(Text)
+    extracted_content_structured = Column(Text)  # JSON: structured content segments with headers, types, etc.
+    extracted_images_metadata = Column(Text)  # JSON: image extraction metadata
+    output_pdf_path = Column(String(512))  # Path to generated OUTPUT.pdf
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

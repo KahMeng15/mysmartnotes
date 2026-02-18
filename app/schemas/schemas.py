@@ -83,7 +83,10 @@ class Lecture(LectureBase):
     file_name: str
     user_id: int
     page_count: int = 0
-    extracted_text: str | None = None
+    extracted_text: Optional[str] = None
+    extracted_content_structured: Optional[str] = None
+    extracted_images_metadata: Optional[str] = None
+    output_pdf_path: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     

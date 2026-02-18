@@ -10,7 +10,7 @@ import os
 
 from app.config import get_settings
 from app.utils.db import init_db
-from app.routers import auth, subjects, lectures, chat, documents, flashcards, study_sessions, search, analytics
+from app.routers import auth, subjects, lectures, chat, documents, flashcards, study_sessions, search, analytics, processing
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +58,16 @@ app.include_router(flashcards.router)
 app.include_router(study_sessions.router)
 app.include_router(search.router)
 app.include_router(analytics.router)
+app.include_router(processing.router)
+
+# Serve generated files (images, PDFs, etc.)
+generated_dir = os.path.join(os.path.dirname(__file__), "generated")
+if os.path.exists(generated_dir):
+    try:
+        app.mount("/generated", StaticFiles(directory=generated_dir), name="generated")
+        logger.info(f"Generated files mounted from {generated_dir}")
+    except Exception as e:
+        logger.warning(f"Could not mount generated files: {e}")
 
 # Serve static files and templates
 static_dir = os.path.join(os.path.dirname(__file__), "app", "static")
