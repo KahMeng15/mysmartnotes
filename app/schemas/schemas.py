@@ -96,7 +96,7 @@ class Lecture(LectureBase):
 
 class LectureResponse(Lecture):
     """Response schema for lecture endpoints"""
-    pass
+    subject: Optional[Subject] = None
 
 
 # ========== Flashcard Schemas ==========

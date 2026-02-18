@@ -69,6 +69,17 @@ if os.path.exists(generated_dir):
     except Exception as e:
         logger.warning(f"Could not mount generated files: {e}")
 
+# Serve output files (extracted images)
+output_dir = os.path.join(os.path.dirname(__file__), "output")
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+
+try:
+    app.mount("/output", StaticFiles(directory=output_dir), name="output")
+    logger.info(f"Output files mounted from {output_dir}")
+except Exception as e:
+    logger.warning(f"Could not mount output files: {e}")
+
 # Serve static files and templates
 static_dir = os.path.join(os.path.dirname(__file__), "app", "static")
 if os.path.exists(static_dir):

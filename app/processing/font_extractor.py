@@ -228,8 +228,9 @@ class FontAwareExtractor:
         re.compile(r"Cisco\s+and/or\s+its\s+affiliates", re.IGNORECASE),
     ]
 
-    # Bullet characters
+    # Bullet characters (including dashes/hyphens used as bullets)
     BULLET_CHARS = set("•‣◦⁃∙‐‑–—►▪▸➤➢")
+    DASH_BULLET_CHARS = set("-–—‐‑")  # Dashes that can serve as list markers
     NUMBERED_PATTERN = re.compile(r"^(\d+[\.\)]\s)")
 
     # Headings to skip (video slides, etc.)
@@ -755,6 +756,14 @@ class FontAwareExtractor:
             if first_char in self.BULLET_CHARS:
                 block.block_type = "list"
                 continue
+
+            # Check for dash-prefixed list items (e.g., "-This is a point")
+            if first_char in self.DASH_BULLET_CHARS and len(text) > 2:
+                # Make sure it's not a negative number or hyphenated word
+                rest = text[1:].lstrip()
+                if rest and rest[0].isupper():
+                    block.block_type = "list"
+                    continue
 
             if self.NUMBERED_PATTERN.match(text):
                 block.block_type = "ordered_list"

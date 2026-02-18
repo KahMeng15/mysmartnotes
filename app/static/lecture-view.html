@@ -11,6 +11,7 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         .lecture-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -73,10 +74,7 @@
         .extracted-text {
             line-height: 1.6;
             color: var(--color-text);
-            max-height: 500px;
-            overflow-y: auto;
             padding: var(--spacing-md);
-            background: var(--color-background);
             border-radius: var(--radius-md);
             font-size: var(--font-size-sm);
         }
@@ -317,7 +315,7 @@
     <nav class="navbar">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
                     <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
@@ -326,7 +324,7 @@
                 </ul>
                 <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
                     <a href="settings.html" class="nav-link">Settings</a>
-                    <div class="avatar" onclick="logout()">👤</div>
+                    <div class="avatar" onclick="logout()"><i class="ph ph-user"></i></div>
                 </div>
             </div>
         </div>
@@ -335,11 +333,11 @@
     <!-- Main Content -->
     <div class="container">
         <a href="my-lectures.html"
-            style="color: var(--color-primary); margin-top: var(--spacing-xl); margin-bottom: var(--spacing-lg); display: inline-block;">←
-            Back to Lectures</a>
+            style="color: var(--color-primary); margin-top: var(--spacing-xl); margin-bottom: var(--spacing-lg); display: inline-block;">
+            <i class="ph ph-arrow-left"></i> Back to Lectures</a>
 
         <div id="loadingContainer" class="loading">
-            <div style="font-size: 2rem; margin-bottom: var(--spacing-md);">📖</div>
+            <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i></div>
             <p>Loading lecture...</p>
         </div>
 
@@ -349,15 +347,15 @@
                 <h1 id="lectureTitle">Lecture Title</h1>
                 <div class="lecture-meta">
                     <div class="lecture-meta-item">
-                        <span>📁</span>
+                        <span><i class="ph ph-calendar-blank"></i></span>
                         <span id="lectureDate">Date</span>
                     </div>
                     <div class="lecture-meta-item">
-                        <span>💾</span>
+                        <span><i class="ph ph-hard-drives"></i></span>
                         <span id="lectureSize">Size</span>
                     </div>
                     <div class="lecture-meta-item">
-                        <span>📄</span>
+                        <span><i class="ph ph-file-text"></i></span>
                         <span id="lectureType">Type</span>
                     </div>
                 </div>
@@ -368,7 +366,7 @@
                 <!-- Main Content -->
                 <div class="lecture-main">
                     <div class="section-card">
-                        <div class="section-title">📝 Extracted Text</div>
+                        <!-- Extracted Text Header Removed -->
 
                         <!-- Status Badge -->
                         <div id="extractionStatus" style="display: none;">
@@ -408,25 +406,6 @@
                                 Loading...</p>
                         </div>
 
-                        <!-- Reprocess Button -->
-                        <div style="display: flex; gap: var(--spacing-md); margin-top: var(--spacing-lg);">
-                            <button class="btn btn-secondary" onclick="reprocessOCR()" id="reprocessBtn"
-                                style="flex: 1;">
-                                🔄 Reprocess Text
-                            </button>
-                        </div>
-
-                        <!-- PDF Generation Buttons -->
-                        <div style="display: flex; gap: var(--spacing-md); margin-top: var(--spacing-md);">
-                            <button class="btn btn-primary" onclick="generatePDF()" id="generatePdfBtn"
-                                style="flex: 1;">
-                                📄 Generate PDF
-                            </button>
-                            <button class="btn btn-outline" onclick="downloadPDF()" id="downloadPdfBtn"
-                                style="flex: 1; display: none;">
-                                ⬇️ Download PDF
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -434,7 +413,7 @@
                 <div class="lecture-sidebar">
                     <!-- Quick Info -->
                     <div class="section-card">
-                        <div class="section-title">ℹ️ Info</div>
+                        <div class="section-title"><i class="ph ph-info"></i> Info</div>
                         <div class="sidebar-item">
                             <div class="sidebar-label">File Name</div>
                             <div class="sidebar-value" id="fileName">-</div>
@@ -451,18 +430,39 @@
 
                     <!-- Actions -->
                     <div class="section-card">
-                        <div class="section-title">⚡ Actions</div>
+                        <div class="section-title"><i class="ph ph-lightning"></i> Actions</div>
                         <div class="action-buttons">
-                            <button class="btn btn-primary" onclick="generateFlashcards()">📇 Flashcards</button>
+                            <button class="btn btn-primary" onclick="generateFlashcards()"><i class="ph ph-cards"></i>
+                                Flashcards</button>
                         </div>
+
                         <div class="action-buttons" style="margin-top: var(--spacing-md);">
-                            <button class="btn btn-outline" onclick="deleteLecture()">🗑️ Delete</button>
+                            <button class="btn btn-secondary" onclick="reprocessOCR()" id="reprocessBtn"><i
+                                    class="ph ph-arrows-clockwise"></i>
+                                Reprocess</button>
+                        </div>
+
+                        <div class="action-buttons" style="margin-top: var(--spacing-md);">
+                            <button class="btn btn-primary" onclick="generatePDF()" id="generatePdfBtn"><i
+                                    class="ph ph-file-pdf"></i> Generate
+                                PDF</button>
+                        </div>
+
+                        <div class="action-buttons" style="margin-top: var(--spacing-md);">
+                            <button class="btn btn-outline" onclick="downloadPDF()" id="downloadPdfBtn"
+                                style="display: none; width: 100%;"><i class="ph ph-download-simple"></i> Download
+                                PDF</button>
+                        </div>
+
+                        <div class="action-buttons" style="margin-top: var(--spacing-md);">
+                            <button class="btn btn-outline" onclick="deleteLecture()"><i class="ph ph-trash"></i>
+                                Delete</button>
                         </div>
                     </div>
 
                     <!-- Chat Section -->
                     <div class="section-card">
-                        <div class="section-title">💬 Quick Chat</div>
+                        <div class="section-title"><i class="ph ph-chat-circle-dots"></i> Quick Chat</div>
                         <div id="chatPreview"
                             style="font-size: var(--font-size-sm); color: var(--color-gray); padding: var(--spacing-md); background: var(--color-background); border-radius: var(--radius-md); margin-bottom: var(--spacing-md); max-height: 200px; overflow-y: auto;">
                             <p style="text-align: center;">No messages yet</p>
@@ -567,7 +567,7 @@
                                 // Append images section at bottom if they aren't embedded in text
                                 // (Basic logic: if text is short or doesn't have image links, show them)
                                 // For now, let's just create a gallery at the bottom
-                                let imgHtml = '<div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;"><h3>📊 Extracted Figures</h3><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">';
+                                let imgHtml = '<div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;"><h3><i class="ph ph-images"></i> Extracted Figures</h3><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">';
                                 images.forEach(img => {
                                     const imgPath = img.file_path || `generated/${lectureData.id}/images/${img.filename}`;
                                     // Make path relative to root if needed
@@ -628,7 +628,7 @@
                         }
                         if (images.length > 0) {
                             let imgHtml = `<div style="margin: 24px 0; padding: 16px; background: #f5f5f5; border-radius: 8px;">`;
-                            imgHtml += `<p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #666;">📊 Diagrams & Images</p>`;
+                            imgHtml += `<p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #666;"><i class="ph ph-images"></i> Diagrams & Images</p>`;
                             imgHtml += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">`;
                             images.forEach(img => {
                                 const imgPath = img.file_path || `generated/${lectureData.id || 1}/images/${img.filename}`;
@@ -968,7 +968,38 @@
             const button = document.querySelector('button[onclick="reprocessOCR()"]');
             const originalText = button.textContent;
             button.disabled = true;
-            button.textContent = '⏳ Reprocessing...';
+            // button.textContent = '⏳ Reprocessing...'; // Removed, using progress container instead
+
+            // Show progress container
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressPercent = document.getElementById('progressPercent');
+            const progressMessage = document.getElementById('progressMessage');
+
+            if (progressContainer) {
+                progressContainer.style.display = 'block';
+                // Simulate start
+                progressFill.style.width = '10%';
+                progressPercent.textContent = '10%';
+                progressMessage.textContent = 'Initializing Smart Pipeline...';
+
+                // Simulate progress (fake update since backend is blocking)
+                setTimeout(() => {
+                    if (progressContainer.style.display !== 'none') {
+                        progressFill.style.width = '40%';
+                        progressPercent.textContent = '40%';
+                        progressMessage.textContent = 'Analyzing layout & extracting text...';
+                    }
+                }, 2000);
+
+                setTimeout(() => {
+                    if (progressContainer.style.display !== 'none') {
+                        progressFill.style.width = '70%';
+                        progressPercent.textContent = '70%';
+                        progressMessage.textContent = 'Extracting images & structuring content...';
+                    }
+                }, 5000);
+            }
 
             try {
                 const response = await fetch(`/lectures/${lectureId}/reprocess-ocr`, {
@@ -979,19 +1010,32 @@
                 });
 
                 if (response.ok) {
+                    // Success progress
+                    if (progressContainer) {
+                        progressFill.style.width = '100%';
+                        progressPercent.textContent = '100%';
+                        progressMessage.textContent = 'Complete! Reloading...';
+                    }
+
                     const result = await response.json();
                     console.log('OCR reprocessed:', result);
-                    alert('✅ Text reprocessed successfully! Refreshing...');
+                    // alert('✅ Text reprocessed successfully! Refreshing...');
                     // Reload the page to display the new structured content
-                    setTimeout(() => window.location.reload(), 1000);
+                    setTimeout(() => window.location.reload(), 800);
                 } else {
+                    let errorMsg = 'Failed to reprocess text';
                     try {
-                        const error = await response.json();
-                        alert('❌ Error: ' + (error.detail || 'Failed to reprocess text'));
-                    } catch (e) {
                         const text = await response.text();
-                        alert('❌ Error reprocessing text: ' + text);
+                        try {
+                            const error = JSON.parse(text);
+                            errorMsg = error.detail || errorMsg;
+                        } catch (e) {
+                            errorMsg += ': ' + text.substring(0, 100);
+                        }
+                    } catch (e) {
+                        console.error('Error reading error response:', e);
                     }
+                    alert('❌ Error: ' + errorMsg);
                     button.textContent = originalText;
                 }
             } catch (error) {

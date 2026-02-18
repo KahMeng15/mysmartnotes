@@ -49,6 +49,14 @@ class SignalMerger:
         "Picture": "skip",
     }
 
+    # Pattern for numbered topic headings like "1.1", "1.2", "2.3.1"
+    NUMBERED_HEADING_RE = re.compile(r"^(\d+(?:\.\d+)+)\s+(.+)$")
+
+    # Pattern for module/chapter-level headings
+    MODULE_HEADING_RE = re.compile(
+        r"^(?:Module|Chapter|Unit)\s+\d+", re.IGNORECASE
+    )
+
     def merge(
         self,
         font_blocks: List[Dict[str, Any]],
@@ -57,14 +65,6 @@ class SignalMerger:
     ) -> List[MergedBlock]:
         """
         Merge all extraction signals into a unified list of blocks.
-
-        Args:
-            font_blocks: Results from FontAwareExtractor (list of page dicts)
-            layout_detections: Results from LayoutDetector (list of detection lists per page)
-            tables: Table extraction results per page
-
-        Returns:
-            Unified list of MergedBlocks ready for markdown formatting
         """
         all_blocks = []
 
@@ -125,14 +125,19 @@ class SignalMerger:
         # Sort by page, then Y position
         all_blocks.sort(key=lambda b: (b.page, b.y_position))
 
-        # Post-processing
+        # Post-processing passes (order matters!)
         all_blocks = self._remove_duplicates(all_blocks)
-        all_blocks = self._fix_heading_hierarchy(all_blocks)
-        # Split inline bullets FIRST so multi-bullet blocks become individual list items,
-        # then merge continuations so wrapped lines attach to their parent list item
+        all_blocks = self._normalize_heading_hierarchy(all_blocks)
         all_blocks = self._split_inline_bullets(all_blocks)
+        all_blocks = self._clean_list_formatting(all_blocks)
         all_blocks = self._merge_continuations(all_blocks)
+        all_blocks = self._fix_list_wrapping(all_blocks)
+        all_blocks = self._clean_list_formatting(all_blocks)  # Second pass: clean up after merging
         all_blocks = self._promote_orphan_body_in_lists(all_blocks)
+        all_blocks = self._split_embedded_list_headers(all_blocks)
+        all_blocks = self._remove_redundant_metadata(all_blocks)
+        all_blocks = self._split_examples(all_blocks)
+        all_blocks = self._extract_list_headers(all_blocks)
 
         return all_blocks
 
@@ -155,7 +160,6 @@ class SignalMerger:
 
         for det in detections:
             bbox = det["bbox"]
-            # Layout bbox is in image coords, need to scale to PDF coords
             img_w = det.get("image_width", page_width)
             img_h = det.get("image_height", page_height)
 
@@ -167,11 +171,10 @@ class SignalMerger:
             lx2 = bbox[2] * scale_x
             ly2 = bbox[3] * scale_y
 
-            # Check if block center falls within detection bbox
             if lx1 <= block_center_x <= lx2 and ly1 <= block_center_y <= ly2:
                 area = (lx2 - lx1) * (ly2 - ly1)
                 conf = det.get("confidence", 0.5)
-                score = conf / max(area, 1)  # Prefer smaller, more confident matches
+                score = conf / max(area, 1)
 
                 if score > best_overlap:
                     best_overlap = score
@@ -186,39 +189,31 @@ class SignalMerger:
     def _resolve_conflict(self, merged: MergedBlock, layout_type: str) -> MergedBlock:
         """
         Resolve conflicts between font-based and layout-based classification.
-
         Font data is primary (most reliable), layout is confirmation/tiebreaker.
         """
         font_type = merged.block_type
-        
+
         if layout_type == "skip":
-            # Layout says this is a header/footer — trust it if font doesn't strongly disagree
             if font_type in ("body",):
                 merged.block_type = "skip"
             return merged
 
-        # If font says heading and layout agrees → high confidence
         if font_type.startswith("h") and layout_type.startswith("h"):
             merged.confidence = 0.95
             return merged
 
-        # If font says body but layout says heading → check text length
         if font_type == "body" and layout_type.startswith("h"):
             if len(merged.text) < 100:
-                # Short text detected as header by AI → promote
                 merged.block_type = layout_type
                 merged.confidence = 0.7
             return merged
 
-        # If font says heading but layout says body → trust font for short text
         if font_type.startswith("h") and layout_type == "body":
             if len(merged.text) > 150:
-                # Long text unlikely to be a heading
                 merged.block_type = "body"
                 merged.confidence = 0.8
             return merged
 
-        # Layout says list → adopt if font is ambiguous
         if layout_type == "list" and font_type == "body":
             merged.block_type = "list"
             merged.confidence = 0.75
@@ -226,10 +221,15 @@ class SignalMerger:
 
         return merged
 
+    # ─── Post-processing passes ──────────────────────────────────────
+
     def _remove_duplicates(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
-        """Remove duplicate content blocks (e.g., repeated slide titles)."""
+        """
+        Remove duplicate content blocks.
+        Enhanced: fuzzy-match headings across levels, detect substring duplicates.
+        """
         cleaned = []
-        seen_headers = set()
+        seen_headers = {}  # normalized_text -> block_type
 
         for block in blocks:
             if block.block_type == "skip":
@@ -239,26 +239,84 @@ class SignalMerger:
                 # Normalize for comparison
                 norm = re.sub(r"\s*\(cont\.?(?:inued)?\).*$", "", block.text, flags=re.IGNORECASE)
                 norm = norm.strip().lower()
+                # Remove leading numbering for comparison (e.g., "1.4 " from "1.4 Clients and Servers")
+                norm_no_num = re.sub(r"^\d+(?:\.\d+)*\s*", "", norm).strip()
 
+                # Check exact duplicate
                 if norm in seen_headers:
                     logger.debug(f"Removing duplicate header: {block.text}")
                     continue
-                seen_headers.add(norm)
+
+                # Check if this heading text (without numbering) is a substring of an already-seen heading
+                # or if an already-seen heading is a substring of this one
+                is_duplicate = False
+                for seen_text, seen_type in list(seen_headers.items()):
+                    seen_no_num = re.sub(r"^\d+(?:\.\d+)*\s*", "", seen_text).strip()
+                    # Skip very short matches to avoid false positives
+                    if len(norm_no_num) < 4 or len(seen_no_num) < 4:
+                        continue
+                    # If either is a close substring of the other, it's a duplicate
+                    if norm_no_num in seen_no_num or seen_no_num in norm_no_num:
+                        # Keep the more specific one (the one with numbering or the longer one)
+                        if len(norm) >= len(seen_text):
+                            # Current is longer/more specific — remove previous, keep current
+                            cleaned = [b for b in cleaned if not (
+                                b.block_type.startswith("h") and
+                                b.text.strip().lower() == seen_text
+                            )]
+                            del seen_headers[seen_text]
+                        else:
+                            # Previous was more specific — skip current
+                            is_duplicate = True
+                            break
+
+                if is_duplicate:
+                    logger.debug(f"Removing fuzzy-duplicate header: {block.text}")
+                    continue
+
+                seen_headers[norm] = block.block_type
 
             cleaned.append(block)
 
         return cleaned
 
-    def _fix_heading_hierarchy(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
+    def _normalize_heading_hierarchy(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
         """
-        Ensure heading levels are sequential (no jumping from h1 to h4).
+        Normalize heading levels based on document structure rules:
+        - Module/Chapter titles → h1 (only one per document unless multiple modules)
+        - Numbered topics (1.1, 1.2, ...) → h2
+        - Subtopics within topics → h3
+        - Ensure no level jumps > 1
         """
-        last_level = 0
+        # Pass 1: Assign semantic levels based on content patterns
+        for block in blocks:
+            if not block.block_type.startswith("h"):
+                continue
 
+            text = block.text.strip()
+
+            # Module/Chapter titles → h1
+            if self.MODULE_HEADING_RE.match(text):
+                block.block_type = "h1"
+                continue
+
+            # Numbered topics (e.g., "1.1 Network Types") → h2
+            m = self.NUMBERED_HEADING_RE.match(text)
+            if m:
+                num_parts = m.group(1).split(".")
+                if len(num_parts) == 2:
+                    # Top-level topic like "1.1", "1.2" → h2
+                    block.block_type = "h2"
+                elif len(num_parts) >= 3:
+                    # Sub-topic like "1.1.1" → h3
+                    block.block_type = "h3"
+                continue
+
+        # Pass 2: Fix hierarchy jumps (no jumping from h1 to h4)
+        last_level = 0
         for block in blocks:
             if block.block_type.startswith("h"):
                 level = int(block.block_type[1])
-                # Don't allow jumping more than 1 level
                 if level > last_level + 1 and last_level > 0:
                     corrected = last_level + 1
                     block.block_type = f"h{corrected}"
@@ -270,8 +328,7 @@ class SignalMerger:
     def _split_inline_bullets(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
         """
         Split blocks that contain multiple inline bullet characters (•) into
-        separate list items. This handles cases where two-column PDF layouts
-        merge terms like "internet• bit• web server•" into a single block.
+        separate list items.
         """
         BULLET_CHARS = "•‣◦⁃∙►▪▸➤➢"
         BULLET_PATTERN = re.compile(r'[' + re.escape(BULLET_CHARS) + r']')
@@ -281,35 +338,25 @@ class SignalMerger:
         for block in blocks:
             text = block.text.strip()
 
-            # Count bullet characters in this block
             bullet_count = sum(1 for c in text if c in BULLET_CHARS)
 
-            # If fewer than 2 bullets, keep as-is (with cleanup)
             if bullet_count < 2:
                 if bullet_count == 1 and text:
                     if text[0] in BULLET_CHARS:
-                        # Single bullet at start → mark as list
                         block.block_type = "list"
                     else:
-                        # Single bullet NOT at start → trailing noise, strip it
                         block.text = BULLET_PATTERN.sub('', block.text).strip()
                 result.append(block)
                 continue
 
-            # Multiple bullets found — split into items
-            # Strategy: split on bullet characters, clean up, create list items
-            # Handle both "• item1 • item2" and "item1• item2• item3•" patterns
-            
-            # Normalize: replace all bullet chars with a common delimiter
             normalized = text
             for bc in BULLET_CHARS:
-                normalized = normalized.replace(bc, '\x00')  # Use null as delimiter
+                normalized = normalized.replace(bc, '\x00')
 
             parts = normalized.split('\x00')
             items = []
             for part in parts:
                 cleaned = part.strip()
-                # Skip empty or very short fragments (likely noise)
                 if cleaned and len(cleaned) > 1:
                     items.append(cleaned)
 
@@ -317,7 +364,6 @@ class SignalMerger:
                 result.append(block)
                 continue
 
-            # Create a list item block for each extracted term
             for item_text in items:
                 new_block = MergedBlock(
                     text=item_text,
@@ -331,15 +377,62 @@ class SignalMerger:
 
         return result
 
+    def _clean_list_formatting(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
+        """
+        Clean up list item formatting:
+        1. Fix double-dashes (e.g., "- -Transmission" → "Transmission")
+        2. Fix missing space after dash ("-This" → "This" — the dash prefix is added by markdown formatter)
+        3. Detect leading dash/hyphen as list indicator
+        4. Fix dash stuck to text (e.g., "-This" → "- This" in body text)
+        """
+        DASH_CHARS = set("-–—‐‑")
+
+        for block in blocks:
+            text = block.text.strip()
+            if not text:
+                continue
+
+            # Detect leading dash as list marker
+            if text[0] in DASH_CHARS and len(text) > 1:
+                # Strip leading dash(es) and mark as list
+                cleaned = text.lstrip("-–—‐‑ ")
+                if cleaned:
+                    block.text = cleaned
+                    if block.block_type == "body":
+                        block.block_type = "list"
+
+            # Fix double-dash patterns within text
+            # e.g. "- -Transmission is achieved by..." → "Transmission is achieved by..."
+            if block.block_type in ("list", "ordered_list"):
+                text = block.text
+                # Remove leading dashes/hyphens (the markdown formatter adds "- " itself)
+                text = re.sub(r"^[\-–—‐‑]+\s*", "", text)
+                block.text = text.strip()
+
+            # Fix dash stuck to text in body blocks (e.g., "-This is created" → "This is created")
+            # This handles cases from interleaved multi-column PDF text
+            if block.block_type == "body":
+                text = block.text
+                # Fix ": -Text" → ": Text" (dash following punctuation)
+                text = re.sub(r'([:\.])\s*-([A-Z])', r'\1 \2', text)
+                block.text = text
+
+        return blocks
+
     def _merge_continuations(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
         """
         Merge sentence fragments that were split across lines/blocks.
+        Enhanced: more aggressive merging for mid-sentence breaks.
         """
         if not blocks:
             return blocks
 
-        # Bullet characters that indicate list content — don't merge these
         BULLET_CHARS = set("•‣◦⁃∙►▪▸➤➢")
+        # Words that indicate a sentence is continuing
+        CONNECTOR_WORDS = {"and", "or", "the", "of", "with", "to", "in", "a", "an",
+                           "for", "from", "by", "on", "at", "as", "is", "are", "was",
+                           "were", "be", "been", "being", "that", "which", "such",
+                           "including", "like", "than", "into"}
 
         merged = [blocks[0]]
 
@@ -355,46 +448,92 @@ class SignalMerger:
                 merged.append(block)
                 continue
 
-            # Never merge blocks that contain bullet characters — they should
-            # remain separate so _split_inline_bullets can process them
+            # Never merge blocks with bullet characters
             block_has_bullets = any(c in BULLET_CHARS for c in block.text)
             prev_has_bullets = any(c in BULLET_CHARS for c in prev.text)
             if block_has_bullets or prev_has_bullets:
                 merged.append(block)
                 continue
 
-            # Body continuation: current starts with lowercase
             should_merge = False
+            text = block.text.strip()
+            prev_text = prev.text.strip()
 
-            if (prev.block_type == "body" and block.block_type == "body"
-                    and block.page == prev.page):
-                text = block.text.strip()
-                if text and text[0].islower():
+            if not text or not prev_text:
+                merged.append(block)
+                continue
+
+            # Same page check
+            same_page = block.page == prev.page
+
+            # --- Body + Body merging ---
+            if prev.block_type == "body" and block.block_type == "body" and same_page:
+                # Current starts with lowercase → continuation
+                if text[0].islower():
                     should_merge = True
                 # Previous ends with connector word
-                prev_words = prev.text.strip().split()
-                if prev_words:
-                    last_word = prev_words[-1].lower().rstrip(".,;:")
-                    if last_word in ("and", "or", "the", "of", "with", "to", "in", "a", "an", "for"):
+                last_word = prev_text.split()[-1].lower().rstrip(".,;:")
+                if last_word in CONNECTOR_WORDS:
+                    should_merge = True
+                # Previous line doesn't end with sentence-ending punctuation
+                # and current doesn't start with uppercase after a bullet/number
+                if not prev_text[-1] in ".!?:\"'" and text[0].islower():
+                    should_merge = True
+
+            # --- List + Body merging (stray text after list items) ---
+            if (prev.block_type in ("list", "ordered_list") and
+                    block.block_type == "body" and same_page):
+                # Current starts with lowercase → continuation of list item
+                if text[0].islower():
+                    should_merge = True
+                # Parenthetical continuation
+                elif text[0] == '(':
+                    should_merge = True
+                # Previous list item ends with connector word
+                elif text:
+                    last_word = prev_text.split()[-1].lower().rstrip(",")
+                    if last_word in CONNECTOR_WORDS:
+                        should_merge = True
+                # Previous doesn't end with sentence-ending punctuation
+                # and text starts with common continuation words
+                if not prev_text[-1] in ".!?:\"'":
+                    first_word = text.split()[0].lower() if text.split() else ""
+                    if first_word in CONNECTOR_WORDS or text[0].islower():
                         should_merge = True
 
-            # List item continuation
+            # --- Body + Body merging for indented continuations ---
+            if (prev.block_type == "body" and block.block_type == "body" and same_page
+                    and block.indent_level > 0):
+                # Indented body that starts with lowercase → continuation
+                if text[0].islower():
+                    should_merge = True
+                # Previous doesn't end with sentence-ending punctuation
+                if not prev_text[-1] in ".!?:\"'":
+                    should_merge = True
+
+            # --- List + List with indent (sub-item continuation) ---
             if (prev.block_type in ("list", "ordered_list") and
-                    block.block_type == "body" and block.page == prev.page):
-                text = block.text.strip()
-                if text and text[0].islower():
+                    block.block_type in ("list", "ordered_list") and same_page):
+                # If the current "list" item starts with lowercase → continuation
+                # BUT: skip if both items are short (likely separate terms from bullet splitting)
+                prev_is_short = len(prev_text) < 40
+                curr_is_short = len(text) < 40
+                if text[0].islower() and not (prev_is_short and curr_is_short):
                     should_merge = True
-                # Parenthetical continuation: "(SOHO) network" after "small office and home office"
-                elif text and text[0] == '(':
+
+            # --- List + Body that doesn't end in sentence-ending punctuation ---
+            if (prev.block_type in ("list", "ordered_list") and
+                    block.block_type == "body" and same_page):
+                # If previous list item doesn't end with sentence punctuation, merge
+                if not prev_text[-1] in ".!?:;" and text[0].islower():
                     should_merge = True
-                # Previous list item ends with connector word — likely wrapped mid-phrase
-                elif text:
-                    prev_words = prev.text.strip().split()
-                    if prev_words:
-                        last_word = prev_words[-1].lower().rstrip(",")
-                        if last_word in ("and", "or", "the", "of", "with", "to",
-                                         "in", "a", "an", "for", "from"):
-                            should_merge = True
+                # If text is very short and starts lowercase, likely continuation
+                if len(text) < 80 and text[0].islower():
+                    should_merge = True
+                # Parenthetical or abbreviation continuation (e.g., "PDAs,", "(SOHO)")
+                if text[0] == '(' or (not prev_text[-1] in ".!?" and text[0].isupper()
+                    and len(text.split()[0]) <= 5 and text.split()[0][-1] in ',).'):
+                    should_merge = True
 
             if should_merge:
                 sep = " "
@@ -410,8 +549,6 @@ class SignalMerger:
     def _promote_orphan_body_in_lists(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
         """
         Promote body blocks to list items when sandwiched between list items.
-        This handles cases where a bullet was stripped but the content is
-        clearly part of a surrounding list (e.g. multi-line terms).
         """
         if len(blocks) < 3:
             return blocks
@@ -428,6 +565,295 @@ class SignalMerger:
                 block.block_type = prev.block_type
 
         return blocks
+
+    def _fix_list_wrapping(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
+        """
+        Fix list items that were split mid-sentence across multiple blocks.
+        If a list item's text doesn't end with sentence-ending punctuation,
+        and the next block (list or body) starts with lowercase, merge them.
+        """
+        if not blocks:
+            return blocks
+
+        merged = [blocks[0]]
+
+        for block in blocks[1:]:
+            prev = merged[-1]
+
+            # Only fix list items on the same page
+            if (prev.block_type in ("list", "ordered_list") and
+                    block.block_type in ("list", "ordered_list", "body") and
+                    prev.page == block.page):
+                prev_text = prev.text.strip()
+                curr_text = block.text.strip()
+
+                if prev_text and curr_text:
+                    # If previous doesn't end with sentence punctuation
+                    # and current starts with lowercase → merge
+                    prev_ends_sentence = prev_text[-1] in ".!?:"
+                    curr_starts_lower = curr_text[0].islower()
+
+                    # Merge if previous doesn't end sentence and current starts lowercase
+                    # BUT: skip if both items are short (likely separate terms from bullet splitting)
+                    prev_is_short = len(prev_text) < 40
+                    curr_is_short = len(curr_text) < 40
+                    if not prev_ends_sentence and curr_starts_lower and not (prev_is_short and curr_is_short):
+                        sep = " "
+                        if prev.text.endswith("-"):
+                            sep = ""
+                            prev.text = prev.text[:-1]
+                        prev.text += sep + block.text
+                        continue
+
+                    # Merge if previous has unclosed parenthesis
+                    # e.g., "Mobile devices (such as smart phones, tablets," + "PDAs, and...)"
+                    if prev_text.count('(') > prev_text.count(')'):
+                        prev.text += " " + block.text
+                        continue
+
+            merged.append(block)
+
+        return merged
+
+    def _split_embedded_list_headers(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
+        """
+        Split list items that contain embedded list header labels.
+        E.g., "...sharing printers Disadvantages of P2P:" → split into two blocks.
+        """
+        LABEL_PATTERN = re.compile(
+            r"^(.+?)\s+((?:Advantages|Disadvantages|Features|Benefits|Drawbacks|"
+            r"Characteristics|Properties|Types|Examples|Steps|Requirements)"
+            r"\s+(?:of\s+)?[^:]*:\s*)$",
+            re.IGNORECASE
+        )
+
+        result = []
+        for block in blocks:
+            if block.block_type not in ("list", "ordered_list"):
+                result.append(block)
+                continue
+
+            text = block.text.strip()
+            m = LABEL_PATTERN.match(text)
+            if m:
+                list_text = m.group(1).strip()
+                header_text = m.group(2).strip()
+
+                # Only split if the list text before the header is meaningful
+                if len(list_text) > 5:
+                    # Keep the list item with just the first part
+                    block.text = list_text
+                    result.append(block)
+
+                    # Add the header label as a bold body block
+                    header_block = MergedBlock(
+                        text=f"**{header_text}**",
+                        block_type="body",
+                        y_position=block.y_position,
+                        page=block.page,
+                        confidence=block.confidence,
+                    )
+                    result.append(header_block)
+                    continue
+
+            result.append(block)
+
+        return result
+
+    def _remove_redundant_metadata(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
+        """
+        Remove redundant metadata lines:
+        - "Module Title: X ... Module Objective: Y" → "**Objective:** Y"
+        - Clean standalone "Module Objective:" to "**Objective:**"
+        - Remove repeated "Module N" headings after the first
+        """
+        # Find the first h1 title
+        h1_title = None
+        for block in blocks:
+            if block.block_type == "h1":
+                h1_title = block.text.strip().lower()
+                break
+
+        # Track if we've seen a module-level heading already
+        seen_module_heading = False
+
+        cleaned = []
+        for block in blocks:
+            text = block.text.strip()
+
+            # Handle combined "Module Title: X Module Objective: Y" lines
+            # Match "Module Title: X" or "Module Title: X Module Objective: Y"
+            if re.match(r"^(?:\*\*)?Module\s+Title", text, re.IGNORECASE):
+                # Extract objective if present in the same line
+                obj_match = re.search(
+                    r"(?:Module\s+)?Objective:\s*(.+)$", text, re.IGNORECASE
+                )
+                if obj_match:
+                    obj_text = obj_match.group(1).strip()
+                    block.text = f"**Objective:** {obj_text}"
+                    cleaned.append(block)
+                else:
+                    logger.debug(f"Removing redundant metadata: {text[:60]}")
+                continue
+
+            # Clean standalone "Module Objective:" → "**Objective:**"
+            if re.match(r"^Module\s+Objective:\s*", text, re.IGNORECASE):
+                block.text = re.sub(r"^Module\s+Objective:", "**Objective:**", text, flags=re.IGNORECASE)
+                cleaned.append(block)
+                continue
+
+            # Remove repeated "Module N" headings (e.g., "Module 1 – New Terms")
+            if block.block_type.startswith("h"):
+                module_match = re.match(r"^Module\s+\d+", text, re.IGNORECASE)
+                if module_match:
+                    if seen_module_heading:
+                        # Demote to h3 or keep but remove "Module N" prefix
+                        # Actually, check if it's something like "Module 1 – New Terms and Commands"
+                        # In that case, just use "New Terms and Commands" as h3
+                        dash_match = re.match(r"^Module\s+\d+\s*[–—\-]\s*(.+)", text, re.IGNORECASE)
+                        if dash_match:
+                            block.text = dash_match.group(1).strip()
+                            block.block_type = "h3"
+                        else:
+                            logger.debug(f"Removing repeated module heading: {text}")
+                            continue
+                    else:
+                        seen_module_heading = True
+
+            cleaned.append(block)
+
+        return cleaned
+
+    def _split_examples(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
+        """
+        Split blocks that contain multiple examples on one line into separate lines.
+        E.g., "Capital letter: A = 01000001 Number: 9 = 00111001 Special character: # = 00100011"
+        → three separate paragraphs.
+        """
+        # Pattern: "Label: value = bits  Label: value = bits"
+        EXAMPLE_PATTERN = re.compile(
+            r"(?:^|\s)([A-Z][a-z]+(?:\s+[a-z]+)*\s*:\s*\S+\s*=\s*[01]+)"
+        )
+
+        result = []
+        for block in blocks:
+            if block.block_type != "body":
+                result.append(block)
+                continue
+
+            text = block.text.strip()
+            matches = list(EXAMPLE_PATTERN.finditer(text))
+
+            if len(matches) >= 2:
+                # Extract all examples
+                examples = []
+                for m in matches:
+                    examples.append(m.group(1).strip())
+
+                if len(examples) >= 2:
+                    # Get any prefix text before the first example
+                    prefix_end = matches[0].start()
+                    prefix = text[:prefix_end].strip()
+
+                    if prefix:
+                        prefix_block = MergedBlock(
+                            text=prefix,
+                            block_type="body",
+                            y_position=block.y_position,
+                            page=block.page,
+                            confidence=block.confidence,
+                        )
+                        result.append(prefix_block)
+
+                    for ex in examples:
+                        # Bold the label part
+                        parts = ex.split(":", 1)
+                        if len(parts) == 2:
+                            formatted = f"**{parts[0].strip()}:** {parts[1].strip()}"
+                        else:
+                            formatted = ex
+                        ex_block = MergedBlock(
+                            text=formatted,
+                            block_type="body",
+                            y_position=block.y_position,
+                            page=block.page,
+                            confidence=block.confidence,
+                        )
+                        result.append(ex_block)
+                    continue
+
+            result.append(block)
+
+        return result
+
+    def _extract_list_headers(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
+        """
+        Extract list header patterns from the end of body paragraphs.
+        E.g., "...P2P network. Advantages of P2P:" → split into body + bold label
+        Also: "Disadvantages of P2P:" at the start of a body block → bold label
+        """
+        # Pattern: text ending with "Label:" followed by list items
+        LIST_HEADER_PATTERN = re.compile(
+            r"^(.*?\.\s+)((?:Advantages|Disadvantages|Features|Benefits|Drawbacks|"
+            r"Characteristics|Properties|Types|Examples|Steps|Requirements)\s+(?:of\s+)?[^:]{0,40}:\s*)$",
+            re.IGNORECASE
+        )
+        # Pattern for standalone list header at start
+        STANDALONE_HEADER_PATTERN = re.compile(
+            r"^((?:Advantages|Disadvantages|Features|Benefits|Drawbacks|"
+            r"Characteristics|Properties|Types|Examples|Steps|Requirements)\s+(?:of\s+)?[^:]*:\s*)$",
+            re.IGNORECASE
+        )
+
+        result = []
+        for i, block in enumerate(blocks):
+            if block.block_type != "body":
+                result.append(block)
+                continue
+
+            text = block.text.strip()
+
+            # Check if body text ends with a list header pattern
+            m = LIST_HEADER_PATTERN.match(text)
+            if m:
+                body_part = m.group(1).strip()
+                header_part = m.group(2).strip()
+
+                # Check if followed by list items
+                has_list_after = (i + 1 < len(blocks) and
+                                  blocks[i + 1].block_type in ("list", "ordered_list"))
+
+                if has_list_after and body_part:
+                    # Split: body text + bold header
+                    body_block = MergedBlock(
+                        text=body_part,
+                        block_type="body",
+                        y_position=block.y_position,
+                        page=block.page,
+                        confidence=block.confidence,
+                    )
+                    result.append(body_block)
+
+                    header_block = MergedBlock(
+                        text=f"**{header_part}**",
+                        block_type="body",
+                        y_position=block.y_position,
+                        page=block.page,
+                        confidence=block.confidence,
+                    )
+                    result.append(header_block)
+                    continue
+
+            # Check if standalone list header
+            sm = STANDALONE_HEADER_PATTERN.match(text)
+            if sm:
+                block.text = f"**{text}**"
+                result.append(block)
+                continue
+
+            result.append(block)
+
+        return result
 
 
 def blocks_to_markdown(blocks: List[MergedBlock]) -> str:
@@ -458,12 +884,10 @@ def blocks_to_markdown(blocks: List[MergedBlock]) -> str:
             level = int(block.block_type[1])
             prefix = "#" * level
 
-            # Add blank line before heading (if not first)
             if lines:
                 if lines[-1] != "":
                     lines.append("")
 
-            # Clean heading text
             heading_text = _clean_heading(text)
             lines.append(f"{prefix} {heading_text}")
             lines.append("")
@@ -482,19 +906,20 @@ def blocks_to_markdown(blocks: List[MergedBlock]) -> str:
 
         # List items
         if block.block_type in ("list", "ordered_list"):
-            # Clean bullet characters from text
             clean_text = _clean_list_item(text)
 
             if block.block_type == "list":
                 prefix = "- "
             else:
-                prefix = "1. "  # Markdown auto-numbers
+                prefix = "1. "
 
             if not in_list:
                 in_list = True
                 list_type = block.block_type
 
-            indent = "  " * block.indent_level
+            # Cap indent level to prevent code-block rendering (max 1 level = 2 spaces)
+            indent_level = min(block.indent_level, 1)
+            indent = "  " * indent_level
             lines.append(f"{indent}{prefix}{clean_text}")
             prev_type = block.block_type
             continue
@@ -502,11 +927,10 @@ def blocks_to_markdown(blocks: List[MergedBlock]) -> str:
         # Body text
         if block.block_type == "body":
             if lines and prev_type and prev_type.startswith("h"):
-                pass  # Already have blank line after heading
+                pass
             elif lines and lines[-1] != "":
                 lines.append("")
 
-            # Apply inline formatting
             formatted = _apply_inline_formatting(text, block)
             lines.append(formatted)
             prev_type = "body"
@@ -519,7 +943,7 @@ def blocks_to_markdown(blocks: List[MergedBlock]) -> str:
             prev_type = "caption"
             continue
 
-    # Clean up: remove trailing blank lines and fix double blanks
+    # Clean up
     result = "\n".join(lines)
     result = re.sub(r"\n{3,}", "\n\n", result)
     result = result.strip() + "\n"
@@ -529,30 +953,37 @@ def blocks_to_markdown(blocks: List[MergedBlock]) -> str:
 
 def _clean_heading(text: str) -> str:
     """Clean heading text."""
-    # Remove trailing (Cont.) etc.
     text = re.sub(r"\s*\(cont\.?(?:inued)?\).*$", "", text, flags=re.IGNORECASE)
-    # Remove leading/trailing whitespace
     text = text.strip()
     return text
 
 
 def _clean_list_item(text: str) -> str:
-    """Clean list item text — remove bullet characters and numbering."""
-    # Remove leading bullet characters
-    text = re.sub(r"^[•‣◦⁃∙‐‑–—\-*►▪▸➤➢]\s*", "", text)
+    """Clean list item text — remove bullet characters, dashes, and numbering."""
+    # Remove leading bullet characters (but NOT asterisks used for bold markdown)
+    text = re.sub(r"^[•‣◦⁃∙‐‑–—\-►▪▸➤➢]+\s*", "", text)
+    # After removing bullets, also strip any remaining leading dashes
+    text = re.sub(r"^[\-–—‐‑]+\s*", "", text)
+    # Remove leading single asterisk bullet (but preserve ** for bold markdown)
+    if text.startswith("* ") and not text.startswith("** "):
+        text = text[2:]
     # Remove leading numbering if present
-    text = re.sub(r"^\d+[\.\)]\s*", "", text)
+    text = re.sub(r"^\d+[\.\\)]\s*", "", text)
+    # Remove any remaining leading whitespace
     return text.strip()
 
 
 def _apply_inline_formatting(text: str, block: MergedBlock) -> str:
     """Apply bold/italic inline formatting to text."""
-    # For now, we detect "Term - Definition" patterns and bold the term
+    # Only bold short term-definition patterns (term < 40 chars, total < 120 chars)
+    # This prevents entire paragraphs from being bolded
+    if len(text) > 120:
+        return text
     match = re.match(r"^([A-Z][a-zA-Z0-9\s/()]+?)\s*[-–—:]\s+(.+)$", text)
     if match:
         term = match.group(1).strip()
         defn = match.group(2).strip()
-        if len(term) < 60:
+        if len(term) < 40:
             return f"**{term}:** {defn}"
 
     return text

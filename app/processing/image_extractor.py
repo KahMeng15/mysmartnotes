@@ -27,6 +27,10 @@ class ExtractedImage:
     is_diagram: bool = False
     file_path: str = ""
 
+    def to_dict(self):
+        import dataclasses
+        return dataclasses.asdict(self)
+
 
 class ImageExtractor:
     """

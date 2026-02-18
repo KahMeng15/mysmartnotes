@@ -73,3 +73,7 @@ npm-debug.log
 *.temp
 .cache/
 uploads
+
+ProcessingAlgorithmTest/output/*
+output/*
+ProcessingAlgorithmTest/output/OUTPUT_smart.md

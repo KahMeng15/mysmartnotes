@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 import uuid
 
@@ -16,6 +16,7 @@ from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.processing.ocr import OCRProcessor
 from app.processing.document_generator import DocumentGenerator
+from app.processing.image_extractor import ImageExtractor
 from app.processing.text_processor import ContentType
 from app.processing.smart_pipeline import SmartPipeline
 from app.routers.processing import _markdown_to_segments
@@ -178,7 +179,7 @@ async def get_lecture(
     import logging
     logger = logging.getLogger(__name__)
     
-    lecture = db.query(Lecture).filter(
+    lecture = db.query(Lecture).options(joinedload(Lecture.subject)).filter(
         Lecture.id == lecture_id,
         Lecture.user_id == current_user.id
     ).first()
@@ -266,18 +267,41 @@ async def reprocess_ocr(
         logger.info(f"Reprocessing OCR for lecture {lecture_id} (use_v2={use_v2})")
         
         # Extract text with structured content using specified processor
-        ocr_result = OCRProcessor.extract_text(
-            lecture.file_path, 
-            lecture.file_type, 
-            lecture_id=lecture_id,
-            use_v2=use_v2
-        )
+        file_ext = os.path.splitext(lecture.file_path)[1].lower()
         
-        raw_text = ocr_result.get("raw_text", "")
-        structured_content = ocr_result.get("structured_content", [])
-        images_data = ocr_result.get("images", [])
+        if file_ext in ('.pdf', '.pptx'):
+            # Use SmartPipeline for PDF/PPTX
+            logger.info(f"Using SmartPipeline for reprocessing {lecture.file_path}")
+            pipeline = SmartPipeline(
+                use_layout_detection=False,
+                use_table_transformer=False,
+            )
+            raw_text = pipeline.process(lecture.file_path)
+            structured_content = _markdown_to_segments(raw_text)
+            
+            # Extract images separately for PDF
+            images_data = []
+            if file_ext == '.pdf':
+                try:
+                    extractor = ImageExtractor(lecture_id=lecture.id)
+                    images_extracted = extractor.extract_images_from_pdf(lecture.file_path)
+                    images_data = [img.to_dict() for img in images_extracted]
+                    logger.info(f"Extracted {len(images_data)} images")
+                except Exception as e:
+                    logger.warning(f"Image extraction failed during reprocessing: {e}")
+        else:
+            # Use Legacy/Fallback OCR for images
+            ocr_result = OCRProcessor.extract_text(
+                lecture.file_path, 
+                lecture.file_type, 
+                lecture_id=lecture_id,
+                use_v2=use_v2
+            )
+            raw_text = ocr_result.get("raw_text", "")
+            structured_content = ocr_result.get("structured_content", [])
+            images_data = ocr_result.get("images", [])
         
-        logger.info(f"OCR reprocessed (v2={use_v2}): {len(raw_text)} characters, {len(structured_content)} segments, {len(images_data)} images")
+        logger.info(f"Reprocessing complete: {len(raw_text)} characters, {len(structured_content)} segments, {len(images_data)} images")
         
         # Update lecture with extracted content
         lecture.extracted_text = raw_text
@@ -291,6 +315,9 @@ async def reprocess_ocr(
         return lecture
         
     except Exception as e:
+        import traceback
+        import sys
+        traceback.print_exc(file=sys.stderr)
         logger.error(f"Error reprocessing OCR: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
