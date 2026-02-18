@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subjects - MySmartNotes</title>
     <link rel="stylesheet" href="/style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         .subjects-container {
             display: grid;
@@ -218,32 +220,35 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Navigation Bar -->
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-left">
-                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="nav-links">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
                     <li><a href="subjects.html" class="nav-link active">Subjects</a></li>
-                    <li><a href="my-lectures.html" class="nav-link">Lectures</a></li>
+                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
                     <li><a href="upload.html" class="nav-link">Upload</a></li>
                 </ul>
             </div>
             <div class="nav-right">
-                <a href="chat.html" class="nav-link">💬 Chat</a>
-                <a href="settings.html" class="nav-link">⚙️ Settings</a>
-                <button onclick="logout()" class="btn btn-outline" style="border: none; cursor: pointer;">Logout</button>
+                <a href="chat.html" class="nav-link"><i class="ph ph-chat-circle-dots"></i> Chat</a>
+                <a href="settings.html" class="nav-link"><i class="ph ph-gear"></i> Settings</a>
+                <button onclick="logout()" class="btn btn-outline"
+                    style="border: none; cursor: pointer;">Logout</button>
             </div>
         </div>
     </nav>
 
     <!-- Main Content -->
     <main class="container" style="padding-top: var(--spacing-xl);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-xl);">
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-xl);">
             <h1>Subjects & Courses</h1>
-            <button onclick="showCreateModal()" class="btn btn-primary">+ New Subject</button>
+            <button onclick="showCreateModal()" class="btn btn-primary"><i class="ph ph-plus"></i> New Subject</button>
         </div>
 
         <!-- Subjects Grid -->
@@ -251,9 +256,8 @@
 
         <!-- Empty State -->
         <div id="emptyState" class="empty-state" style="display: none;">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m0 0h6" />
-            </svg>
+            <i class="ph ph-books"
+                style="font-size: 64px; margin-bottom: var(--spacing-lg); opacity: 0.5; color: var(--color-gray);"></i>
             <h2>No subjects yet</h2>
             <p>Create your first subject to start organizing your lectures</p>
             <button onclick="showCreateModal()" class="btn btn-primary">Create Subject</button>
@@ -278,12 +282,18 @@
                 <div class="form-group">
                     <label>Color</label>
                     <div class="color-picker">
-                        <div class="color-option selected" style="background: #3b82f6;" onclick="selectColor('#3b82f6', this)"></div>
-                        <div class="color-option" style="background: #ec4899;" onclick="selectColor('#ec4899', this)"></div>
-                        <div class="color-option" style="background: #f59e0b;" onclick="selectColor('#f59e0b', this)"></div>
-                        <div class="color-option" style="background: #10b981;" onclick="selectColor('#10b981', this)"></div>
-                        <div class="color-option" style="background: #8b5cf6;" onclick="selectColor('#8b5cf6', this)"></div>
-                        <div class="color-option" style="background: #06b6d4;" onclick="selectColor('#06b6d4', this)"></div>
+                        <div class="color-option selected" style="background: #3b82f6;"
+                            onclick="selectColor('#3b82f6', this)"></div>
+                        <div class="color-option" style="background: #ec4899;" onclick="selectColor('#ec4899', this)">
+                        </div>
+                        <div class="color-option" style="background: #f59e0b;" onclick="selectColor('#f59e0b', this)">
+                        </div>
+                        <div class="color-option" style="background: #10b981;" onclick="selectColor('#10b981', this)">
+                        </div>
+                        <div class="color-option" style="background: #8b5cf6;" onclick="selectColor('#8b5cf6', this)">
+                        </div>
+                        <div class="color-option" style="background: #06b6d4;" onclick="selectColor('#06b6d4', this)">
+                        </div>
                     </div>
                 </div>
 
@@ -351,8 +361,8 @@
                     <h3>${subject.name}</h3>
                     <p>${subject.description || 'No description'}</p>
                     <div class="subject-stats">
-                        <span>📚 Lectures: 0</span>
-                        <span>📝 Items: 0</span>
+                        <span><i class="ph ph-file-text"></i> Lectures: 0</span>
+                        <span><i class="ph ph-list-bullets"></i> Items: 0</span>
                     </div>
                     <div class="subject-actions">
                         <button class="btn-edit" onclick="editSubject(${subject.id})">Edit</button>
@@ -453,4 +463,5 @@
         }
     </script>
 </body>
+
 </html>

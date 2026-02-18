@@ -44,7 +44,8 @@ async def create_subject(
         name=subject.name,
         description=subject.description,
         color=subject.color,
-        user_id=current_user.id
+        user_id=current_user.id,
+        group_id=subject.group_id
     )
     db.add(db_subject)
     db.commit()

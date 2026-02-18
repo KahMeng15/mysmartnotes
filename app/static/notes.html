@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Notes - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        /* Modal Styles (reused/inline for simplicity) */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: var(--spacing-2xl);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 500px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <a href="notes.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
+                <ul class="navbar-nav">
+                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                    <li><a href="notes.html" class="nav-link active">My Notes</a></li>
+                    <li><a href="chat.html" class="nav-link">Chat</a></li>
+                    <li><a href="settings.html" class="nav-link">Settings</a></li>
+                </ul>
+                <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top: var(--spacing-2xl);">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center" style="margin-bottom: var(--spacing-xl);">
+            <h1>My Notes</h1>
+            <button onclick="openGroupModal()" class="btn btn-primary">
+                <i class="ph ph-plus"></i> Create Group
+            </button>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls-bar">
+            <div class="search-box">
+                <i class="ph ph-magnifying-glass search-icon"></i>
+                <input type="text" id="searchInput" placeholder="Search groups, subjects, lectures..."
+                    onkeyup="filterNotes()">
+            </div>
+            <select id="sortSelect" class="form-control" style="width: auto;" onchange="sortNotes()">
+                <option value="name">Sort by Name (A-Z)</option>
+                <option value="date">Sort by Date Created</option>
+            </select>
+        </div>
+
+        <!-- Groups Container -->
+        <div id="notesContainer">
+            <div class="empty-state">
+                <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>
+                <p>Loading your notes...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Group Modal -->
+    <div id="groupModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Create New Group</h2>
+                <button class="modal-close" onclick="closeModal('groupModal')">&times;</button>
+            </div>
+            <form onsubmit="handleCreateGroup(event)">
+                <div class="form-group">
+                    <label>Group Name</label>
+                    <input type="text" id="groupNameInput" class="form-control" placeholder="e.g. Semester 1, Year 2"
+                        required>
+                </div>
+                <div class="d-flex justify-content-end gap-sm" style="margin-top: var(--spacing-xl);">
+                    <button type="button" onclick="closeModal('groupModal')" class="btn btn-outline">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Group</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Subject Modal -->
+    <div id="subjectModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Add New Subject</h2>
+                <button class="modal-close" onclick="closeModal('subjectModal')">&times;</button>
+            </div>
+            <form onsubmit="handleCreateSubject(event)">
+                <input type="hidden" id="targetGroupId">
+                <div class="form-group">
+                    <label>Subject Name</label>
+                    <input type="text" id="subjectNameInput" class="form-control" placeholder="e.g. Calculus I"
+                        required>
+                </div>
+                <div class="form-group">
+                    <label>Description (Optional)</label>
+                    <textarea id="subjectDescInput" class="form-control" rows="3"></textarea>
+                </div>
+                <!-- Color picker simplified -->
+                <div class="form-group">
+                    <label>Color Tag</label>
+                    <input type="color" id="subjectColorInput" value="#3b82f6" style="width: 100%; height: 40px;">
+                </div>
+                <div class="d-flex justify-content-end gap-sm" style="margin-top: var(--spacing-xl);">
+                    <button type="button" onclick="closeModal('subjectModal')" class="btn btn-outline">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Subject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Group Modal -->
+    <div id="editGroupModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Edit Group</h2>
+                <button class="modal-close" onclick="closeModal('editGroupModal')">&times;</button>
+            </div>
+            <form onsubmit="handleEditGroup(event)">
+                <input type="hidden" id="editGroupId">
+                <div class="form-group">
+                    <label>Group Name</label>
+                    <input type="text" id="editGroupNameInput" class="form-control" required>
+                </div>
+                <div class="d-flex justify-content-end gap-sm" style="margin-top: var(--spacing-xl);">
+                    <button type="button" onclick="closeModal('editGroupModal')" class="btn btn-outline">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        const token = localStorage.getItem('token');
+        const userStr = localStorage.getItem('user');
+        const user = userStr ? JSON.parse(userStr) : null;
+
+        let groupsData = [];
+        let subjectsData = [];
+        let ungroupedSubjects = [];
+
+        window.addEventListener('load', () => {
+            if (!token) window.location.href = 'index.html';
+            fetchData();
+        });
+
+        async function fetchData() {
+            try {
+                // Fetch Groups
+                const groupsRes = await fetch(`${API_URL}/groups`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (groupsRes.ok) groupsData = await groupsRes.json();
+
+                // Fetch All Subjects
+                const subjectsRes = await fetch(`${API_URL}/subjects`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (subjectsRes.ok) subjectsData = await subjectsRes.json();
+
+                renderNotes();
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('notesContainer').innerHTML =
+                    `<div class="empty-state">Error loading notes. Please try again.</div>`;
+            }
+        }
+
+        function renderNotes() {
+            const container = document.getElementById('notesContainer');
+            container.innerHTML = '';
+
+            // 1. Render Groups
+            groupsData.forEach(group => {
+                const groupSubjects = subjectsData.filter(s => s.group_id === group.id);
+                const groupHtml = createGroupSection(group, groupSubjects);
+                container.insertAdjacentHTML('beforeend', groupHtml);
+            });
+
+            // 2. Render Ungrouped Subjects
+            const ungrouped = subjectsData.filter(s => !s.group_id);
+            if (ungrouped.length > 0) {
+                const ungroupedHtml = createGroupSection({ id: null, name: 'Ungrouped' }, ungrouped, true);
+                container.insertAdjacentHTML('beforeend', ungroupedHtml);
+            }
+
+            if (groupsData.length === 0 && ungrouped.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="ph ph-notebook" style="font-size: 48px; margin-bottom: 1rem;"></i>
+                        <h3>Welcome to My Notes</h3>
+                        <p>Create a group or add a subject to get started.</p>
+                        <button onclick="openGroupModal()" class="btn btn-primary" style="margin-top: 1rem;">Create First Group</button>
+                    </div>
+                `;
+            }
+        }
+
+        function createGroupSection(group, subjects, isUngrouped = false) {
+            // Generate Subject Cards
+            const subjectsHtml = subjects.length > 0 ? subjects.map(s => `
+                <div class="subject-card" onclick="event.stopPropagation(); openSubject(${s.id})" style="border-left: 4px solid ${s.color || '#3b82f6'};">
+                    <div class="subject-title">${s.name}</div>
+                    <p style="color: var(--color-gray); font-size: 0.9rem; margin-bottom: 1rem; flex: 1;">
+                        ${s.description || 'No description'}
+                    </p>
+                    <div class="subject-meta">
+                        <i class="ph ph-files"></i> View Lectures
+                    </div>
+                </div>
+            `).join('') : `
+                <div class="empty-state" style="grid-column: 1/-1; padding: var(--spacing-lg);">
+                    No subjects in this group.
+                </div>
+            `;
+
+            // Actions logic
+            let actionsHtml = '';
+            if (!isUngrouped) {
+                actionsHtml = `
+                    <div class="group-actions">
+                        <button onclick="event.stopPropagation(); openSubjectModal(${group.id})" class="btn btn-outline btn-small">
+                            <i class="ph ph-plus"></i> Subject
+                        </button>
+                         <button onclick="event.stopPropagation(); location.href='upload.html?group_id=${group.id}'" class="btn btn-outline btn-small">
+                            <i class="ph ph-upload-simple"></i> Upload
+                        </button>
+                        <button onclick="event.stopPropagation(); openEditGroupModal(${group.id}, '${group.name.replace(/'/g, "\\'")}')" class="btn btn-outline btn-small">
+                            <i class="ph ph-pencil-simple"></i>
+                        </button>
+                        <button onclick="event.stopPropagation(); deleteGroup(${group.id})" class="btn btn-text btn-small" style="color: var(--color-error);">
+                            <i class="ph ph-trash"></i>
+                        </button>
+                    </div>
+                `;
+            } else {
+                // Ungrouped section actions (maybe just add subject?)
+                actionsHtml = `
+                     <div class="group-actions">
+                        <button onclick="event.stopPropagation(); openSubjectModal(null)" class="btn btn-outline btn-small">
+                            <i class="ph ph-plus"></i> Subject
+                        </button>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="group-section" ${!isUngrouped ? `onclick="window.location.href='group.html?id=${group.id}'"` : ''} style="${!isUngrouped ? 'cursor: pointer;' : ''}">
+                    <div class="group-header">
+                        <div class="group-title">
+                            <i class="ph ${isUngrouped ? 'ph-folder-open' : 'ph-folder'}"></i>
+                            ${group.name}
+                        </div>
+                        ${actionsHtml}
+                    </div>
+                    <div class="subjects-grid">
+                        ${subjectsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- Filters & Sort ---
+        function filterNotes() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            // Simple re-render with filtering logic could be complex if we want to filter hierarchy
+            // For now, let's filter groups based on name matches OR if they contain matching subjects
+            // This requires re-fetching or keeping logic in render.
+            // Let's implement a simple DOM filter or data filter?
+            // Data filter is cleaner.
+
+            if (!query) {
+                renderNotes();
+                return;
+            }
+
+            const container = document.getElementById('notesContainer');
+            container.innerHTML = '';
+
+            // Filter logic: Show group if Group Name matches OR Subject Name matches
+            // If Group Name matches, show all subjects in it? Or just matching?
+            // Usually, show matching subjects.
+
+            // Helper to check match
+            const matches = (txt) => txt && txt.toLowerCase().includes(query);
+
+            groupsData.forEach(group => {
+                const groupMatches = matches(group.name);
+                let groupSubjects = subjectsData.filter(s => s.group_id === group.id);
+
+                if (groupMatches) {
+                    // Show all subjects if group matches? Or filter subjects too?
+                    // User said "search function should be able to find groups, subjects"
+                    // If group matches, maybe show it all.
+                } else {
+                    // Filter subjects
+                    groupSubjects = groupSubjects.filter(s => matches(s.name));
+                }
+
+                if (groupMatches || groupSubjects.length > 0) {
+                    const groupHtml = createGroupSection(group, groupSubjects); // Note: might show empty subjects if only group name matched
+                    container.insertAdjacentHTML('beforeend', groupHtml);
+                }
+            });
+
+            // Ungrouped
+            const ungrouped = subjectsData.filter(s => !s.group_id);
+            const matchingUngrouped = ungrouped.filter(s => matches(s.name));
+            if (matchingUngrouped.length > 0) {
+                const html = createGroupSection({ id: null, name: 'Ungrouped' }, matchingUngrouped, true);
+                container.insertAdjacentHTML('beforeend', html);
+            }
+        }
+
+        function sortNotes() {
+            const sortType = document.getElementById('sortSelect').value;
+            // Sort groups and subjects
+            if (sortType === 'name') {
+                groupsData.sort((a, b) => a.name.localeCompare(b.name));
+                subjectsData.sort((a, b) => a.name.localeCompare(b.name));
+            } else if (sortType === 'date') {
+                groupsData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                subjectsData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            }
+            renderNotes();
+        }
+
+        // --- Modals ---
+        function openGroupModal() {
+            document.getElementById('groupModal').classList.add('show');
+            document.getElementById('groupNameInput').value = '';
+            document.getElementById('groupNameInput').focus();
+        }
+
+        function openEditGroupModal(id, name) {
+            document.getElementById('editGroupModal').classList.add('show');
+            document.getElementById('editGroupId').value = id;
+            document.getElementById('editGroupNameInput').value = name;
+            document.getElementById('editGroupNameInput').focus();
+        }
+
+        function openSubjectModal(groupId) {
+            document.getElementById('subjectModal').classList.add('show');
+            document.getElementById('targetGroupId').value = groupId || '';
+            document.getElementById('subjectNameInput').value = '';
+            document.getElementById('subjectDescInput').value = '';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        // --- Actions ---
+        async function handleCreateGroup(e) {
+            e.preventDefault();
+            const name = document.getElementById('groupNameInput').value;
+            try {
+                const res = await fetch(`${API_URL}/groups`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    closeModal('groupModal');
+                    fetchData(); // Reload
+                }
+            } catch (err) {
+                alert('Failed to create group');
+            }
+        }
+
+        async function handleEditGroup(e) {
+            e.preventDefault();
+            const id = document.getElementById('editGroupId').value;
+            const name = document.getElementById('editGroupNameInput').value;
+            try {
+                const res = await fetch(`${API_URL}/groups/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    closeModal('editGroupModal');
+                    fetchData(); // Reload
+                } else {
+                    alert('Failed to update group');
+                }
+            } catch (err) {
+                alert('Error updating group');
+            }
+        }
+
+        async function handleCreateSubject(e) {
+            e.preventDefault();
+            const name = document.getElementById('subjectNameInput').value;
+            const desc = document.getElementById('subjectDescInput').value;
+            const color = document.getElementById('subjectColorInput').value;
+            const groupId = document.getElementById('targetGroupId').value;
+
+            try {
+                const res = await fetch(`${API_URL}/subjects`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description: desc,
+                        color,
+                        group_id: groupId ? parseInt(groupId) : null
+                    })
+                });
+                if (res.ok) {
+                    closeModal('subjectModal');
+                    fetchData();
+                }
+            } catch (err) {
+                alert('Failed to create subject');
+            }
+        }
+
+        async function deleteGroup(id) {
+            if (!confirm("Delete this group? Subjects in it will be deleted.")) return;
+            try {
+                const res = await fetch(`${API_URL}/groups/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) fetchData();
+            } catch (err) {
+                alert('Failed to delete group');
+            }
+        }
+
+        function openSubject(id) {
+            window.location.href = `subject.html?id=${id}`;
+        }
+
+        function logout() {
+            if (confirm('Logout?')) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'index.html';
+            }
+        }
+
+        // Close modal on outside click
+        window.onclick = function (event) {
+            if (event.target.classList.contains('modal-overlay')) {
+                event.target.classList.remove('show');
+            }
+        }
+    </script>
+</body>
+
+</html>

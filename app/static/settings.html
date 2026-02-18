@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         .settings-container {
             max-width: 800px;
@@ -78,19 +82,20 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
                     <li><a href="chat.html" class="nav-link">Chat</a></li>
                     <li><a href="settings.html" class="nav-link active">Settings</a></li>
                 </ul>
-                <div class="avatar" onclick="logout()">👤</div>
+                <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
             </div>
         </div>
     </nav>
@@ -102,7 +107,7 @@
         <div class="settings-container">
             <!-- Profile Settings -->
             <div class="settings-section">
-                <h3>👤 Profile Settings</h3>
+                <h3><i class="ph ph-user"></i> Profile Settings</h3>
                 <form id="profileForm" onsubmit="updateProfile(event)" class="settings-grid">
                     <div class="form-group">
                         <label>Full Name</label>
@@ -122,19 +127,21 @@
 
             <!-- Privacy Settings -->
             <div class="settings-section">
-                <h3>🔒 Privacy</h3>
+                <h3><i class="ph ph-lock-key"></i> Privacy</h3>
                 <div class="settings-grid">
                     <div class="toggle">
                         <div>
                             <div style="font-weight: 600;">Allow analytics</div>
-                            <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Help us improve by sharing usage data</div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Help us improve by
+                                sharing usage data</div>
                         </div>
                         <div class="toggle-switch active" onclick="toggleAnalytics()"></div>
                     </div>
                     <div class="toggle">
                         <div>
                             <div style="font-weight: 600;">Email notifications</div>
-                            <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Get updates about your learning progress</div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Get updates about
+                                your learning progress</div>
                         </div>
                         <div class="toggle-switch active" onclick="toggleNotifications()"></div>
                     </div>
@@ -143,17 +150,19 @@
 
             <!-- Storage & Cache -->
             <div class="settings-section">
-                <h3>💾 Storage</h3>
+                <h3><i class="ph ph-floppy-disk"></i> Storage</h3>
                 <div class="settings-grid">
                     <div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-md);">
                             <div>
                                 <div style="font-weight: 600;">Storage Used</div>
-                                <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Your data storage</div>
+                                <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Your data storage
+                                </div>
                             </div>
                             <div style="font-weight: 600; color: var(--color-primary);">2.5 GB / 10 GB</div>
                         </div>
-                        <div style="height: 8px; background: var(--color-light-gray); border-radius: var(--radius-full); overflow: hidden;">
+                        <div
+                            style="height: 8px; background: var(--color-light-gray); border-radius: var(--radius-full); overflow: hidden;">
                             <div style="height: 100%; width: 25%; background: var(--color-primary);"></div>
                         </div>
                     </div>
@@ -163,7 +172,7 @@
 
             <!-- App Settings -->
             <div class="settings-section">
-                <h3>⚙️ Application</h3>
+                <h3><i class="ph ph-gear"></i> Application</h3>
                 <div class="settings-grid">
                     <div class="form-group">
                         <label>Theme</label>
@@ -186,7 +195,7 @@
 
             <!-- Security -->
             <div class="settings-section">
-                <h3>🔐 Security</h3>
+                <h3><i class="ph ph-shield-check"></i> Security</h3>
                 <div class="settings-grid">
                     <div class="form-group">
                         <label>Current Password</label>
@@ -206,30 +215,34 @@
 
             <!-- Danger Zone -->
             <div class="settings-section danger-zone">
-                <h3 style="color: var(--color-error);">⚠️ Danger Zone</h3>
-                <p style="color: var(--color-gray); margin-bottom: var(--spacing-lg);">These actions cannot be undone.</p>
+                <h3 style="color: var(--color-error);"><i class="ph ph-warning-circle"></i> Danger Zone</h3>
+                <p style="color: var(--color-gray); margin-bottom: var(--spacing-lg);">These actions cannot be undone.
+                </p>
                 <div style="display: flex; gap: var(--spacing-md); flex-wrap: wrap;">
-                    <button onclick="downloadData()" class="btn btn-outline">📥 Download My Data</button>
-                    <button onclick="deleteAccount()" class="btn btn-secondary">🗑️ Delete Account</button>
+                    <button onclick="downloadData()" class="btn btn-outline"><i class="ph ph-download-simple"></i>
+                        Download My Data</button>
+                    <button onclick="deleteAccount()" class="btn btn-secondary"><i class="ph ph-trash"></i> Delete
+                        Account</button>
                 </div>
             </div>
 
             <!-- About -->
             <div class="settings-section">
-                <h3>ℹ️ About</h3>
+                <h3><i class="ph ph-info"></i> About</h3>
                 <div style="color: var(--color-gray); font-size: var(--font-size-sm);">
                     <p><strong>MySmartNotes</strong> v1.0.0</p>
                     <p>An AI-powered study companion to help you learn efficiently.</p>
                     <p style="margin-top: var(--spacing-lg);">
-                        <a href="#" style="color: var(--color-primary);">Terms of Service</a> • 
-                        <a href="#" style="color: var(--color-primary);">Privacy Policy</a> • 
+                        <a href="#" style="color: var(--color-primary);">Terms of Service</a> •
+                        <a href="#" style="color: var(--color-primary);">Privacy Policy</a> •
                         <a href="#" style="color: var(--color-primary);">Contact Support</a>
                     </p>
                 </div>
             </div>
 
             <!-- Logout -->
-            <button onclick="logout()" class="btn btn-outline btn-block" style="margin-top: var(--spacing-2xl);">Logout</button>
+            <button onclick="logout()" class="btn btn-outline btn-block"
+                style="margin-top: var(--spacing-2xl);">Logout</button>
         </div>
     </div>
 
@@ -311,7 +324,7 @@
         function deleteAccount() {
             if (!confirm('Are you sure? This cannot be undone.')) return;
             if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) return;
-            
+
             alert('Account deletion coming soon');
         }
 
@@ -324,4 +337,5 @@
         }
     </script>
 </body>
+
 </html>

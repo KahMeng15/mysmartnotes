@@ -318,7 +318,7 @@
                 <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="notes.html" class="nav-link active">My Notes</a></li>
                     <li><a href="upload.html" class="nav-link">Upload</a></li>
                     <li><a href="chat.html" class="nav-link">Chat</a></li>
                 </ul>
@@ -331,10 +331,15 @@
     </nav>
 
     <!-- Main Content -->
-    <div class="container">
-        <a href="my-lectures.html"
-            style="color: var(--color-primary); margin-top: var(--spacing-xl); margin-bottom: var(--spacing-lg); display: inline-block;">
-            <i class="ph ph-arrow-left"></i> Back to Lectures</a>
+    <!-- Main Content -->
+    <div class="container" style="padding-top: var(--spacing-2xl);">
+        <!-- Back Link -->
+        <div style="margin-bottom: var(--spacing-md);">
+            <a href="notes.html" id="backLink"
+                style="color: var(--color-gray); font-size: var(--font-size-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                <i class="ph ph-arrow-left"></i> Back to Notes
+            </a>
+        </div>
 
         <div id="loadingContainer" class="loading">
             <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i></div>
@@ -537,6 +542,16 @@
             document.getElementById('fileName').textContent = lectureData.file_name;
             document.getElementById('subjectName').textContent = lectureData.subject?.name || 'Unknown';
             document.getElementById('uploadedDate').textContent = new Date(lectureData.created_at).toLocaleDateString();
+
+            // Update Back Link 
+            const backLink = document.getElementById('backLink');
+            if (lectureData.subject_id) {
+                backLink.href = `subject.html?id=${lectureData.subject_id}`;
+                backLink.innerHTML = `<i class="ph ph-arrow-left"></i> Back to Subject`;
+            } else {
+                backLink.href = 'notes.html';
+                backLink.innerHTML = `<i class="ph ph-arrow-left"></i> Back to Notes`;
+            }
 
             updateExtractedText();
         }

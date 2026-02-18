@@ -4,13 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Lecture - MySmartNotes</title>
+    <title>Upload - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         .upload-area {
             border: 2px dashed var(--color-primary);
@@ -190,16 +191,16 @@
     <nav class="navbar">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
-                    <li><a href="upload.html" class="nav-link active">Upload</a></li>
+                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
                     <li><a href="chat.html" class="nav-link">Chat</a></li>
+                    <li><a href="settings.html" class="nav-link">Settings</a></li>
                 </ul>
                 <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
-                    <a href="settings.html" class="nav-link">Settings</a>
-                    <div class="avatar" onclick="logout()">👤</div>
+                    <a href="upload.html" class="nav-link active">Upload</a>
+                    <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
                 </div>
             </div>
         </div>
@@ -208,42 +209,61 @@
     <!-- Main Content -->
     <div class="container" style="padding-top: var(--spacing-2xl); max-width: 800px;">
         <a href="dashboard.html"
-            style="color: var(--color-primary); margin-bottom: var(--spacing-lg); display: inline-block;">← Back to
+            style="color: var(--color-primary); margin-bottom: var(--spacing-lg); display: inline-block;"><i
+                class="ph ph-arrow-left"></i> Back to
             Dashboard</a>
 
-        <h1 style="margin-bottom: var(--spacing-md);">Upload Lecture</h1>
-        <p style="color: var(--color-gray); margin-bottom: var(--spacing-2xl);">Upload your lecture slides or notes for
+        <h1 style="margin-bottom: var(--spacing-md);">Upload</h1>
+        <p style="color: var(--color-gray); margin-bottom: var(--spacing-2xl);">Upload your slides or notes for
             processing</p>
 
-        <div class="card">
-            <form id="uploadForm" onsubmit="handleUpload(event)">
-                <!-- Subject Selection -->
-                <div class="form-group">
-                    <label>Subject *</label>
-                    <div class="subject-helper">
-                        <div class="subject-select-wrapper">
-                            <select id="subjectSelect" required>
-                                <option value="">Loading subjects...</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn-create-subject" onclick="showCreateSubjectModal()">+
-                            New</button>
+        <form id="uploadForm" onsubmit="handleUpload(event)">
+
+            <!-- Group Selection -->
+            <div class="form-group">
+                <label>Group *</label>
+                <div class="subject-helper">
+                    <div class="subject-select-wrapper">
+                        <select id="groupSelect" onchange="filterSubjects()" required style="background-color: white;">
+                            <option value="">Select a Group...</option>
+                        </select>
                     </div>
+                    <button type="button" class="btn-create-subject" onclick="showCreateGroupModal()"><i
+                            class="ph ph-plus"></i>
+                        New</button>
                 </div>
+            </div>
 
-                <!-- Lecture Title -->
-                <div class="form-group">
-                    <label>Lecture Title *</label>
-                    <input type="text" id="lectureTitle" placeholder="e.g., Calculus I - Chapter 3" required>
+            <!-- Subject Selection -->
+            <div class="form-group">
+                <label>Subject *</label>
+                <div class="subject-helper">
+                    <div class="subject-select-wrapper">
+                        <select id="subjectSelect" required style="background-color: white;">
+                            <option value="">Select a subject...</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn-create-subject" onclick="showCreateSubjectModal()"><i
+                            class="ph ph-plus"></i>
+                        New</button>
                 </div>
+            </div>
 
-                <!-- File Upload -->
-                <div class="form-group">
-                    <label>Upload File *</label>
-                    <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)"
-                        ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
-                        onclick="document.getElementById('fileInput').click()">
-                        <div class="upload-icon">📁</div>
+            <!-- Lecture Title -->
+            <div class="form-group">
+                <label>Lecture Title</label>
+                <input type="text" id="lectureTitle" placeholder="Leave empty to auto-detect from content">
+            </div>
+
+            <!-- File Upload -->
+            <div class="form-group">
+                <label>Upload File *</label>
+                <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)"
+                    ondragleave="handleDragLeave(event)" onclick="document.getElementById('fileInput').click()"
+                    style="background-color: white;">
+
+                    <div id="uploadPlaceholder">
+                        <div class="upload-icon"><i class="ph ph-folder-open"></i></div>
                         <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Drag and drop your file here
                         </div>
                         <div style="color: var(--color-gray); font-size: var(--font-size-sm);">or click to browse</div>
@@ -251,49 +271,61 @@
                             style="color: var(--color-gray); font-size: var(--font-size-xs); margin-top: var(--spacing-md);">
                             Supported: PDF, PPTX, PNG, JPG (Max 50MB)
                         </div>
-                        <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx,.png,.jpg,.jpeg"
-                            onchange="handleFileSelect(event)">
                     </div>
-                    <div id="fileList" class="file-list"></div>
-                </div>
+                    <div id="fileDisplay" style="display: none; width: 100%;"></div>
 
-                <!-- Progress -->
-                <div id="progressContainer" style="display: none;">
-                    <p style="font-size: var(--font-size-sm); color: var(--color-gray);">Uploading...</p>
-                    <div class="progress-bar">
-                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
-                    </div>
+                    <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx,.png,.jpg,.jpeg"
+                        onchange="handleFileSelect(event)">
                 </div>
+            </div>
 
-                <!-- Submit -->
-                <div style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-md);">
-                    <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Upload Lecture</button>
-                    <a href="dashboard.html" class="btn btn-outline btn-block"
-                        style="text-decoration: none; text-align: center;">Cancel</a>
+            <!-- Progress -->
+            <div id="progressContainer" style="display: none;">
+                <p style="font-size: var(--font-size-sm); color: var(--color-gray);">Uploading...</p>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Submit -->
+            <div style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-md);">
+                <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Upload</button>
+                <a href="dashboard.html" class="btn btn-outline btn-block"
+                    style="text-decoration: none; text-align: center;">Cancel</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Info (User commented out) -->
+    <!-- ... -->
+
+    </div>
+
+    <!-- Create Group Modal -->
+    <div id="groupModal" class="modal">
+        <div class="modal-content">
+            <h3>Create New Group</h3>
+            <form onsubmit="createGroup(event)">
+                <div class="form-group">
+                    <label for="newGroupName">Group Name</label>
+                    <input type="text" id="newGroupName" required placeholder="e.g., Semester 1">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Create Group</button>
+                    <button type="button" onclick="closeCreateGroupModal()" class="btn-cancel">Cancel</button>
                 </div>
             </form>
         </div>
-
-        <!-- Info -->
-        <div class="info-box">
-            <h4>💡 Processing Info</h4>
-            <ul>
-                <li>Text will be extracted automatically from your files</li>
-                <li>Images and diagrams will be preserved</li>
-                <li>Processing typically takes a few minutes</li>
-                <li>You'll get a notification when it's done</li>
-            </ul>
-        </div>
     </div>
 
-    <!-- Create Subject Modal (moved outside container to cover full page) -->
+    <!-- Create Subject Modal -->
     <div id="subjectModal" class="modal">
         <div class="modal-content">
             <h3>Create New Subject</h3>
             <form onsubmit="createSubject(event)">
                 <div class="form-group">
                     <label for="newSubjectName">Subject Name</label>
-                    <input type="text" id="newSubjectName" required placeholder="e.g., Physics 101">
+                    <input type="text" id="newSubjectName" required placeholder="e.g., Web Development">
                 </div>
                 <div class="form-group">
                     <label for="newSubjectDescription">Description</label>
@@ -311,15 +343,146 @@
         const TOKEN_KEY = 'token';
         const token = localStorage.getItem(TOKEN_KEY);
         let selectedFile = null;
+        let allSubjects = [];
 
         window.addEventListener('load', () => {
             if (!token) {
                 window.location.href = 'index.html';
                 return;
             }
-            loadSubjects();
+            loadData();
         });
 
+        async function loadData() {
+            try {
+                // 1. Fetch Groups
+                const groupsRes = await fetch('/groups', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (groupsRes.ok) {
+                    const groups = await groupsRes.json();
+                    populateGroups(groups);
+                }
+
+                // 2. Fetch Subjects
+                const subjectsRes = await fetch('/subjects', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (subjectsRes.ok) {
+                    allSubjects = await subjectsRes.json();
+                }
+
+                // 3. Handle URL Params
+                const urlParams = new URLSearchParams(window.location.search);
+                const groupId = urlParams.get('group_id');
+                const subjectId = urlParams.get('subject') || urlParams.get('subject_id');
+
+                if (groupId) {
+                    document.getElementById('groupSelect').value = groupId;
+                }
+
+                // Always populate subjects based on current group selection (or lack thereof)
+                filterSubjects();
+
+                if (subjectId) {
+                    // Try to find subject to verify it exists in current logic
+                    const subj = allSubjects.find(s => s.id == subjectId);
+                    if (subj) {
+                        // If group wasn't selected but subject has group, auto-select group?
+                        if (!groupId && subj.group_id) {
+                            document.getElementById('groupSelect').value = subj.group_id;
+                            filterSubjects();
+                        }
+                        document.getElementById('subjectSelect').value = subjectId;
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+
+        function populateGroups(groups) {
+            const groupSelect = document.getElementById('groupSelect');
+            // Keep default option? User said "not optional".
+            // But if there are no groups, we need a way to create one.
+            // And if we force selection, we need to select the first one.
+            groupSelect.innerHTML = '<option value="">Select a Group...</option>';
+            groups.forEach(g => {
+                const option = document.createElement('option');
+                option.value = g.id;
+                option.textContent = g.name;
+                groupSelect.appendChild(option);
+            });
+        }
+
+        function filterSubjects() {
+            const groupId = document.getElementById('groupSelect').value;
+            let filtered = allSubjects;
+
+            if (groupId) {
+                filtered = allSubjects.filter(s => s.group_id == groupId);
+            } else {
+                // If no group selected, show ALL subjects? Or only ungrouped?
+                // User said "Group box is not optional". This implies we SHOULD select a group.
+                // If user hasn't selected a group, maybe we shouldn't show subjects yet?
+                // But legacy subjects might be ungrouped.
+                // Let's show all for now to avoid breaking legacy flow, but UI encourages group selection.
+            }
+
+            const select = document.getElementById('subjectSelect');
+            select.innerHTML = '<option value="">Select a subject...</option>';
+            filtered.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = subject.name;
+                select.appendChild(option);
+            });
+        }
+
+        // --- Group Modal ---
+        function showCreateGroupModal() {
+            document.getElementById('groupModal').classList.add('active');
+        }
+
+        function closeCreateGroupModal() {
+            document.getElementById('groupModal').classList.remove('active');
+            document.getElementById('newGroupName').value = '';
+        }
+
+        async function createGroup(event) {
+            event.preventDefault();
+            const name = document.getElementById('newGroupName').value;
+            try {
+                const res = await fetch('/groups', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    const newGroup = await res.json();
+                    closeCreateGroupModal();
+                    // Reload groups
+                    const groupsRes = await fetch('/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (groupsRes.ok) {
+                        const groups = await groupsRes.json();
+                        populateGroups(groups);
+                        document.getElementById('groupSelect').value = newGroup.id;
+                        filterSubjects();
+                    }
+                    alert('Group created successfully!');
+                } else {
+                    alert('Failed to create group');
+                }
+            } catch (err) {
+                alert('Error creating group: ' + err.message);
+            }
+        }
+
+        // --- Subject Modal ---
         function showCreateSubjectModal() {
             document.getElementById('subjectModal').classList.add('active');
         }
@@ -332,9 +495,9 @@
 
         async function createSubject(event) {
             event.preventDefault();
-
             const name = document.getElementById('newSubjectName').value;
             const description = document.getElementById('newSubjectDescription').value;
+            const groupId = document.getElementById('groupSelect').value;
 
             try {
                 const response = await fetch('/subjects', {
@@ -346,13 +509,21 @@
                     body: JSON.stringify({
                         name,
                         description,
-                        color: '#3b82f6'
+                        color: '#3b82f6',
+                        group_id: groupId ? parseInt(groupId) : null
                     })
                 });
 
                 if (response.ok) {
+                    const newSubj = await response.json();
                     closeCreateSubjectModal();
-                    await loadSubjects();
+                    // Reload subjects
+                    const subjectsRes = await fetch('/subjects', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (subjectsRes.ok) {
+                        allSubjects = await subjectsRes.json();
+                        filterSubjects();
+                        document.getElementById('subjectSelect').value = newSubj.id;
+                    }
                     alert('Subject created successfully!');
                 } else {
                     const error = await response.json();
@@ -363,29 +534,6 @@
             }
         }
 
-        async function loadSubjects() {
-            try {
-                const response = await fetch('/subjects', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const subjects = await response.json();
-                    const select = document.getElementById('subjectSelect');
-                    select.innerHTML = '<option value="">Select a subject...</option>';
-                    subjects.forEach(subject => {
-                        const option = document.createElement('option');
-                        option.value = subject.id;
-                        option.textContent = subject.name;
-                        select.appendChild(option);
-                    });
-                } else {
-                    document.getElementById('subjectSelect').innerHTML = '<option value="">Error loading subjects</option>';
-                }
-            } catch (error) {
-                console.error('Error loading subjects:', error);
-                document.getElementById('subjectSelect').innerHTML = '<option value="">Error loading subjects</option>';
-            }
-        }
 
         function handleDragOver(event) {
             event.preventDefault();
@@ -415,15 +563,23 @@
         }
 
         function displayFile(file) {
-            const fileList = document.getElementById('fileList');
+            const placeholder = document.getElementById('uploadPlaceholder');
+            const fileDisplay = document.getElementById('fileDisplay');
             const sizeMB = (file.size / 1024 / 1024).toFixed(2);
-            fileList.innerHTML = `
-                <div class="file-item">
-                    <div>
-                        <div style="font-weight: 600; margin-bottom: 0.25rem;">📄 ${file.name}</div>
-                        <div style="font-size: 0.9rem; color: var(--color-gray);">${sizeMB} MB</div>
+
+            placeholder.style.display = 'none';
+            fileDisplay.style.display = 'block';
+
+            fileDisplay.innerHTML = `
+                <div class="file-item" style="border: none; padding: 0;">
+                    <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                        <div style="font-size: 2rem; color: var(--color-primary);"><i class="ph ph-file-text"></i></div>
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 0.25rem;">${file.name}</div>
+                            <div style="font-size: 0.9rem; color: var(--color-gray);">${sizeMB} MB</div>
+                        </div>
                     </div>
-                    <button type="button" onclick="clearFile()" class="btn btn-outline">Remove</button>
+                    <button type="button" onclick="event.stopPropagation(); clearFile()" class="btn btn-outline btn-small">Remove</button>
                 </div>
             `;
         }
@@ -431,8 +587,11 @@
         function clearFile() {
             selectedFile = null;
             document.getElementById('fileInput').value = '';
-            document.getElementById('fileList').innerHTML = '';
+            document.getElementById('uploadPlaceholder').style.display = 'block';
+            document.getElementById('fileDisplay').style.display = 'none';
+            document.getElementById('fileDisplay').innerHTML = '';
         }
+
 
         async function handleUpload(event) {
             event.preventDefault();

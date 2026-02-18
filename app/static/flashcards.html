@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flashcards - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         .study-header {
             display: flex;
@@ -170,19 +174,20 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
                     <li><a href="chat.html" class="nav-link">Chat</a></li>
                     <li><a href="settings.html" class="nav-link">Settings</a></li>
                 </ul>
-                <div class="avatar" onclick="logout()">👤</div>
+                <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
             </div>
         </div>
     </nav>
@@ -197,7 +202,8 @@
             <div class="stat-value"><span id="cardCount">0</span>/10</div>
             <div class="stat-label">Cards</div>
         </div>
-        <button onclick="exitStudy()" class="btn btn-outline" style="background: white; color: var(--color-primary);">Exit Study</button>
+        <button onclick="exitStudy()" class="btn btn-outline"
+            style="background: white; color: var(--color-primary);">Exit Study</button>
     </div>
 
     <!-- Content -->
@@ -235,31 +241,37 @@
         </div>
 
         <!-- Hint -->
-        <div style="text-align: center; color: var(--color-gray); font-size: var(--font-size-sm); margin-bottom: var(--spacing-lg);">
-            💡 Click the card to reveal the answer
+        <div
+            style="text-align: center; color: var(--color-gray); font-size: var(--font-size-sm); margin-bottom: var(--spacing-lg);">
+            <i class="ph ph-lightbulb"></i> Click the card to reveal the answer
         </div>
 
         <!-- Controls -->
         <div class="controls">
-            <button onclick="markWrong()" class="btn-control btn-wrong">❌ I got it wrong</button>
-            <button onclick="skipCard()" class="btn-control btn-skip">⏭️ Skip</button>
-            <button onclick="markCorrect()" class="btn-control btn-correct">✅ I got it right</button>
+            <button onclick="markWrong()" class="btn-control btn-wrong"><i class="ph ph-x"></i> I got it wrong</button>
+            <button onclick="skipCard()" class="btn-control btn-skip"><i class="ph ph-skip-forward"></i> Skip</button>
+            <button onclick="markCorrect()" class="btn-control btn-correct"><i class="ph ph-check"></i> I got it
+                right</button>
         </div>
 
         <!-- Progress Bar -->
-        <div style="background: var(--color-light-gray); height: 8px; border-radius: var(--radius-full); overflow: hidden; margin-top: var(--spacing-2xl);">
-            <div id="progressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); transition: width 0.3s ease;"></div>
+        <div
+            style="background: var(--color-light-gray); height: 8px; border-radius: var(--radius-full); overflow: hidden; margin-top: var(--spacing-2xl);">
+            <div id="progressBar"
+                style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--color-primary), var(--color-secondary)); transition: width 0.3s ease;">
+            </div>
         </div>
     </div>
 
     <!-- Finish Modal -->
     <div id="finishModal" class="finish-modal" style="display: none;">
         <div class="modal-content">
-            <div class="emoji-large">🎉</div>
+            <div class="emoji-large"><i class="ph ph-confetti"></i></div>
             <h2>Study Session Complete!</h2>
             <div style="margin: var(--spacing-lg) 0;">
                 <p><strong id="finalCorrect">0</strong> out of <strong id="finalTotal">10</strong> correct</p>
-                <p style="color: var(--color-gray); margin-top: var(--spacing-md); font-size: var(--font-size-sm);">Great job! Keep practicing to improve your score.</p>
+                <p style="color: var(--color-gray); margin-top: var(--spacing-md); font-size: var(--font-size-sm);">
+                    Great job! Keep practicing to improve your score.</p>
             </div>
             <div style="display: flex; gap: var(--spacing-md); margin-top: var(--spacing-lg);">
                 <button onclick="restartStudy()" class="btn btn-primary btn-block">Study Again</button>
@@ -294,11 +306,11 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!response.ok) throw new Error('Failed to load flashcards');
-                
+
                 const data = await response.json();
                 flashcards = data.flashcards || [];
                 stats.total = flashcards.length;
-                
+
                 if (flashcards.length === 0) {
                     alert('No flashcards available for this subject');
                     window.location.href = 'dashboard.html';
@@ -325,7 +337,7 @@
             document.getElementById('cardCount').textContent = currentIndex + 1;
             document.getElementById('subjectName').textContent = card.subject || 'Flashcard Study';
             document.getElementById('flashcard').classList.remove('flipped');
-            
+
             updateProgressBar();
         }
 
@@ -358,7 +370,7 @@
             document.getElementById('correctCount').textContent = stats.correct;
             document.getElementById('wrongCount').textContent = stats.wrong;
             document.getElementById('skipCount').textContent = stats.skipped;
-            
+
             const answered = stats.correct + stats.wrong;
             const percentage = answered > 0 ? Math.round((stats.correct / answered) * 100) : 0;
             document.getElementById('percentageCorrect').textContent = percentage + '%';
@@ -402,4 +414,5 @@
         }
     </script>
 </body>
+
 </html>

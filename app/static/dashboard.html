@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         .dashboard-grid {
             display: grid;
@@ -98,21 +102,22 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
-                    <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
                     <li><a href="chat.html" class="nav-link">Chat</a></li>
                     <li><a href="settings.html" class="nav-link">Settings</a></li>
                 </ul>
                 <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
                     <span id="userDisplay" style="font-size: var(--font-size-sm);"></span>
-                    <div class="avatar" onclick="logout()">👤</div>
+                    <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
                 </div>
             </div>
         </div>
@@ -122,8 +127,9 @@
     <div class="container" style="padding-top: var(--spacing-2xl);">
         <!-- Welcome Section -->
         <div style="margin-bottom: var(--spacing-2xl);">
-            <h1>Welcome back, <span id="userName">Student</span>! 👋</h1>
-            <p style="color: var(--color-gray); font-size: var(--font-size-lg);">Let's continue your learning journey</p>
+            <h1>Welcome back, <span id="userName">Student</span>! <i class="ph ph-hand-waving"></i></h1>
+            <p style="color: var(--color-gray); font-size: var(--font-size-lg);">Let's continue your learning journey
+            </p>
         </div>
 
         <!-- Quick Stats -->
@@ -131,7 +137,7 @@
             <div class="card card-stat">
                 <div class="card-stat-value">5</div>
                 <div class="card-stat-label">Total Subjects</div>
-                <div class="card-stat-delta positive">✓ Active</div>
+                <div class="card-stat-delta positive"><i class="ph ph-check"></i> Active</div>
             </div>
             <div class="card card-stat">
                 <div class="card-stat-value">24</div>
@@ -153,20 +159,25 @@
         <!-- Quick Actions -->
         <h2 style="margin-top: var(--spacing-2xl);">Quick Actions</h2>
         <div class="quick-actions">
-            <a href="upload.html" class="card action-btn" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none;">
-                <div class="icon">📤</div>
+            <a href="upload.html" class="card action-btn"
+                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none;">
+                <div class="icon"><i class="ph ph-upload-simple"></i></div>
                 <div style="font-weight: 600;">Upload Lecture</div>
             </a>
-            <a href="my-lectures.html" class="card action-btn" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-decoration: none;">
-                <div class="icon">📚</div>
-                <div style="font-weight: 600;">My Lectures</div>
+            <a href="notes.html" class="card action-btn"
+                style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; text-decoration: none;">
+                <div class="icon"><i class="ph ph-notebook"></i></div>
+                <div style="font-weight: 600;">My Notes</div>
             </a>
-            <a href="chat.html" class="card action-btn" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; text-decoration: none;">
-                <div class="icon">💬</div>
+
+            <a href="chat.html" class="card action-btn"
+                style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; text-decoration: none;">
+                <div class="icon"><i class="ph ph-chat-circle-dots"></i></div>
                 <div style="font-weight: 600;">Ask AI</div>
             </a>
-            <a href="subjects.html" class="card action-btn" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; text-decoration: none;">
-                <div class="icon">📋</div>
+            <a href="subjects.html" class="card action-btn"
+                style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; text-decoration: none;">
+                <div class="icon"><i class="ph ph-clipboard-text"></i></div>
                 <div style="font-weight: 600;">Subjects</div>
             </a>
         </div>
@@ -267,8 +278,8 @@
                     <div class="subject-card-content">
                         <div class="subject-name">${subject.name}</div>
                         <div class="subject-stats">
-                            <span>📚 0 lectures</span>
-                            <span>🎯 0 tasks</span>
+                            <span><i class="ph ph-file-text"></i> 0 lectures</span>
+                            <span><i class="ph ph-check-circle"></i> 0 tasks</span>
                         </div>
                     </div>
                 </div>
@@ -303,7 +314,7 @@
             list.innerHTML = lectures.map(lecture => `
                 <li class="lecture-item">
                     <div>
-                        <div class="lecture-title">📄 ${lecture.title}</div>
+                        <div class="lecture-title"><i class="ph ph-file-pdf"></i> ${lecture.title}</div>
                         <div class="lecture-date">${new Date(lecture.created_at).toLocaleDateString()}</div>
                     </div>
                     <button onclick="openLecture(${lecture.id})" class="btn btn-primary btn-small">Open</button>
@@ -361,4 +372,5 @@
         }
     </script>
 </body>
+
 </html>

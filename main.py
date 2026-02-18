@@ -10,7 +10,7 @@ import os
 
 from app.config import get_settings
 from app.utils.db import init_db
-from app.routers import auth, subjects, lectures, chat, documents, flashcards, study_sessions, search, analytics, processing
+from app.routers import auth, subjects, lectures, chat, documents, flashcards, study_sessions, search, analytics, processing, groups
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -59,6 +59,7 @@ app.include_router(study_sessions.router)
 app.include_router(search.router)
 app.include_router(analytics.router)
 app.include_router(processing.router)
+app.include_router(groups.router)
 
 # Serve generated files (images, PDFs, etc.)
 generated_dir = os.path.join(os.path.dirname(__file__), "generated")

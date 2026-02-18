@@ -50,14 +50,20 @@ async def get_lectures(
 
 @router.post("/upload", response_model=LectureResponse, status_code=status.HTTP_201_CREATED)
 async def upload_lecture(
-    title: str = Form(...),
     subject_id: int = Form(...),
     file: UploadFile = File(...),
+    title: str = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Upload a lecture file and create lecture record"""
     
+    # Handle auto-title
+    auto_detect_title = False
+    if not title:
+        title = os.path.splitext(file.filename)[0]
+        auto_detect_title = True
+
     # Validate subject exists and belongs to user
     subject = db.query(Subject).filter(
         Subject.id == subject_id,
@@ -140,6 +146,17 @@ async def upload_lecture(
             
             db_lecture.extracted_text = markdown
             db_lecture.extracted_content_structured = json.dumps(structured_segments)
+            
+            # Auto-title detection from H1
+            if auto_detect_title:
+                for line in markdown.split('\n'):
+                    if line.strip().startswith('# '):
+                        detected_title = line.strip()[2:].strip()
+                        if detected_title:
+                            db_lecture.title = detected_title
+                            logger.info(f"Auto-detected title: {detected_title}")
+                            break
+            
             db.commit()
             db.refresh(db_lecture)
             

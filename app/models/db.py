@@ -24,6 +24,22 @@ class User(Base):
     subjects = relationship("Subject", back_populates="owner", cascade="all, delete-orphan")
     study_sessions = relationship("StudySession", back_populates="user", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
+    subject_groups = relationship("SubjectGroup", back_populates="user", cascade="all, delete-orphan")
+
+
+class SubjectGroup(Base):
+    """Group of subjects (e.g. Semester 1)"""
+    __tablename__ = "subject_groups"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="subject_groups")
+    subjects = relationship("Subject", back_populates="group", cascade="all, delete-orphan")
 
 
 class Subject(Base):
@@ -32,6 +48,7 @@ class Subject(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    group_id = Column(Integer, ForeignKey("subject_groups.id"), nullable=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
     color = Column(String(7), default="#3b82f6")  # hex color
@@ -40,6 +57,7 @@ class Subject(Base):
     
     # Relationships
     owner = relationship("User", back_populates="subjects")
+    group = relationship("SubjectGroup", back_populates="subjects")
     lectures = relationship("Lecture", back_populates="subject", cascade="all, delete-orphan")
 
 

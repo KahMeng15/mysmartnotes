@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         .chat-container {
             display: flex;
@@ -140,19 +144,20 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
                     <li><a href="chat.html" class="nav-link active">Chat</a></li>
                     <li><a href="settings.html" class="nav-link">Settings</a></li>
                 </ul>
-                <div class="avatar" onclick="logout()">👤</div>
+                <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
             </div>
         </div>
     </nav>
@@ -177,13 +182,15 @@
             <!-- Header -->
             <div class="chat-header">
                 <h3 id="chatTitle">Select a lecture to start</h3>
-                <p style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions about your lecture content</p>
+                <p style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions about your
+                    lecture content</p>
             </div>
 
             <!-- Messages -->
             <div class="chat-messages" id="messagesContainer">
                 <div class="empty-state">
-                    <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);">💬</div>
+                    <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);"><i
+                            class="ph ph-chat-circle-dots"></i></div>
                     <p>Select a lecture to begin asking questions</p>
                 </div>
             </div>
@@ -192,7 +199,8 @@
             <div class="chat-input-area">
                 <div class="chat-input-form">
                     <input type="text" id="messageInput" placeholder="Ask a question about this lecture..." disabled>
-                    <button type="button" id="sendBtn" class="btn btn-primary" disabled onclick="sendMessage()">→</button>
+                    <button type="button" id="sendBtn" class="btn btn-primary" disabled onclick="sendMessage()"><i
+                            class="ph ph-paper-plane-right"></i></button>
                 </div>
             </div>
         </div>
@@ -234,13 +242,13 @@
             if (!lectureId) return;
             selectedLectureId = lectureId;
             messages = [];
-            
+
             const lectureTitle = document.getElementById('lectureSelect').options[document.getElementById('lectureSelect').selectedIndex].text;
             document.getElementById('chatTitle').textContent = lectureTitle;
-            
+
             document.getElementById('messageInput').disabled = false;
             document.getElementById('sendBtn').disabled = false;
-            
+
             displayMessages();
             document.getElementById('messageInput').focus();
         }
@@ -254,19 +262,19 @@
         async function sendMessage() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
-            
+
             if (!message || !selectedLectureId) return;
-            
+
             // Add user message
             messages.push({
                 role: 'user',
                 content: message,
                 time: new Date()
             });
-            
+
             input.value = '';
             displayMessages();
-            
+
             // Show loading
             messages.push({
                 role: 'ai',
@@ -275,7 +283,7 @@
                 loading: true
             });
             displayMessages();
-            
+
             try {
                 const response = await fetch(`${API_URL}/chat/ask`, {
                     method: 'POST',
@@ -288,7 +296,7 @@
                         message: message
                     })
                 });
-                
+
                 if (response.ok) {
                     const data = await response.json();
                     messages.pop(); // Remove loading message
@@ -314,23 +322,23 @@
                     time: new Date()
                 });
             }
-            
+
             displayMessages();
         }
 
         function displayMessages() {
             const container = document.getElementById('messagesContainer');
-            
+
             if (messages.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);">💬</div>
+                        <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);"><i class="ph ph-chat-circle-dots"></i></div>
                         <p>Start asking questions about this lecture</p>
                     </div>
                 `;
                 return;
             }
-            
+
             container.innerHTML = messages.map((msg, idx) => `
                 <div class="message ${msg.role}">
                     <div class="message-content">
@@ -341,7 +349,7 @@
                     </div>
                 </div>
             `).join('');
-            
+
             // Scroll to bottom
             container.scrollTop = container.scrollHeight;
         }
@@ -355,4 +363,5 @@
         }
     </script>
 </body>
+
 </html>

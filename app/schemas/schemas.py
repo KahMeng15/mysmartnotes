@@ -35,10 +35,33 @@ class TokenResponse(BaseModel):
 
 
 # ========== Subject Schemas ==========
+
+# ========== Subject Group Schemas ==========
+class SubjectGroupBase(BaseModel):
+    name: str
+
+class SubjectGroupCreate(SubjectGroupBase):
+    pass
+
+class SubjectGroupUpdate(BaseModel):
+    name: Optional[str] = None
+
+class SubjectGroup(SubjectGroupBase):
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ========== Subject Schemas ==========
 class SubjectBase(BaseModel):
     name: str
     description: Optional[str] = None
     color: str = "#3b82f6"
+    group_id: Optional[int] = None
 
 
 class SubjectCreate(SubjectBase):
@@ -49,6 +72,7 @@ class SubjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
+    group_id: Optional[int] = None
 
 
 class Subject(SubjectBase):
@@ -63,6 +87,10 @@ class Subject(SubjectBase):
 class SubjectResponse(Subject):
     """Response schema for subject endpoints"""
     pass
+
+
+class SubjectGroupResponse(SubjectGroup):
+    subjects: List[SubjectResponse] = []
 
 
 # ========== Lecture Schemas ==========

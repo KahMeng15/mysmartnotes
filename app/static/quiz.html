@@ -1,13 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         .quiz-header {
             display: flex;
@@ -179,19 +183,20 @@
         }
     </style>
 </head>
+
 <body>
     <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand">📚 MySmartNotes</a>
+                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="my-lectures.html" class="nav-link">My Lectures</a></li>
+                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
                     <li><a href="chat.html" class="nav-link">Chat</a></li>
                     <li><a href="settings.html" class="nav-link">Settings</a></li>
                 </ul>
-                <div class="avatar" onclick="logout()">👤</div>
+                <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
             </div>
         </div>
     </nav>
@@ -232,13 +237,15 @@
         </div>
 
         <!-- Submit Button -->
-        <button onclick="submitQuiz()" class="btn btn-primary btn-block" style="margin-top: var(--spacing-2xl);">Submit Quiz</button>
+        <button onclick="submitQuiz()" class="btn btn-primary btn-block" style="margin-top: var(--spacing-2xl);">Submit
+            Quiz</button>
     </div>
 
     <!-- Result Modal -->
     <div id="resultModal" class="result-modal" style="display: none;">
         <div class="modal-content">
-            <div style="font-size: 48px; margin-bottom: var(--spacing-lg);">📊</div>
+            <div style="font-size: 48px; margin-bottom: var(--spacing-lg); color: var(--color-primary);"><i
+                    class="ph ph-chart-bar"></i></div>
             <h2>Quiz Complete!</h2>
             <div class="score-display" id="scorePercentage">85%</div>
             <div class="score-feedback" id="scoreFeedback">Excellent work! Keep it up!</div>
@@ -289,7 +296,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!response.ok) throw new Error('Failed to load quiz');
-                
+
                 const data = await response.json();
                 quiz = data.questions || [];
 
@@ -301,7 +308,7 @@
 
                 document.getElementById('totalQuestions').textContent = quiz.length;
                 document.getElementById('totalCount').textContent = quiz.length;
-                
+
                 // Create progress dots
                 const track = document.getElementById('progressTrack');
                 track.innerHTML = '';
@@ -380,7 +387,7 @@
                 timeRemaining--;
                 const mins = Math.floor(timeRemaining / 60);
                 const secs = timeRemaining % 60;
-                document.getElementById('timerDisplay').textContent = 
+                document.getElementById('timerDisplay').textContent =
                     `${mins}:${secs.toString().padStart(2, '0')}`;
 
                 if (timeRemaining <= 0) {
@@ -401,11 +408,11 @@
             document.getElementById('timeSpent').textContent = formatTime(totalTime);
 
             if (percentage >= 80) {
-                document.getElementById('scoreFeedback').textContent = '🎉 Excellent work! Keep it up!';
+                document.getElementById('scoreFeedback').innerHTML = '<i class="ph ph-confetti"></i> Excellent work! Keep it up!';
             } else if (percentage >= 60) {
-                document.getElementById('scoreFeedback').textContent = '👍 Good job! Review the material to improve.';
+                document.getElementById('scoreFeedback').innerHTML = '<i class="ph ph-thumbs-up"></i> Good job! Review the material to improve.';
             } else {
-                document.getElementById('scoreFeedback').textContent = '📚 Keep studying! You\'ll improve with practice.';
+                document.getElementById('scoreFeedback').innerHTML = '<i class="ph ph-books"></i> Keep studying! You\'ll improve with practice.';
             }
 
             document.getElementById('resultModal').style.display = 'flex';
@@ -466,4 +473,5 @@
         }
     </script>
 </body>
+
 </html>
