@@ -12,6 +12,8 @@
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/nav.js"></script>
     <style>
         .dashboard-grid {
             display: grid;
@@ -104,24 +106,7 @@
 </head>
 
 <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
-                <ul class="navbar-nav">
-                    <li><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
-                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
-                    <li><a href="chat.html" class="nav-link">Chat</a></li>
-                    <li><a href="settings.html" class="nav-link">Settings</a></li>
-                </ul>
-                <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
-                    <span id="userDisplay" style="font-size: var(--font-size-sm);"></span>
-                    <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
-                </div>
-            </div>
-        </div>
-    </nav>
+
 
     <!-- Main Content -->
     <div class="container" style="padding-top: var(--spacing-2xl);">
@@ -244,7 +229,6 @@
         function loadUserInfo() {
             const user = JSON.parse(localStorage.getItem('user') || '{}');
             document.getElementById('userName').textContent = user.username || 'Student';
-            document.getElementById('userDisplay').textContent = user.username || 'User';
         }
 
         async function loadSubjects() {

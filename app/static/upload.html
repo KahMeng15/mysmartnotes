@@ -12,6 +12,8 @@
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/nav.js"></script>
     <style>
         .upload-area {
             border: 2px dashed var(--color-primary);
@@ -187,113 +189,105 @@
 </head>
 
 <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
-                <ul class="navbar-nav">
-                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
-                    <li><a href="chat.html" class="nav-link">Chat</a></li>
-                    <li><a href="settings.html" class="nav-link">Settings</a></li>
-                </ul>
-                <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
-                    <a href="upload.html" class="nav-link active">Upload</a>
-                    <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
-                </div>
-            </div>
-        </div>
-    </nav>
+
 
     <!-- Main Content -->
-    <div class="container" style="padding-top: var(--spacing-2xl); max-width: 800px;">
+    <div class="container" style="padding-top: var(--spacing-2xl);">
         <a href="dashboard.html"
             style="color: var(--color-primary); margin-bottom: var(--spacing-lg); display: inline-block;"><i
                 class="ph ph-arrow-left"></i> Back to
             Dashboard</a>
 
-        <h1 style="margin-bottom: var(--spacing-md);">Upload</h1>
-        <p style="color: var(--color-gray); margin-bottom: var(--spacing-2xl);">Upload your slides or notes for
-            processing</p>
-
-        <form id="uploadForm" onsubmit="handleUpload(event)">
-
-            <!-- Group Selection -->
-            <div class="form-group">
-                <label>Group *</label>
-                <div class="subject-helper">
-                    <div class="subject-select-wrapper">
-                        <select id="groupSelect" onchange="filterSubjects()" required style="background-color: white;">
-                            <option value="">Select a Group...</option>
-                        </select>
-                    </div>
-                    <button type="button" class="btn-create-subject" onclick="showCreateGroupModal()"><i
-                            class="ph ph-plus"></i>
-                        New</button>
-                </div>
+        <div class="d-flex justify-content-between align-items-center" style="margin-bottom: var(--spacing-xl);">
+            <div>
+                <h1>Upload</h1>
+                <p style="color: var(--color-gray); margin-bottom: 0;">Upload your slides or notes for processing</p>
             </div>
+        </div>
 
-            <!-- Subject Selection -->
-            <div class="form-group">
-                <label>Subject *</label>
-                <div class="subject-helper">
-                    <div class="subject-select-wrapper">
-                        <select id="subjectSelect" required style="background-color: white;">
-                            <option value="">Select a subject...</option>
-                        </select>
-                    </div>
-                    <button type="button" class="btn-create-subject" onclick="showCreateSubjectModal()"><i
-                            class="ph ph-plus"></i>
-                        New</button>
-                </div>
-            </div>
+        <div class="group-section"
+            style="background: white; border-radius: var(--radius-lg); padding: var(--spacing-xl); border: 1px solid var(--color-light-gray); margin: 0;">
+            <form id="uploadForm" onsubmit="handleUpload(event)">
 
-            <!-- Lecture Title -->
-            <div class="form-group">
-                <label>Lecture Title</label>
-                <input type="text" id="lectureTitle" placeholder="Leave empty to auto-detect from content">
-            </div>
-
-            <!-- File Upload -->
-            <div class="form-group">
-                <label>Upload File *</label>
-                <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)" ondragover="handleDragOver(event)"
-                    ondragleave="handleDragLeave(event)" onclick="document.getElementById('fileInput').click()"
-                    style="background-color: white;">
-
-                    <div id="uploadPlaceholder">
-                        <div class="upload-icon"><i class="ph ph-folder-open"></i></div>
-                        <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Drag and drop your file here
+                <!-- Group Selection -->
+                <div class="form-group">
+                    <label>Group *</label>
+                    <div class="subject-helper">
+                        <div class="subject-select-wrapper">
+                            <select id="groupSelect" onchange="filterSubjects()" required
+                                style="background-color: white;">
+                                <option value="">Select a Group...</option>
+                            </select>
                         </div>
-                        <div style="color: var(--color-gray); font-size: var(--font-size-sm);">or click to browse</div>
-                        <div
-                            style="color: var(--color-gray); font-size: var(--font-size-xs); margin-top: var(--spacing-md);">
-                            Supported: PDF, PPTX, PNG, JPG (Max 50MB)
-                        </div>
+                        <button type="button" class="btn-create-subject" onclick="showCreateGroupModal()"><i
+                                class="ph ph-plus"></i>
+                            New</button>
                     </div>
-                    <div id="fileDisplay" style="display: none; width: 100%;"></div>
-
-                    <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx,.png,.jpg,.jpeg"
-                        onchange="handleFileSelect(event)">
                 </div>
-            </div>
 
-            <!-- Progress -->
-            <div id="progressContainer" style="display: none;">
-                <p style="font-size: var(--font-size-sm); color: var(--color-gray);">Uploading...</p>
-                <div class="progress-bar">
-                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                <!-- Subject Selection -->
+                <div class="form-group">
+                    <label>Subject *</label>
+                    <div class="subject-helper">
+                        <div class="subject-select-wrapper">
+                            <select id="subjectSelect" required style="background-color: white;">
+                                <option value="">Select a subject...</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn-create-subject" onclick="showCreateSubjectModal()"><i
+                                class="ph ph-plus"></i>
+                            New</button>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Submit -->
-            <div style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-md);">
-                <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Upload</button>
-                <a href="dashboard.html" class="btn btn-outline btn-block"
-                    style="text-decoration: none; text-align: center;">Cancel</a>
-            </div>
-        </form>
+                <!-- Lecture Title -->
+                <div class="form-group">
+                    <label>Lecture Title</label>
+                    <input type="text" id="lectureTitle" placeholder="Leave empty to auto-detect from content">
+                </div>
+
+                <!-- File Upload -->
+                <div class="form-group">
+                    <label>Upload File *</label>
+                    <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)"
+                        ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
+                        onclick="document.getElementById('fileInput').click()" style="background-color: white;">
+
+                        <div id="uploadPlaceholder">
+                            <div class="upload-icon"><i class="ph ph-folder-open"></i></div>
+                            <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Drag and drop your file
+                                here
+                            </div>
+                            <div style="color: var(--color-gray); font-size: var(--font-size-sm);">or click to browse
+                            </div>
+                            <div
+                                style="color: var(--color-gray); font-size: var(--font-size-xs); margin-top: var(--spacing-md);">
+                                Supported: PDF, PPTX, PNG, JPG (Max 50MB)
+                            </div>
+                        </div>
+                        <div id="fileDisplay" style="display: none; width: 100%;"></div>
+
+                        <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx,.png,.jpg,.jpeg"
+                            onchange="handleFileSelect(event)">
+                    </div>
+                </div>
+
+                <!-- Progress -->
+                <div id="progressContainer" style="display: none;">
+                    <p style="font-size: var(--font-size-sm); color: var(--color-gray);">Uploading...</p>
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-md);">
+                    <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Upload</button>
+                    <a href="dashboard.html" class="btn btn-outline btn-block"
+                        style="text-decoration: none; text-align: center;">Cancel</a>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Info (User commented out) -->

@@ -12,6 +12,8 @@
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/nav.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .stats-grid {
@@ -154,21 +156,7 @@
 </head>
 
 <body>
-    <!-- Navigation -->
-    <nav class="navbar">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
-                <ul class="navbar-nav">
-                    <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
-                    <li><a href="chat.html" class="nav-link">Chat</a></li>
-                    <li><a href="settings.html" class="nav-link">Settings</a></li>
-                </ul>
-                <div class="avatar" onclick="logout()"><i class="ph ph-user-circle"></i></div>
-            </div>
-        </div>
-    </nav>
+
 
     <!-- Content -->
     <div class="container" style="padding-top: var(--spacing-2xl); padding-bottom: var(--spacing-2xl);">
