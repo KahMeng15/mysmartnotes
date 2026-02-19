@@ -27,12 +27,10 @@
     window.fetch = async function (url, options = {}) {
         // Add Authorization header if token exists and not already set
         if (token && !options.headers?.Authorization && !options.headers?.['Authorization']) {
-            // Note: Some existing calls might set it manually, so we only add if missing OR if we want to enforce it.
-            // However, existing code might use different headers or constructs.
-            // Given the existing code manually adds 'Authorization': `Bearer ${token}`, 
-            // we can either automate it here or just listen for 401s.
-            // For now, let's just listen for 401s to avoid breaking custom requests, 
-            // as the primary goal is to catch failures.
+            options.headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`
+            };
         }
 
         try {

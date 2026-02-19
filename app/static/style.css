@@ -2,7 +2,7 @@
 
 :root {
   /* Primary Colors */
-  --color-primary: #4ECDC4;
+  --color-primary: #00012b;
   --color-primary-dark: #3AB8B0;
   --color-primary-light: #7EDCD6;
 
@@ -317,6 +317,24 @@ a:hover {
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
+.card-content {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-2xl);
+  border: 1px solid var(--color-light-gray);
+}
+
+.card-content {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-base);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-2xl);
+  border: 1px solid var(--color-light-gray);
+}
+
 .card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
@@ -442,7 +460,7 @@ textarea {
 
 .btn-outline {
   background: transparent;
-  border: 2px solid var(--color-primary);
+  border: 1px solid var(--color-primary);
   color: var(--color-primary);
 }
 
@@ -508,6 +526,31 @@ textarea {
   background: rgba(231, 76, 60, 0.1);
   color: var(--color-error);
   border-color: var(--color-error);
+}
+
+.coming-soon-badge {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: var(--color-primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.card-stat.coming-soon {
+  opacity: 0.7;
+  position: relative;
+}
+
+.disabled-btn {
+  opacity: 0.7;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .alert-warning {
@@ -805,6 +848,74 @@ textarea {
   border-radius: var(--radius-lg);
   border: 1px dashed var(--color-light-gray);
 }
+
+/* Lecture List Item Styles (Shared) */
+.lecture-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.lecture-item {
+  background: var(--color-background);
+  border: 1px solid var(--color-light-gray);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all var(--transition-base);
+}
+
+.lecture-item:hover {
+  transform: translateX(4px);
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-background);
+  /* Override default hover */
+}
+
+.lecture-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex: 1;
+  cursor: pointer;
+}
+
+.lecture-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--color-white);
+  color: var(--color-primary);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border: 1px solid var(--color-light-gray);
+  margin-bottom: 0;
+  /* Override subject-icon margin */
+}
+
+.lecture-details h4 {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+
+.lecture-details p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-gray);
+}
+
+.lecture-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+
 
 .controls-bar {
   display: flex;

@@ -6,7 +6,7 @@ from datetime import timedelta
 from app.models.db import User
 from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, TokenResponse
 from app.utils.db import get_db
-from app.utils.auth import hash_password, verify_password, create_access_token
+from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user as get_current_user_from_token
 from app.config import get_settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -64,11 +64,10 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "user": user}
 
 
 @router.get("/me", response_model=UserSchema)
-def get_current_user(token: str = None, db: Session = Depends(get_db)):
+def get_current_user(current_user: User = Depends(get_current_user_from_token)):
     """Get current user info"""
-    # This is a simplified version - real implementation should extract token from header
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    return current_user

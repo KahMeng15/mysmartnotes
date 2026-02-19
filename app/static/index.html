@@ -303,6 +303,9 @@
                 if (response.ok) {
                     const data = await response.json();
                     localStorage.setItem('token', data.access_token);
+                    if (data.user) {
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                    }
                     messageEl.className = 'message success';
                     messageEl.textContent = 'Login successful! Redirecting...';
                     setTimeout(() => {

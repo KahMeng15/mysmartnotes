@@ -32,6 +32,7 @@ class User(UserBase):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    user: User
 
 
 # ========== Subject Schemas ==========
