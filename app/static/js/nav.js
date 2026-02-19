@@ -18,7 +18,7 @@ function injectNavbar() {
                 <a href="dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
                 <ul class="navbar-nav">
                     <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="notes.html" class="nav-link">My Notes</a></li>
+                    <li><a href="mynotes.html" class="nav-link">My Notes</a></li>
                     <li><a href="chat.html" class="nav-link">Chat</a></li>
                     <li><a href="upload.html" class="nav-link">Upload</a></li>
                 </ul>
