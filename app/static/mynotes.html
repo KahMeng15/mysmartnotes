@@ -13,9 +13,12 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
+    <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
+    <script src="js/utils.js"></script>
     <style>
         /* Modal Styles (reused/inline for simplicity) */
+        /* Modal Styles from upload.html */
         .modal {
             display: none;
             position: fixed;
@@ -24,17 +27,64 @@
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
             align-items: center;
             justify-content: center;
-            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
         }
 
         .modal-content {
             background: white;
-            padding: var(--spacing-2xl);
             border-radius: var(--radius-lg);
-            width: 100%;
+            padding: var(--spacing-xl);
             max-width: 500px;
+            min-height: 400px;
+            /* Slightly smaller min-height for edit modals */
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-content h2 {
+            margin-bottom: var(--spacing-lg);
+            font-size: 1.5rem;
+        }
+
+        .modal-content form {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        /* Push buttons to bottom */
+        .modal-buttons {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: auto;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: var(--spacing-md);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-save {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: var(--color-light-gray);
+            color: var(--color-text);
         }
     </style>
 </head>
@@ -74,33 +124,27 @@
     </div>
 
     <!-- Create Group Modal -->
-    <div id="groupModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Create New Group</h2>
-                <button class="modal-close" onclick="closeModal('groupModal')">&times;</button>
-            </div>
+    <div id="groupModal" class="modal">
+        <div class="modal-content">
+            <h2>Create New Group</h2>
             <form onsubmit="handleCreateGroup(event)">
                 <div class="form-group">
                     <label>Group Name</label>
                     <input type="text" id="groupNameInput" class="form-control" placeholder="e.g. Semester 1, Year 2"
                         required>
                 </div>
-                <div class="d-flex justify-content-end gap-sm" style="margin-top: var(--spacing-xl);">
-                    <button type="button" onclick="closeModal('groupModal')" class="btn btn-outline">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Group</button>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Create Group</button>
+                    <button type="button" onclick="closeModal('groupModal')" class="btn-cancel">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Create Subject Modal -->
-    <div id="subjectModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Add New Subject</h2>
-                <button class="modal-close" onclick="closeModal('subjectModal')">&times;</button>
-            </div>
+    <div id="subjectModal" class="modal">
+        <div class="modal-content">
+            <h2>Add New Subject</h2>
             <form onsubmit="handleCreateSubject(event)">
                 <input type="hidden" id="targetGroupId">
                 <div class="form-group">
@@ -112,35 +156,32 @@
                     <label>Description (Optional)</label>
                     <textarea id="subjectDescInput" class="form-control" rows="3"></textarea>
                 </div>
-                <!-- Color picker simplified -->
                 <div class="form-group">
                     <label>Color Tag</label>
-                    <input type="color" id="subjectColorInput" value="#3b82f6" style="width: 100%; height: 40px;">
+                    <input type="color" id="subjectColorInput" value="#3b82f6"
+                        style="width: 100%; height: 40px; border: none; padding: 0;">
                 </div>
-                <div class="d-flex justify-content-end gap-sm" style="margin-top: var(--spacing-xl);">
-                    <button type="button" onclick="closeModal('subjectModal')" class="btn btn-outline">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Subject</button>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Add Subject</button>
+                    <button type="button" onclick="closeModal('subjectModal')" class="btn-cancel">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Edit Group Modal -->
-    <div id="editGroupModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Edit Group</h2>
-                <button class="modal-close" onclick="closeModal('editGroupModal')">&times;</button>
-            </div>
+    <div id="editGroupModal" class="modal">
+        <div class="modal-content">
+            <h2>Edit Group</h2>
             <form onsubmit="handleEditGroup(event)">
                 <input type="hidden" id="editGroupId">
                 <div class="form-group">
                     <label>Group Name</label>
                     <input type="text" id="editGroupNameInput" class="form-control" required>
                 </div>
-                <div class="d-flex justify-content-end gap-sm" style="margin-top: var(--spacing-xl);">
-                    <button type="button" onclick="closeModal('editGroupModal')" class="btn btn-outline">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Save Changes</button>
+                    <button type="button" onclick="closeModal('editGroupModal')" class="btn-cancel">Cancel</button>
                 </div>
             </form>
         </div>
@@ -344,27 +385,32 @@
 
         // --- Modals ---
         function openGroupModal() {
-            document.getElementById('groupModal').classList.add('show');
+            document.getElementById('groupModal').classList.add('active');
             document.getElementById('groupNameInput').value = '';
             document.getElementById('groupNameInput').focus();
         }
 
         function openEditGroupModal(id, name) {
-            document.getElementById('editGroupModal').classList.add('show');
+            document.getElementById('editGroupModal').classList.add('active');
             document.getElementById('editGroupId').value = id;
             document.getElementById('editGroupNameInput').value = name;
             document.getElementById('editGroupNameInput').focus();
         }
 
         function openSubjectModal(groupId) {
-            document.getElementById('subjectModal').classList.add('show');
+            document.getElementById('subjectModal').classList.add('active');
             document.getElementById('targetGroupId').value = groupId || '';
             document.getElementById('subjectNameInput').value = '';
             document.getElementById('subjectDescInput').value = '';
+
+            // Auto-generate color
+            const existingColors = subjectsData.map(s => s.color || '#3b82f6');
+            const newColor = generateContrastingColor(existingColors);
+            document.getElementById('subjectColorInput').value = newColor;
         }
 
         function closeModal(id) {
-            document.getElementById(id).classList.remove('show');
+            document.getElementById(id).classList.remove('active');
         }
 
         // --- Actions ---
@@ -457,6 +503,14 @@
         }
 
         function openSubject(id) {
+            window.location.href = `note.html?id=${id}`; // Note: user renamed lecture-view to note.html, assumption is subject links to note.html? Wait, subject links to subject.html usually.
+            // Let's check original code. It was `window.location.href = 'subject.html?id=${id}'`.
+            // Wait, I should double check where 'subject.html' links to.
+            // In the file view earlier: `window.location.href = 'subject.html?id=${id}'` (line 460)
+            // But I see `note.html` referenced in tasks.
+            // Task says: "Rename lecture-view.html to note.html".
+            // Subject page is likely `subject.html`.
+            // I will keep it as `subject.html` unless I see evidence otherwise.
             window.location.href = `subject.html?id=${id}`;
         }
 
@@ -470,8 +524,8 @@
 
         // Close modal on outside click
         window.onclick = function (event) {
-            if (event.target.classList.contains('modal-overlay')) {
-                event.target.classList.remove('show');
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
             }
         }
     </script>

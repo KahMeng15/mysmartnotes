@@ -199,7 +199,7 @@
 
         async function loadUserInfo() {
             let user = JSON.parse(localStorage.getItem('user') || '{}');
-            let name = user.username;
+            let name = user.nickname || user.full_name || user.username;
 
             // If name is missing but we have a token, try to fetch user info
             if (!name) {
@@ -208,7 +208,7 @@
                     if (response.ok) {
                         user = await response.json();
                         localStorage.setItem('user', JSON.stringify(user));
-                        name = user.username;
+                        name = user.nickname || user.full_name || user.username;
                     } else if (response.status === 401) {
                         // Token invalid/expired, redirect to login
                         window.location.href = 'index.html';

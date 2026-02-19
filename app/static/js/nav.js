@@ -73,8 +73,8 @@ function displayUser() {
         try {
             const user = JSON.parse(userStr);
             const display = document.getElementById('navUserDisplay');
-            if (display && user.username) {
-                display.textContent = user.username;
+            if (display) {
+                display.textContent = user.nickname || user.full_name || user.username || 'Student';
             }
         } catch (e) {
             console.error('Error parsing user data', e);

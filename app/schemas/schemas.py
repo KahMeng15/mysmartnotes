@@ -9,15 +9,24 @@ class UserBase(BaseModel):
     username: str
     email: EmailStr
     full_name: Optional[str] = None
+    nickname: Optional[str] = None
 
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
+    email: EmailStr
     password: str
+    nickname: str
+    full_name: Optional[str] = None
 
 
 class UserLogin(BaseModel):
-    username: str
+    email: EmailStr
     password: str
+
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    nickname: Optional[str] = None
 
 
 class User(UserBase):

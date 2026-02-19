@@ -567,40 +567,85 @@ textarea {
 
 /* ===== MODALS ===== */
 
-.modal-overlay {
+.modal {
   display: none;
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 200;
+  z-index: 1000;
   align-items: center;
   justify-content: center;
 }
 
-.modal-overlay.show {
+.modal.active {
   display: flex;
 }
 
-.modal {
+.modal-content {
   background: var(--color-white);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-2xl);
+  padding: var(--spacing-xl);
+  max-width: 500px;
   width: 90%;
-  box-shadow: var(--shadow-xl);
-}
-
-.modal-header {
-  margin-bottom: var(--spacing-lg);
-  padding-bottom: var(--spacing-lg);
-  border-bottom: 1px solid var(--color-light-gray);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  max-height: 90vh;
+  /* Prevent overflow on small screens */
+  overflow-y: auto;
 }
 
+.modal-content h2,
+.modal-content h3 {
+  margin-bottom: var(--spacing-lg);
+  font-size: 1.5rem;
+}
+
+.modal-content form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
+  /* Add spacing above buttons */
+}
+
+.modal-buttons button {
+  flex: 1;
+  padding: var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-save {
+  background: var(--color-primary);
+  color: white;
+}
+
+.btn-save:hover {
+  background: var(--color-primary-dark);
+}
+
+.btn-cancel {
+  background: var(--color-light-gray);
+  color: var(--color-text);
+}
+
+.btn-cancel:hover {
+  background: #aab2b7;
+}
+
+/* Close button for header-style modals (optional, if used) */
 .modal-close {
   background: none;
   border: none;

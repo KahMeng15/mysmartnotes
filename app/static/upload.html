@@ -13,7 +13,9 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
+    <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
+    <script src="js/utils.js"></script>
     <style>
         .upload-area {
             border: 2px dashed var(--color-primary);
@@ -111,28 +113,28 @@
             background: white;
             border-radius: var(--radius-lg);
             padding: var(--spacing-xl);
-            max-width: 400px;
+            max-width: 500px;
+            min-height: 500px;
             width: 90%;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-content form {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
         }
 
         .modal-content h3 {
             margin-bottom: var(--spacing-lg);
         }
 
-        .modal-content input {
-            width: 100%;
-            padding: var(--spacing-md);
-            margin-top: var(--spacing-sm);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-md);
-            font-family: inherit;
-        }
-
         .modal-buttons {
             display: flex;
             gap: var(--spacing-md);
-            margin-top: var(--spacing-lg);
+            margin-top: auto;
         }
 
         .modal-buttons button {
@@ -151,16 +153,8 @@
         }
 
         .btn-cancel {
-            background: var(--color-border);
+            background: var(--color-light-gray);
             color: var(--color-text);
-        }
-
-        .btn-save:hover {
-            background: var(--color-primary-dark);
-        }
-
-        .btn-cancel:hover {
-            background: #e0e0e0;
         }
 
         .info-box {
@@ -312,15 +306,20 @@
     <!-- Create Subject Modal -->
     <div id="subjectModal" class="modal">
         <div class="modal-content">
-            <h3>Create New Subject</h3>
+            <h3>Add New Subject</h3>
             <form onsubmit="createSubject(event)">
                 <div class="form-group">
                     <label for="newSubjectName">Subject Name</label>
                     <input type="text" id="newSubjectName" required placeholder="e.g., Web Development">
                 </div>
                 <div class="form-group">
-                    <label for="newSubjectDescription">Description</label>
-                    <input type="text" id="newSubjectDescription" placeholder="Optional description">
+                    <label for="newSubjectDescription">Description (Optional)</label>
+                    <textarea id="newSubjectDescription" placeholder="Optional description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="newSubjectColor">Color Tag</label>
+                    <input type="color" id="newSubjectColor" value="#3b82f6"
+                        style="width: 100%; height: 40px; border: none; padding: 0;">
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn-save">Create Subject</button>
@@ -476,6 +475,11 @@
         // --- Subject Modal ---
         function showCreateSubjectModal() {
             document.getElementById('subjectModal').classList.add('active');
+
+            // Auto-generate color
+            const existingColors = allSubjects.map(s => s.color || '#3b82f6');
+            const newColor = generateContrastingColor(existingColors);
+            document.getElementById('newSubjectColor').value = newColor;
         }
 
         function closeCreateSubjectModal() {
@@ -488,6 +492,7 @@
             event.preventDefault();
             const name = document.getElementById('newSubjectName').value;
             const description = document.getElementById('newSubjectDescription').value;
+            const color = document.getElementById('newSubjectColor').value;
             const groupId = document.getElementById('groupSelect').value;
 
             try {
@@ -500,7 +505,7 @@
                     body: JSON.stringify({
                         name,
                         description,
-                        color: '#3b82f6',
+                        color,
                         group_id: groupId ? parseInt(groupId) : null
                     })
                 });

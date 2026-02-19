@@ -213,8 +213,8 @@
                 <div id="registerMessage" class="message"></div>
                 <form id="registerForm">
                     <div class="form-group">
-                        <label for="regUsername">Username</label>
-                        <input type="text" id="regUsername" required>
+                        <label for="regNickname">Nickname</label>
+                        <input type="text" id="regNickname" required placeholder="What should we call you?">
                     </div>
                     <div class="form-group">
                         <label for="regEmail">Email</label>
@@ -237,8 +237,8 @@
                 <div id="loginMessage" class="message"></div>
                 <form id="loginForm">
                     <div class="form-group">
-                        <label for="loginUsername">Username</label>
-                        <input type="text" id="loginUsername" required>
+                        <label for="loginEmail">Email</label>
+                        <input type="email" id="loginEmail" required>
                     </div>
                     <div class="form-group">
                         <label for="loginPassword">Password</label>
@@ -263,7 +263,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        username: document.getElementById('regUsername').value,
+                        nickname: document.getElementById('regNickname').value,
                         email: document.getElementById('regEmail').value,
                         full_name: document.getElementById('regFullName').value,
                         password: document.getElementById('regPassword').value
@@ -295,7 +295,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        username: document.getElementById('loginUsername').value,
+                        email: document.getElementById('loginEmail').value,
                         password: document.getElementById('loginPassword').value
                     })
                 });
