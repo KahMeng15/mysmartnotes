@@ -517,3 +517,69 @@ async def download_pdf(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error downloading PDF"
         )
+
+
+@router.put("/{lecture_id}/content", response_model=LectureResponse)
+async def update_lecture_content(
+    lecture_id: int,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Save edited markdown content back to the lecture"""
+    lecture = db.query(Lecture).options(joinedload(Lecture.subject)).filter(
+        Lecture.id == lecture_id,
+        Lecture.user_id == current_user.id
+    ).first()
+    
+    if not lecture:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lecture not found"
+        )
+    
+    new_text = body.get("extracted_text")
+    if new_text is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="extracted_text is required"
+        )
+    
+    lecture.extracted_text = new_text
+    lecture.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(lecture)
+    
+    logger.info(f"Updated content for lecture {lecture_id}: {len(new_text)} chars")
+    return lecture
+
+
+@router.get("/{lecture_id}/download-file")
+async def download_original_file(
+    lecture_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download the original uploaded file"""
+    lecture = db.query(Lecture).filter(
+        Lecture.id == lecture_id,
+        Lecture.user_id == current_user.id
+    ).first()
+    
+    if not lecture:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lecture not found"
+        )
+    
+    if not lecture.file_path or not os.path.exists(lecture.file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Original file not found"
+        )
+    
+    return FileResponse(
+        path=lecture.file_path,
+        filename=lecture.file_name or f"lecture_{lecture_id}",
+        media_type=lecture.file_type or "application/octet-stream"
+    )

@@ -14,55 +14,70 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
+    <script src="js/utils.js"></script>
     <style>
-        .lecture-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        /* ===== NOTE HEADER ===== */
+        .note-header {
             padding: var(--spacing-2xl);
             border-radius: var(--radius-lg);
             margin-bottom: var(--spacing-2xl);
+            position: relative;
+            overflow: hidden;
         }
 
-        .lecture-header h1 {
+        .note-header h1 {
             margin: 0 0 var(--spacing-md) 0;
             font-size: 2rem;
         }
 
-        .lecture-meta {
+        .note-header-meta {
             display: flex;
-            gap: var(--spacing-2xl);
+            gap: var(--spacing-lg);
             flex-wrap: wrap;
             font-size: var(--font-size-sm);
-            opacity: 0.9;
-        }
-
-        .lecture-meta-item {
-            display: flex;
-            gap: var(--spacing-md);
             align-items: center;
         }
 
-        .lecture-content {
+        .note-header-meta a {
+            text-decoration: none;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: opacity 0.2s;
+        }
+
+        .note-header-meta a:hover {
+            opacity: 0.8;
+        }
+
+        .meta-separator {
+            opacity: 0.5;
+        }
+
+        /* ===== LAYOUT ===== */
+        .note-content {
             display: grid;
-            grid-template-columns: 1fr 350px;
+            grid-template-columns: 1fr 340px;
             gap: var(--spacing-2xl);
         }
 
-        .lecture-main {
+        .note-main {
             min-width: 0;
         }
 
-        .lecture-sidebar {
+        .note-sidebar {
             display: flex;
             flex-direction: column;
             gap: var(--spacing-lg);
         }
 
+        /* ===== SECTION CARDS ===== */
         .section-card {
             background: white;
             border-radius: var(--radius-lg);
             padding: var(--spacing-lg);
-            border: 1px solid var(--color-border);
+            border: 1px solid var(--color-light-gray);
         }
 
         .section-title {
@@ -70,146 +85,433 @@
             margin-bottom: var(--spacing-md);
             display: flex;
             align-items: center;
+            gap: var(--spacing-sm);
+            font-size: var(--font-size-base);
+        }
+
+        /* ===== INFO ITEMS ===== */
+        .info-item {
+            padding: var(--spacing-md);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-sm);
+            display: flex;
+            align-items: center;
             gap: var(--spacing-md);
         }
 
-        .extracted-text {
-            line-height: 1.6;
-            color: var(--color-text);
-            padding: var(--spacing-md);
+        .info-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-item.clickable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .info-item.clickable:hover {
+            background: var(--color-light-gray);
+        }
+
+        .info-icon {
+            width: 32px;
+            height: 32px;
             border-radius: var(--radius-md);
-            font-size: var(--font-size-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+            background: white;
+            border: 1px solid var(--color-light-gray);
+            color: var(--color-primary);
         }
 
-        .extracted-text-preview {
-            color: var(--color-gray);
-            font-size: var(--font-size-xs);
-            margin-top: var(--spacing-md);
-        }
-
-        .sidebar-item {
-            padding: var(--spacing-lg);
-            background: var(--color-background);
-            border-radius: var(--radius-md);
-        }
-
-        .sidebar-label {
+        .info-label {
             font-size: var(--font-size-xs);
             color: var(--color-gray);
             text-transform: uppercase;
             font-weight: 600;
-            margin-bottom: var(--spacing-sm);
         }
 
-        .sidebar-value {
+        .info-value {
             font-weight: 500;
-            color: var(--color-text);
+            color: var(--color-dark);
+            font-size: var(--font-size-sm);
             word-break: break-word;
         }
 
-        .action-buttons {
+        /* ===== ACTION GRID ===== */
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-sm);
+        }
+
+        .action-btn {
             display: flex;
-            gap: var(--spacing-md);
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-md);
+            border: 1px solid var(--color-light-gray);
+            border-radius: var(--radius-md);
+            background: white;
+            cursor: pointer;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            color: var(--color-dark);
+            transition: all 0.2s;
+            font-family: var(--font-primary);
         }
 
-        .action-buttons .btn {
-            flex: 1;
+        .action-btn:hover {
+            background: var(--color-background);
+            border-color: var(--color-primary);
+            color: var(--color-primary);
         }
 
-        @media (max-width: 968px) {
-            .lecture-content {
-                grid-template-columns: 1fr;
-            }
-
-            .lecture-header h1 {
-                font-size: 1.5rem;
-            }
-
-            .lecture-meta {
-                flex-direction: column;
-                gap: var(--spacing-md);
-            }
+        .action-btn.delete-btn:hover {
+            border-color: var(--color-error);
+            color: var(--color-error);
         }
 
-        .loading {
-            text-align: center;
-            padding: var(--spacing-2xl);
+        .action-btn.coming-soon {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .action-btn i {
+            font-size: 18px;
+        }
+
+        /* ===== SNAPSHOT ITEMS ===== */
+        .snapshot-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .snapshot-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-md);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .snapshot-item:hover {
+            background: var(--color-light-gray);
+            border-color: var(--color-primary);
+        }
+
+        .snapshot-item.active {
+            border-color: var(--color-primary);
+            background: rgba(78, 205, 196, 0.05);
+        }
+
+        .snapshot-name {
+            font-weight: 500;
+            font-size: var(--font-size-sm);
+        }
+
+        .snapshot-date {
+            font-size: var(--font-size-xs);
             color: var(--color-gray);
         }
 
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: var(--spacing-lg);
-            border-radius: var(--radius-md);
-            border-left: 4px solid #c33;
+        .snapshot-delete {
+            background: none;
+            border: none;
+            color: var(--color-gray);
+            cursor: pointer;
+            padding: 4px;
+            font-size: 14px;
+            transition: color 0.2s;
         }
 
-        .progress-container {
-            padding: var(--spacing-lg);
-            background: var(--color-background);
-            border-radius: var(--radius-md);
+        .snapshot-delete:hover {
+            color: var(--color-error);
         }
 
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: var(--radius-full);
-            overflow: hidden;
-            margin: var(--spacing-md) 0;
+        /* ===== EDITOR (FULLSCREEN) ===== */
+        .editor-container {
+            display: none;
         }
 
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--color-primary), var(--color-primary-dark));
-            width: 0%;
-            transition: width 0.3s ease;
+        .editor-container.active {
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            background: white;
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: var(--spacing-sm) var(--spacing-md);
-            border-radius: var(--radius-full);
-            font-size: var(--font-size-xs);
+        /* Top bar: logo | toolbar | actions */
+        .editor-topbar {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: 8px 16px;
+            background: var(--color-dark);
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .editor-logo {
+            font-family: var(--font-heading);
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            margin-right: var(--spacing-md);
+        }
+
+        .editor-logo i {
+            font-size: 1.3rem;
+        }
+
+        .editor-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            align-items: center;
+            flex: 1;
+        }
+
+        .toolbar-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            font-size: 13px;
             font-weight: 600;
-            text-transform: uppercase;
-            margin-bottom: var(--spacing-md);
+            color: rgba(255, 255, 255, 0.85);
+            transition: all 0.15s;
+            font-family: var(--font-primary);
         }
 
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
+        .toolbar-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
         }
 
-        .status-running {
-            background: #d1ecf1;
-            color: #0c5460;
+        .toolbar-btn.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
         }
 
-        .status-completed {
-            background: #d4edda;
-            color: #155724;
+        .toolbar-sep {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 0 3px;
         }
 
-        .status-failed {
-            background: #f8d7da;
-            color: #721c24;
+        .toolbar-toggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.7);
+            transition: all 0.15s;
+            font-family: var(--font-primary);
         }
-    </style>
-    <!-- Use local marked.js for offline support and reliability -->
-    <script src="/js/marked.min.js"></script>
-    <script>
-        // Fallback to CDN if local fails (though local should exist)
-        if (typeof marked === 'undefined') {
-            document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');
+
+        .toolbar-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
         }
-    </script>
-    <style>
-        /* Markdown Styles */
+
+        .toolbar-toggle.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+
+        .editor-topbar-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-left: var(--spacing-md);
+            flex-shrink: 0;
+        }
+
+        .editor-topbar-actions .btn {
+            padding: 6px 16px;
+            font-size: var(--font-size-sm);
+        }
+
+        .editor-topbar-actions .btn-outline {
+            color: rgba(255, 255, 255, 0.8);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .editor-topbar-actions .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        /* Editor body area */
+        .editor-body {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            justify-content: center;
+            background: var(--color-background);
+        }
+
+        .wysiwyg-area {
+            width: 100%;
+            max-width: 900px;
+            min-height: 100%;
+            padding: 48px 64px;
+            outline: none;
+            line-height: 1.8;
+            font-size: 16px;
+            color: var(--color-dark);
+            background: white;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.06);
+        }
+
+        .wysiwyg-area:focus {
+            outline: none;
+        }
+
+        .wysiwyg-area h1,
+        .wysiwyg-area h2,
+        .wysiwyg-area h3,
+        .wysiwyg-area h4,
+        .wysiwyg-area h5 {
+            margin-top: 1.2em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+        }
+
+        .wysiwyg-area h1 {
+            font-size: 2rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0.3em;
+        }
+
+        .wysiwyg-area h2 {
+            font-size: 1.6rem;
+        }
+
+        .wysiwyg-area h3 {
+            font-size: 1.3rem;
+        }
+
+        .wysiwyg-area p {
+            margin-bottom: 0.8em;
+        }
+
+        .wysiwyg-area ul,
+        .wysiwyg-area ol {
+            margin-bottom: 1em;
+            padding-left: 2em;
+        }
+
+        .wysiwyg-area li {
+            margin-bottom: 0.25em;
+        }
+
+        .wysiwyg-area blockquote {
+            border-left: 4px solid #ddd;
+            margin: 0.5em 0;
+            padding-left: 1em;
+            color: #666;
+        }
+
+        .wysiwyg-area code {
+            font-family: var(--font-mono);
+            background: #f5f5f5;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+
+        .wysiwyg-area pre {
+            background: #f5f5f5;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 1em 0;
+        }
+
+        .wysiwyg-area pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .wysiwyg-area table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+
+        .wysiwyg-area th,
+        .wysiwyg-area td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .wysiwyg-area th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .wysiwyg-area img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .source-textarea {
+            width: 100%;
+            max-width: 900px;
+            min-height: 100%;
+            padding: 48px 64px;
+            border: none;
+            resize: none;
+            font-family: var(--font-mono);
+            font-size: var(--font-size-sm);
+            line-height: 1.7;
+            outline: none;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            display: none;
+        }
+
+        .source-textarea:focus {
+            outline: none;
+        }
+
+        /* ===== MARKDOWN (read-only view) ===== */
         .markdown-content {
             line-height: 1.6;
-            color: var(--color-text);
+            color: var(--color-dark);
         }
 
         .markdown-content h1,
@@ -309,14 +611,121 @@
             border-radius: 4px;
             margin: 1em 0;
         }
+
+        /* ===== STATUS & PROGRESS ===== */
+        .loading {
+            text-align: center;
+            padding: var(--spacing-2xl);
+            color: var(--color-gray);
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-md);
+            border-left: 4px solid #c33;
+        }
+
+        .progress-container {
+            padding: var(--spacing-lg);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            margin: var(--spacing-md) 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-primary-dark));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-full);
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-running {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .snapshot-save-row {
+            display: flex;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .snapshot-save-row input {
+            flex: 1;
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-size: var(--font-size-sm);
+        }
+
+        .snapshot-save-row button {
+            padding: var(--spacing-sm) var(--spacing-md);
+            font-size: var(--font-size-sm);
+            white-space: nowrap;
+        }
+
+        /* Responsive */
+        @media (max-width: 968px) {
+            .note-content {
+                grid-template-columns: 1fr;
+            }
+
+            .note-header h1 {
+                font-size: 1.5rem;
+            }
+
+            .editor-split {
+                grid-template-columns: 1fr;
+            }
+
+            .action-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
+    <script src="/js/marked.min.js"></script>
+    <script>
+        if (typeof marked === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');
+        }
+    </script>
 </head>
 
 <body>
 
-
-    <!-- Main Content -->
-    <!-- Main Content -->
     <div class="container" style="padding-top: var(--spacing-2xl);">
         <!-- Back Link -->
         <div style="margin-bottom: var(--spacing-md);">
@@ -332,32 +741,21 @@
         </div>
 
         <div id="lectureContainer" style="display: none;">
-            <!-- Lecture Header -->
-            <div class="lecture-header">
+            <!-- Note Header -->
+            <div class="note-header" id="noteHeader">
                 <h1 id="lectureTitle">Lecture Title</h1>
-                <div class="lecture-meta">
-                    <div class="lecture-meta-item">
-                        <span><i class="ph ph-calendar-blank"></i></span>
-                        <span id="lectureDate">Date</span>
-                    </div>
-                    <div class="lecture-meta-item">
-                        <span><i class="ph ph-hard-drives"></i></span>
-                        <span id="lectureSize">Size</span>
-                    </div>
-                    <div class="lecture-meta-item">
-                        <span><i class="ph ph-file-text"></i></span>
-                        <span id="lectureType">Type</span>
-                    </div>
+                <div class="note-header-meta">
+                    <a href="#" id="metaSubject"><i class="ph ph-book-open"></i> <span>Subject</span></a>
+                    <span class="meta-separator">•</span>
+                    <a href="#" id="metaGroup"><i class="ph ph-folder"></i> <span>Group</span></a>
                 </div>
             </div>
 
             <!-- Content Area -->
-            <div class="lecture-content">
+            <div class="note-content">
                 <!-- Main Content -->
-                <div class="lecture-main">
+                <div class="note-main">
                     <div class="section-card">
-                        <!-- Extracted Text Header Removed -->
-
                         <!-- Status Badge -->
                         <div id="extractionStatus" style="display: none;">
                             <div id="statusBadge" class="status-badge status-pending">Pending</div>
@@ -381,7 +779,7 @@
                         </div>
 
                         <!-- Error Container -->
-                        <div id="errorContainer" style="display: none;">
+                        <div id="errorContainerInline" style="display: none;">
                             <div class="error-message">
                                 <strong>⚠️ Processing Failed</strong>
                                 <p id="errorDetails"
@@ -390,79 +788,150 @@
                             </div>
                         </div>
 
-                        <!-- Extracted Text -->
-                        <div id="extractedText" class="extracted-text markdown-content">
-                            <p style="color: var(--color-gray); text-align: center; padding: var(--spacing-lg);">
-                                Loading...</p>
+                        <!-- View Mode: Rendered Markdown -->
+                        <div id="viewContainer">
+                            <div id="extractedText" class="markdown-content">
+                                <p style="color: var(--color-gray); text-align: center; padding: var(--spacing-lg);">
+                                    Loading...</p>
+                            </div>
                         </div>
 
+                        <!-- Edit Mode: Fullscreen WYSIWYG Editor -->
+                        <div id="editorContainer" class="editor-container">
+                            <div class="editor-topbar">
+                                <div class="editor-logo"><i class="ph ph-notebook"></i> MySmartNotes</div>
+                                <div class="editor-toolbar" id="editorToolbar">
+                                    <button class="toolbar-btn" onclick="execCmd('formatBlock','H1')"
+                                        title="Heading 1">H1</button>
+                                    <button class="toolbar-btn" onclick="execCmd('formatBlock','H2')"
+                                        title="Heading 2">H2</button>
+                                    <button class="toolbar-btn" onclick="execCmd('formatBlock','H3')"
+                                        title="Heading 3">H3</button>
+                                    <div class="toolbar-sep"></div>
+                                    <button class="toolbar-btn" id="btnBold" onclick="execCmd('bold')"
+                                        title="Bold (Ctrl+B)"><b>B</b></button>
+                                    <button class="toolbar-btn" id="btnItalic" onclick="execCmd('italic')"
+                                        title="Italic (Ctrl+I)"><i>I</i></button>
+                                    <button class="toolbar-btn" id="btnUnderline" onclick="execCmd('underline')"
+                                        title="Underline (Ctrl+U)"><u>U</u></button>
+                                    <button class="toolbar-btn" id="btnStrike" onclick="execCmd('strikeThrough')"
+                                        title="Strikethrough"><s>S</s></button>
+                                    <div class="toolbar-sep"></div>
+                                    <button class="toolbar-btn" id="btnUl" onclick="execCmd('insertUnorderedList')"
+                                        title="Bullet List"><i class="ph ph-list-bullets"></i></button>
+                                    <button class="toolbar-btn" id="btnOl" onclick="execCmd('insertOrderedList')"
+                                        title="Numbered List"><i class="ph ph-list-numbers"></i></button>
+                                    <div class="toolbar-sep"></div>
+                                    <button class="toolbar-btn" onclick="insertTableWysiwyg()" title="Insert Table"><i
+                                            class="ph ph-table"></i></button>
+                                    <button class="toolbar-btn" onclick="execCmd('formatBlock','BLOCKQUOTE')"
+                                        title="Blockquote"><i class="ph ph-quotes"></i></button>
+                                    <button class="toolbar-btn" onclick="insertCodeBlock()" title="Code Block"><i
+                                            class="ph ph-code"></i></button>
+                                    <div class="toolbar-sep"></div>
+                                    <button class="toolbar-btn" onclick="document.execCommand('undo')"
+                                        title="Undo (Ctrl+Z)"><i class="ph ph-arrow-counter-clockwise"></i></button>
+                                    <button class="toolbar-btn" onclick="document.execCommand('redo')"
+                                        title="Redo (Ctrl+Shift+Z)"><i class="ph ph-arrow-clockwise"></i></button>
+                                    <button class="toolbar-toggle" id="sourceToggle" onclick="toggleSource()"
+                                        title="View raw markdown">
+                                        <i class="ph ph-code"></i> Source
+                                    </button>
+                                </div>
+                                <div class="editor-topbar-actions">
+                                    <button class="btn btn-outline" onclick="cancelEdit()">Cancel</button>
+                                    <button class="btn btn-primary" onclick="saveContent()"><i
+                                            class="ph ph-floppy-disk"></i> Save</button>
+                                </div>
+                            </div>
+                            <div class="editor-body">
+                                <div id="wysiwygArea" class="wysiwyg-area" contenteditable="true"></div>
+                                <textarea id="sourceTextarea" class="source-textarea" spellcheck="false"></textarea>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Sidebar -->
-                <div class="lecture-sidebar">
-                    <!-- Quick Info -->
+                <div class="note-sidebar">
+                    <!-- Info Card -->
                     <div class="section-card">
                         <div class="section-title"><i class="ph ph-info"></i> Info</div>
-                        <div class="sidebar-item">
-                            <div class="sidebar-label">File Name</div>
-                            <div class="sidebar-value" id="fileName">-</div>
+                        <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
+                            onclick="downloadOriginalFile()">
+                            <div class="info-icon"><i class="ph ph-file-arrow-down"></i></div>
+                            <div>
+                                <div class="info-label">File Name</div>
+                                <div class="info-value" id="fileName">-</div>
+                            </div>
                         </div>
-                        <div class="sidebar-item" style="margin-top: var(--spacing-md);">
-                            <div class="sidebar-label">Subject</div>
-                            <div class="sidebar-value" id="subjectName">-</div>
+                        <div class="info-item">
+                            <div class="info-icon"><i class="ph ph-calendar-blank"></i></div>
+                            <div>
+                                <div class="info-label">Uploaded</div>
+                                <div class="info-value" id="uploadedDate">-</div>
+                            </div>
                         </div>
-                        <div class="sidebar-item" style="margin-top: var(--spacing-md);">
-                            <div class="sidebar-label">Uploaded</div>
-                            <div class="sidebar-value" id="uploadedDate">-</div>
+                        <div class="info-item">
+                            <div class="info-icon"><i class="ph ph-file-text"></i></div>
+                            <div>
+                                <div class="info-label">File Type</div>
+                                <div class="info-value" id="fileType">-</div>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-icon"><i class="ph ph-hard-drives"></i></div>
+                            <div>
+                                <div class="info-label">File Size</div>
+                                <div class="info-value" id="fileSize">-</div>
+                            </div>
+                        </div>
+                        <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
+                            onclick="reprocessOCR()">
+                            <div class="info-icon"><i class="ph ph-timer"></i></div>
+                            <div>
+                                <div class="info-label">Processing</div>
+                                <div class="info-value" id="processingTime">-</div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Actions -->
+                    <!-- Snapshots Card -->
+                    <div class="section-card">
+                        <div class="section-title"><i class="ph ph-camera"></i> Snapshots</div>
+                        <div class="snapshot-save-row">
+                            <input type="text" id="snapshotNameInput" placeholder="Snapshot name...">
+                            <button class="btn btn-primary btn-small" onclick="createSnapshot()"><i
+                                    class="ph ph-plus"></i> Save</button>
+                        </div>
+                        <div id="snapshotList" class="snapshot-list">
+                            <p
+                                style="color: var(--color-gray); font-size: var(--font-size-sm); text-align: center; padding: var(--spacing-md);">
+                                No snapshots yet</p>
+                        </div>
+                    </div>
+
+                    <!-- Actions Card -->
                     <div class="section-card">
                         <div class="section-title"><i class="ph ph-lightning"></i> Actions</div>
-                        <div class="action-buttons">
-                            <button class="btn btn-primary" onclick="generateFlashcards()"><i class="ph ph-cards"></i>
+                        <div class="action-grid">
+                            <button class="action-btn" onclick="goToChat()"><i class="ph ph-chat-circle-dots"></i>
+                                Chat</button>
+                            <button class="action-btn" onclick="toggleEdit()" id="editBtn"><i
+                                    class="ph ph-pencil-simple"></i> Edit</button>
+                            <button class="action-btn" onclick="reprocessOCR()" id="autoFormatBtn"><i
+                                    class="ph ph-magic-wand"></i> Auto Format</button>
+                            <button class="action-btn coming-soon" title="Coming Soon"><i
+                                    class="ph ph-text-align-left"></i> Summarize</button>
+                            <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-exam"></i>
+                                Quiz</button>
+                            <button class="action-btn" onclick="generateFlashcards()"><i class="ph ph-cards"></i>
                                 Flashcards</button>
-                        </div>
-
-                        <div class="action-buttons" style="margin-top: var(--spacing-md);">
-                            <button class="btn btn-secondary" onclick="reprocessOCR()" id="reprocessBtn"><i
-                                    class="ph ph-arrows-clockwise"></i>
-                                Reprocess</button>
-                        </div>
-
-                        <div class="action-buttons" style="margin-top: var(--spacing-md);">
-                            <button class="btn btn-primary" onclick="generatePDF()" id="generatePdfBtn"><i
-                                    class="ph ph-file-pdf"></i> Generate
-                                PDF</button>
-                        </div>
-
-                        <div class="action-buttons" style="margin-top: var(--spacing-md);">
-                            <button class="btn btn-outline" onclick="downloadPDF()" id="downloadPdfBtn"
-                                style="display: none; width: 100%;"><i class="ph ph-download-simple"></i> Download
-                                PDF</button>
-                        </div>
-
-                        <div class="action-buttons" style="margin-top: var(--spacing-md);">
-                            <button class="btn btn-outline" onclick="deleteLecture()"><i class="ph ph-trash"></i>
+                            <button class="action-btn" onclick="exportNote()"><i class="ph ph-export"></i>
+                                Export</button>
+                            <button class="action-btn delete-btn" onclick="deleteLecture()"><i class="ph ph-trash"></i>
                                 Delete</button>
                         </div>
-                    </div>
-
-                    <!-- Chat Section -->
-                    <div class="section-card">
-                        <div class="section-title"><i class="ph ph-chat-circle-dots"></i> Quick Chat</div>
-                        <div id="chatPreview"
-                            style="font-size: var(--font-size-sm); color: var(--color-gray); padding: var(--spacing-md); background: var(--color-background); border-radius: var(--radius-md); margin-bottom: var(--spacing-md); max-height: 200px; overflow-y: auto;">
-                            <p style="text-align: center;">No messages yet</p>
-                        </div>
-                        <form onsubmit="sendMessage(event)" style="display: flex; gap: var(--spacing-sm);">
-                            <input type="text" id="chatInput" placeholder="Ask about this lecture..."
-                                style="flex: 1; padding: var(--spacing-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-sm);">
-                            <button type="submit" class="btn btn-primary"
-                                style="width: auto; padding: 0 var(--spacing-lg);">Send</button>
-                        </form>
                     </div>
                 </div>
             </div>
@@ -479,242 +948,182 @@
         let lectureId = null;
         let lectureData = null;
         let pollingInterval = null;
+        let isEditing = false;
 
+
+        // ===== CONTRAST COLOR UTILITY =====
+        function getContrastColor(hexColor) {
+            if (!hexColor || hexColor.length < 7) return '#ffffff';
+            const r = parseInt(hexColor.slice(1, 3), 16);
+            const g = parseInt(hexColor.slice(3, 5), 16);
+            const b = parseInt(hexColor.slice(5, 7), 16);
+            // Relative luminance (WCAG formula)
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return luminance > 0.5 ? '#1a1a1a' : '#ffffff';
+        }
+
+        // ===== INIT =====
         window.addEventListener('load', () => {
-            if (!token) {
-                window.location.href = 'index.html';
-                return;
-            }
-
+            if (!token) { window.location.href = 'index.html'; return; }
             const params = new URLSearchParams(window.location.search);
             lectureId = params.get('id');
-
-            if (!lectureId) {
-                showError('No lecture ID provided');
-                return;
-            }
-
+            if (!lectureId) { showError('No lecture ID provided'); return; }
             loadLecture();
         });
 
+        // ===== LOAD LECTURE =====
         async function loadLecture() {
             try {
                 const response = await fetch(`/lectures/${lectureId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-
-                if (!response.ok) {
-                    throw new Error('Failed to load lecture');
-                }
-
+                if (!response.ok) throw new Error('Failed to load lecture');
                 lectureData = await response.json();
                 displayLecture();
                 checkExtractionStatus();
+                loadSnapshots();
             } catch (error) {
                 showError(error.message);
             }
         }
 
+        // ===== DISPLAY LECTURE =====
         function displayLecture() {
             document.getElementById('loadingContainer').style.display = 'none';
             document.getElementById('lectureContainer').style.display = 'block';
 
             document.getElementById('lectureTitle').textContent = lectureData.title;
-            document.getElementById('lectureDate').textContent = new Date(lectureData.created_at).toLocaleDateString();
-            document.getElementById('lectureSize').textContent = (lectureData.file_size / 1024 / 1024).toFixed(2) + ' MB';
-            document.getElementById('lectureType').textContent = lectureData.file_type.toUpperCase();
 
-            document.getElementById('fileName').textContent = lectureData.file_name;
-            document.getElementById('subjectName').textContent = lectureData.subject?.name || 'Unknown';
-            document.getElementById('uploadedDate').textContent = new Date(lectureData.created_at).toLocaleDateString();
+            // Header color from subject
+            const subjectColor = lectureData.subject?.color || '#3b82f6';
+            const textColor = getContrastColor(subjectColor);
+            const header = document.getElementById('noteHeader');
+            header.style.background = subjectColor;
+            header.style.color = textColor;
+            // Style links in header
+            header.querySelectorAll('a').forEach(a => a.style.color = textColor);
+            header.querySelectorAll('.meta-separator').forEach(s => s.style.color = textColor);
 
-            // Update Back Link 
-            const backLink = document.getElementById('backLink');
-            if (lectureData.subject_id) {
-                backLink.href = `subject.html?id=${lectureData.subject_id}`;
-                backLink.innerHTML = `<i class="ph ph-arrow-left"></i> Back to Subject`;
+            // Metadata
+            const subjectName = lectureData.subject?.name || 'Unknown Subject';
+            const subjectId = lectureData.subject_id;
+            const metaSubject = document.getElementById('metaSubject');
+            metaSubject.querySelector('span').textContent = subjectName;
+            metaSubject.href = subjectId ? `subject.html?id=${subjectId}` : '#';
+
+            // Fetch group name
+            if (lectureData.subject?.group_id) {
+                fetchGroupName(lectureData.subject.group_id);
             } else {
-                backLink.href = 'mynotes.html';
-                backLink.innerHTML = `<i class="ph ph-arrow-left"></i> Back to Notes`;
+                document.getElementById('metaGroup').querySelector('span').textContent = 'No Group';
+            }
+
+            // Back link
+            const backLink = document.getElementById('backLink');
+            if (subjectId) {
+                backLink.href = `subject.html?id=${subjectId}`;
+                backLink.innerHTML = `<i class="ph ph-arrow-left"></i> Back to Subject`;
+            }
+
+            // Sidebar info
+            document.getElementById('fileName').textContent = lectureData.file_name || '-';
+            const uploadDate = new Date(lectureData.created_at);
+            document.getElementById('uploadedDate').textContent = uploadDate.toLocaleString();
+
+            const fileType = lectureData.file_type || '';
+            if (fileType.includes('pdf')) document.getElementById('fileType').textContent = 'PDF';
+            else if (fileType.includes('presentation') || fileType.includes('powerpoint')) document.getElementById('fileType').textContent = 'PPTX';
+            else if (fileType.includes('image')) document.getElementById('fileType').textContent = 'Image';
+            else document.getElementById('fileType').textContent = fileType.split('/').pop()?.toUpperCase() || 'File';
+
+            document.getElementById('fileSize').textContent = formatFileSize(lectureData.file_size);
+
+            // Processing time
+            if (lectureData.updated_at && lectureData.created_at) {
+                const created = new Date(lectureData.created_at);
+                const updated = new Date(lectureData.updated_at);
+                const diffMs = updated - created;
+                if (diffMs > 0 && diffMs < 3600000) {
+                    const secs = Math.round(diffMs / 1000);
+                    document.getElementById('processingTime').textContent = secs > 60 ? `${Math.round(secs / 60)}m ${secs % 60}s` : `${secs}s`;
+                } else {
+                    document.getElementById('processingTime').textContent = 'N/A';
+                }
             }
 
             updateExtractedText();
         }
 
+        async function fetchGroupName(groupId) {
+            try {
+                const res = await fetch('/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const groups = await res.json();
+                    const group = groups.find(g => g.id == groupId);
+                    const metaGroup = document.getElementById('metaGroup');
+                    if (group) {
+                        metaGroup.querySelector('span').textContent = group.name;
+                        metaGroup.href = `group.html?id=${group.id}`;
+                    } else {
+                        metaGroup.querySelector('span').textContent = 'Unknown Group';
+                    }
+                }
+            } catch (e) { console.error('Error fetching group:', e); }
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '-';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(2) + ' MB';
+        }
+
+        // ===== EXTRACTED TEXT =====
         function updateExtractedText() {
             const textContainer = document.getElementById('extractedText');
-            // Clear previous content
             textContainer.innerHTML = '';
-
             document.getElementById('progressContainer').style.display = 'none';
-            document.getElementById('errorContainer').style.display = 'none';
+            document.getElementById('errorContainerInline').style.display = 'none';
             document.getElementById('extractionStatus').style.display = 'none';
 
-            // PREFERRED: Use marked.js to render the full markdown text from extracted_text
             if (lectureData.extracted_text) {
                 try {
-                    console.log('Rendering content with marked.js');
                     textContainer.innerHTML = marked.parse(lectureData.extracted_text);
-
-                    // Also try to inject images if available in metadata
-                    if (lectureData.extracted_images_metadata) {
-                        try {
-                            let images = lectureData.extracted_images_metadata;
-                            if (typeof images === 'string') images = JSON.parse(images);
-
-                            if (images && images.length > 0) {
-                                console.log(`Found ${images.length} images to display`);
-                                // Append images section at bottom if they aren't embedded in text
-                                // (Basic logic: if text is short or doesn't have image links, show them)
-                                // For now, let's just create a gallery at the bottom
-                                let imgHtml = '<div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;"><h3><i class="ph ph-images"></i> Extracted Figures</h3><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">';
-                                images.forEach(img => {
-                                    const imgPath = img.file_path || `generated/${lectureData.id}/images/${img.filename}`;
-                                    // Make path relative to root if needed
-                                    const src = imgPath.startsWith('/') ? imgPath : '/' + imgPath;
-                                    imgHtml += `
-                                        <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; text-align: center;">
-                                            <img src="${src}" style="max-width: 100%; max-height: 250px; object-fit: contain;" alt="Figure">
-                                            <p style="font-size: 0.8rem; color: #666; margin-top: 5px;">${img.filename}</p>
-                                        </div>
-                                    `;
-                                });
-                                imgHtml += '</div></div>';
-                                textContainer.innerHTML += imgHtml;
-                            }
-                        } catch (e) { console.error('Error parsing image metadata', e); }
-                    }
-
                     if (pollingInterval) clearInterval(pollingInterval);
-                    return; // Done
+                    return;
                 } catch (e) {
                     console.error('marked.js failed:', e);
-                    // Fallback to manual rendering if marked.js fails
                 }
             }
 
-            // FALLBACK: Old logic for manual rendering (mostly for legacy data without good markdown)
-            // (Only use if no extracted_text or marked failed)
-            if (lectureData.extracted_content_structured) {
-                // ... existing manual rendering logic as fallback ...
-                // For brevity, defaulting to raw text if no markdown library
-                if (!lectureData.extracted_text && lectureData.extracted_content_structured) {
-                    // Try fallback struct rendering
-                    try {
-                        let structured = lectureData.extracted_content_structured;
-                        if (typeof structured === 'string') structured = JSON.parse(structured);
-                        let html = '';
-                        structured.forEach(item => {
-                            if (item.type === 'h1') html += `<h1 style="margin: 24px 0 12px 0; font-size: 28px; font-weight: bold; color: #1a1a1a;">${escapeHtml(item.content)}</h1>`;
-                            else if (item.type === 'h2') html += `<h2 style="margin: 20px 0 10px 0; font-size: 22px; font-weight: 600; color: #333;">${escapeHtml(item.content)}</h2>`;
-                            else if (item.type === 'h3') html += `<h3 style="margin: 16px 0 8px 0; font-size: 18px; font-weight: 600; color: #555;">${escapeHtml(item.content)}</h3>`;
-                            else if (item.type === 'list') html += `<li style="margin-left: 24px; margin-bottom: 6px;">${escapeHtml(item.content)}</li>`;
-                            else html += `<p style="margin: 12px 0; line-height: 1.6; color: #333;">${escapeHtml(item.content)}</p>`;
-                        });
-                        textContainer.innerHTML = html;
-
-                        // Render images for this page (from old logic)
-                        let images = [];
-                        if (lectureData.extracted_images_metadata) {
-                            try {
-                                let imagesMeta = lectureData.extracted_images_metadata;
-                                if (typeof imagesMeta === 'string') {
-                                    imagesMeta = JSON.parse(imagesMeta);
-                                }
-                                images = imagesMeta || [];
-                            } catch (e) {
-                                console.error('Error parsing images metadata (fallback):', e);
-                            }
-                        }
-                        if (images.length > 0) {
-                            let imgHtml = `<div style="margin: 24px 0; padding: 16px; background: #f5f5f5; border-radius: 8px;">`;
-                            imgHtml += `<p style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #666;"><i class="ph ph-images"></i> Diagrams & Images</p>`;
-                            imgHtml += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">`;
-                            images.forEach(img => {
-                                const imgPath = img.file_path || `generated/${lectureData.id || 1}/images/${img.filename}`;
-                                imgHtml += `<div style="text-align: center;">`;
-                                imgHtml += `<img src="/${imgPath}" style="max-width: 100%; max-height: 300px; border-radius: 4px; border: 1px solid #ddd;" alt="Diagram">`;
-                                if (img.caption) {
-                                    imgHtml += `<p style="margin: 8px 0 0 0; font-size: 12px; color: #666;">${escapeHtml(img.caption)}</p>`;
-                                }
-                                imgHtml += `</div>`;
-                            });
-                            imgHtml += `</div></div>`;
-                            textContainer.innerHTML += imgHtml;
-                        }
-
-                        if (pollingInterval) clearInterval(pollingInterval);
-                        return;
-                    } catch (e) {
-                        console.error('Error parsing structured content (fallback):', e);
-                    }
-                }
-            }
-
-            // Final fallback: raw text if nothing else worked, or a message if no text at all
             if (lectureData.extracted_text) {
                 textContainer.innerHTML = `<p>${lectureData.extracted_text.replace(/\n/g, '<br>')}</p>`;
             } else {
                 textContainer.innerHTML = '<p class="text-center text-muted">No content extracted yet.</p>';
             }
-
             if (pollingInterval) clearInterval(pollingInterval);
         }
 
-        function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
-
+        // ===== EXTRACTION STATUS =====
         async function checkExtractionStatus() {
-            if (lectureData.extracted_text) {
-                console.log('✅ Extracted text already exists');
-                return;
-            }
-
+            if (lectureData.extracted_text) return;
             try {
-                console.log(`📡 Checking extraction status for lecture ${lectureId}...`);
                 const response = await fetch(`/search/task?lecture_id=${lectureId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-
                 if (response.ok) {
                     const task = await response.json();
-                    console.log('📊 Task status:', task);
                     document.getElementById('extractionStatus').style.display = 'block';
-
-                    if (task.status === 'pending') {
-                        console.log('⏳ Task is pending');
-                        showPending();
-                        startPolling();
-                    } else if (task.status === 'running') {
-                        console.log('⚙️ Task is running');
-                        showRunning();
-                        startPolling();
-                    } else if (task.status === 'completed') {
-                        console.log('✅ Task completed, reloading lecture...');
-                        reloadLecture();
-                    } else if (task.status === 'failed') {
-                        console.log('❌ Task failed');
-                        showFailed();
-                    }
-                } else {
-                    console.warn(`⚠️ Task endpoint returned status ${response.status}`);
+                    if (task.status === 'pending') { showPending(); startPolling(); }
+                    else if (task.status === 'running') { showRunning(); startPolling(); }
+                    else if (task.status === 'completed') { reloadLecture(); }
+                    else if (task.status === 'failed') { showFailed(); }
                 }
-            } catch (error) {
-                console.error('❌ Error checking task status:', error);
-            }
+            } catch (error) { console.error('Error checking task status:', error); }
         }
 
         function showPending() {
             document.getElementById('progressContainer').style.display = 'block';
-            document.getElementById('errorContainer').style.display = 'none';
             document.getElementById('statusBadge').textContent = 'Pending';
             document.getElementById('statusBadge').className = 'status-badge status-pending';
             document.getElementById('progressPercent').textContent = '5%';
@@ -724,7 +1133,6 @@
 
         function showRunning() {
             document.getElementById('progressContainer').style.display = 'block';
-            document.getElementById('errorContainer').style.display = 'none';
             document.getElementById('statusBadge').textContent = 'Processing';
             document.getElementById('statusBadge').className = 'status-badge status-running';
             document.getElementById('progressPercent').textContent = '50%';
@@ -734,84 +1142,376 @@
 
         function showFailed() {
             document.getElementById('progressContainer').style.display = 'none';
-            document.getElementById('errorContainer').style.display = 'block';
+            document.getElementById('errorContainerInline').style.display = 'block';
             document.getElementById('statusBadge').textContent = 'Failed';
             document.getElementById('statusBadge').className = 'status-badge status-failed';
-            document.getElementById('errorDetails').textContent = 'Text extraction failed. Please try re-uploading the lecture.';
             if (pollingInterval) clearInterval(pollingInterval);
         }
 
-        function startPolling() {
-            pollingInterval = setInterval(pollStatus, 2000);
-        }
+        function startPolling() { pollingInterval = setInterval(pollStatus, 2000); }
 
         async function pollStatus() {
             try {
-                console.log(`🔄 Polling task status for lecture ${lectureId}...`);
                 const response = await fetch(`/search/task?lecture_id=${lectureId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-
                 if (response.ok) {
                     const task = await response.json();
-                    console.log('📊 Poll result:', task);
-
-                    if (task.status === 'completed') {
-                        console.log('✅ Task completed during poll, reloading lecture...');
-                        clearInterval(pollingInterval);
-                        reloadLecture();
-                    } else if (task.status === 'failed') {
-                        console.log('❌ Task failed during poll');
-                        clearInterval(pollingInterval);
-                        showFailed();
-                    }
-                } else {
-                    console.warn(`⚠️ Poll returned status ${response.status}`);
+                    if (task.status === 'completed') { clearInterval(pollingInterval); reloadLecture(); }
+                    else if (task.status === 'failed') { clearInterval(pollingInterval); showFailed(); }
                 }
-            } catch (error) {
-                console.error('❌ Error polling status:', error);
-            }
+            } catch (error) { console.error('Error polling:', error); }
         }
 
         async function reloadLecture() {
             try {
-                console.log(`🔄 Reloading lecture ${lectureId}...`);
                 const response = await fetch(`/lectures/${lectureId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-
                 if (response.ok) {
                     lectureData = await response.json();
-                    console.log('📚 Lecture reloaded:', lectureData);
-                    console.log('📝 Extracted text length:', lectureData.extracted_text?.length || 'NULL');
-
                     updateExtractedText();
                     document.getElementById('progressContainer').style.display = 'none';
-                    document.getElementById('errorContainer').style.display = 'none';
+                    document.getElementById('errorContainerInline').style.display = 'none';
                     document.getElementById('extractionStatus').style.display = 'none';
-
-                    if (lectureData.extracted_text) {
-                        console.log('✅ Text extraction successful!');
-                    } else {
-                        console.warn('⚠️ Lecture reloaded but extracted_text is still NULL');
-                    }
-                } else {
-                    console.error(`❌ Reload failed with status ${response.status}`);
                 }
-            } catch (error) {
-                console.error('❌ Error reloading lecture:', error);
+            } catch (error) { console.error('Error reloading:', error); }
+        }
+
+        // ===== WYSIWYG EDITOR =====
+        let showingSource = false;
+
+        function toggleEdit() {
+            if (isEditing) {
+                cancelEdit();
+            } else {
+                isEditing = true;
+                document.getElementById('editorContainer').classList.add('active');
+                document.getElementById('editBtn').innerHTML = '<i class="ph ph-eye"></i> View';
+                document.body.style.overflow = 'hidden';
+                const area = document.getElementById('wysiwygArea');
+                const md = lectureData.extracted_text || '';
+                try {
+                    area.innerHTML = marked.parse(md);
+                } catch (e) {
+                    area.innerHTML = md.replace(/\n/g, '<br>');
+                }
+                area.focus();
+                showingSource = false;
+                document.getElementById('sourceToggle').classList.remove('active');
             }
+        }
+
+        function cancelEdit() {
+            isEditing = false;
+            showingSource = false;
+            document.getElementById('editorContainer').classList.remove('active');
+            document.getElementById('editBtn').innerHTML = '<i class="ph ph-pencil-simple"></i> Edit';
+            document.body.style.overflow = '';
+            document.getElementById('wysiwygArea').style.display = '';
+            document.getElementById('sourceTextarea').style.display = 'none';
+            document.getElementById('sourceToggle').classList.remove('active');
+        }
+
+        // Execute formatting command on the WYSIWYG area
+        function execCmd(command, value) {
+            const area = document.getElementById('wysiwygArea');
+            // Ensure focus is on the editable area
+            if (document.activeElement !== area) area.focus();
+            if (command === 'formatBlock') {
+                document.execCommand('formatBlock', false, '<' + value + '>');
+            } else {
+                document.execCommand(command, false, value || null);
+            }
+            updateToolbarState();
+        }
+
+        function insertTableWysiwyg() {
+            const area = document.getElementById('wysiwygArea');
+            area.focus();
+            const html = '<table><thead><tr><th>Header 1</th><th>Header 2</th><th>Header 3</th></tr></thead><tbody><tr><td>Cell 1</td><td>Cell 2</td><td>Cell 3</td></tr><tr><td>Cell 4</td><td>Cell 5</td><td>Cell 6</td></tr></tbody></table><p><br></p>';
+            document.execCommand('insertHTML', false, html);
+        }
+
+        function insertCodeBlock() {
+            const area = document.getElementById('wysiwygArea');
+            area.focus();
+            const html = '<pre><code>// your code here</code></pre><p><br></p>';
+            document.execCommand('insertHTML', false, html);
+        }
+
+        // Track active formatting state for toolbar highlights
+        function updateToolbarState() {
+            const cmds = { 'btnBold': 'bold', 'btnItalic': 'italic', 'btnUnderline': 'underline', 'btnStrike': 'strikeThrough' };
+            for (const [id, cmd] of Object.entries(cmds)) {
+                const btn = document.getElementById(id);
+                if (btn) btn.classList.toggle('active', document.queryCommandState(cmd));
+            }
+            const btnUl = document.getElementById('btnUl');
+            const btnOl = document.getElementById('btnOl');
+            if (btnUl) btnUl.classList.toggle('active', document.queryCommandState('insertUnorderedList'));
+            if (btnOl) btnOl.classList.toggle('active', document.queryCommandState('insertOrderedList'));
+        }
+
+        // Update toolbar state on selection change
+        document.addEventListener('selectionchange', () => {
+            if (isEditing && !showingSource) updateToolbarState();
+        });
+
+        // Source toggle
+        function toggleSource() {
+            const area = document.getElementById('wysiwygArea');
+            const src = document.getElementById('sourceTextarea');
+            const toggle = document.getElementById('sourceToggle');
+
+            if (showingSource) {
+                // Switch from source back to WYSIWYG
+                showingSource = false;
+                toggle.classList.remove('active');
+                const md = src.value;
+                try {
+                    area.innerHTML = marked.parse(md);
+                } catch (e) {
+                    area.innerHTML = md.replace(/\n/g, '<br>');
+                }
+                area.style.display = '';
+                src.style.display = 'none';
+                area.focus();
+            } else {
+                // Switch from WYSIWYG to source view
+                showingSource = true;
+                toggle.classList.add('active');
+                src.value = htmlToMarkdown(area.innerHTML);
+                area.style.display = 'none';
+                src.style.display = 'block';
+                src.focus();
+            }
+        }
+
+        // HTML to Markdown converter
+        function htmlToMarkdown(html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            return nodeToMd(doc.body).trim();
+        }
+
+        function nodeToMd(node) {
+            let result = '';
+            for (const child of node.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    result += child.textContent;
+                } else if (child.nodeType === Node.ELEMENT_NODE) {
+                    const tag = child.tagName.toLowerCase();
+                    const inner = nodeToMd(child);
+                    switch (tag) {
+                        case 'h1': result += '\n# ' + inner.trim() + '\n\n'; break;
+                        case 'h2': result += '\n## ' + inner.trim() + '\n\n'; break;
+                        case 'h3': result += '\n### ' + inner.trim() + '\n\n'; break;
+                        case 'h4': result += '\n#### ' + inner.trim() + '\n\n'; break;
+                        case 'h5': result += '\n##### ' + inner.trim() + '\n\n'; break;
+                        case 'p': result += inner.trim() + '\n\n'; break;
+                        case 'br': result += '\n'; break;
+                        case 'strong': case 'b': result += '**' + inner + '**'; break;
+                        case 'em': case 'i': result += '*' + inner + '*'; break;
+                        case 'u': result += '<u>' + inner + '</u>'; break;
+                        case 's': case 'strike': case 'del': result += '~~' + inner + '~~'; break;
+                        case 'code':
+                            if (child.parentElement && child.parentElement.tagName === 'PRE') {
+                                result += inner;
+                            } else {
+                                result += '`' + inner + '`';
+                            }
+                            break;
+                        case 'pre': result += '\n```\n' + inner.trim() + '\n```\n\n'; break;
+                        case 'blockquote': {
+                            const lines = inner.trim().split('\n');
+                            result += '\n' + lines.map(l => '> ' + l).join('\n') + '\n\n';
+                            break;
+                        }
+                        case 'ul': {
+                            const items = child.querySelectorAll(':scope > li');
+                            items.forEach(li => { result += '- ' + nodeToMd(li).trim() + '\n'; });
+                            result += '\n';
+                            break;
+                        }
+                        case 'ol': {
+                            const items = child.querySelectorAll(':scope > li');
+                            items.forEach((li, i) => { result += (i + 1) + '. ' + nodeToMd(li).trim() + '\n'; });
+                            result += '\n';
+                            break;
+                        }
+                        case 'li': result += inner; break;
+                        case 'table': {
+                            const rows = child.querySelectorAll('tr');
+                            let tableStr = '\n';
+                            rows.forEach((row, ri) => {
+                                const cells = row.querySelectorAll('th, td');
+                                tableStr += '| ' + Array.from(cells).map(c => c.textContent.trim()).join(' | ') + ' |\n';
+                                if (ri === 0) {
+                                    tableStr += '| ' + Array.from(cells).map(() => '---').join(' | ') + ' |\n';
+                                }
+                            });
+                            result += tableStr + '\n';
+                            break;
+                        }
+                        case 'a': result += '[' + inner + '](' + (child.getAttribute('href') || '') + ')'; break;
+                        case 'img': result += '![' + (child.getAttribute('alt') || '') + '](' + (child.getAttribute('src') || '') + ')'; break;
+                        case 'hr': result += '\n---\n\n'; break;
+                        case 'div': case 'section': case 'article': case 'span':
+                            result += inner;
+                            break;
+                        default:
+                            result += inner;
+                    }
+                }
+            }
+            return result;
+        }
+
+        // Keyboard shortcuts for WYSIWYG
+        document.addEventListener('keydown', function (e) {
+            if (!isEditing) return;
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 's') { e.preventDefault(); saveContent(); }
+            }
+        });
+
+        async function saveContent() {
+            // Get content depending on current view
+            let mdText;
+            if (showingSource) {
+                mdText = document.getElementById('sourceTextarea').value;
+            } else {
+                mdText = htmlToMarkdown(document.getElementById('wysiwygArea').innerHTML);
+            }
+            try {
+                const res = await fetch(`/lectures/${lectureId}/content`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ extracted_text: mdText })
+                });
+                if (res.ok) {
+                    lectureData.extracted_text = mdText;
+                    updateExtractedText();
+                    cancelEdit();
+                    alert('✅ Content saved!');
+                } else {
+                    alert('Failed to save content');
+                }
+            } catch (err) {
+                alert('Error saving: ' + err.message);
+            }
+        }
+
+        // ===== SNAPSHOTS =====
+        async function loadSnapshots() {
+            try {
+                const res = await fetch(`/snapshots/${lectureId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const snapshots = await res.json();
+                    renderSnapshots(snapshots);
+                }
+            } catch (e) { console.error('Error loading snapshots:', e); }
+        }
+
+        function renderSnapshots(snapshots) {
+            const container = document.getElementById('snapshotList');
+            if (!snapshots || snapshots.length === 0) {
+                container.innerHTML = '<p style="color: var(--color-gray); font-size: var(--font-size-sm); text-align: center; padding: var(--spacing-md);">No snapshots yet</p>';
+                return;
+            }
+            container.innerHTML = snapshots.map(s => `
+                <div class="snapshot-item" onclick="viewSnapshot(${s.id})">
+                    <div>
+                        <div class="snapshot-name">${escapeHtml(s.name)}</div>
+                        <div class="snapshot-date">${new Date(s.created_at).toLocaleString()}</div>
+                    </div>
+                    <button class="snapshot-delete" onclick="event.stopPropagation(); deleteSnapshot(${s.id})" title="Delete snapshot">
+                        <i class="ph ph-trash"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        async function createSnapshot() {
+            const nameInput = document.getElementById('snapshotNameInput');
+            const name = nameInput.value.trim();
+            if (!name) { alert('Please enter a snapshot name'); return; }
+
+            const content = lectureData.extracted_text || '';
+            try {
+                const res = await fetch(`/snapshots/${lectureId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, content })
+                });
+                if (res.ok) {
+                    nameInput.value = '';
+                    loadSnapshots();
+                } else {
+                    alert('Failed to create snapshot');
+                }
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function viewSnapshot(snapshotId) {
+            try {
+                const res = await fetch(`/snapshots/${lectureId}/${snapshotId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const snapshot = await res.json();
+                    // Show snapshot content in the main view
+                    const textContainer = document.getElementById('extractedText');
+                    try {
+                        textContainer.innerHTML = marked.parse(snapshot.content);
+                    } catch (e) {
+                        textContainer.innerHTML = snapshot.content.replace(/\n/g, '<br>');
+                    }
+                    // If editing, also load into editor
+                    if (isEditing) {
+                        document.getElementById('editorTextarea').value = snapshot.content;
+                        updatePreview();
+                    }
+                    // Highlight active snapshot
+                    document.querySelectorAll('.snapshot-item').forEach(el => el.classList.remove('active'));
+                    event.target.closest('.snapshot-item')?.classList.add('active');
+                }
+            } catch (e) { alert('Error loading snapshot: ' + e.message); }
+        }
+
+        async function deleteSnapshot(snapshotId) {
+            if (!confirm('Delete this snapshot?')) return;
+            try {
+                const res = await fetch(`/snapshots/${lectureId}/${snapshotId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.status === 204) {
+                    loadSnapshots();
+                }
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        // ===== ACTIONS =====
+        function goToChat() {
+            window.location.href = `chat.html?lecture_id=${lectureId}`;
         }
 
         async function generateFlashcards() {
             if (!lectureId) return;
-
             try {
                 const response = await fetch(`/documents/flashcards/${lectureId}`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-
                 if (response.ok) {
                     alert('Flashcards generated! Redirecting...');
                     window.location.href = 'flashcards.html';
@@ -819,49 +1519,133 @@
                     const error = await response.json();
                     alert('Error: ' + (error.detail || 'Failed to generate flashcards'));
                 }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
+            } catch (error) { alert('Error: ' + error.message); }
         }
 
-        async function sendMessage(event) {
-            event.preventDefault();
+        function exportNote() {
+            // Use existing PDF generation
+            generatePDF();
+        }
 
-            const message = document.getElementById('chatInput').value.trim();
-            if (!message || !lectureId) return;
-
+        async function generatePDF() {
+            const button = document.querySelector('.action-btn[onclick="exportNote()"]');
+            if (button) { button.disabled = true; button.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Exporting...'; }
             try {
-                const response = await fetch(`/chat/ask/${lectureId}`, {
+                const response = await fetch(`/lectures/${lectureId}/generate-pdf`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ question: message })
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
-
                 if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('chatInput').value = '';
-
-                    const preview = document.getElementById('chatPreview');
-                    preview.innerHTML = `
-                        <div style="margin-bottom: var(--spacing-md); padding: var(--spacing-md); background: var(--color-primary); color: white; border-radius: var(--radius-md);">
-                            <strong>You:</strong> ${message}
-                        </div>
-                        <div style="padding: var(--spacing-md); background: #f0f0f0; border-radius: var(--radius-md);">
-                            <strong>Assistant:</strong> ${data.answer}
-                        </div>
-                    `;
+                    // Auto-download
+                    const dlRes = await fetch(`/lectures/${lectureId}/download-pdf`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (dlRes.ok) {
+                        const blob = await dlRes.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${lectureData.title || 'lecture'}_OUTPUT.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        a.remove();
+                    }
+                    alert('✅ PDF exported!');
                 } else {
                     const error = await response.json();
-                    alert('Error: ' + (error.detail || 'Failed to send message'));
+                    alert('Error: ' + (error.detail || 'Failed to export'));
                 }
-            } catch (error) {
-                alert('Error: ' + error.message);
+            } catch (error) { alert('Error: ' + error.message); }
+            finally {
+                if (button) { button.disabled = false; button.innerHTML = '<i class="ph ph-export"></i> Export'; }
             }
         }
 
+        async function downloadOriginalFile() {
+            try {
+                const response = await fetch(`/lectures/${lectureId}/download-file`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = lectureData.file_name || 'file';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                } else {
+                    alert('Failed to download file');
+                }
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function reprocessOCR() {
+            const btn = document.getElementById('autoFormatBtn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Processing...'; }
+
+            document.getElementById('progressContainer').style.display = 'block';
+            document.getElementById('progressFill').style.width = '10%';
+            document.getElementById('progressPercent').textContent = '10%';
+            document.getElementById('progressMessage').textContent = 'Initializing Smart Pipeline...';
+
+            setTimeout(() => {
+                document.getElementById('progressFill').style.width = '40%';
+                document.getElementById('progressPercent').textContent = '40%';
+                document.getElementById('progressMessage').textContent = 'Analyzing layout & extracting text...';
+            }, 2000);
+
+            setTimeout(() => {
+                document.getElementById('progressFill').style.width = '70%';
+                document.getElementById('progressPercent').textContent = '70%';
+                document.getElementById('progressMessage').textContent = 'Structuring content...';
+            }, 5000);
+
+            try {
+                const response = await fetch(`/lectures/${lectureId}/reprocess-ocr`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    document.getElementById('progressFill').style.width = '100%';
+                    document.getElementById('progressPercent').textContent = '100%';
+                    document.getElementById('progressMessage').textContent = 'Complete! Reloading...';
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    let errorMsg = 'Failed to reprocess';
+                    try { const e = await response.json(); errorMsg = e.detail || errorMsg; } catch (e) { }
+                    alert('❌ Error: ' + errorMsg);
+                }
+            } catch (error) { alert('❌ Error: ' + error.message); }
+            finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph ph-magic-wand"></i> Auto Format'; }
+            }
+        }
+
+        async function deleteLecture() {
+            if (!confirm('Delete this lecture? This cannot be undone.')) return;
+            try {
+                const response = await fetch(`/lectures/${lectureId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok || response.status === 204) {
+                    alert('Lecture deleted');
+                    if (lectureData.subject_id) {
+                        window.location.href = `subject.html?id=${lectureData.subject_id}`;
+                    } else {
+                        window.location.href = 'mynotes.html';
+                    }
+                } else {
+                    alert('Failed to delete lecture');
+                }
+            } catch (error) { alert('Error: ' + error.message); }
+        }
+
+        // ===== UTILITIES =====
         function showError(message) {
             document.getElementById('loadingContainer').style.display = 'none';
             document.getElementById('lectureContainer').style.display = 'none';
@@ -869,182 +1653,14 @@
             document.getElementById('errorMessage').textContent = message;
         }
 
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
         function logout() {
             localStorage.removeItem(TOKEN_KEY);
             window.location.href = 'index.html';
-        }
-
-        async function generatePDF() {
-            const lectureId = new URLSearchParams(window.location.search).get('id');
-            const token = localStorage.getItem(TOKEN_KEY);
-
-            const button = document.querySelector('button[onclick="generatePDF()"]');
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = '⏳ Generating PDF...';
-
-            try {
-                const response = await fetch(`/lectures/${lectureId}/generate-pdf`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    console.log('PDF generated:', result);
-                    alert('✅ PDF generated successfully!');
-                    button.textContent = '✅ PDF Ready!';
-                    // Show and enable download button
-                    const downloadBtn = document.querySelector('button[onclick="downloadPDF()"]');
-                    downloadBtn.style.display = 'flex';
-                    downloadBtn.style.flex = '1';
-                    downloadBtn.disabled = false;
-                } else {
-                    try {
-                        const error = await response.json();
-                        alert('❌ Error: ' + (error.detail || 'Failed to generate PDF'));
-                    } catch (e) {
-                        const text = await response.text();
-                        console.error('Response:', text);
-                        alert('❌ Error generating PDF: ' + text);
-                    }
-                    button.textContent = originalText;
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('❌ Error: ' + error.message);
-                button.textContent = originalText;
-            } finally {
-                button.disabled = false;
-            }
-        }
-
-        async function downloadPDF() {
-            const lectureId = new URLSearchParams(window.location.search).get('id');
-            const token = localStorage.getItem(TOKEN_KEY);
-
-            const button = document.querySelector('button[onclick="downloadPDF()"]');
-            button.disabled = true;
-            button.textContent = '⏳ Downloading...';
-
-            try {
-                const response = await fetch(`/lectures/${lectureId}/download-pdf`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `lecture_${lectureId}_OUTPUT.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    a.remove();
-                    button.textContent = '📥 Download PDF';
-                } else {
-                    const error = await response.json();
-                    alert('❌ Error: ' + (error.detail || 'Failed to download PDF'));
-                    button.textContent = '📥 Download PDF';
-                }
-            } catch (error) {
-                alert('❌ Error: ' + error.message);
-                button.textContent = '📥 Download PDF';
-            } finally {
-                button.disabled = false;
-            }
-        }
-
-        async function reprocessOCR() {
-            const lectureId = new URLSearchParams(window.location.search).get('id');
-            const token = localStorage.getItem(TOKEN_KEY);
-
-            const button = document.querySelector('button[onclick="reprocessOCR()"]');
-            const originalText = button.textContent;
-            button.disabled = true;
-            // button.textContent = '⏳ Reprocessing...'; // Removed, using progress container instead
-
-            // Show progress container
-            const progressContainer = document.getElementById('progressContainer');
-            const progressFill = document.getElementById('progressFill');
-            const progressPercent = document.getElementById('progressPercent');
-            const progressMessage = document.getElementById('progressMessage');
-
-            if (progressContainer) {
-                progressContainer.style.display = 'block';
-                // Simulate start
-                progressFill.style.width = '10%';
-                progressPercent.textContent = '10%';
-                progressMessage.textContent = 'Initializing Smart Pipeline...';
-
-                // Simulate progress (fake update since backend is blocking)
-                setTimeout(() => {
-                    if (progressContainer.style.display !== 'none') {
-                        progressFill.style.width = '40%';
-                        progressPercent.textContent = '40%';
-                        progressMessage.textContent = 'Analyzing layout & extracting text...';
-                    }
-                }, 2000);
-
-                setTimeout(() => {
-                    if (progressContainer.style.display !== 'none') {
-                        progressFill.style.width = '70%';
-                        progressPercent.textContent = '70%';
-                        progressMessage.textContent = 'Extracting images & structuring content...';
-                    }
-                }, 5000);
-            }
-
-            try {
-                const response = await fetch(`/lectures/${lectureId}/reprocess-ocr`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.ok) {
-                    // Success progress
-                    if (progressContainer) {
-                        progressFill.style.width = '100%';
-                        progressPercent.textContent = '100%';
-                        progressMessage.textContent = 'Complete! Reloading...';
-                    }
-
-                    const result = await response.json();
-                    console.log('OCR reprocessed:', result);
-                    // alert('✅ Text reprocessed successfully! Refreshing...');
-                    // Reload the page to display the new structured content
-                    setTimeout(() => window.location.reload(), 800);
-                } else {
-                    let errorMsg = 'Failed to reprocess text';
-                    try {
-                        const text = await response.text();
-                        try {
-                            const error = JSON.parse(text);
-                            errorMsg = error.detail || errorMsg;
-                        } catch (e) {
-                            errorMsg += ': ' + text.substring(0, 100);
-                        }
-                    } catch (e) {
-                        console.error('Error reading error response:', e);
-                    }
-                    alert('❌ Error: ' + errorMsg);
-                    button.textContent = originalText;
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('❌ Error: ' + error.message);
-                button.textContent = originalText;
-            } finally {
-                button.disabled = false;
-            }
         }
     </script>
 </body>

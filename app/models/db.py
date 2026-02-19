@@ -173,3 +173,19 @@ class ChatMessage(Base):
     # Relationships
     user = relationship("User")
     lecture = relationship("Lecture")
+
+
+class NoteSnapshot(Base):
+    """Named snapshots of lecture notes for version history"""
+    __tablename__ = "note_snapshots"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+    lecture = relationship("Lecture")

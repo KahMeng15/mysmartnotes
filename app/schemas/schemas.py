@@ -223,3 +223,26 @@ class ChatResponse(BaseModel):
     message: str
     response: str
     sources: Optional[List[str]] = None
+
+
+# ========== Note Snapshot Schemas ==========
+class NoteSnapshotCreate(BaseModel):
+    name: str
+    content: str
+
+
+class NoteSnapshotResponse(BaseModel):
+    id: int
+    lecture_id: int
+    user_id: int
+    name: str
+    content: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ========== Lecture Content Update ==========
+class LectureContentUpdate(BaseModel):
+    extracted_text: str

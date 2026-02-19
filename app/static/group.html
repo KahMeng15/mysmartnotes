@@ -14,6 +14,7 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
+    <script src="js/utils.js"></script>
     <style>
         /* Local overrides if needed, otherwise using style.css */
     </style>
@@ -73,20 +74,17 @@
     </div>
 
     <!-- Edit Group Modal -->
-    <div id="editGroupModal" class="modal-overlay"> <!-- Using modal-overlay class from style.css -->
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Edit Group</h2>
-                <button class="modal-close" onclick="closeModal('editGroupModal')">&times;</button>
-            </div>
+    <div id="editGroupModal" class="modal">
+        <div class="modal-content">
+            <h2>Edit Group</h2>
             <form onsubmit="handleEditGroup(event)">
                 <div class="form-group">
                     <label>Group Name</label>
                     <input type="text" id="editGroupNameInput" class="form-control" required>
                 </div>
-                <div class="d-flex justify-content-end gap-2 mt-5">
-                    <button type="button" onclick="closeModal('editGroupModal')" class="btn btn-outline">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Save Changes</button>
+                    <button type="button" onclick="closeModal('editGroupModal')" class="btn-cancel">Cancel</button>
                 </div>
             </form>
         </div>
@@ -209,13 +207,19 @@
         }
 
         function openEditGroupModal() {
-            if (!currentGroup) return;
-            document.getElementById('editGroupModal').classList.add('show');
-            document.getElementById('editGroupNameInput').value = currentGroup.name;
+            if (!currentGroup) {
+                alert('Error: Group data not loaded properly. Please refresh.');
+                return;
+            }
+            const modal = document.getElementById('editGroupModal');
+            if (modal) {
+                modal.classList.add('active');
+                document.getElementById('editGroupNameInput').value = currentGroup.name;
+            }
         }
 
         function closeModal(id) {
-            document.getElementById(id).classList.remove('show');
+            document.getElementById(id).classList.remove('active');
         }
 
         async function handleEditGroup(e) {
@@ -251,7 +255,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (res.ok) {
-                    window.location.href = 'notes.html';
+                    window.location.href = 'mynotes.html';
                 }
             } catch (err) {
                 alert('Failed to delete group');
@@ -268,8 +272,8 @@
 
         // Close modal on outside click
         window.onclick = function (event) {
-            if (event.target.classList.contains('modal-overlay')) {
-                event.target.classList.remove('show');
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
             }
         }
     </script>

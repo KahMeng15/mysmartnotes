@@ -14,6 +14,7 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
+    <script src="js/utils.js"></script>
     <style>
         .group-section {
             background: white;
@@ -214,12 +215,9 @@
     </div>
 
     <!-- Edit Subject Modal -->
-    <div id="editSubjectModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Edit Subject</h2>
-                <button class="modal-close" onclick="closeModal('editSubjectModal')">&times;</button>
-            </div>
+    <div id="editSubjectModal" class="modal">
+        <div class="modal-content">
+            <h2>Edit Subject</h2>
             <form onsubmit="handleEditSubject(event)">
                 <div class="form-group">
                     <label>Subject Name</label>
@@ -229,16 +227,15 @@
                     <label>Description</label>
                     <textarea id="editSubjectDescInput" class="form-control" rows="3"></textarea>
                 </div>
-                <!-- Simplified Color Picker (optional, backend supports it) -->
                 <div class="form-group">
                     <label>Color Tag</label>
-                    <input type="color" id="editSubjectColorInput" class="form-control" style="height: 40px;">
+                    <input type="color" id="editSubjectColorInput" class="form-control"
+                        style="height: 40px; padding: 0; border: none;">
                 </div>
 
-                <div class="d-flex justify-content-end gap-2 mt-5">
-                    <button type="button" onclick="closeModal('editSubjectModal')"
-                        class="btn btn-outline">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Save Changes</button>
+                    <button type="button" onclick="closeModal('editSubjectModal')" class="btn-cancel">Cancel</button>
                 </div>
             </form>
         </div>
@@ -392,14 +389,14 @@
         // --- Edit Subject Logic ---
         function openEditSubjectModal() {
             if (!currentSubject) return;
-            document.getElementById('editSubjectModal').classList.add('show');
+            document.getElementById('editSubjectModal').classList.add('active');
             document.getElementById('editSubjectNameInput').value = currentSubject.name;
             document.getElementById('editSubjectDescInput').value = currentSubject.description || '';
             document.getElementById('editSubjectColorInput').value = currentSubject.color || '#3b82f6';
         }
 
         function closeModal(id) {
-            document.getElementById(id).classList.remove('show');
+            document.getElementById(id).classList.remove('active');
         }
 
         async function handleEditSubject(e) {
@@ -442,7 +439,7 @@
                 });
                 if (response.ok) {
                     alert('Subject deleted successfully');
-                    window.location.href = 'notes.html';
+                    window.location.href = 'mynotes.html'; // Update redirect to mynotes.html
                 } else {
                     alert('Failed to delete subject');
                 }
@@ -476,8 +473,8 @@
 
         // Close modal on outside click
         window.onclick = function (event) {
-            if (event.target.classList.contains('modal-overlay')) {
-                event.target.classList.remove('show');
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
             }
         }
     </script>
