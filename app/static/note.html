@@ -326,9 +326,11 @@
         .toolbar-toggle {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 4px;
-            padding: 4px 10px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 4px 8px;
+            height: 30px;
+            border: 1px solid transparent;
             border-radius: var(--radius-sm);
             background: rgba(255, 255, 255, 0.1);
             cursor: pointer;
@@ -376,8 +378,8 @@
         .editor-body {
             flex: 1;
             overflow-y: auto;
-            display: flex;
-            justify-content: center;
+            display: block;
+            /* Use block to avoid flex cutoff issues */
             background: var(--color-background);
         }
 
@@ -385,6 +387,11 @@
             width: 100%;
             max-width: 900px;
             min-height: 100%;
+            /* Fill entire parent body */
+            margin: 0 auto;
+            /* Center horizontally */
+            box-sizing: border-box;
+            /* Include padding in height */
             padding: 48px 64px;
             outline: none;
             line-height: 1.8;
@@ -492,6 +499,10 @@
             width: 100%;
             max-width: 900px;
             min-height: 100%;
+            /* Fill parent */
+            margin: 0 auto;
+            /* Center */
+            box-sizing: border-box;
             padding: 48px 64px;
             border: none;
             resize: none;
@@ -499,8 +510,8 @@
             font-size: var(--font-size-sm);
             line-height: 1.7;
             outline: none;
-            background: #1e1e2e;
-            color: #cdd6f4;
+            background: white;
+            color: var(--color-dark);
             display: none;
         }
 
@@ -801,11 +812,11 @@
                             <div class="editor-topbar">
                                 <div class="editor-logo"><i class="ph ph-notebook"></i> MySmartNotes</div>
                                 <div class="editor-toolbar" id="editorToolbar">
-                                    <button class="toolbar-btn" onclick="execCmd('formatBlock','H1')"
+                                    <button class="toolbar-btn" id="btnH1" onclick="execCmd('formatBlock','H1')"
                                         title="Heading 1">H1</button>
-                                    <button class="toolbar-btn" onclick="execCmd('formatBlock','H2')"
+                                    <button class="toolbar-btn" id="btnH2" onclick="execCmd('formatBlock','H2')"
                                         title="Heading 2">H2</button>
-                                    <button class="toolbar-btn" onclick="execCmd('formatBlock','H3')"
+                                    <button class="toolbar-btn" id="btnH3" onclick="execCmd('formatBlock','H3')"
                                         title="Heading 3">H3</button>
                                     <div class="toolbar-sep"></div>
                                     <button class="toolbar-btn" id="btnBold" onclick="execCmd('bold')"
@@ -1242,11 +1253,49 @@
 
         // Track active formatting state for toolbar highlights
         function updateToolbarState() {
+            const sel = window.getSelection();
+            let currentHeading = null;
+            let hasBoldTag = false;
+
+            if (sel && sel.rangeCount > 0) {
+                let node = sel.focusNode; // focusNode is better than anchorNode to capture where caret is
+                while (node && node !== document.getElementById('wysiwygArea')) {
+                    if (node.nodeType === 1) { // ELEMENT_NODE
+                        if (/^H[1-6]$/i.test(node.tagName)) {
+                            currentHeading = node.tagName.toUpperCase();
+                        }
+                        if (node.tagName === 'B' || node.tagName === 'STRONG') {
+                            hasBoldTag = true;
+                        }
+                    }
+                    node = node.parentNode;
+                }
+            }
+
+            // Headings highlighting
+            const h1 = document.getElementById('btnH1');
+            const h2 = document.getElementById('btnH2');
+            const h3 = document.getElementById('btnH3');
+            if (h1) h1.classList.toggle('active', currentHeading === 'H1');
+            if (h2) h2.classList.toggle('active', currentHeading === 'H2');
+            if (h3) h3.classList.toggle('active', currentHeading === 'H3');
+
+            // Standard toggles
             const cmds = { 'btnBold': 'bold', 'btnItalic': 'italic', 'btnUnderline': 'underline', 'btnStrike': 'strikeThrough' };
             for (const [id, cmd] of Object.entries(cmds)) {
                 const btn = document.getElementById(id);
-                if (btn) btn.classList.toggle('active', document.queryCommandState(cmd));
+                if (!btn) continue;
+                let state = document.queryCommandState(cmd);
+
+                // Override false bold on headings
+                if (cmd === 'bold' && currentHeading && state) {
+                    state = hasBoldTag;
+                }
+
+                btn.classList.toggle('active', state);
             }
+
+            // Lists
             const btnUl = document.getElementById('btnUl');
             const btnOl = document.getElementById('btnOl');
             if (btnUl) btnUl.classList.toggle('active', document.queryCommandState('insertUnorderedList'));
