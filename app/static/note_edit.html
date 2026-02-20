@@ -237,6 +237,389 @@
             color: var(--color-error);
         }
 
+        /* ===== EDITOR (FULLSCREEN) ===== */
+        .editor-container {
+            display: none;
+        }
+
+        .editor-container.active {
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            background: white;
+        }
+
+        /* Top bar: logo | toolbar | actions */
+        .editor-topbar {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: 8px 16px;
+            background: var(--color-dark);
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .editor-logo {
+            font-family: var(--font-heading);
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            margin-right: var(--spacing-md);
+        }
+
+        .editor-logo i {
+            font-size: 1.3rem;
+        }
+
+        .editor-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            align-items: center;
+            flex: 1;
+        }
+
+        .toolbar-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            transition: all 0.15s;
+            font-family: var(--font-primary);
+        }
+
+        .toolbar-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .toolbar-btn.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+
+        .toolbar-sep {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 0 3px;
+        }
+
+        .toolbar-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 4px 8px;
+            height: 30px;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.7);
+            transition: all 0.15s;
+            font-family: var(--font-primary);
+        }
+
+        .toolbar-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .toolbar-toggle.active {
+            background: var(--color-primary);
+            color: white;
+            border-color: var(--color-primary);
+        }
+
+        .editor-topbar-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-left: var(--spacing-md);
+            flex-shrink: 0;
+        }
+
+        .editor-topbar-actions .btn {
+            padding: 6px 16px;
+            font-size: var(--font-size-sm);
+        }
+
+        .editor-topbar-actions .btn-outline {
+            color: rgba(255, 255, 255, 0.8);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .editor-topbar-actions .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        /* Editor body area */
+        .editor-body {
+            flex: 1;
+            overflow-y: auto;
+            display: block;
+            /* Use block to avoid flex cutoff issues */
+            background: var(--color-background);
+        }
+
+        .wysiwyg-area {
+            width: 100%;
+            max-width: 900px;
+            min-height: 100%;
+            /* Fill entire parent body */
+            margin: 0 auto;
+            /* Center horizontally */
+            box-sizing: border-box;
+            /* Include padding in height */
+            padding: 48px 64px;
+            outline: none;
+            line-height: 1.8;
+            font-size: 16px;
+            color: var(--color-dark);
+            background: white;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.06);
+        }
+
+        .wysiwyg-area:focus {
+            outline: none;
+        }
+
+        .wysiwyg-area h1,
+        .wysiwyg-area h2,
+        .wysiwyg-area h3,
+        .wysiwyg-area h4,
+        .wysiwyg-area h5 {
+            margin-top: 1.2em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+        }
+
+        .wysiwyg-area h1 {
+            font-size: 2rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0.3em;
+        }
+
+        .wysiwyg-area h2 {
+            font-size: 1.6rem;
+        }
+
+        .wysiwyg-area h3 {
+            font-size: 1.3rem;
+        }
+
+        .wysiwyg-area p {
+            margin-bottom: 0.8em;
+        }
+
+        .wysiwyg-area ul,
+        .wysiwyg-area ol {
+            margin-bottom: 1em;
+            padding-left: 2em;
+        }
+
+        .wysiwyg-area li {
+            margin-bottom: 0.25em;
+        }
+
+        .wysiwyg-area blockquote {
+            border-left: 4px solid #ddd;
+            margin: 0.5em 0;
+            padding-left: 1em;
+            color: #666;
+        }
+
+        .wysiwyg-area code {
+            font-family: var(--font-mono);
+            background: #f5f5f5;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+
+        .wysiwyg-area pre {
+            background: #f5f5f5;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 1em 0;
+        }
+
+        .wysiwyg-area pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .wysiwyg-area table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+
+        .wysiwyg-area th,
+        .wysiwyg-area td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .wysiwyg-area th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        /* Table Context Menu */
+        .table-context-menu {
+            position: absolute;
+            background: white;
+            border-radius: var(--radius-md);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            padding: 4px;
+            display: flex;
+            gap: 2px;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            border: 1px solid var(--color-border);
+        }
+
+        .table-context-menu.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .table-context-btn {
+            background: transparent;
+            border: none;
+            color: var(--color-gray);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 16px;
+        }
+
+        .table-context-btn:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--color-primary);
+        }
+
+        .table-context-btn.danger:hover {
+            color: #dc3545;
+            background: rgba(220, 53, 69, 0.1);
+        }
+
+        .table-context-divider {
+            width: 1px;
+            background: var(--color-border);
+            margin: 4px 2px;
+        }
+
+        .table-add-handle {
+            position: absolute;
+            background: var(--color-border);
+            color: var(--color-text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, background 0.2s, color 0.2s;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .table-add-handle.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .table-add-handle:hover {
+            background: #0b57d0;
+            color: white;
+        }
+
+        .table-add-handle i {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .table-add-handle.vertical {
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            transform: translateY(-50%);
+        }
+
+        .table-add-handle.horizontal {
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            transform: translateX(-50%);
+        }
+
+        .active-table-cell {
+            outline: 2px solid #0b57d0 !important;
+            outline-offset: -2px;
+            background-color: rgba(11, 87, 208, 0.05) !important;
+        }
+
+        .wysiwyg-area img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .source-textarea {
+            width: 100%;
+            max-width: 900px;
+            min-height: 100%;
+            /* Fill parent */
+            margin: 0 auto;
+            /* Center */
+            box-sizing: border-box;
+            padding: 48px 64px;
+            border: none;
+            resize: none;
+            font-family: var(--font-mono);
+            font-size: var(--font-size-sm);
+            line-height: 1.7;
+            outline: none;
+            background: white;
+            color: var(--color-dark);
+            display: none;
+        }
+
+        .source-textarea:focus {
+            outline: none;
+        }
+
         /* ===== MARKDOWN (read-only view) ===== */
         .markdown-content {
             line-height: 1.6;
@@ -768,9 +1151,9 @@
         window.addEventListener('load', () => {
             if (!token) { window.location.href = '/index.html'; return; }
 
-            // Extract UUID or integer ID from path /note/123
+            // Extract UUID or integer ID from path /note/123/edit
             const pathParts = window.location.pathname.split('/');
-            lectureId = pathParts[pathParts.length - 1];
+            lectureId = pathParts[pathParts.length - 2];
 
             if (!lectureId || lectureId === 'note') {
                 showError('No lecture ID provided in URL path');
@@ -860,6 +1243,10 @@
             }
 
             updateExtractedText();
+            // Automatically open editor for note_edit page
+            if (!isEditing) {
+                toggleEdit();
+            }
         }
 
         async function fetchGroupName(groupId) {
@@ -986,8 +1373,737 @@
             } catch (error) { console.error('Error reloading:', error); }
         }
 
+        // ===== WYSIWYG EDITOR =====
+        let showingSource = false;
+
         function toggleEdit() {
-            window.location.href = `/note/${lectureId}/edit`;
+            if (isEditing) {
+                cancelEdit();
+            } else {
+                isEditing = true;
+                document.getElementById('editorContainer').classList.add('active');
+                document.getElementById('editBtn').innerHTML = '<i class="ph ph-eye"></i> View';
+                document.body.style.overflow = 'hidden';
+                const area = document.getElementById('wysiwygArea');
+                const md = lectureData.extracted_text || '';
+                try {
+                    area.innerHTML = marked.parse(md);
+                } catch (e) {
+                    area.innerHTML = md.replace(/\n/g, '<br>');
+                }
+                area.focus();
+                showingSource = false;
+                document.getElementById('sourceToggle').classList.remove('active');
+            }
+        }
+
+        function cancelEdit() {
+            window.location.href = `/note/${lectureId}`;
+        }
+
+        // Execute formatting command on the WYSIWYG area
+        function execCmd(command, value) {
+            const area = document.getElementById('wysiwygArea');
+            // Ensure focus is on the editable area
+            if (document.activeElement !== area) area.focus();
+
+            if (command === 'formatBlock' && value && value.match(/^H[1-3]$/)) {
+                if (globalCurrentTable) return;
+            }
+
+            if (command === 'formatBlock') {
+                document.execCommand('formatBlock', false, '<' + value + '>');
+            } else {
+                document.execCommand(command, false, value || null);
+            }
+            updateToolbarState();
+        }
+
+        function toggleBlockquote() {
+            const area = document.getElementById('wysiwygArea');
+            if (document.activeElement !== area) area.focus();
+
+            const sel = window.getSelection();
+            let inBlockquote = false;
+
+            if (sel && sel.rangeCount > 0) {
+                let node = sel.focusNode;
+                while (node && node !== area) {
+                    if (node.nodeType === 1 && node.tagName === 'BLOCKQUOTE') {
+                        inBlockquote = true;
+                        break;
+                    }
+                    node = node.parentNode;
+                }
+            }
+
+            if (inBlockquote) {
+                // Remove blockquote using outdent
+                document.execCommand('outdent');
+            } else {
+                document.execCommand('formatBlock', false, '<BLOCKQUOTE>');
+            }
+            updateToolbarState();
+        }
+
+        // Modals
+        function showSaveModal() {
+            document.getElementById('saveConfirmModal').classList.add('active');
+        }
+
+        function closeSaveModal() {
+            document.getElementById('saveConfirmModal').classList.remove('active');
+        }
+
+        function confirmSave() {
+            closeSaveModal();
+            saveContent();
+        }
+
+        function showDiscardModal() {
+            document.getElementById('discardConfirmModal').classList.add('active');
+        }
+
+        function closeDiscardModal() {
+            document.getElementById('discardConfirmModal').classList.remove('active');
+        }
+
+        function confirmDiscard() {
+            closeDiscardModal();
+            cancelEdit();
+        }
+
+        function insertTableWysiwyg() {
+            const area = document.getElementById('wysiwygArea');
+            area.focus();
+            const html = '<table><thead><tr><th>Header 1</th><th>Header 2</th><th>Header 3</th></tr></thead><tbody><tr><td>Cell 1</td><td>Cell 2</td><td>Cell 3</td></tr><tr><td>Cell 4</td><td>Cell 5</td><td>Cell 6</td></tr></tbody></table><p><br></p>';
+            document.execCommand('insertHTML', false, html);
+        }
+
+        function insertCodeBlock() {
+            const area = document.getElementById('wysiwygArea');
+            area.focus();
+            const html = '<pre><code>// your code here</code></pre><p><br></p>';
+            document.execCommand('insertHTML', false, html);
+        }
+
+        // Track active formatting state for toolbar highlights
+
+        // Globals for table context
+        let globalCurrentTableCell = null;
+        let globalCurrentTable = null;
+        let currentSelectedCells = [];
+        let isTableSelecting = false;
+        let startTableCell = null;
+        let isMouseDownInTable = false;
+        let isResizing = false;
+        let resizeType = null;
+        let resizeTarget = null;
+        let startX = 0, startY = 0, startWidth = 0, startHeight = 0;
+        let hoverResizeType = null;
+        let hoverResizeTarget = null;
+
+        function clearCellSelection() {
+            document.querySelectorAll('.active-table-cell').forEach(c => c.classList.remove('active-table-cell'));
+            currentSelectedCells = [];
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const editorBody = document.getElementById('editorBody');
+
+            editorBody.addEventListener('mousemove', (e) => {
+                if (!isEditing || showingSource) return;
+
+                if (isResizing) {
+                    if (resizeType === 'col') {
+                        const newWidth = startWidth + (e.pageX - startX);
+                        if (newWidth > 20) resizeTarget.style.width = newWidth + 'px';
+                    } else if (resizeType === 'row') {
+                        const newHeight = startHeight + (e.pageY - startY);
+                        if (newHeight > 20) resizeTarget.style.height = newHeight + 'px';
+                    }
+
+                    // Hide context menu during drag, but reposition handles smoothly without DOM thrashing
+                    document.getElementById('tableContextMenu').classList.remove('visible');
+                    const editorRect = editorBody.parentElement.getBoundingClientRect();
+                    const targetRect = resizeTarget.getBoundingClientRect();
+
+                    if (resizeType === 'col') {
+                        const colHandle = document.getElementById('colAddHandle');
+                        if (colHandle) {
+                            colHandle.style.left = (targetRect.right - editorRect.left + 2) + 'px';
+                        }
+                    } else if (resizeType === 'row') {
+                        const rowHandle = document.getElementById('rowAddHandle');
+                        if (rowHandle) {
+                            rowHandle.style.top = (targetRect.bottom - editorRect.top + 2) + 'px';
+                        }
+                    }
+
+                    e.preventDefault();
+                    return;
+                }
+
+                if (!isMouseDownInTable && e.target.closest) {
+                    const td = e.target.closest('td, th');
+                    if (td) {
+                        const rect = td.getBoundingClientRect();
+                        const x = e.clientX;
+                        const y = e.clientY;
+
+                        const nearRight = (rect.right - x) < 12 && (rect.right - x) >= -6;
+                        const nearBottom = (rect.bottom - y) < 12 && (rect.bottom - y) >= -6;
+
+                        if (nearRight) {
+                            editorBody.style.cursor = 'col-resize';
+                            hoverResizeType = 'col';
+                            hoverResizeTarget = td;
+                        } else if (nearBottom) {
+                            editorBody.style.cursor = 'row-resize';
+                            hoverResizeType = 'row';
+                            hoverResizeTarget = td;
+                        } else {
+                            editorBody.style.cursor = '';
+                            hoverResizeType = null;
+                            hoverResizeTarget = null;
+                        }
+                    } else {
+                        editorBody.style.cursor = '';
+                        hoverResizeType = null;
+                        hoverResizeTarget = null;
+                    }
+                }
+            });
+
+            editorBody.addEventListener('mousedown', (e) => {
+                if (!isEditing || showingSource) return;
+
+                if (hoverResizeType && hoverResizeTarget) {
+                    isResizing = true;
+                    resizeType = hoverResizeType;
+                    resizeTarget = hoverResizeTarget;
+                    startX = e.pageX;
+                    startY = e.pageY;
+                    startWidth = resizeTarget.offsetWidth;
+                    startHeight = resizeTarget.offsetHeight;
+                    e.preventDefault();
+                    return;
+                }
+
+                const td = e.target.closest('td, th');
+                if (td) {
+                    isMouseDownInTable = true;
+                    if (e.shiftKey && startTableCell && startTableCell.closest('table') === td.closest('table')) {
+                        e.preventDefault();
+                        isTableSelecting = true;
+                        selectCellsBetween(startTableCell, td);
+                    } else {
+                        startTableCell = td;
+                        isTableSelecting = false;
+                        if (!td.classList.contains('active-table-cell') || currentSelectedCells.length > 1) {
+                            clearCellSelection();
+                            td.classList.add('active-table-cell');
+                            currentSelectedCells = [td];
+                            setTimeout(updateToolbarState, 10);
+                        }
+                    }
+                } else {
+                    startTableCell = null;
+                    clearCellSelection();
+                    setTimeout(updateToolbarState, 10);
+                }
+            });
+
+            editorBody.addEventListener('mouseover', (e) => {
+                if (isMouseDownInTable && startTableCell) {
+                    const td = e.target.closest('td, th');
+                    if (td && td !== startTableCell && startTableCell.closest('table') === td.closest('table')) {
+                        isTableSelecting = true;
+                        selectCellsBetween(startTableCell, td);
+                        window.getSelection().removeAllRanges();
+                    }
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    editorBody.style.cursor = '';
+                    resizeTarget = null;
+                    setTimeout(updateToolbarState, 10);
+                }
+                isMouseDownInTable = false;
+                isTableSelecting = false;
+            });
+        });
+
+        function selectCellsBetween(startCell, endCell) {
+            clearCellSelection();
+            const table = startCell.closest('table');
+            if (!table) return;
+
+            const rows = Array.from(table.rows);
+            let startRowIndex = -1, startColIndex = -1, endRowIndex = -1, endColIndex = -1;
+
+            // Safer calculation matching row properties
+            const startTr = startCell.closest('tr');
+            const endTr = endCell.closest('tr');
+            if (startTr && endTr) {
+                startRowIndex = startTr.rowIndex;
+                endRowIndex = endTr.rowIndex;
+                startColIndex = Array.from(startTr.children).indexOf(startCell);
+                endColIndex = Array.from(endTr.children).indexOf(endCell);
+            }
+            if (startRowIndex === -1 || endRowIndex === -1) return;
+
+            const minRow = Math.min(startRowIndex, endRowIndex);
+            const maxRow = Math.max(startRowIndex, endRowIndex);
+            const minCol = Math.min(startColIndex, endColIndex);
+            const maxCol = Math.max(startColIndex, endColIndex);
+
+            for (let i = minRow; i <= maxRow; i++) {
+                const row = rows[i];
+                if (!row) continue;
+                for (let j = minCol; j <= maxCol; j++) {
+                    const cell = row.children[j];
+                    if (cell) {
+                        cell.classList.add('active-table-cell');
+                        currentSelectedCells.push(cell);
+                    }
+                }
+            }
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function updateToolbarState() {
+            const sel = window.getSelection();
+            let currentHeading = null;
+            let hasBoldTag = false;
+            let inBlockquote = false;
+            let currentTableCellNode = null;
+            let currentTableNode = null;
+
+            if (currentSelectedCells.length > 0) {
+                currentTableCellNode = currentSelectedCells[0];
+                currentTableNode = currentTableCellNode.closest('table');
+            }
+
+            if (sel && sel.rangeCount > 0) {
+                let node = sel.focusNode; // focusNode is better than anchorNode to capture where caret is
+                while (node && node !== document.getElementById('wysiwygArea')) {
+                    if (node && node.nodeType === 1) { // ELEMENT_NODE
+                        if (/^H[1-6]$/i.test(node.tagName)) {
+                            currentHeading = node.tagName.toUpperCase();
+                        }
+                        if (node.tagName === 'B' || node.tagName === 'STRONG') {
+                            hasBoldTag = true;
+                        }
+                        if (node.tagName === 'BLOCKQUOTE') {
+                            inBlockquote = true;
+                        }
+                        if (node.tagName === 'TD' || node.tagName === 'TH') {
+                            if (currentSelectedCells.length <= 1) currentTableCellNode = node;
+                        }
+                        if (node.tagName === 'TABLE') {
+                            if (currentSelectedCells.length <= 1) currentTableNode = node;
+                        }
+                    }
+                    node = node.parentNode;
+                }
+            }
+
+            globalCurrentTableCell = currentTableCellNode;
+            globalCurrentTable = currentTableNode;
+            const menu = document.getElementById('tableContextMenu');
+            const colHandle = document.getElementById('colAddHandle');
+            const rowHandle = document.getElementById('rowAddHandle');
+
+            if (currentTableNode && currentTableCellNode && !showingSource) {
+                if (currentSelectedCells.length <= 1) {
+                    clearCellSelection();
+                    currentTableCellNode.classList.add('active-table-cell');
+                    currentSelectedCells = [currentTableCellNode];
+                }
+
+                const editorRect = document.getElementById('editorContainer').getBoundingClientRect();
+                let minTop = Infinity, minLeft = Infinity, maxBottom = -Infinity, maxRight = -Infinity;
+
+                currentSelectedCells.forEach(c => {
+                    const r = c.getBoundingClientRect();
+                    if (r.top < minTop) minTop = r.top;
+                    if (r.left < minLeft) minLeft = r.left;
+                    if (r.bottom > maxBottom) maxBottom = r.bottom;
+                    if (r.right > maxRight) maxRight = r.right;
+                });
+
+                menu.style.top = Math.max(0, (minTop - editorRect.top - 45)) + 'px';
+                menu.style.left = (minLeft - editorRect.left) + 'px';
+                menu.classList.add('visible');
+
+                if (colHandle) {
+                    colHandle.style.top = Math.max(0, (minTop - editorRect.top + (maxBottom - minTop) / 2)) + 'px';
+                    colHandle.style.left = (maxRight - editorRect.left + 2) + 'px';
+                    colHandle.style.height = ''; // Handled by CSS now
+                    colHandle.classList.add('visible');
+                }
+
+                if (rowHandle) {
+                    rowHandle.style.top = (maxBottom - editorRect.top + 2) + 'px';
+                    rowHandle.style.left = (minLeft - editorRect.left + (maxRight - minLeft) / 2) + 'px';
+                    rowHandle.style.width = ''; // Handled by CSS now
+                    rowHandle.classList.add('visible');
+                }
+
+                const btnMerge = document.getElementById('btnMergeCells');
+                if (btnMerge) {
+                    const canMerge = currentSelectedCells.length > 1 || !!currentTableCellNode.nextElementSibling;
+                    btnMerge.style.opacity = canMerge ? '1' : '0.3';
+                    btnMerge.style.pointerEvents = canMerge ? 'auto' : 'none';
+                }
+            } else {
+                clearCellSelection();
+                menu.classList.remove('visible');
+                if (colHandle) colHandle.classList.remove('visible');
+                if (rowHandle) rowHandle.classList.remove('visible');
+            }
+
+            // Headings highlighting
+            const h1 = document.getElementById('btnH1');
+            const h2 = document.getElementById('btnH2');
+            const h3 = document.getElementById('btnH3');
+            if (h1) h1.classList.toggle('active', currentHeading === 'H1');
+            if (h2) h2.classList.toggle('active', currentHeading === 'H2');
+            if (h3) h3.classList.toggle('active', currentHeading === 'H3');
+
+            // Disable headings dynamically for tables
+            [h1, h2, h3].forEach(btn => {
+                if (btn) {
+                    btn.disabled = !!currentTableNode;
+                    btn.style.opacity = currentTableNode ? '0.3' : '1';
+                    btn.style.pointerEvents = currentTableNode ? 'none' : 'auto';
+                }
+            });
+
+            // Blockquote highlighting
+            const btnQuote = document.getElementById('btnQuote');
+            if (btnQuote) btnQuote.classList.toggle('active', inBlockquote);
+
+            // Standard toggles
+            const cmds = { 'btnBold': 'bold', 'btnItalic': 'italic', 'btnUnderline': 'underline', 'btnStrike': 'strikeThrough' };
+            for (const [id, cmd] of Object.entries(cmds)) {
+                const btn = document.getElementById(id);
+                if (!btn) continue;
+                let state = document.queryCommandState(cmd);
+
+                // Override false bold on headings
+                if (cmd === 'bold' && currentHeading && state) {
+                    state = hasBoldTag;
+                }
+
+                btn.classList.toggle('active', state);
+            }
+
+            // Lists
+            const btnUl = document.getElementById('btnUl');
+            const btnOl = document.getElementById('btnOl');
+            if (btnUl) btnUl.classList.toggle('active', document.queryCommandState('insertUnorderedList'));
+            if (btnOl) btnOl.classList.toggle('active', document.queryCommandState('insertOrderedList'));
+        }
+
+        // --- Table Context Functions ---
+
+        function getTableContext() {
+            return { cell: globalCurrentTableCell, table: globalCurrentTable };
+        }
+
+        function insertHtmlRow(position) {
+            const { cell } = getTableContext();
+            if (!cell) return;
+            const tr = cell.closest('tr');
+            if (!tr) return;
+            const newTr = document.createElement('tr');
+            const cellCount = tr.children.length;
+            for (let i = 0; i < cellCount; i++) {
+                const td = document.createElement('td');
+                td.innerHTML = '<br>'; // keep empty cell clickable
+                newTr.appendChild(td);
+            }
+            if (position === 'before') {
+                tr.parentNode.insertBefore(newTr, tr);
+            } else {
+                tr.parentNode.insertBefore(newTr, tr.nextSibling);
+            }
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function insertHtmlCol(position) {
+            const { cell, table } = getTableContext();
+            if (!cell || !table) return;
+            const tr = cell.closest('tr');
+            const cellIndex = Array.from(tr.children).indexOf(cell);
+
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                const newCell = document.createElement(row.parentNode.tagName === 'THEAD' ? 'th' : 'td');
+                newCell.innerHTML = '<br>';
+                if (position === 'before') {
+                    row.insertBefore(newCell, row.children[cellIndex]);
+                } else {
+                    row.insertBefore(newCell, row.children[cellIndex].nextSibling);
+                }
+            });
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function deleteHtmlRow() {
+            const { cell, table } = getTableContext();
+            if (!cell || !table) return;
+            const tr = cell.closest('tr');
+            tr.remove();
+
+            // Clean up empty table
+            if (table.querySelectorAll('tr').length === 0) table.remove();
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function deleteHtmlCol() {
+            const { cell, table } = getTableContext();
+            if (!cell || !table) return;
+            const tr = cell.closest('tr');
+            const cellIndex = Array.from(tr.children).indexOf(cell);
+
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                if (row.children[cellIndex]) {
+                    row.children[cellIndex].remove();
+                }
+            });
+
+            // Clean up empty rows
+            const firstRow = table.querySelector('tr');
+            if (!firstRow || firstRow.children.length === 0) table.remove();
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function deleteHtmlTable() {
+            const { table } = getTableContext();
+            if (table) table.remove();
+            globalCurrentTable = null;
+            globalCurrentTableCell = null;
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function mergeHtmlCells() {
+            if (globalCurrentTable && currentSelectedCells.length > 1) {
+                const firstCell = currentSelectedCells[0];
+                const startRowIndex = firstCell.closest('tr').rowIndex;
+                const startColIndex = Array.from(firstCell.closest('tr').children).indexOf(firstCell);
+
+                let maxRowIdx = startRowIndex;
+                let maxColIdx = startColIndex;
+
+                currentSelectedCells.forEach(cell => {
+                    const rIdx = cell.closest('tr').rowIndex;
+                    const cIdx = Array.from(cell.closest('tr').children).indexOf(cell);
+                    if (rIdx > maxRowIdx) maxRowIdx = rIdx;
+                    if (cIdx > maxColIdx) maxColIdx = cIdx;
+                });
+
+                const rowSpan = maxRowIdx - startRowIndex + 1;
+                const colSpan = maxColIdx - startColIndex + 1;
+
+                let mergedContent = '';
+                currentSelectedCells.forEach(cell => {
+                    let html = cell.innerHTML.trim();
+                    if (html && html !== '<br>') {
+                        mergedContent += html + ' <br> ';
+                    }
+                    if (cell !== firstCell) {
+                        cell.remove();
+                    }
+                });
+
+                mergedContent = mergedContent.replace(/(<br\s*\/?>\s*)+$/gi, '').trim();
+                firstCell.innerHTML = mergedContent || '<br>';
+
+                if (rowSpan > 1) firstCell.setAttribute('rowspan', rowSpan);
+                if (colSpan > 1) firstCell.setAttribute('colspan', colSpan);
+
+                firstCell.focus();
+                currentSelectedCells = [firstCell];
+                setTimeout(updateToolbarState, 10);
+            } else {
+                const { cell } = getTableContext();
+                if (!cell) return;
+                const nextCell = cell.nextElementSibling;
+                if (nextCell) {
+                    const colspan = parseInt(cell.getAttribute('colspan') || '1');
+                    const nextColspan = parseInt(nextCell.getAttribute('colspan') || '1');
+                    cell.setAttribute('colspan', colspan + nextColspan);
+
+                    // Append content if not empty
+                    const cellText = cell.innerText.trim();
+                    const nextText = nextCell.innerText.trim();
+                    if (nextText) {
+                        cell.innerHTML += ' <br> ' + nextCell.innerHTML;
+                    }
+                    nextCell.remove();
+                    cell.focus();
+
+                    setTimeout(updateToolbarState, 10);
+                }
+            }
+        }
+
+        // Update toolbar state on selection change
+        document.addEventListener('selectionchange', () => {
+            if (isEditing && !showingSource) updateToolbarState();
+        });
+
+        // Ensure handles stick nicely when scrolling
+        document.getElementById('editorBody').addEventListener('scroll', () => {
+            if (isEditing && !showingSource) updateToolbarState();
+        });
+
+        // Source toggle
+        function toggleSource() {
+            const area = document.getElementById('wysiwygArea');
+            const src = document.getElementById('sourceTextarea');
+            const toggle = document.getElementById('sourceToggle');
+
+            if (showingSource) {
+                // Switch from source back to WYSIWYG
+                showingSource = false;
+                toggle.classList.remove('active');
+                const md = src.value;
+                try {
+                    area.innerHTML = marked.parse(md);
+                } catch (e) {
+                    area.innerHTML = md.replace(/\n/g, '<br>');
+                }
+                area.style.display = '';
+                src.style.display = 'none';
+                area.focus();
+            } else {
+                // Switch from WYSIWYG to source view
+                showingSource = true;
+                toggle.classList.add('active');
+                src.value = htmlToMarkdown(area.innerHTML);
+                area.style.display = 'none';
+                src.style.display = 'block';
+                src.focus();
+            }
+        }
+
+        // HTML to Markdown converter
+        function htmlToMarkdown(html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            return nodeToMd(doc.body).trim();
+        }
+
+        function nodeToMd(node) {
+            let result = '';
+            for (const child of node.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    result += child.textContent;
+                } else if (child.nodeType === Node.ELEMENT_NODE) {
+                    const tag = child.tagName.toLowerCase();
+                    const inner = nodeToMd(child);
+                    switch (tag) {
+                        case 'h1': result += '\n# ' + inner.trim() + '\n\n'; break;
+                        case 'h2': result += '\n## ' + inner.trim() + '\n\n'; break;
+                        case 'h3': result += '\n### ' + inner.trim() + '\n\n'; break;
+                        case 'h4': result += '\n#### ' + inner.trim() + '\n\n'; break;
+                        case 'h5': result += '\n##### ' + inner.trim() + '\n\n'; break;
+                        case 'p': result += inner.trim() + '\n\n'; break;
+                        case 'br': result += '\n'; break;
+                        case 'strong': case 'b': result += '**' + inner + '**'; break;
+                        case 'em': case 'i': result += '*' + inner + '*'; break;
+                        case 'u': result += '<u>' + inner + '</u>'; break;
+                        case 's': case 'strike': case 'del': result += '~~' + inner + '~~'; break;
+                        case 'code':
+                            if (child.parentElement && child.parentElement.tagName === 'PRE') {
+                                result += inner;
+                            } else {
+                                result += '`' + inner + '`';
+                            }
+                            break;
+                        case 'pre': result += '\n```\n' + inner.trim() + '\n```\n\n'; break;
+                        case 'blockquote': {
+                            const lines = inner.trim().split('\n');
+                            result += '\n' + lines.map(l => '> ' + l).join('\n') + '\n\n';
+                            break;
+                        }
+                        case 'ul': {
+                            const items = child.querySelectorAll(':scope > li');
+                            items.forEach(li => { result += '- ' + nodeToMd(li).trim() + '\n'; });
+                            result += '\n';
+                            break;
+                        }
+                        case 'ol': {
+                            const items = child.querySelectorAll(':scope > li');
+                            items.forEach((li, i) => { result += (i + 1) + '. ' + nodeToMd(li).trim() + '\n'; });
+                            result += '\n';
+                            break;
+                        }
+                        case 'li': result += inner; break;
+                        case 'table': {
+                            // Preserve native HTML table for merged cells and column styling widths!
+                            const clone = child.cloneNode(true);
+                            // Cleanup transient editor state
+                            clone.querySelectorAll('.active-table-cell').forEach(c => c.classList.remove('active-table-cell'));
+                            result += '\n\n' + clone.outerHTML + '\n\n';
+                            break;
+                        }
+                        case 'a': result += '[' + inner + '](' + (child.getAttribute('href') || '') + ')'; break;
+                        case 'img': result += '![' + (child.getAttribute('alt') || '') + '](' + (child.getAttribute('src') || '') + ')'; break;
+                        case 'hr': result += '\n---\n\n'; break;
+                        case 'div': case 'section': case 'article': case 'span':
+                            result += inner;
+                            break;
+                        default:
+                            result += inner;
+                    }
+                }
+            }
+            return result;
+        }
+
+        // Keyboard shortcuts for WYSIWYG
+        document.addEventListener('keydown', function (e) {
+            if (!isEditing) return;
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 's') { e.preventDefault(); saveContent(); }
+            }
+        });
+
+        async function saveContent() {
+            // Get content depending on current view
+            let mdText;
+            if (showingSource) {
+                mdText = document.getElementById('sourceTextarea').value;
+            } else {
+                mdText = htmlToMarkdown(document.getElementById('wysiwygArea').innerHTML);
+            }
+            try {
+                const res = await fetch(`/lectures/${lectureId}/content`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ extracted_text: mdText })
+                });
+                if (res.ok) {
+                    lectureData.extracted_text = mdText;
+                    updateExtractedText();
+                    cancelEdit();
+                } else {
+                    alert('Failed to save content');
+                }
+            } catch (err) {
+                alert('Error saving: ' + err.message);
+            }
         }
 
         // ===== SNAPSHOTS =====

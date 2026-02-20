@@ -619,7 +619,7 @@
                 if (response.ok) {
                     const result = await response.json();
                     alert('Lecture uploaded and processed successfully!');
-                    window.location.href = `note.html?id=${result.id}`;
+                    window.location.href = `/note/${result.id}`;
                 } else {
                     try {
                         const error = await response.json();
