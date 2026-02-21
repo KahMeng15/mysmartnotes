@@ -789,9 +789,8 @@
         }
 
         .progress-container {
-            padding: var(--spacing-lg);
-            background: var(--color-background);
-            border-radius: var(--radius-md);
+            padding-top: 10px;
+
         }
 
         .progress-bar {
@@ -927,7 +926,7 @@
                             <div
                                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
                                 <span style="font-weight: 600; font-size: var(--font-size-sm);">Processing
-                                    lecture...</span>
+                                    document...</span>
                                 <span id="progressPercent"
                                     style="font-size: var(--font-size-sm); color: var(--color-gray);">0%</span>
                             </div>
@@ -942,7 +941,7 @@
                         <!-- Error Container -->
                         <div id="errorContainerInline" style="display: none;">
                             <div class="error-message">
-                                <strong>⚠️ Processing Failed</strong>
+                                <strong>Processing Failed</strong>
                                 <p id="errorDetails"
                                     style="margin: var(--spacing-md) 0 0 0; font-size: var(--font-size-sm);">Failed to
                                     extract text from document</p>
@@ -1178,6 +1177,19 @@
             </div>
         </div>
     </div>
+
+    <!-- Reprocess Confirm Modal -->
+    <div id="reprocessConfirmModal" class="modal">
+        <div class="modal-content" style="min-height: auto;">
+            <h3>Reprocess Document?</h3>
+            <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray);">Are you sure you want to reprocess
+                this document? This will overwrite the current content with newly processed data.</p>
+            <div class="modal-buttons">
+                <button type="button" class="btn-save" onclick="confirmReprocess()">Reprocess</button>
+                <button type="button" class="btn-cancel" onclick="closeReprocessModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
     <script>
         const TOKEN_KEY = 'token';
         const token = localStorage.getItem(TOKEN_KEY);
@@ -1281,16 +1293,21 @@
             document.getElementById('fileSize').textContent = formatFileSize(lectureData.file_size);
 
             // Processing time
-            if (lectureData.updated_at && lectureData.created_at) {
-                const created = new Date(lectureData.created_at);
-                const updated = new Date(lectureData.updated_at);
-                const diffMs = updated - created;
-                if (diffMs > 0 && diffMs < 3600000) {
-                    const secs = Math.round(diffMs / 1000);
-                    document.getElementById('processingTime').textContent = secs > 60 ? `${Math.round(secs / 60)}m ${secs % 60}s` : `${secs}s`;
+            if (lectureData.processing_time_ms !== null && lectureData.processing_time_ms !== undefined) {
+                const diffMs = lectureData.processing_time_ms;
+                if (diffMs < 1000) {
+                    document.getElementById('processingTime').textContent = `${diffMs}ms`;
                 } else {
-                    document.getElementById('processingTime').textContent = 'N/A';
+                    const totalSecs = Math.floor(diffMs / 1000);
+                    if (totalSecs > 3600) {
+                        document.getElementById('processingTime').textContent = 'N/A';
+                    } else {
+                        document.getElementById('processingTime').textContent = totalSecs > 60 ?
+                            `${Math.floor(totalSecs / 60)}m ${totalSecs % 60}s` : `${totalSecs}s`;
+                    }
                 }
+            } else {
+                document.getElementById('processingTime').textContent = 'N/A';
             }
 
             updateExtractedText();
@@ -2296,12 +2313,15 @@
                         const blob = await dlRes.blob();
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
+                        a.style.display = 'none';
                         a.href = url;
                         a.download = `${lectureData.title || 'lecture'}_OUTPUT.pdf`;
                         document.body.appendChild(a);
                         a.click();
-                        window.URL.revokeObjectURL(url);
-                        a.remove();
+                        setTimeout(() => {
+                            window.URL.revokeObjectURL(url);
+                            a.remove();
+                        }, 1000);
                     }
                     alert('✅ PDF exported!');
                 } else {
@@ -2323,22 +2343,46 @@
                     const blob = await response.blob();
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
+                    a.style.display = 'none';
                     a.href = url;
-                    a.download = lectureData.file_name || 'file';
+
+                    let filename = lectureData.file_name || 'file';
+                    const disposition = response.headers.get('Content-Disposition');
+                    if (disposition && disposition.indexOf('filename=') !== -1) {
+                        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                        if (matches != null && matches[1]) {
+                            filename = matches[1].replace(/['"]/g, '');
+                        }
+                    }
+
+                    a.download = filename;
                     document.body.appendChild(a);
                     a.click();
-                    window.URL.revokeObjectURL(url);
-                    a.remove();
+
+                    setTimeout(() => {
+                        window.URL.revokeObjectURL(url);
+                        a.remove();
+                    }, 1000);
                 } else {
                     alert('Failed to download file');
                 }
             } catch (e) { alert('Error: ' + e.message); }
         }
 
-        async function reprocessOCR() {
+        function reprocessOCR() {
+            document.getElementById('reprocessConfirmModal').classList.add('active');
+        }
+
+        function closeReprocessModal() {
+            document.getElementById('reprocessConfirmModal').classList.remove('active');
+        }
+
+        async function confirmReprocess() {
+            closeReprocessModal();
             const btn = document.getElementById('autoFormatBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Processing...'; }
 
+            document.getElementById('editorContainer').style.display = 'none';
             document.getElementById('progressContainer').style.display = 'block';
             document.getElementById('progressFill').style.width = '10%';
             document.getElementById('progressPercent').textContent = '10%';
@@ -2370,8 +2414,14 @@
                     let errorMsg = 'Failed to reprocess';
                     try { const e = await response.json(); errorMsg = e.detail || errorMsg; } catch (e) { }
                     alert('❌ Error: ' + errorMsg);
+                    document.getElementById('editorContainer').style.display = 'block';
+                    document.getElementById('progressContainer').style.display = 'none';
                 }
-            } catch (error) { alert('❌ Error: ' + error.message); }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+                document.getElementById('editorContainer').style.display = 'block';
+                document.getElementById('progressContainer').style.display = 'none';
+            }
             finally {
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph ph-magic-wand"></i> Auto Format'; }
             }

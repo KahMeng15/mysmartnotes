@@ -132,6 +132,8 @@ async def upload_lecture(
     
     # Process content extraction immediately
     try:
+        import time
+        start_time = time.time()
         file_ext = os.path.splitext(file_path)[1].lower()
         
         if file_ext in ('.pdf', '.pptx'):
@@ -157,6 +159,8 @@ async def upload_lecture(
                             logger.info(f"Auto-detected title: {detected_title}")
                             break
             
+            db_lecture.processing_time_ms = int((time.time() - start_time) * 1000)
+            db_lecture.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(db_lecture)
             
@@ -172,6 +176,8 @@ async def upload_lecture(
             db_lecture.extracted_text = ocr_result.get("raw_text", "")
             db_lecture.extracted_content_structured = json.dumps(ocr_result.get("structured_content", []))
             db_lecture.extracted_images_metadata = json.dumps(ocr_result.get("images", []))
+            db_lecture.processing_time_ms = int((time.time() - start_time) * 1000)
+            db_lecture.updated_at = datetime.utcnow()
             db.commit()
             db.refresh(db_lecture)
             
@@ -281,6 +287,8 @@ async def reprocess_ocr(
         )
     
     try:
+        import time
+        start_time = time.time()
         logger.info(f"Reprocessing OCR for lecture {lecture_id} (use_v2={use_v2})")
         
         # Extract text with structured content using specified processor
@@ -318,6 +326,7 @@ async def reprocess_ocr(
             structured_content = ocr_result.get("structured_content", [])
             images_data = ocr_result.get("images", [])
         
+        lecture.processing_time_ms = int((time.time() - start_time) * 1000)
         logger.info(f"Reprocessing complete: {len(raw_text)} characters, {len(structured_content)} segments, {len(images_data)} images")
         
         # Update lecture with extracted content

@@ -125,6 +125,7 @@ class Lecture(LectureBase):
     extracted_content_structured: Optional[str] = None
     extracted_images_metadata: Optional[str] = None
     output_pdf_path: Optional[str] = None
+    processing_time_ms: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     
