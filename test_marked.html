@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+<div id="content"></div>
+<script>
+  const text = "# Heading 1\nSome text here\n## Heading 2\nMore text here\n### Heading 3\nEven more text";
+  document.getElementById('content').innerHTML = marked.parse(text);
+  console.log(document.getElementById('content').innerHTML);
+</script>
+</body>
+</html>

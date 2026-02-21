@@ -28,6 +28,7 @@
         .note-header h1 {
             margin: 0 0 var(--spacing-md) 0;
             font-size: 2rem;
+            color: inherit;
         }
 
         .note-header-meta {
@@ -70,6 +71,24 @@
             display: flex;
             flex-direction: column;
             gap: var(--spacing-lg);
+            position: sticky;
+            top: 100px;
+            align-self: start;
+            max-height: calc(100vh - 120px);
+            overflow-y: hidden;
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* IE and Edge */
+        }
+
+        .note-sidebar.can-scroll {
+            overflow-y: auto;
+        }
+
+        .note-sidebar::-webkit-scrollbar {
+            display: none;
+            /* Chrome, Safari and Opera */
         }
 
         /* ===== SECTION CARDS ===== */
@@ -78,6 +97,7 @@
             border-radius: var(--radius-lg);
             padding: var(--spacing-lg);
             border: 1px solid var(--color-light-gray);
+            overflow: visible;
         }
 
         .section-title {
@@ -90,18 +110,21 @@
         }
 
         /* ===== INFO ITEMS ===== */
-        .info-item {
-            padding: var(--spacing-md);
-            background: var(--color-background);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--spacing-sm);
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-md);
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
         }
 
-        .info-item:last-child {
-            margin-bottom: 0;
+        .info-item {
+            padding: var(--spacing-sm);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            min-width: 0;
         }
 
         .info-item.clickable {
@@ -113,14 +136,18 @@
             background: var(--color-light-gray);
         }
 
+        .info-item>div:last-child {
+            min-width: 0;
+        }
+
         .info-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-md);
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 14px;
             flex-shrink: 0;
             background: white;
             border: 1px solid var(--color-light-gray);
@@ -128,7 +155,7 @@
         }
 
         .info-label {
-            font-size: var(--font-size-xs);
+            font-size: 0.65rem;
             color: var(--color-gray);
             text-transform: uppercase;
             font-weight: 600;
@@ -137,8 +164,10 @@
         .info-value {
             font-weight: 500;
             color: var(--color-dark);
-            font-size: var(--font-size-sm);
-            word-break: break-word;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* ===== ACTION GRID ===== */
@@ -162,6 +191,7 @@
             color: var(--color-dark);
             transition: all 0.2s;
             font-family: var(--font-primary);
+            text-align: left;
         }
 
         .action-btn:hover {
@@ -243,29 +273,50 @@
             color: var(--color-dark);
         }
 
+        .markdown-content>*:first-child {
+            margin-top: 0;
+        }
+
         .markdown-content h1,
         .markdown-content h2,
         .markdown-content h3 {
             margin-top: 1.5em;
             margin-bottom: 0.5em;
             font-weight: 600;
+            position: sticky;
+            background: white;
+            z-index: 10;
         }
 
         .markdown-content h1 {
             font-size: 1.8rem;
             color: #1a1a1a;
-            border-bottom: 2px solid #eee;
             padding-bottom: 0.3em;
+            padding-top: 15px;
+            padding-bottom: 5px;
+            top: 70px;
+            /* Spacing from navbar */
+            z-index: 13;
         }
 
         .markdown-content h2 {
             font-size: 1.5rem;
             color: #333;
+            padding-top: 15px;
+            padding-bottom: 5px;
+            top: 150px;
+            /* Clear h1 */
+            z-index: 12;
         }
 
         .markdown-content h3 {
             font-size: 1.25rem;
             color: #555;
+            padding-top: 15px;
+            padding-bottom: 5px;
+            top: 190px;
+            /* Clear h2 */
+            z-index: 11;
         }
 
         .markdown-content p {
@@ -484,7 +535,7 @@
             <div class="note-content">
                 <!-- Main Content -->
                 <div class="note-main">
-                    <div class="section-card">
+                    <div class="section-card" style="padding-top: 10px;">
                         <!-- Status Badge -->
                         <div id="extractionStatus" style="display: none;">
                             <div id="statusBadge" class="status-badge status-pending">Pending</div>
@@ -524,106 +575,6 @@
                                     Loading...</p>
                             </div>
                         </div>
-
-                        <!-- Edit Mode: Fullscreen WYSIWYG Editor -->
-                        <div id="editorContainer" class="editor-container">
-                            <div class="editor-topbar">
-                                <div class="editor-logo"><i class="ph ph-notebook"></i> MySmartNotes</div>
-                                <div class="editor-toolbar" id="editorToolbar">
-                                    <button class="toolbar-btn" id="btnH1" onclick="execCmd('formatBlock','H1')"
-                                        title="Heading 1">H1</button>
-                                    <button class="toolbar-btn" id="btnH2" onclick="execCmd('formatBlock','H2')"
-                                        title="Heading 2">H2</button>
-                                    <button class="toolbar-btn" id="btnH3" onclick="execCmd('formatBlock','H3')"
-                                        title="Heading 3">H3</button>
-                                    <div class="toolbar-sep"></div>
-                                    <button class="toolbar-btn" id="btnBold" onclick="execCmd('bold')"
-                                        title="Bold (Ctrl+B)"><b>B</b></button>
-                                    <button class="toolbar-btn" id="btnItalic" onclick="execCmd('italic')"
-                                        title="Italic (Ctrl+I)"><i>I</i></button>
-                                    <button class="toolbar-btn" id="btnUnderline" onclick="execCmd('underline')"
-                                        title="Underline (Ctrl+U)"><u>U</u></button>
-                                    <button class="toolbar-btn" id="btnStrike" onclick="execCmd('strikeThrough')"
-                                        title="Strikethrough"><s>S</s></button>
-                                    <div class="toolbar-sep"></div>
-                                    <button class="toolbar-btn" id="btnUl" onclick="execCmd('insertUnorderedList')"
-                                        title="Bullet List"><i class="ph ph-list-bullets"></i></button>
-                                    <button class="toolbar-btn" id="btnOl" onclick="execCmd('insertOrderedList')"
-                                        title="Numbered List"><i class="ph ph-list-numbers"></i></button>
-                                    <div class="toolbar-sep"></div>
-                                    <button class="toolbar-btn" onclick="insertTableWysiwyg()" title="Insert Table"><i
-                                            class="ph ph-table"></i></button>
-                                    <button class="toolbar-btn" id="btnQuote" onclick="toggleBlockquote()"
-                                        title="Blockquote"><i class="ph ph-quotes"></i></button>
-                                    <button class="toolbar-btn" onclick="insertCodeBlock()" title="Code Block"><i
-                                            class="ph ph-code"></i></button>
-                                    <div class="toolbar-sep"></div>
-                                    <button class="toolbar-btn" onclick="document.execCommand('undo')"
-                                        title="Undo (Ctrl+Z)"><i class="ph ph-arrow-counter-clockwise"></i></button>
-                                    <button class="toolbar-btn" onclick="document.execCommand('redo')"
-                                        title="Redo (Ctrl+Shift+Z)"><i class="ph ph-arrow-clockwise"></i></button>
-                                    <button class="toolbar-toggle" id="sourceToggle" onclick="toggleSource()"
-                                        title="View raw markdown">
-                                        <i class="ph ph-code"></i> Source
-                                    </button>
-                                </div>
-                                <div class="editor-topbar-actions">
-                                    <button class="btn btn-outline" onclick="showDiscardModal()">Cancel</button>
-                                    <button class="btn btn-primary" onclick="showSaveModal()"><i
-                                            class="ph ph-floppy-disk"></i> Save</button>
-                                </div>
-                            </div>
-                            <!-- Table Context Menu -->
-                            <div id="tableContextMenu" class="table-context-menu">
-                                <button class="table-context-btn"
-                                    onmousedown="event.preventDefault(); insertHtmlRow('before')"
-                                    title="Add Row Above"><i class="ph ph-arrow-line-up"></i></button>
-                                <button class="table-context-btn"
-                                    onmousedown="event.preventDefault(); insertHtmlRow('after')"
-                                    title="Add Row Below"><i class="ph ph-arrow-line-down"></i></button>
-                                <div class="table-context-divider"></div>
-                                <button class="table-context-btn"
-                                    onmousedown="event.preventDefault(); insertHtmlCol('before')"
-                                    title="Add Column Left"><i class="ph ph-arrow-line-left"></i></button>
-                                <button class="table-context-btn"
-                                    onmousedown="event.preventDefault(); insertHtmlCol('after')"
-                                    title="Add Column Right"><i class="ph ph-arrow-line-right"></i></button>
-                                <div class="table-context-divider"></div>
-                                <button class="table-context-btn" onmousedown="event.preventDefault(); mergeHtmlCells()"
-                                    id="btnMergeCells" title="Merge Right"><i class="ph ph-intersect"></i></button>
-                                <div class="table-context-divider"></div>
-                                <button class="table-context-btn danger"
-                                    onmousedown="event.preventDefault(); deleteHtmlRow()" title="Delete Row">
-                                    <i class="ph ph-trash"></i> <span
-                                        style="font-size: 11px; margin-left: 4px; font-weight: 600;">Row</span>
-                                </button>
-                                <button class="table-context-btn danger"
-                                    onmousedown="event.preventDefault(); deleteHtmlCol()" title="Delete Column">
-                                    <i class="ph ph-trash"></i> <span
-                                        style="font-size: 11px; margin-left: 4px; font-weight: 600;">Col</span>
-                                </button>
-                                <button class="table-context-btn danger"
-                                    onmousedown="event.preventDefault(); deleteHtmlTable()" title="Delete Table">
-                                    <i class="ph ph-trash"></i> <span
-                                        style="font-size: 11px; margin-left: 4px; font-weight: 600;">Table</span>
-                                </button>
-                            </div>
-
-                            <!-- Table Add Handles -->
-                            <div id="colAddHandle" class="table-add-handle vertical"
-                                onmousedown="event.preventDefault(); insertHtmlCol('after')" title="Add Column Right">
-                                <i class="ph ph-plus"></i>
-                            </div>
-                            <div id="rowAddHandle" class="table-add-handle horizontal"
-                                onmousedown="event.preventDefault(); insertHtmlRow('after')" title="Add Row Below">
-                                <i class="ph ph-plus"></i>
-                            </div>
-
-                            <div class="editor-body" id="editorBody">
-                                <div id="wysiwygArea" class="wysiwyg-area" contenteditable="true"></div>
-                                <textarea id="sourceTextarea" class="source-textarea" spellcheck="false"></textarea>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -632,41 +583,43 @@
                     <!-- Info Card -->
                     <div class="section-card">
                         <div class="section-title"><i class="ph ph-info"></i> Info</div>
-                        <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
-                            onclick="downloadOriginalFile()">
-                            <div class="info-icon"><i class="ph ph-file-arrow-down"></i></div>
-                            <div>
-                                <div class="info-label">File Name</div>
-                                <div class="info-value" id="fileName">-</div>
+                        <div class="info-grid">
+                            <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
+                                onclick="downloadOriginalFile()">
+                                <div class="info-icon"><i class="ph ph-file-arrow-down"></i></div>
+                                <div>
+                                    <div class="info-label">File Name</div>
+                                    <div class="info-value" id="fileName">-</div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-icon"><i class="ph ph-calendar-blank"></i></div>
-                            <div>
-                                <div class="info-label">Uploaded</div>
-                                <div class="info-value" id="uploadedDate">-</div>
+                            <div class="info-item">
+                                <div class="info-icon"><i class="ph ph-calendar-blank"></i></div>
+                                <div>
+                                    <div class="info-label">Uploaded</div>
+                                    <div class="info-value" id="uploadedDate">-</div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-icon"><i class="ph ph-file-text"></i></div>
-                            <div>
-                                <div class="info-label">File Type</div>
-                                <div class="info-value" id="fileType">-</div>
+                            <div class="info-item">
+                                <div class="info-icon"><i class="ph ph-file-text"></i></div>
+                                <div>
+                                    <div class="info-label">File Type</div>
+                                    <div class="info-value" id="fileType">-</div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-icon"><i class="ph ph-hard-drives"></i></div>
-                            <div>
-                                <div class="info-label">File Size</div>
-                                <div class="info-value" id="fileSize">-</div>
+                            <div class="info-item">
+                                <div class="info-icon"><i class="ph ph-hard-drives"></i></div>
+                                <div>
+                                    <div class="info-label">File Size</div>
+                                    <div class="info-value" id="fileSize">-</div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
-                            onclick="reprocessOCR()">
-                            <div class="info-icon"><i class="ph ph-timer"></i></div>
-                            <div>
-                                <div class="info-label">Processing</div>
-                                <div class="info-value" id="processingTime">-</div>
+                            <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
+                                onclick="reprocessOCR()">
+                                <div class="info-icon"><i class="ph ph-timer"></i></div>
+                                <div>
+                                    <div class="info-label">Processing</div>
+                                    <div class="info-value" id="processingTime">-</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1247,6 +1200,18 @@
             localStorage.removeItem(TOKEN_KEY);
             window.location.href = '/index.html';
         }
+
+        // Toggle sidebar scroll based on window scroll position
+        window.addEventListener('scroll', () => {
+            const sidebar = document.querySelector('.note-sidebar');
+            if (sidebar) {
+                if (window.scrollY > 0) {
+                    sidebar.classList.add('can-scroll');
+                } else {
+                    sidebar.classList.remove('can-scroll');
+                }
+            }
+        });
     </script>
 </body>
 

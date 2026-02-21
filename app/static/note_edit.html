@@ -28,6 +28,7 @@
         .note-header h1 {
             margin: 0 0 var(--spacing-md) 0;
             font-size: 2rem;
+            color: inherit;
         }
 
         .note-header-meta {
@@ -70,6 +71,24 @@
             display: flex;
             flex-direction: column;
             gap: var(--spacing-lg);
+            position: sticky;
+            top: 100px;
+            align-self: start;
+            max-height: calc(100vh - 120px);
+            overflow-y: hidden;
+            scrollbar-width: none;
+            /* Firefox */
+            -ms-overflow-style: none;
+            /* IE and Edge */
+        }
+
+        .note-sidebar.can-scroll {
+            overflow-y: auto;
+        }
+
+        .note-sidebar::-webkit-scrollbar {
+            display: none;
+            /* Chrome, Safari and Opera */
         }
 
         /* ===== SECTION CARDS ===== */
@@ -90,18 +109,21 @@
         }
 
         /* ===== INFO ITEMS ===== */
-        .info-item {
-            padding: var(--spacing-md);
-            background: var(--color-background);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--spacing-sm);
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-md);
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
         }
 
-        .info-item:last-child {
-            margin-bottom: 0;
+        .info-item {
+            padding: var(--spacing-sm);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            min-width: 0;
         }
 
         .info-item.clickable {
@@ -113,14 +135,18 @@
             background: var(--color-light-gray);
         }
 
+        .info-item>div:last-child {
+            min-width: 0;
+        }
+
         .info-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-md);
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 14px;
             flex-shrink: 0;
             background: white;
             border: 1px solid var(--color-light-gray);
@@ -128,7 +154,7 @@
         }
 
         .info-label {
-            font-size: var(--font-size-xs);
+            font-size: 0.65rem;
             color: var(--color-gray);
             text-transform: uppercase;
             font-weight: 600;
@@ -137,8 +163,10 @@
         .info-value {
             font-weight: 500;
             color: var(--color-dark);
-            font-size: var(--font-size-sm);
-            word-break: break-word;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* ===== ACTION GRID ===== */
@@ -377,7 +405,7 @@
         /* Editor body area */
         .editor-body {
             flex: 1;
-            overflow-y: auto;
+            /* overflow-y: auto; */
             display: block;
             /* Use block to avoid flex cutoff issues */
             background: var(--color-background);
@@ -626,29 +654,50 @@
             color: var(--color-dark);
         }
 
+        .markdown-content>*:first-child {
+            margin-top: 0;
+        }
+
         .markdown-content h1,
         .markdown-content h2,
         .markdown-content h3 {
             margin-top: 1.5em;
             margin-bottom: 0.5em;
             font-weight: 600;
+            position: sticky;
+            background: white;
+            z-index: 10;
         }
 
         .markdown-content h1 {
             font-size: 1.8rem;
             color: #1a1a1a;
-            border-bottom: 2px solid #eee;
             padding-bottom: 0.3em;
+            padding-top: 15px;
+            padding-bottom: 5px;
+            top: 70px;
+            /* Spacing from navbar */
+            z-index: 13;
         }
 
         .markdown-content h2 {
             font-size: 1.5rem;
             color: #333;
+            padding-top: 15px;
+            padding-bottom: 5px;
+            top: 150px;
+            /* Clear h1 */
+            z-index: 12;
         }
 
         .markdown-content h3 {
             font-size: 1.25rem;
             color: #555;
+            padding-top: 15px;
+            padding-bottom: 5px;
+            top: 190px;
+            /* Clear h2 */
+            z-index: 11;
         }
 
         .markdown-content p {
@@ -1015,41 +1064,43 @@
                     <!-- Info Card -->
                     <div class="section-card">
                         <div class="section-title"><i class="ph ph-info"></i> Info</div>
-                        <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
-                            onclick="downloadOriginalFile()">
-                            <div class="info-icon"><i class="ph ph-file-arrow-down"></i></div>
-                            <div>
-                                <div class="info-label">File Name</div>
-                                <div class="info-value" id="fileName">-</div>
+                        <div class="info-grid">
+                            <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
+                                onclick="downloadOriginalFile()">
+                                <div class="info-icon"><i class="ph ph-file-arrow-down"></i></div>
+                                <div>
+                                    <div class="info-label">File Name</div>
+                                    <div class="info-value" id="fileName">-</div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-icon"><i class="ph ph-calendar-blank"></i></div>
-                            <div>
-                                <div class="info-label">Uploaded</div>
-                                <div class="info-value" id="uploadedDate">-</div>
+                            <div class="info-item">
+                                <div class="info-icon"><i class="ph ph-calendar-blank"></i></div>
+                                <div>
+                                    <div class="info-label">Uploaded</div>
+                                    <div class="info-value" id="uploadedDate">-</div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-icon"><i class="ph ph-file-text"></i></div>
-                            <div>
-                                <div class="info-label">File Type</div>
-                                <div class="info-value" id="fileType">-</div>
+                            <div class="info-item">
+                                <div class="info-icon"><i class="ph ph-file-text"></i></div>
+                                <div>
+                                    <div class="info-label">File Type</div>
+                                    <div class="info-value" id="fileType">-</div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-icon"><i class="ph ph-hard-drives"></i></div>
-                            <div>
-                                <div class="info-label">File Size</div>
-                                <div class="info-value" id="fileSize">-</div>
+                            <div class="info-item">
+                                <div class="info-icon"><i class="ph ph-hard-drives"></i></div>
+                                <div>
+                                    <div class="info-label">File Size</div>
+                                    <div class="info-value" id="fileSize">-</div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
-                            onclick="reprocessOCR()">
-                            <div class="info-icon"><i class="ph ph-timer"></i></div>
-                            <div>
-                                <div class="info-label">Processing</div>
-                                <div class="info-value" id="processingTime">-</div>
+                            <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
+                                onclick="reprocessOCR()">
+                                <div class="info-icon"><i class="ph ph-timer"></i></div>
+                                <div>
+                                    <div class="info-label">Processing</div>
+                                    <div class="info-value" id="processingTime">-</div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2363,6 +2414,18 @@
             localStorage.removeItem(TOKEN_KEY);
             window.location.href = '/index.html';
         }
+
+        // Toggle sidebar scroll based on window scroll position
+        window.addEventListener('scroll', () => {
+            const sidebar = document.querySelector('.note-sidebar');
+            if (sidebar) {
+                if (window.scrollY > 0) {
+                    sidebar.classList.add('can-scroll');
+                } else {
+                    sidebar.classList.remove('can-scroll');
+                }
+            }
+        });
     </script>
 </body>
 

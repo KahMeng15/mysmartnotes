@@ -266,7 +266,7 @@ a:hover {
   padding: var(--spacing-xl);
   border-radius: var(--radius-lg);
   height: 100vh;
-  overflow-y: auto;
+  /* overflow-y: auto; */
   position: fixed;
   left: 0;
   top: 0;
