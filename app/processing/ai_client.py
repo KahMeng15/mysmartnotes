@@ -12,38 +12,52 @@ settings = get_settings()
 
 
 class AIClient:
-    """Unified AI client for Gemini, Hugging Face, and local Ollama"""
+    """Unified AI client for Gemini, Hugging Face, and local Ollama
+    
+    Settings Priority:
+    1. User personal settings (if use_global_ai_config=False)
+    2. Global settings from environment (if use_global_ai_config=True)
+    3. System fallback settings (rarely used)
+    """
     
     def __init__(self, user: Optional[User] = None):
         self.user = user
         
-        # Determine if using global settings
-        use_global = user.use_global_ai_config if user else False
-        
-        # Priority: user settings (if not using global) > global settings > root settings
-        if use_global and user:
-            # Use global settings from environment
+        # Determine settings source
+        if user and user.use_global_ai_config:
+            # Use global settings managed by administrator
             self.provider = settings.GLOBAL_AI_PROVIDER
-            self.gemini_key = settings.GLOBAL_GEMINI_API_KEY if settings.GLOBAL_AI_PROVIDER == "gemini" else None
-            self.ai_model_name = settings.GLOBAL_AI_MODEL if settings.GLOBAL_AI_MODEL else None
-            logger.info(f"User {user.id} using global AI settings: {self.provider}")
-        else:
+            self.ai_model_name = settings.GLOBAL_AI_MODEL or None
+            self.gemini_key = settings.GLOBAL_GEMINI_API_KEY if self.provider == "gemini" else None
+            self.hf_token = None
+            self.ollama_base_url = None
+            logger.info(f"[User {user.id}] Using global AI settings: {self.provider}")
+            
+        elif user and user.ai_provider:
             # Use user's personal settings
-            self.provider = user.ai_provider if user and user.ai_provider else settings.AI_PROVIDER
-            self.gemini_key = user.ai_api_key if user and user.ai_provider == "gemini" and user.ai_api_key else settings.GEMINI_API_KEY
-            self.ai_model_name = user.ai_model if user and user.ai_model else None
+            self.provider = user.ai_provider
+            self.ai_model_name = user.ai_model or None
+            self.gemini_key = user.ai_api_key if self.provider == "gemini" else None
+            self.hf_token = user.ai_api_key if self.provider == "huggingface" else None
+            self.ollama_base_url = user.ai_base_url if self.provider == "ollama" else None
+            logger.info(f"[User {user.id}] Using personal AI settings: {self.provider}")
+            
+        else:
+            # Fallback to system defaults (no user or user has no settings)
+            self.provider = settings.AI_PROVIDER
+            self.ai_model_name = None
+            self.gemini_key = settings.GEMINI_API_KEY
+            self.hf_token = settings.HUGGINGFACE_TOKEN
+            self.ollama_base_url = settings.OLLAMA_BASE_URL
+            logger.info(f"Using system fallback AI settings: {self.provider}")
         
-        self.hf_token = user.ai_api_key if user and user.ai_provider == "huggingface" and user.ai_api_key else settings.HUGGINGFACE_TOKEN
-        
-        # Ollama URL: must be explicitly configured (no default localhost)
-        self.ollama_base_url = user.ai_base_url if user and user.ai_base_url else settings.OLLAMA_BASE_URL
-        
+        # Initialize the selected provider
         if self.provider == "gemini":
             self._init_gemini()
         elif self.provider == "huggingface":
             self._init_huggingface()
         elif self.provider == "ollama":
-            logger.info("Local Ollama AI initialized")
+            logger.info(f"Ollama AI initialized (URL: {self.ollama_base_url})")
     def _init_gemini(self):
         """Initialize Gemini API and dynamically select the best model."""
         try:

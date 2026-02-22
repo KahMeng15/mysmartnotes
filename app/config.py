@@ -5,28 +5,45 @@ import os
 
 
 class Settings(BaseSettings):
-    """Application settings from environment variables"""
+    """Application settings from environment variables
+    
+    AI Configuration Hierarchy:
+    ===========================
+    1. GLOBAL_* settings: Administrator-managed defaults for all users
+       - Used when user enables "Use Global AI Settings" in their profile
+       - Recommended for most users in managed environments
+    
+    2. User personal settings: Individual user configurations (stored in DB)
+       - Used when user disables "Use Global AI Settings"
+       - Allows users to use their own API keys and providers
+    
+    3. Fallback settings: System-wide defaults (GEMINI_API_KEY, AI_PROVIDER, etc.)
+       - Used only when user has no personal settings and not using global
+       - Typically not used in production environments
+    """
     
     # Database
     DATABASE_URL: str = "sqlite:///./data/app.db"
     
-    # API Keys
-    GEMINI_API_KEY: str = ""
-    HUGGINGFACE_TOKEN: str = ""
-    
-    # Global AI Configuration
-    GLOBAL_AI_PROVIDER: str = "gemini"
-    GLOBAL_GEMINI_API_KEY: str = ""
-    GLOBAL_AI_MODEL: str = ""
-    
-    # JWT
+    # JWT Security
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # AI Provider
-    AI_PROVIDER: str = "gemini"  # or "huggingface"
-    OLLAMA_BASE_URL: str = ""  # e.g., "http://10.0.0.10:11434" - no default, must be configured
+    # ============================================
+    # Global AI Configuration (Administrator-managed)
+    # ============================================
+    GLOBAL_AI_PROVIDER: str = "gemini"  # Options: gemini, huggingface, ollama
+    GLOBAL_GEMINI_API_KEY: str = ""     # API key for global Gemini usage
+    GLOBAL_AI_MODEL: str = ""           # Optional: specific model name (leave empty for auto-select)
+    
+    # ============================================
+    # Fallback AI Settings (System defaults)
+    # ============================================
+    GEMINI_API_KEY: str = ""            # Fallback Gemini API key
+    HUGGINGFACE_TOKEN: str = ""         # Fallback Hugging Face token
+    AI_PROVIDER: str = "gemini"         # Fallback provider
+    OLLAMA_BASE_URL: str = ""           # Ollama server URL (e.g., "http://192.168.1.100:11434")
     
     # App Settings
     APP_NAME: str = "MySmartNotes"

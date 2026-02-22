@@ -40,6 +40,8 @@ class ChatResponse(BaseModel):
     response: str
     sources: list = []
     timings: Optional[dict] = None
+    ai_model: Optional[str] = None  # AI model/provider used
+    detailed_sources: Optional[list] = []  # Detailed source references with positions
 
 
 # Helper: Web search fallback
@@ -168,6 +170,8 @@ async def ask_question(
     # STEP 2: Semantic search for relevant snippets
     context = ""
     snippet_sources = []
+    detailed_sources = []  # Store detailed source info with positions
+    
     if all_content:
         try:
             from app.processing.embeddings import find_relevant_snippets, combine_snippets
@@ -177,6 +181,20 @@ async def ask_question(
                 top_k=3
             )
             context = combine_snippets(snippets, max_chars=2000)
+            
+            # Build detailed sources with positions and scores
+            for snippet in snippets:
+                source_info = {
+                    'text_preview': snippet['text'][:100] + '...' if len(snippet['text']) > 100 else snippet['text'],
+                    'position': snippet['position'],
+                    'score': snippet['score'],
+                    'lecture_id': request.lecture_id if request.lecture_id else None
+                }
+                # Try to identify which lecture this snippet is from
+                if not request.lecture_id and sources:
+                    source_info['source_name'] = sources[0] if sources else 'Unknown'
+                detailed_sources.append(source_info)
+            
             # Use top sources
             snippet_sources = sources[:2] if sources else []
         except Exception as e:
@@ -202,6 +220,11 @@ async def ask_question(
     # STEP 5: Call LLM with strict prompting and timeout
     ai_client = AIClient(current_user)
     t_model_start = time.time()
+    
+    # Get AI model info
+    ai_model_info = f"{ai_client.provider.upper()}"
+    if ai_client.ai_model_name:
+        ai_model_info += f" ({ai_client.ai_model_name})"
     
     try:
         # Enforce 4.5s timeout on model call
@@ -242,6 +265,8 @@ async def ask_question(
         message=request.message,
         response=response,
         sources=snippet_sources,
+        ai_model=ai_model_info,
+        detailed_sources=detailed_sources,
         timings={
             "retrieval_ms": round(retrieval_ms, 2),
             "model_ms": round(model_ms, 2),

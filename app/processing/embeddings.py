@@ -103,7 +103,7 @@ def load_embeddings(path: str) -> List[dict]:
         return []
 
 
-def find_relevant_snippets(query: str, text: str, top_k: int = 3, chunk_size: int = 500) -> List[str]:
+def find_relevant_snippets(query: str, text: str, top_k: int = 3, chunk_size: int = 500) -> List[dict]:
     """
     Find the most relevant text chunks for a query using semantic similarity.
     
@@ -114,22 +114,29 @@ def find_relevant_snippets(query: str, text: str, top_k: int = 3, chunk_size: in
         chunk_size: Approximate size of each chunk in characters
     
     Returns:
-        List of top-k most relevant text chunks
+        List of dicts with 'text', 'position', and 'score' for top-k most relevant chunks
     """
     model = get_embeddings_model()
     if model is None or not text:
         return []
     
     try:
-        # Split text into chunks
+        # Split text into chunks and track positions
         chunks = []
+        positions = []
         words = text.split()
         current_chunk = []
         current_length = 0
+        char_position = 0
         
         for word in words:
+            if not current_chunk:
+                # Start position of this chunk
+                positions.append(char_position)
+            
             current_chunk.append(word)
             current_length += len(word) + 1
+            char_position += len(word) + 1
             
             if current_length >= chunk_size:
                 chunks.append(" ".join(current_chunk))
@@ -137,6 +144,7 @@ def find_relevant_snippets(query: str, text: str, top_k: int = 3, chunk_size: in
                 current_length = 0
         
         if current_chunk:
+            positions.append(char_position - current_length)
             chunks.append(" ".join(current_chunk))
         
         if not chunks:
@@ -152,23 +160,28 @@ def find_relevant_snippets(query: str, text: str, top_k: int = 3, chunk_size: in
             sim = float(np.dot(query_embedding, chunk_emb) / (
                 np.linalg.norm(query_embedding) * np.linalg.norm(chunk_emb) + 1e-9
             ))
-            similarities.append((i, sim, chunks[i]))
+            similarities.append({
+                'text': chunks[i],
+                'position': positions[i] if i < len(positions) else 0,
+                'score': round(sim * 100, 1),  # Convert to percentage
+                'index': i
+            })
         
         # Sort and return top-k
-        similarities.sort(key=lambda x: x[1], reverse=True)
-        return [s[2] for s in similarities[:top_k]]
+        similarities.sort(key=lambda x: x['score'], reverse=True)
+        return similarities[:top_k]
     
     except Exception as e:
         logger.error(f"Error in find_relevant_snippets: {e}")
         return []
 
 
-def combine_snippets(snippets: List[str], max_chars: int = 2000) -> str:
+def combine_snippets(snippets: List[dict], max_chars: int = 2000) -> str:
     """
-    Combine multiple snippets into a single context string with character limit.
+    Combine multiple snippet dicts into a single context string with character limit.
     
     Args:
-        snippets: List of text snippets
+        snippets: List of snippet dicts with 'text' key
         max_chars: Maximum total character length
     
     Returns:
@@ -179,10 +192,11 @@ def combine_snippets(snippets: List[str], max_chars: int = 2000) -> str:
     
     combined = ""
     for snippet in snippets:
-        if len(combined) + len(snippet) + 2 <= max_chars:
+        text = snippet['text'] if isinstance(snippet, dict) else snippet
+        if len(combined) + len(text) + 2 <= max_chars:
             if combined:
                 combined += "\n\n"
-            combined += snippet
+            combined += text
         else:
             break
     
