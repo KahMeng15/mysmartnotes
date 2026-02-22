@@ -14,6 +14,12 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
+    <script src="/js/marked.min.js"></script>
+    <script>
+        if (typeof marked === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');
+        }
+    </script>
     <style>
         .chat-container {
             display: flex;
@@ -22,11 +28,13 @@
         }
 
         .chat-sidebar {
-            width: 280px;
+            width: 320px;
             background: var(--color-white);
             border-right: 1px solid var(--color-light-gray);
             overflow-y: auto;
             padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
         }
 
         .chat-main {
@@ -54,7 +62,7 @@
         .message {
             display: flex;
             gap: var(--spacing-md);
-            max-width: 70%;
+            max-width: 80%;
         }
 
         .message.user {
@@ -66,6 +74,7 @@
             padding: var(--spacing-md) var(--spacing-lg);
             border-radius: var(--radius-lg);
             word-wrap: break-word;
+            line-height: 1.5;
         }
 
         .message.ai .message-content {
@@ -85,12 +94,97 @@
             padding: 0 var(--spacing-sm);
             display: flex;
             align-items: flex-end;
+            min-width: 60px;
+        }
+
+        /* Spinner Animation */
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            animation: spin 1s linear infinite;
+            width: 24px;
+            height: 24px;
+        }
+
+        /* Thinking Section */
+        .thinking-section {
+            background: var(--color-background);
+            border-left: 3px solid var(--color-primary);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+            overflow: hidden;
+        }
+
+        .thinking-header {
+            padding: var(--spacing-md) var(--spacing-lg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            background: var(--color-white);
+            border-bottom: 1px solid var(--color-light-gray);
+            transition: background-color 0.2s;
+        }
+
+        .thinking-header:hover {
+            background-color: var(--color-background);
+        }
+
+        .thinking-icon {
+            display: flex;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+
+        .thinking-icon.expanded {
+            transform: rotate(90deg);
+        }
+
+        .thinking-content {
+            padding: var(--spacing-lg);
+            font-size: var(--font-size-sm);
+            color: var(--color-gray);
+            line-height: 1.6;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .thinking-content.expanded {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .loading-message {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
         }
 
         .chat-input-area {
             padding: var(--spacing-lg);
             background: var(--color-white);
             border-top: 1px solid var(--color-light-gray);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .scope-selection {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
         }
 
         .chat-input-form {
@@ -114,27 +208,6 @@
             font-size: var(--font-size-lg);
         }
 
-        .lecture-selector {
-            margin-bottom: var(--spacing-lg);
-        }
-
-        .lecture-selector label {
-            margin-bottom: var(--spacing-sm);
-        }
-
-        .lecture-selector select {
-            width: 100%;
-        }
-
-        .chat-conversation {
-            display: none;
-        }
-
-        .chat-conversation.active {
-            display: flex;
-            flex-direction: column;
-        }
-
         .empty-state {
             display: flex;
             flex-direction: column;
@@ -143,25 +216,83 @@
             height: 100%;
             color: var(--color-gray);
             text-align: center;
+            padding: var(--spacing-xl);
+        }
+
+        /* History Items Component */
+        .history-item {
+            padding: var(--spacing-md);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .history-item:hover {
+            border-color: var(--color-primary);
+            background: var(--color-light-gray);
+        }
+
+        .history-item.active {
+            border-color: var(--color-primary);
+            background: rgba(78, 205, 196, 0.05);
+        }
+
+        .history-msg {
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .history-meta {
+            font-size: var(--font-size-xs);
+            color: var(--color-gray);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Markdown in AI response */
+        .message.ai .message-content p {
+            margin-bottom: 0.5em;
+        }
+
+        .message.ai .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message.ai .message-content pre {
+            background: #f5f5f5;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+
+        .message.ai .message-content code {
+            background: #f5f5f5;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.9em;
         }
     </style>
 </head>
 
 <body>
 
-
     <!-- Chat Container -->
     <div class="chat-container">
         <!-- Sidebar -->
         <div class="chat-sidebar">
-            <h3 style="margin-bottom: var(--spacing-lg);">Select Lecture</h3>
-            <div class="lecture-selector">
-                <select id="lectureSelect" onchange="selectLecture(this.value)">
-                    <option value="">Choose a lecture...</option>
-                </select>
-            </div>
-            <div id="conversationList" style="margin-top: var(--spacing-lg);">
-                <!-- Conversations will appear here -->
+            <h3 style="margin-bottom: var(--spacing-lg);"><i class="ph ph-clock-counter-clockwise"></i> Past Chats</h3>
+            <div id="conversationList" style="flex: 1; overflow-y: auto;">
+                <div class="empty-state" style="padding: var(--spacing-md);">
+                    <p style="font-size: var(--font-size-sm);">Loading history...</p>
+                </div>
             </div>
         </div>
 
@@ -169,9 +300,9 @@
         <div class="chat-main">
             <!-- Header -->
             <div class="chat-header">
-                <h3 id="chatTitle">Select a lecture to start</h3>
+                <h3 id="chatTitle">Select a scope to start</h3>
                 <p style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions about your
-                    lecture content</p>
+                    notes, subjects, or groups</p>
             </div>
 
             <!-- Messages -->
@@ -179,14 +310,23 @@
                 <div class="empty-state">
                     <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);"><i
                             class="ph ph-chat-circle-dots"></i></div>
-                    <p>Select a lecture to begin asking questions</p>
+                    <p>Select a scope (Group/Subject/Note) to begin asking questions</p>
                 </div>
             </div>
 
             <!-- Input -->
             <div class="chat-input-area">
+                <div class="scope-selection">
+                    <span style="font-size: var(--font-size-sm); color: var(--color-gray);">Context:</span>
+                    <button class="btn btn-secondary btn-small"
+                        style="border-radius: var(--radius-full); padding: 4px 12px; font-size: var(--font-size-xs);"
+                        onclick="openScopeModal()">
+                        <i class="ph ph-target"></i> <span id="scopeLabel">Select Note/Subject/Group</span>
+                    </button>
+                </div>
+
                 <div class="chat-input-form">
-                    <input type="text" id="messageInput" placeholder="Ask a question about this lecture..." disabled>
+                    <input type="text" id="messageInput" placeholder="Ask a question about your notes..." disabled>
                     <button type="button" id="sendBtn" class="btn btn-primary" disabled onclick="sendMessage()"><i
                             class="ph ph-paper-plane-right"></i></button>
                 </div>
@@ -194,49 +334,279 @@
         </div>
     </div>
 
+    <!-- Scope Selection Modal -->
+    <div id="scopeModal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <h3>Select Chat Scope</h3>
+            <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray); font-size: var(--font-size-sm);">
+                Choose the context the AI should search to answer your questions.</p>
+
+            <div style="margin-bottom: var(--spacing-md);">
+                <label
+                    style="display: block; margin-bottom: var(--spacing-xs); font-weight: 500; font-size: var(--font-size-sm);">Group</label>
+                <select id="groupSelect"
+                    style="width: 100%; padding: var(--spacing-sm); border-radius: var(--radius-md); border: 1px solid var(--color-light-gray);"
+                    onchange="onGroupChange()">
+                    <option value="">-- All Groups --</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: var(--spacing-md);">
+                <label
+                    style="display: block; margin-bottom: var(--spacing-xs); font-weight: 500; font-size: var(--font-size-sm);">Subject</label>
+                <select id="subjectSelect"
+                    style="width: 100%; padding: var(--spacing-sm); border-radius: var(--radius-md); border: 1px solid var(--color-light-gray);"
+                    onchange="onSubjectChange()" disabled>
+                    <option value="">-- Entire Group (Select Group First) --</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: var(--spacing-lg);">
+                <label
+                    style="display: block; margin-bottom: var(--spacing-xs); font-weight: 500; font-size: var(--font-size-sm);">Note</label>
+                <select id="noteSelect"
+                    style="width: 100%; padding: var(--spacing-sm); border-radius: var(--radius-md); border: 1px solid var(--color-light-gray);"
+                    disabled onchange="onNoteChange()">
+                    <option value="">-- Entire Subject (Select Subject First) --</option>
+                </select>
+            </div>
+
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-primary" id="confirmScopeBtn" onclick="confirmScope()"
+                    disabled>Confirm Selection</button>
+                <button type="button" class="btn btn-secondary" onclick="closeScopeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = '';
         const token = localStorage.getItem('token');
-        let selectedLectureId = null;
+
         let messages = [];
+        let chatHistory = [];
+
+        let allGroups = [];
+        let allSubjects = [];
+        let allLectures = [];
+
+        let currentScope = { type: null, id: null, title: 'Select a scope to start' };
+
+        // Modal state
+        let tempGroupId = null;
+        let tempSubjectId = null;
+        let tempNoteId = null;
+
+        // Load saved scope from localStorage
+        function loadSavedScope() {
+            const saved = localStorage.getItem('chatScope');
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {
+                    console.error("Error parsing saved scope", e);
+                    return null;
+                }
+            }
+            return null;
+        }
+
+        // Save scope to localStorage
+        function saveScopeToStorage(scope) {
+            localStorage.setItem('chatScope', JSON.stringify(scope));
+        }
 
         window.addEventListener('load', () => {
             if (!token) window.location.href = 'index.html';
-            loadLectures();
+            loadData();
             setupMessageInput();
         });
 
-        async function loadLectures() {
+        async function loadData() {
             try {
-                const response = await fetch(`${API_URL}/lectures`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const lectures = await response.json();
-                    const select = document.getElementById('lectureSelect');
-                    lectures.forEach(lecture => {
-                        const option = document.createElement('option');
-                        option.value = lecture.id;
-                        option.textContent = lecture.title;
-                        select.appendChild(option);
-                    });
+                // Fetch groups, subjects, lectures and history
+                const [gRes, sRes, lRes, hRes] = await Promise.all([
+                    fetch(`/groups`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`/subjects`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`/lectures`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`/chat/history`, { headers: { 'Authorization': `Bearer ${token}` } })
+                ]);
+
+                if (gRes.ok) allGroups = await gRes.json();
+                if (sRes.ok) allSubjects = await sRes.json();
+                if (lRes.ok) allLectures = await lRes.json();
+                if (hRes.ok) chatHistory = await hRes.json();
+
+                renderHistory();
+                populateGroupSelect();
+
+                // Check URL params for pre-selection
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlNoteId = urlParams.get('lecture_id') || urlParams.get('note_id');
+                if (urlNoteId) {
+                    const note = allLectures.find(l => l.id == urlNoteId);
+                    if (note) {
+                        setScope('note', note.id, `Note: ${note.title}`);
+                    } else {
+                        // Keep default empty state but open modal to encourage selection
+                        openScopeModal();
+                    }
+                } else {
+                    // Try to load previously saved scope
+                    const savedScope = loadSavedScope();
+                    console.log('Saved scope:', savedScope);
+                    if (savedScope && savedScope.type && savedScope.id) {
+                        // Verify the scope still exists in the data
+                        let scopeExists = false;
+                        if (savedScope.type === 'note') {
+                            scopeExists = allLectures.some(l => l.id == savedScope.id);
+                        } else if (savedScope.type === 'subject') {
+                            scopeExists = allSubjects.some(s => s.id == savedScope.id);
+                        } else if (savedScope.type === 'group') {
+                            scopeExists = allGroups.some(g => g.id == savedScope.id);
+                        }
+                        
+                        console.log('Scope exists:', scopeExists);
+                        if (scopeExists) {
+                            console.log('Loading saved scope:', savedScope);
+                            setScope(savedScope.type, savedScope.id, savedScope.title);
+                        } else {
+                            // Saved scope no longer exists, clear it and prompt for new selection
+                            console.log('Saved scope no longer exists, prompting for new selection');
+                            localStorage.removeItem('chatScope');
+                            openScopeModal();
+                        }
+                    } else {
+                        console.log('No saved scope found or empty, prompting for selection');
+                        openScopeModal();
+                    }
                 }
-            } catch (error) {
-                console.error('Error loading lectures:', error);
+
+            } catch (e) {
+                console.error("Error loading data", e);
+                document.getElementById('conversationList').innerHTML = `<p style="color:var(--color-error); padding:var(--spacing-md); text-align:center;">Failed to load history.</p>`;
             }
         }
 
-        function selectLecture(lectureId) {
-            if (!lectureId) return;
-            selectedLectureId = lectureId;
-            messages = [];
+        // --- Scope Selection Modal ---
+        function openScopeModal() {
+            const modal = document.getElementById('scopeModal');
+            modal.classList.add('active');
 
-            const lectureTitle = document.getElementById('lectureSelect').options[document.getElementById('lectureSelect').selectedIndex].text;
-            document.getElementById('chatTitle').textContent = lectureTitle;
+            // Reset modal state
+            document.getElementById('groupSelect').value = "";
+            document.getElementById('subjectSelect').value = "";
+            document.getElementById('subjectSelect').disabled = true;
+            document.getElementById('subjectSelect').innerHTML = '<option value="">-- Entire Group (Select Group First) --</option>';
+            document.getElementById('noteSelect').value = "";
+            document.getElementById('noteSelect').disabled = true;
+            document.getElementById('noteSelect').innerHTML = '<option value="">-- Entire Subject (Select Subject First) --</option>';
 
+            checkConfirmBtn();
+        }
+
+        function closeScopeModal() {
+            document.getElementById('scopeModal').classList.remove('active');
+        }
+
+        function populateGroupSelect() {
+            const select = document.getElementById('groupSelect');
+            select.innerHTML = '<option value="">-- Select a Group --</option>';
+            allGroups.forEach(g => {
+                select.innerHTML += `<option value="${g.id}">${g.name}</option>`;
+            });
+        }
+
+        function onGroupChange() {
+            tempGroupId = document.getElementById('groupSelect').value;
+            const subSelect = document.getElementById('subjectSelect');
+            const noteSelect = document.getElementById('noteSelect');
+
+            if (tempGroupId) {
+                subSelect.disabled = false;
+                subSelect.innerHTML = '<option value="">-- Entire Group --</option>';
+                const groupSubjects = allSubjects.filter(s => s.group_id == tempGroupId);
+                groupSubjects.forEach(s => {
+                    subSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+                });
+            } else {
+                subSelect.disabled = true;
+                subSelect.innerHTML = '<option value="">-- Entire Group (Select Group First) --</option>';
+            }
+
+            noteSelect.disabled = true;
+            noteSelect.innerHTML = '<option value="">-- Entire Subject (Select Subject First) --</option>';
+
+            checkConfirmBtn();
+        }
+
+        function onSubjectChange() {
+            tempSubjectId = document.getElementById('subjectSelect').value;
+            const noteSelect = document.getElementById('noteSelect');
+
+            if (tempSubjectId) {
+                noteSelect.disabled = false;
+                noteSelect.innerHTML = '<option value="">-- Entire Subject --</option>';
+                const subjectNotes = allLectures.filter(l => l.subject_id == tempSubjectId);
+                subjectNotes.forEach(n => {
+                    noteSelect.innerHTML += `<option value="${n.id}">${n.title}</option>`;
+                });
+            } else {
+                noteSelect.disabled = true;
+                noteSelect.innerHTML = '<option value="">-- Entire Subject (Select Subject First) --</option>';
+            }
+
+            checkConfirmBtn();
+        }
+
+        function onNoteChange() {
+            tempNoteId = document.getElementById('noteSelect').value;
+            checkConfirmBtn();
+        }
+
+        function checkConfirmBtn() {
+            const grp = document.getElementById('groupSelect').value;
+            const sub = document.getElementById('subjectSelect').value;
+            const nte = document.getElementById('noteSelect').value;
+
+            const btn = document.getElementById('confirmScopeBtn');
+            if (grp || sub || nte) {
+                btn.disabled = false;
+            } else {
+                btn.disabled = true;
+            }
+        }
+
+        function confirmScope() {
+            const grpId = document.getElementById('groupSelect').value;
+            const subId = document.getElementById('subjectSelect').value;
+            const noteId = document.getElementById('noteSelect').value;
+
+            if (noteId) {
+                const note = allLectures.find(l => l.id == noteId);
+                setScope('note', noteId, `Note: ${note ? note.title : 'Unknown'}`);
+            } else if (subId) {
+                const sub = allSubjects.find(s => s.id == subId);
+                setScope('subject', subId, `Subject: ${sub ? sub.name : 'Unknown'}`);
+            } else if (grpId) {
+                const grp = allGroups.find(g => g.id == grpId);
+                setScope('group', grpId, `Group: ${grp ? grp.name : 'Unknown'}`);
+            }
+
+            closeScopeModal();
+        }
+
+        function setScope(type, id, title) {
+            currentScope = { type, id, title };
+            saveScopeToStorage(currentScope);
+            document.getElementById('chatTitle').textContent = title;
+            document.getElementById('scopeLabel').textContent = title;
             document.getElementById('messageInput').disabled = false;
             document.getElementById('sendBtn').disabled = false;
 
+            // clear messages to start a new fresh context view
+            // In a more complex app, we might load history for this specific scope
+            messages = [];
             displayMessages();
             document.getElementById('messageInput').focus();
         }
@@ -251,7 +621,11 @@
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
 
-            if (!message || !selectedLectureId) return;
+            if (!message || !currentScope.id) return;
+
+            console.log('🚀 [SEND MESSAGE] Starting message send...');
+            console.log('📝 Message:', message);
+            console.log('🎯 Current Scope:', currentScope);
 
             // Add user message
             messages.push({
@@ -266,11 +640,24 @@
             // Show loading
             messages.push({
                 role: 'ai',
-                content: 'Thinking...',
+                content: '<div class="loading-message"><span class="spinner"><i class="ph ph-spinner"></i></span> Thinking...</div>',
                 time: new Date(),
                 loading: true
             });
             displayMessages();
+            console.log('⏳ Loading message displayed');
+
+            const payload = { message: message };
+            if (currentScope.type === 'note') payload.lecture_id = currentScope.id;
+            else if (currentScope.type === 'subject') payload.subject_id = currentScope.id;
+            else if (currentScope.type === 'group') payload.group_id = currentScope.id;
+
+            console.log('📤 Payload being sent:', payload);
+            console.log('🔗 API URL:', `${API_URL}/chat/ask`);
+            console.log('🔐 Token exists:', !!token);
+
+            const startTime = performance.now();
+            console.log('⏱️ Request started at:', new Date().toISOString());
 
             try {
                 const response = await fetch(`${API_URL}/chat/ask`, {
@@ -279,30 +666,52 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({
-                        lecture_id: selectedLectureId,
-                        message: message
-                    })
+                    body: JSON.stringify(payload)
                 });
+
+                const endTime = performance.now();
+                console.log('⏱️ Response received after', (endTime - startTime).toFixed(2), 'ms');
+                console.log('📊 Response Status:', response.status, response.statusText);
 
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('✅ API Response successful:', data);
+                    console.log('💭 Thinking field:', data.thinking);
+                    console.log('📄 Response text length:', data.response ? data.response.length : 0);
+                    console.log('📚 Sources:', data.sources);
+                    
                     messages.pop(); // Remove loading message
                     messages.push({
                         role: 'ai',
                         content: data.response,
-                        time: new Date()
+                        time: new Date(),
+                        sources: data.sources,
+                        thinking: data.thinking || null,
+                        timings: data.timings,  // Include timing breakdown
+                        isError: data.response && (data.response.includes('[') || data.response.startsWith('Failed'))  // Flag if error response
                     });
+
+                    console.log('✨ Message added to messages array');
+                    console.log('⏱️ Timings:', data.timings);
+                    // refresh history sidebar
+                    fetchHistory();
                 } else {
+                    console.error('❌ Response not OK:', response.status);
+                    const errorText = await response.text();
+                    console.error('❌ Error response body:', errorText);
+                    
                     messages.pop();
                     messages.push({
                         role: 'ai',
-                        content: 'Sorry, I encountered an error. Please try again.',
+                        content: `Sorry, I encountered an error (${response.status}). Please try again.`,
                         time: new Date()
                     });
                 }
             } catch (error) {
-                console.error('Error:', error);
+                console.error('❌ Fetch Error:', error);
+                console.error('❌ Error message:', error.message);
+                console.error('❌ Error stack:', error.stack);
+                
                 messages.pop();
                 messages.push({
                     role: 'ai',
@@ -312,6 +721,7 @@
             }
 
             displayMessages();
+            console.log('✅ [SEND MESSAGE] Complete');
         }
 
         function displayMessages() {
@@ -321,27 +731,157 @@
                 container.innerHTML = `
                     <div class="empty-state">
                         <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);"><i class="ph ph-chat-circle-dots"></i></div>
-                        <p>Start asking questions about this lecture</p>
+                        <p>Ask a question about ${currentScope.title}</p>
                     </div>
                 `;
                 return;
             }
 
-            container.innerHTML = messages.map((msg, idx) => `
+            container.innerHTML = messages.map((msg, idx) => {
+                let contentHTML = msg.content;
+                // Parse markdown for AI responses if marked is available and not loading
+                if (msg.role === 'ai' && !msg.loading && typeof marked !== 'undefined') {
+                    try {
+                        contentHTML = marked.parse(contentHTML);
+                    } catch (e) { }
+                }
+
+                // Build thinking section if available
+                let thinkingHTML = '';
+                if (msg.thinking) {
+                    thinkingHTML = `
+                        <div class="thinking-section">
+                            <div class="thinking-header" onclick="toggleThinking(this)">
+                                <span class="thinking-icon"><i class="ph ph-caret-right"></i></span>
+                                <span>🧠 AI Thinking Process</span>
+                            </div>
+                            <div class="thinking-content">
+                                ${msg.thinking.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Build timings display if available
+                let timingsHTML = '';
+                if (msg.timings) {
+                    const t = msg.timings;
+                    timingsHTML = `
+                        <div class="timings-info" style="margin-top: 12px; padding: 8px; background: #f5f5f5; border-radius: 4px; font-size: 12px; color: #666;">
+                            <span>⏱️ Retrieval: ${t.retrieval_ms}ms</span> | 
+                            <span>🤖 Model: ${t.model_ms}ms</span> | 
+                            <span>📊 Total: ${t.total_ms}ms</span>
+                        </div>
+                    `;
+                }
+
+                // Add error styling if this is an error response
+                let errorStyle = msg.isError ? 'border: 1px solid #ffcccc; background: #fff5f5;' : '';
+                let errorIcon = msg.isError ? '⚠️ ' : '';
+
+                return `
                 <div class="message ${msg.role}">
-                    <div class="message-content">
-                        ${msg.content}
+                    <div class="message-content" style="${errorStyle}">
+                        ${errorIcon ? '<span style="color: #d32f2f; font-weight: bold;">' + errorIcon + '</span>' : ''}
+                        ${thinkingHTML}
+                        ${contentHTML}
+                        ${timingsHTML}
                     </div>
                     <div class="message-time">
                         ${msg.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
+
+            // Add click handlers for thinking sections
+            container.querySelectorAll('.thinking-header').forEach(header => {
+                header.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    toggleThinking(this);
+                });
+            });
 
             // Scroll to bottom
             container.scrollTop = container.scrollHeight;
         }
 
+        function toggleThinking(header) {
+            const icon = header.querySelector('.thinking-icon');
+            const content = header.nextElementSibling;
+            
+            icon.classList.toggle('expanded');
+            content.classList.toggle('expanded');
+        }
+
+        // --- History Sidebar ---
+        async function fetchHistory() {
+            try {
+                const res = await fetch(`/chat/history`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    chatHistory = await res.json();
+                    renderHistory();
+                }
+            } catch (e) { console.error("Error fetching history", e); }
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('conversationList');
+            if (chatHistory.length === 0) {
+                list.innerHTML = `<div class="empty-state" style="padding: var(--spacing-md);"><p style="font-size: var(--font-size-sm);">No past chats</p></div>`;
+                return;
+            }
+
+            list.innerHTML = chatHistory.map(h => {
+                const d = new Date(h.created_at);
+                let scopeStr = 'Global';
+                if (h.lecture_id) scopeStr = 'Note';
+                else if (h.subject_id) scopeStr = 'Subject';
+                else if (h.group_id) scopeStr = 'Group';
+
+                return `
+                <div class="history-item" onclick="viewHistoryItem(${h.id})">
+                    <div class="history-msg">${formatEscaped(h.message)}</div>
+                    <div class="history-meta">
+                        <span><i class="ph ph-target"></i> ${scopeStr}</span>
+                        <span>${d.toLocaleDateString()}</span>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        function viewHistoryItem(id) {
+            const item = chatHistory.find(h => h.id == id);
+            if (!item) return;
+
+            // clear current chat and show just this history interaction
+            // A more complex app would string together threads. Here we'll display the QA pair.
+            messages = [
+                { role: 'user', content: item.message, time: new Date(item.created_at) },
+                { role: 'ai', content: item.response, time: new Date(item.created_at), sources: item.sources }
+            ];
+
+            // update scope UI to reflect what this was asked about
+            let t = 'Past Chat';
+            if (item.lecture_id) {
+                const l = allLectures.find(x => x.id == item.lecture_id);
+                if (l) { t = `Note: ${l.title}`; currentScope = { type: 'note', id: l.id, title: t }; }
+            } else if (item.subject_id) {
+                const s = allSubjects.find(x => x.id == item.subject_id);
+                if (s) { t = `Subject: ${s.name}`; currentScope = { type: 'subject', id: s.id, title: t }; }
+            } else if (item.group_id) {
+                const g = allGroups.find(x => x.id == item.group_id);
+                if (g) { t = `Group: ${g.name}`; currentScope = { type: 'group', id: g.id, title: t }; }
+            }
+
+            document.getElementById('chatTitle').textContent = t;
+            document.getElementById('scopeLabel').textContent = t;
+
+            displayMessages();
+        }
+
+        function formatEscaped(str) {
+            return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
 
     </script>
 </body>

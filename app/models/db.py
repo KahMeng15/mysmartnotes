@@ -18,6 +18,11 @@ class User(Base):
     full_name = Column(String(255))
     nickname = Column(String(100))
     is_active = Column(Boolean, default=True)
+    ai_provider = Column(String(50), default="gemini") # gemini, huggingface, ollama
+    ai_model = Column(String(100), nullable=True)
+    ai_base_url = Column(String(255), nullable=True)
+    ai_api_key = Column(String(255), nullable=True)
+    use_global_ai_config = Column(Boolean, default=False)  # Whether to use global settings instead of personal
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -165,7 +170,9 @@ class ChatMessage(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=False, index=True)
+    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=True, index=True)
+    subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=True, index=True)
+    group_id = Column(Integer, ForeignKey("subject_groups.id"), nullable=True, index=True)
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     sources = Column(Text)  # JSON array of sources
@@ -174,6 +181,8 @@ class ChatMessage(Base):
     # Relationships
     user = relationship("User")
     lecture = relationship("Lecture")
+    subject = relationship("Subject")
+    group = relationship("SubjectGroup")
 
 
 class NoteSnapshot(Base):

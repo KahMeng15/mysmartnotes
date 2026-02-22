@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lecture View - MySmartNotes</title>
+    <title>Note View - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -516,13 +516,13 @@
 
         <div id="loadingContainer" class="loading">
             <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i></div>
-            <p>Loading lecture...</p>
+            <p>Loading note...</p>
         </div>
 
         <div id="lectureContainer" style="display: none;">
             <!-- Note Header -->
             <div class="note-header" id="noteHeader">
-                <h1 id="lectureTitle">Lecture Title</h1>
+                <h1 id="lectureTitle">Note Title</h1>
                 <div class="note-header-meta">
                     <a href="#" id="metaSubject"><i class="ph ph-book-open"></i> <span>Subject</span></a>
                     <span class="meta-separator">•</span>
@@ -665,7 +665,7 @@
         </div>
 
         <div id="errorContainer" style="display: none; margin-top: var(--spacing-2xl);">
-            <div class="error-message" id="errorMessage">Error loading lecture</div>
+            <div class="error-message" id="errorMessage">Error loading note</div>
         </div>
     </div>
 

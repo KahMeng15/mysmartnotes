@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     HUGGINGFACE_TOKEN: str = ""
     
+    # Global AI Configuration
+    GLOBAL_AI_PROVIDER: str = "gemini"
+    GLOBAL_GEMINI_API_KEY: str = ""
+    GLOBAL_AI_MODEL: str = ""
+    
     # JWT
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
@@ -21,6 +26,7 @@ class Settings(BaseSettings):
     
     # AI Provider
     AI_PROVIDER: str = "gemini"  # or "huggingface"
+    OLLAMA_BASE_URL: str = ""  # e.g., "http://10.0.0.10:11434" - no default, must be configured
     
     # App Settings
     APP_NAME: str = "MySmartNotes"

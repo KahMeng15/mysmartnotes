@@ -27,11 +27,21 @@ class UserLogin(BaseModel):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     nickname: Optional[str] = None
+    ai_provider: Optional[str] = None
+    ai_model: Optional[str] = None
+    ai_base_url: Optional[str] = None
+    ai_api_key: Optional[str] = None
+    use_global_ai_config: Optional[bool] = None
 
 
 class User(UserBase):
     id: int
     is_active: bool
+    ai_provider: str = "gemini"
+    ai_model: Optional[str] = None
+    ai_base_url: Optional[str] = None
+    ai_api_key: Optional[str] = None
+    use_global_ai_config: bool = False
     created_at: datetime
     
     class Config:

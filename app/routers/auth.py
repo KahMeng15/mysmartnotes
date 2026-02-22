@@ -45,12 +45,22 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
     """Login user and return access token"""
     user = db.query(User).filter(User.email == credentials.email).first()
     
-    if not user or not verify_password(credentials.password, user.hashed_password):
+    try:
+        if not user or not verify_password(credentials.password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid username or password"
+            )
+    except ValueError as e:
+        # This can happen with bcrypt's 72-byte limit if a long password was used
+        # during registration on a system without the fix, and now is being verified
+        # with the fix. We treat it as an invalid password.
+        print(f"Password verification error for user {credentials.email}: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
         )
-    
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -79,6 +89,16 @@ def update_profile(user_update: UserUpdate, current_user: User = Depends(get_cur
         current_user.full_name = user_update.full_name
     if user_update.nickname is not None:
         current_user.nickname = user_update.nickname
+    if user_update.ai_provider is not None:
+        current_user.ai_provider = user_update.ai_provider
+    if user_update.ai_model is not None:
+        current_user.ai_model = user_update.ai_model
+    if user_update.ai_base_url is not None:
+        current_user.ai_base_url = user_update.ai_base_url
+    if user_update.ai_api_key is not None:
+        current_user.ai_api_key = user_update.ai_api_key
+    if user_update.use_global_ai_config is not None:
+        current_user.use_global_ai_config = user_update.use_global_ai_config
         
     db.commit()
     db.refresh(current_user)

@@ -11,6 +11,7 @@ A lightweight, single-container web application that converts lecture slides (PD
 * **Subject Organization**: Organize notes by subjects and lectures
 * **Flashcard System**: Spaced repetition flashcards for self-testing
 * **Real-Time Updates**: WebSocket support for live progress updates
+* **Global AI Settings**: Admins can configure shared AI provider & API key for all users
 * **Private & Simple**: No complex infrastructure - just one command to run
 
 ## 🎯 Design Philosophy
@@ -40,6 +41,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation.
 
 * **[README.md](README.md)** - This file - Project overview and quick start
 * **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and tech stack
+* **[GLOBAL_AI_SETTINGS.md](GLOBAL_AI_SETTINGS.md)** - Global AI configuration for shared backends
 * **[FILE_STRUCTURE.md](FILE_STRUCTURE.md)** - Complete project directory structure
 * **[DATABASE.md](DATABASE.md)** - Database schemas and relationships
 * **[DATA_STRUCTURES.md](DATA_STRUCTURES.md)** - Data models and API schemas

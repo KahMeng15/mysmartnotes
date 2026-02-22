@@ -216,28 +216,61 @@
                 </div>
             </div>
 
-            <!-- 5. App Settings -->
+            <!-- 5. App Settings / AI Config -->
             <div class="settings-section">
-                <h3><i class="ph ph-gear"></i> Application</h3>
+                <h3><i class="ph ph-gear"></i> AI Settings</h3>
+                
+                <!-- Global Settings Toggle -->
+                <div class="toggle" style="margin-bottom: var(--spacing-lg); padding-bottom: var(--spacing-lg); border-bottom: 1px solid var(--color-light-gray);">
+                    <div>
+                        <div style="font-weight: 600;">Use Global AI Settings</div>
+                        <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Use the AI configuration set by your administrator</div>
+                    </div>
+                    <div class="toggle-switch" id="globalSettingsToggle" onclick="toggleGlobalSettings()"></div>
+                </div>
+                
                 <div class="settings-grid" style="flex: 1; align-content: start;">
-                    <div class="form-group">
-                        <label>Theme</label>
-                        <select>
-                            <option>Light</option>
-                            <option>Dark</option>
-                            <option>System</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Default AI Provider</label>
-                        <select>
-                            <option>Gemini</option>
-                            <option>Hugging Face</option>
-                        </select>
-                    </div>
+                    <form id="aiConfigForm" onsubmit="updateProfile(event)" style="display: contents;">
+                        <div class="form-group" id="personalSettingsSection">
+                            <label>AI Provider</label>
+                            <select id="aiProvider" onchange="toggleAIFields()">
+                                <option value="gemini">Google Gemini</option>
+                                <option value="huggingface">Hugging Face</option>
+                                <option value="ollama">Ollama (Local/Self-hosted)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Model Name</label>
+                            <input type="text" id="aiModel" placeholder="e.g. gemini-pro, qwen3:4b-thinking">
+                            <small style="color:var(--color-gray); font-size:12px;">Leave blank for default</small>
+                        </div>
+
+                        <div class="form-group" id="aiBaseUrlGroup" style="display: none;">
+                            <label>Base URL</label>
+                            <input type="url" id="aiBaseUrl" placeholder="e.g. http://192.168.1.100:11434">
+                            <small style="color:var(--color-gray); font-size:12px;">Required for Local/Ollama</small>
+                        </div>
+
+                        <div class="form-group" id="aiApiKeyGroup">
+                            <label>API Key</label>
+                            <input type="password" id="aiApiKey" placeholder="Leave blank to use system default">
+                            <small style="color:var(--color-gray); font-size:12px;">Optional for Local/Ollama</small>
+                        </div>
+                        
+                        <!-- Global Settings Display (when enabled) -->
+                        <div id="globalSettingsDisplay" style="display: none; background: #f0f7ff; padding: var(--spacing-lg); border-radius: var(--radius-md); border-left: 3px solid var(--color-primary); margin-top: var(--spacing-lg);">
+                            <div style="font-weight: 600; margin-bottom: var(--spacing-md);">📡 Global Settings Active</div>
+                            <div style="font-size: var(--font-size-sm); color: var(--color-gray);">
+                                <p><strong>Provider:</strong> <span id="globalProviderDisplay">-</span></p>
+                                <p><strong>Model:</strong> <span id="globalModelDisplay">-</span></p>
+                            </div>
+                        </div>
+                    </form>
                 </div>
                 <div style="margin-top: auto; padding-top: var(--spacing-lg);">
-                    <button type="button" class="btn btn-primary btn-block">Save Preferences</button>
+                    <button type="button" class="btn btn-primary btn-block"
+                        onclick="document.getElementById('aiConfigForm').requestSubmit()">Save AI Preferences</button>
                 </div>
             </div>
 
@@ -271,21 +304,109 @@
             document.getElementById('fullName').value = user.full_name || '';
             document.getElementById('email').value = user.email || '';
             document.getElementById('nickname').value = user.nickname || user.username || '';
+
+            // Load AI settings
+            const useGlobal = user.use_global_ai_config || false;
+            const toggle = document.getElementById('globalSettingsToggle');
+            
+            if (useGlobal) {
+                toggle.classList.add('active');
+                document.getElementById('personalSettingsSection').style.display = 'none';
+                document.getElementById('aiApiKeyGroup').style.display = 'none';
+                document.getElementById('globalSettingsDisplay').style.display = 'block';
+                displayGlobalSettings();
+            } else {
+                toggle.classList.remove('active');
+                document.getElementById('personalSettingsSection').style.display = 'block';
+                document.getElementById('aiApiKeyGroup').style.display = 'block';
+                document.getElementById('globalSettingsDisplay').style.display = 'none';
+                
+                document.getElementById('aiProvider').value = user.ai_provider || 'gemini';
+                document.getElementById('aiModel').value = user.ai_model || '';
+                document.getElementById('aiBaseUrl').value = user.ai_base_url || '';
+                document.getElementById('aiApiKey').value = user.ai_api_key || '';
+            }
+
+            toggleAIFields();
+        }
+        
+        async function displayGlobalSettings() {
+            try {
+                // Fetch global settings from config
+                const response = await fetch('/auth/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (response.ok) {
+                    // Settings are displayed from environment config
+                    // For now, we show placeholder text since we can't fetch .env from client
+                    document.getElementById('globalProviderDisplay').textContent = 'Configured by administrator';
+                    document.getElementById('globalModelDisplay').textContent = 'Configured by administrator';
+                }
+            } catch (e) {
+                console.error('Error loading global settings:', e);
+            }
+        }
+        
+        function toggleGlobalSettings() {
+            const toggle = document.getElementById('globalSettingsToggle');
+            const personalSection = document.getElementById('personalSettingsSection');
+            const apiKeyGroup = document.getElementById('aiApiKeyGroup');
+            const globalDisplay = document.getElementById('globalSettingsDisplay');
+            
+            toggle.classList.toggle('active');
+            
+            if (toggle.classList.contains('active')) {
+                // Switch to global settings
+                personalSection.style.display = 'none';
+                apiKeyGroup.style.display = 'none';
+                globalDisplay.style.display = 'block';
+                displayGlobalSettings();
+            } else {
+                // Switch to personal settings
+                personalSection.style.display = 'block';
+                apiKeyGroup.style.display = 'block';
+                globalDisplay.style.display = 'none';
+            }
+        }
+
+        function toggleAIFields() {
+            const provider = document.getElementById('aiProvider').value;
+            const baseUrlGroup = document.getElementById('aiBaseUrlGroup');
+
+            if (provider === 'ollama') {
+                baseUrlGroup.style.display = 'block';
+            } else {
+                baseUrlGroup.style.display = 'none';
+            }
         }
 
         async function updateProfile(event) {
             event.preventDefault();
             try {
+                const useGlobal = document.getElementById('globalSettingsToggle').classList.contains('active');
+                
+                const payload = {
+                    full_name: document.getElementById('fullName').value,
+                    nickname: document.getElementById('nickname').value,
+                    use_global_ai_config: useGlobal
+                };
+                
+                // Only include personal settings if not using global
+                if (!useGlobal) {
+                    payload.ai_provider = document.getElementById('aiProvider').value;
+                    payload.ai_model = document.getElementById('aiModel').value;
+                    payload.ai_base_url = document.getElementById('aiBaseUrl').value;
+                    payload.ai_api_key = document.getElementById('aiApiKey').value;
+                }
+                
                 const response = await fetch('/auth/profile', {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({
-                        full_name: document.getElementById('fullName').value,
-                        nickname: document.getElementById('nickname').value
-                    })
+                    body: JSON.stringify(payload)
                 });
                 if (response.ok) {
                     const updatedUser = await response.json();

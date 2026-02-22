@@ -101,3 +101,89 @@ def load_embeddings(path: str) -> List[dict]:
     except Exception as e:
         logger.error(f"Error loading embeddings: {e}")
         return []
+
+
+def find_relevant_snippets(query: str, text: str, top_k: int = 3, chunk_size: int = 500) -> List[str]:
+    """
+    Find the most relevant text chunks for a query using semantic similarity.
+    
+    Args:
+        query: The search query
+        text: The full text to search in
+        top_k: Number of top snippets to return
+        chunk_size: Approximate size of each chunk in characters
+    
+    Returns:
+        List of top-k most relevant text chunks
+    """
+    model = get_embeddings_model()
+    if model is None or not text:
+        return []
+    
+    try:
+        # Split text into chunks
+        chunks = []
+        words = text.split()
+        current_chunk = []
+        current_length = 0
+        
+        for word in words:
+            current_chunk.append(word)
+            current_length += len(word) + 1
+            
+            if current_length >= chunk_size:
+                chunks.append(" ".join(current_chunk))
+                current_chunk = []
+                current_length = 0
+        
+        if current_chunk:
+            chunks.append(" ".join(current_chunk))
+        
+        if not chunks:
+            return []
+        
+        # Encode query and chunks
+        query_embedding = model.encode(query, convert_to_tensor=False)
+        chunk_embeddings = model.encode(chunks, convert_to_tensor=False)
+        
+        # Calculate similarities
+        similarities = []
+        for i, chunk_emb in enumerate(chunk_embeddings):
+            sim = float(np.dot(query_embedding, chunk_emb) / (
+                np.linalg.norm(query_embedding) * np.linalg.norm(chunk_emb) + 1e-9
+            ))
+            similarities.append((i, sim, chunks[i]))
+        
+        # Sort and return top-k
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        return [s[2] for s in similarities[:top_k]]
+    
+    except Exception as e:
+        logger.error(f"Error in find_relevant_snippets: {e}")
+        return []
+
+
+def combine_snippets(snippets: List[str], max_chars: int = 2000) -> str:
+    """
+    Combine multiple snippets into a single context string with character limit.
+    
+    Args:
+        snippets: List of text snippets
+        max_chars: Maximum total character length
+    
+    Returns:
+        Combined snippets as a single string
+    """
+    if not snippets:
+        return ""
+    
+    combined = ""
+    for snippet in snippets:
+        if len(combined) + len(snippet) + 2 <= max_chars:
+            if combined:
+                combined += "\n\n"
+            combined += snippet
+        else:
+            break
+    
+    return combined
