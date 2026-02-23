@@ -77,3 +77,4 @@ uploads
 ProcessingAlgorithmTest/output/*
 output/*
 ProcessingAlgorithmTest/output/OUTPUT_smart.md
+.github/copilot-instructions.md

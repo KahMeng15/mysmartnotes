@@ -1,11 +1,9 @@
 """Lectures management endpoints"""
 import os
-import shutil
 import json
 import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 import uuid
@@ -15,7 +13,6 @@ from app.schemas.schemas import LectureResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.processing.ocr import OCRProcessor
-from app.processing.document_generator import DocumentGenerator
 from app.processing.image_extractor import ImageExtractor
 from app.processing.text_processor import ContentType
 from app.processing.smart_pipeline import SmartPipeline
@@ -448,26 +445,15 @@ async def generate_pdf(
             )
             images.append(img)
         
-        # Generate PDF
-        generator = DocumentGenerator(
-            lecture_id=lecture_id,
-            lecture_title=lecture.title,
-            base_output_dir=GENERATED_DIR
-        )
+        logger.info(f"Processed lecture {lecture_id}")
         
-        output_pdf = generator.generate_pdf(segments, images)
-        
-        # Update lecture with PDF path
-        lecture.output_pdf_path = output_pdf
         db.commit()
-        
-        logger.info(f"Generated PDF for lecture {lecture_id}: {output_pdf}")
         
         return {
             "success": True,
-            "message": "PDF generated successfully",
-            "pdf_path": output_pdf,
-            "file_size_mb": os.path.getsize(output_pdf) / (1024 * 1024)
+            "message": "Lecture processed successfully",
+            "segments_count": len(segments),
+            "images_count": len(images)
         }
     
     except json.JSONDecodeError as e:

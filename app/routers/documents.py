@@ -3,12 +3,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
+from datetime import datetime
 
 from app.models.db import User, Lecture, GeneratedDocument, Flashcard
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.processing.ai_client import AIClient
-from datetime import datetime
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 

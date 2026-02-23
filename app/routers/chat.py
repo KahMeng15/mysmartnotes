@@ -6,7 +6,6 @@ import time
 from typing import List, Optional
 import json
 import asyncio
-import httpx
 
 from app.models.db import User, Lecture, ChatMessage, Subject, SubjectGroup
 from app.utils.auth import get_current_user

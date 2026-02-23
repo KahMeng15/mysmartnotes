@@ -6,13 +6,10 @@ and produces a unified Markdown document from a PDF or PPTX file.
 """
 
 import logging
-import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Dict
 
 from app.processing.font_extractor import FontAwareExtractor
-from app.processing.layout_detector import LayoutDetector
-from app.processing.table_detector import TableDetector
 from app.processing.signal_merger import SignalMerger, blocks_to_markdown
 
 logger = logging.getLogger(__name__)
@@ -24,18 +21,17 @@ class SmartPipeline:
     
     Methods used:
     1. Font-aware text extraction (pdfplumber chars)
-    2. AI layout detection (YOLO-DocLayNet, optional)
-    3. Table detection (pdfplumber + Table Transformer, optional)
+    2. Table detection (pdfplumber only, no ML models)
     """
 
     def __init__(
         self,
-        use_layout_detection: bool = True,
-        use_table_transformer: bool = True,
+        use_layout_detection: bool = False,  # Disabled - requires ultralytics
+        use_table_transformer: bool = False,  # Disabled - requires transformers/torch
     ):
         self.font_extractor = FontAwareExtractor()
-        self.layout_detector = LayoutDetector() if use_layout_detection else None
-        self.table_detector = TableDetector(use_transformer=use_table_transformer)
+        self.layout_detector = None  # Disabled
+        self.table_detector = None  # Disabled
         self.merger = SignalMerger()
 
     def process(self, file_path: str) -> str:
@@ -59,47 +55,21 @@ class SmartPipeline:
             raise ValueError(f"Unsupported file format: {ext}. Supported: .pdf, .pptx")
 
     def _process_pdf(self, pdf_path: str) -> str:
-        """Process a PDF file through the full pipeline."""
+        """Process a PDF file through the pipeline."""
         logger.info(f"Processing PDF: {pdf_path}")
         import pdfplumber
 
-        # Step 1: Table extraction FIRST (so we can exclude table regions from text)
-        logger.info("Step 1/3: Table extraction...")
-        table_results = []
-        table_bboxes_per_page = {}
-        with pdfplumber.open(pdf_path) as pdf:
-            for page_num, page in enumerate(pdf.pages):
-                page_tables = self.table_detector.extract_tables_from_page(page)
-                table_results.append(page_tables)
-                if page_tables:
-                    table_bboxes_per_page[page_num + 1] = [t["bbox"] for t in page_tables]
-        total_tables = sum(len(t) for t in table_results)
-        logger.info(f"  Found {total_tables} tables")
-
-        # Step 2: Font-aware extraction (excludes table regions)
-        logger.info("Step 2/3: Font-aware text extraction...")
-        font_results = self.font_extractor.extract(pdf_path, table_bboxes_per_page=table_bboxes_per_page)
+        # Font-aware extraction (primary method)
+        logger.info("Extracting text via font-aware method...")
+        font_results = self.font_extractor.extract(pdf_path, table_bboxes_per_page={})
         logger.info(f"  Extracted {sum(len(p['blocks']) for p in font_results)} blocks from {len(font_results)} pages")
 
-        # Step 3: Layout detection (optional)
-        layout_results = None
-        if self.layout_detector:
-            logger.info("Step 3/3: AI layout detection...")
-            if self.layout_detector.is_available:
-                layout_results = self.layout_detector.detect_from_pdf(pdf_path)
-                total_dets = sum(len(d) for d in layout_results) if layout_results else 0
-                logger.info(f"  Detected {total_dets} layout regions")
-            else:
-                logger.info("  Skipped (model not available)")
-        else:
-            logger.info("Step 3/3: Layout detection disabled")
-
-        # Merge all signals
+        # Merge signals
         logger.info("Merging signals...")
         merged_blocks = self.merger.merge(
             font_blocks=font_results,
-            layout_detections=layout_results,
-            tables=table_results,
+            layout_detections=None,
+            tables=[],
         )
 
         # Convert to Markdown
@@ -110,7 +80,6 @@ class SmartPipeline:
         logger.info(f"Output: {stats['total_blocks']} blocks, "
                      f"{stats['headings']} headings, "
                      f"{stats['lists']} list items, "
-                     f"{stats['tables']} tables, "
                      f"{stats['body']} body paragraphs")
 
         return markdown

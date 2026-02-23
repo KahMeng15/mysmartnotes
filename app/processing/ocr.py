@@ -1,5 +1,4 @@
 """OCR and text extraction module"""
-import os
 import json
 import pytesseract
 from pdf2image import convert_from_path
@@ -16,7 +15,6 @@ except ImportError:
 from app.processing.text_processor import process_extracted_text, ContentSegment
 
 from app.processing.image_extractor import ImageExtractor
-from app.processing.document_generator import DocumentGenerator
 
 logger = logging.getLogger(__name__)
 
