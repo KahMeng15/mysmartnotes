@@ -180,6 +180,16 @@ async def upload_lecture(
             
             logger.info(f"OCR extracted {len(db_lecture.extracted_text)} chars")
         
+        # STEP 4: Compute and store embeddings in background
+        if db_lecture.extracted_text and db_lecture.extracted_text.strip():
+            try:
+                from app.processing.embeddings import compute_and_store_embeddings
+                compute_and_store_embeddings(db_lecture.id, db_lecture.extracted_text, db)
+                logger.info(f"Embeddings computed for lecture {db_lecture.id}")
+            except Exception as e:
+                logger.error(f"Error computing embeddings: {e}", exc_info=True)
+                # Don't fail the upload, embeddings can be computed later
+        
     except Exception as e:
         logger.error(f"Error processing lecture: {e}", exc_info=True)
         # Continue anyway, content can be extracted later via reprocess
@@ -333,6 +343,16 @@ async def reprocess_ocr(
         lecture.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(lecture)
+        
+        # Update embeddings after reprocessing
+        if raw_text and raw_text.strip():
+            try:
+                from app.processing.embeddings import update_lecture_embeddings
+                update_lecture_embeddings(lecture.id, raw_text, db)
+                logger.info(f"Updated embeddings after reprocessing for lecture {lecture_id}")
+            except Exception as e:
+                logger.error(f"Error updating embeddings after reprocessing: {e}", exc_info=True)
+                # Don't fail the reprocessing
         
         logger.info(f"Successfully reprocessed OCR for lecture {lecture_id}")
         return lecture
@@ -544,6 +564,16 @@ async def update_lecture_content(
     lecture.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(lecture)
+    
+    # Update embeddings to stay in sync
+    if new_text and new_text.strip():
+        try:
+            from app.processing.embeddings import update_lecture_embeddings
+            update_lecture_embeddings(lecture.id, new_text, db)
+            logger.info(f"Updated embeddings for lecture {lecture_id}")
+        except Exception as e:
+            logger.error(f"Error updating embeddings: {e}", exc_info=True)
+            # Don't fail the content update
     
     logger.info(f"Updated content for lecture {lecture_id}: {len(new_text)} chars")
     return lecture

@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # ============================================
     GLOBAL_AI_PROVIDER: str = "gemini"  # Options: gemini, huggingface, ollama
     GLOBAL_GEMINI_API_KEY: str = ""     # API key for global Gemini usage
+    GLOBAL_HUGGINGFACE_TOKEN: str = ""  # API token for global Hugging Face usage
     GLOBAL_AI_MODEL: str = ""           # Optional: specific model name (leave empty for auto-select)
     
     # ============================================

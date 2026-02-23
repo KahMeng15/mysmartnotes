@@ -201,3 +201,169 @@ def combine_snippets(snippets: List[dict], max_chars: int = 2000) -> str:
             break
     
     return combined
+
+
+def compute_and_store_embeddings(lecture_id: int, text: str, db) -> int:
+    """
+    Compute embeddings for a lecture and store them in the database.
+    
+    Args:
+        lecture_id: ID of the lecture
+        text: Full extracted text
+        db: SQLAlchemy Session
+        
+    Returns:
+        Number of embeddings stored
+    """
+    from app.models.db import LectureEmbedding
+    
+    if not text or not text.strip():
+        logger.warning(f"Lecture {lecture_id} has empty text, skipping embedding")
+        return 0
+    
+    model = get_embeddings_model()
+    if model is None:
+        logger.error(f"Failed to get embeddings model for lecture {lecture_id}")
+        return 0
+    
+    try:
+        # Delete existing embeddings for this lecture
+        db.query(LectureEmbedding).filter(
+            LectureEmbedding.lecture_id == lecture_id
+        ).delete()
+        db.commit()
+        
+        # Split text into chunks
+        chunks = []
+        positions = []
+        words = text.split()
+        current_chunk = []
+        current_length = 0
+        char_position = 0
+        chunk_size = 500  # characters
+        
+        for word in words:
+            if not current_chunk:
+                positions.append(char_position)
+            
+            current_chunk.append(word)
+            current_length += len(word) + 1
+            char_position += len(word) + 1
+            
+            if current_length >= chunk_size:
+                chunks.append(" ".join(current_chunk))
+                current_chunk = []
+                current_length = 0
+        
+        if current_chunk:
+            positions.append(char_position - current_length)
+            chunks.append(" ".join(current_chunk))
+        
+        if not chunks:
+            logger.warning(f"No chunks created for lecture {lecture_id}")
+            return 0
+        
+        # Compute embeddings for all chunks
+        embeddings = model.encode(chunks, convert_to_tensor=False)
+        
+        # Store embeddings in database
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            pos = positions[i] if i < len(positions) else 0
+            emb_record = LectureEmbedding(
+                lecture_id=lecture_id,
+                chunk_text=chunk,
+                chunk_index=i,
+                embedding=embedding.tolist(),  # Convert numpy array to list
+                position=pos
+            )
+            db.add(emb_record)
+        
+        db.commit()
+        logger.info(f"Stored {len(chunks)} embeddings for lecture {lecture_id}")
+        return len(chunks)
+        
+    except Exception as e:
+        logger.error(f"Error computing embeddings for lecture {lecture_id}: {e}")
+        db.rollback()
+        return 0
+
+
+def update_lecture_embeddings(lecture_id: int, text: str, db) -> int:
+    """
+    Update embeddings when lecture content changes.
+    Deletes old embeddings and computes new ones.
+    
+    Args:
+        lecture_id: ID of the lecture
+        text: Updated extracted text
+        db: SQLAlchemy Session
+        
+    Returns:
+        Number of new embeddings stored
+    """
+    return compute_and_store_embeddings(lecture_id, text, db)
+
+
+def retrieve_relevant_chunks(
+    query: str,
+    lecture_ids: List[int],
+    db,
+    top_k: int = 3
+) -> List[dict]:
+    """
+    Retrieve most relevant pre-computed chunks for a query using vector similarity.
+    
+    Args:
+        query: Search query
+        lecture_ids: List of lecture IDs to search within
+        db: SQLAlchemy Session
+        top_k: Number of top results to return
+        
+    Returns:
+        List of dicts with 'text', 'position', 'score', 'lecture_id'
+    """
+    from app.models.db import LectureEmbedding
+    
+    if not lecture_ids or not query:
+        return []
+    
+    model = get_embeddings_model()
+    if model is None:
+        logger.error("Failed to get embeddings model")
+        return []
+    
+    try:
+        # Get all embeddings for the given lectures
+        embeddings_records = db.query(LectureEmbedding).filter(
+            LectureEmbedding.lecture_id.in_(lecture_ids)
+        ).all()
+        
+        if not embeddings_records:
+            logger.warning(f"No embeddings found for lectures {lecture_ids}")
+            return []
+        
+        # Compute query embedding
+        query_embedding = model.encode(query, convert_to_tensor=False)
+        
+        # Calculate similarities
+        similarities = []
+        for record in embeddings_records:
+            chunk_embedding = np.array(record.embedding)
+            sim = float(np.dot(query_embedding, chunk_embedding) / (
+                np.linalg.norm(query_embedding) * np.linalg.norm(chunk_embedding) + 1e-9
+            ))
+            similarities.append({
+                'text': record.chunk_text,
+                'position': record.position,
+                'score': round(sim * 100, 1),
+                'lecture_id': record.lecture_id,
+                'chunk_index': record.chunk_index
+            })
+        
+        # Sort by similarity and return top-k
+        similarities.sort(key=lambda x: x['score'], reverse=True)
+        return similarities[:top_k]
+        
+    except Exception as e:
+        logger.error(f"Error retrieving chunks: {e}")
+        return []

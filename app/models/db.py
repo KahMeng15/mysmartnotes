@@ -1,5 +1,5 @@
 """Database models"""
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Table, Float
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Table, Float, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -93,6 +93,7 @@ class Lecture(Base):
     subject = relationship("Subject", back_populates="lectures")
     documents = relationship("GeneratedDocument", back_populates="lecture", cascade="all, delete-orphan")
     flashcards = relationship("Flashcard", back_populates="lecture", cascade="all, delete-orphan")
+    embeddings = relationship("LectureEmbedding", back_populates="lecture", cascade="all, delete-orphan")
 
 
 class GeneratedDocument(Base):
@@ -109,6 +110,23 @@ class GeneratedDocument(Base):
     
     # Relationships
     lecture = relationship("Lecture", back_populates="documents")
+
+
+class LectureEmbedding(Base):
+    """Pre-computed embeddings for lecture chunks (vector DB)"""
+    __tablename__ = "lecture_embeddings"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=False, index=True)
+    chunk_text = Column(Text, nullable=False)  # Original text of this chunk
+    chunk_index = Column(Integer, nullable=False)  # Order of this chunk in lecture
+    embedding = Column(JSON, nullable=False)  # Embedding vector as list of floats
+    position = Column(Integer)  # Character position in original text
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    lecture = relationship("Lecture", back_populates="embeddings")
 
 
 class Flashcard(Base):

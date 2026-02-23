@@ -28,7 +28,7 @@ class AIClient:
             self.provider = settings.GLOBAL_AI_PROVIDER
             self.ai_model_name = settings.GLOBAL_AI_MODEL or None
             self.gemini_key = settings.GLOBAL_GEMINI_API_KEY if self.provider == "gemini" else None
-            self.hf_token = None
+            self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN if self.provider == "huggingface" else None
             self.ollama_base_url = None
             logger.info(f"[User {user.id}] Using global AI settings: {self.provider}")
             

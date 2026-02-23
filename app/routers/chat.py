@@ -122,10 +122,10 @@ async def ask_question(
         )
          
     t_start = time.time()
-    all_content = ""
+    lecture_ids = []
     sources = []
     
-    # STEP 1: Retrieve content from notes
+    # STEP 1: Identify which lectures to search
     if request.lecture_id:
         lecture = db.query(Lecture).filter(
             Lecture.id == request.lecture_id,
@@ -133,8 +133,8 @@ async def ask_question(
         ).first()
         if not lecture:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
-        all_content = lecture.extracted_text or ""
-        sources.append(lecture.title)
+        lecture_ids = [request.lecture_id]
+        sources = [lecture.title]
         
     elif request.subject_id:
         subject = db.query(Subject).filter(
@@ -144,10 +144,8 @@ async def ask_question(
         if not subject:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
         lectures = db.query(Lecture).filter(Lecture.subject_id == subject.id).all()
-        for l in lectures:
-            if l.extracted_text:
-                all_content += f"\n--- Note: {l.title} ---\n{l.extracted_text}"
-                sources.append(l.title)
+        lecture_ids = [l.id for l in lectures]
+        sources = [l.title for l in lectures]
 
     elif request.group_id:
         group = db.query(SubjectGroup).filter(
@@ -159,50 +157,58 @@ async def ask_question(
         subjects = db.query(Subject).filter(Subject.group_id == group.id).all()
         for s in subjects:
             lectures = db.query(Lecture).filter(Lecture.subject_id == s.id).all()
-            for l in lectures:
-                if l.extracted_text:
-                    all_content += f"\n--- Subject: {s.name}, Note: {l.title} ---\n{l.extracted_text}"
-                    sources.append(l.title)
+            lecture_ids.extend([l.id for l in lectures])
+            sources.extend([l.title for l in lectures])
     
     retrieval_ms = (time.time() - t_start) * 1000.0
     
-    # STEP 2: Semantic search for relevant snippets
+    # STEP 2: Retrieve relevant chunks from pre-computed embeddings
     context = ""
     snippet_sources = []
-    detailed_sources = []  # Store detailed source info with positions
+    detailed_sources = []
     
-    if all_content:
+    if lecture_ids:
         try:
-            from app.processing.embeddings import find_relevant_snippets, combine_snippets
-            snippets = find_relevant_snippets(
+            from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
+            chunks = retrieve_relevant_chunks(
                 query=request.message,
-                text=all_content,
+                lecture_ids=lecture_ids,
+                db=db,
                 top_k=3
             )
-            context = combine_snippets(snippets, max_chars=2000)
             
-            # Build detailed sources with positions and scores
-            for snippet in snippets:
-                source_info = {
-                    'text_preview': snippet['text'][:100] + '...' if len(snippet['text']) > 100 else snippet['text'],
-                    'position': snippet['position'],
-                    'score': snippet['score'],
-                    'lecture_id': request.lecture_id if request.lecture_id else None
-                }
-                # Try to identify which lecture this snippet is from
-                if not request.lecture_id and sources:
-                    source_info['source_name'] = sources[0] if sources else 'Unknown'
-                detailed_sources.append(source_info)
+            if chunks:
+                # Convert chunks to snippet format for combine_snippets
+                snippets = [
+                    {
+                        'text': chunk['text'],
+                        'position': chunk['position'],
+                        'score': chunk['score']
+                    }
+                    for chunk in chunks
+                ]
+                context = combine_snippets(snippets, max_chars=2000)
+                
+                # Build detailed sources
+                for chunk in chunks:
+                    source_info = {
+                        'text_preview': chunk['text'][:100] + '...' if len(chunk['text']) > 100 else chunk['text'],
+                        'position': chunk['position'],
+                        'score': chunk['score'],
+                        'lecture_id': chunk['lecture_id']
+                    }
+                    detailed_sources.append(source_info)
+                
+                # Get unique source names
+                snippet_sources = list(set(sources))[:2] if sources else []
             
-            # Use top sources
-            snippet_sources = sources[:2] if sources else []
+            retrieval_ms = (time.time() - t_start) * 1000.0
         except Exception as e:
-            print(f"[chat] Semantic search failed, falling back to direct context: {e}")
-            context = all_content[:2000]  # Fallback to first 2000 chars
-            snippet_sources = sources
+            print(f"[chat] Vector retrieval failed: {e}")
+            # Fallback: get raw text and use old method
+            retrieval_ms = (time.time() - t_start) * 1000.0
     
     # STEP 3: Web search fallback if no local context
-    web_snippet = ""
     if not context or len(context) < 100:
         print(f"[chat] No sufficient local context ({len(context)} chars), trying web search...")
         web_snippet, web_source = await web_search(request.message, timeout=2.5)
