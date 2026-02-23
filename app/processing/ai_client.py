@@ -88,6 +88,8 @@ class AIClient:
             logger.info(f"Gemini AI initialized with model: {self.model.model_name}")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini: {e}")
+            self.model = None
+            self.connection_error = f"[GEMINI] Connection failed: {e}"
     
     def _init_huggingface(self):
         """Initialize Hugging Face"""

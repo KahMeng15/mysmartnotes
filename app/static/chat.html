@@ -24,7 +24,6 @@
         .chat-container {
             display: flex;
             height: calc(100vh - 80px);
-            gap: var(--spacing-lg);
         }
 
         .chat-sidebar {
@@ -287,6 +286,97 @@
             border-radius: 3px;
             font-size: 0.9em;
         }
+
+        /* Past Chats Header with Plus Button */
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .new-chat-btn {
+            background: var(--color-primary);
+            color: var(--color-white);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: var(--font-size-lg);
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .new-chat-btn:hover {
+            background: var(--color-primary);
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(78, 205, 196, 0.3);
+        }
+
+        .new-chat-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Collapsible Reference Section */
+        .message-metadata {
+
+        }
+
+        .metadata-toggle {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            cursor: pointer;
+            user-select: none;
+            font-size: var(--font-size-xs);
+            color: var(--color-gray);
+            padding: var(--spacing-sm);
+            margin: calc(var(--spacing-sm) * -1);
+        }
+
+        .metadata-toggle-icon {
+            display: inline-flex;
+            transition: transform 0.2s;
+        }
+
+        .metadata-toggle-icon.expanded {
+            transform: rotate(90deg);
+        }
+
+        .reference-divider {
+            display: inline-block;
+            margin: 0 var(--spacing-sm);
+            color: var(--color-gray);
+        }
+
+        .info-btn {
+            background: none;
+            border: none;
+            color: var(--color-gray);
+            cursor: pointer;
+            font-size: var(--font-size-xs);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            transition: color 0.2s;
+        }
+
+        .info-btn:hover {
+            color: var(--color-primary);
+        }
+
+        .metadata-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .metadata-content.expanded {
+            max-height: 600px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 
@@ -296,7 +386,12 @@
     <div class="chat-container">
         <!-- Sidebar -->
         <div class="chat-sidebar">
-            <h3 style="margin-bottom: var(--spacing-lg);"><i class="ph ph-clock-counter-clockwise"></i> Past Chats</h3>
+            <div class="sidebar-header">
+                <h3><i class="ph ph-clock-counter-clockwise"></i> Past Chats</h3>
+                <button class="new-chat-btn" onclick="createNewChat()" title="Start a new chat">
+                    <i class="ph ph-plus"></i>
+                </button>
+            </div>
             <div id="conversationList" style="flex: 1; overflow-y: auto;">
                 <div class="empty-state" style="padding: var(--spacing-md);">
                     <p style="font-size: var(--font-size-sm);">Loading history...</p>
@@ -619,6 +714,20 @@
             document.getElementById('messageInput').focus();
         }
 
+        function createNewChat() {
+            // Clear current chat and scope
+            currentScope = { type: null, id: null, title: 'Select a scope to start' };
+            messages = [];
+            document.getElementById('chatTitle').textContent = 'Select a scope to start';
+            document.getElementById('scopeLabel').textContent = 'Select Note/Subject/Group';
+            document.getElementById('messageInput').disabled = true;
+            document.getElementById('sendBtn').disabled = true;
+            document.getElementById('messageInput').value = '';
+            displayMessages();
+            // Open scope selection modal to help user start a new chat
+            openScopeModal();
+        }
+
         function setupMessageInput() {
             document.getElementById('messageInput').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') sendMessage();
@@ -648,7 +757,7 @@
             // Show loading
             messages.push({
                 role: 'ai',
-                content: '<div class="loading-message"><span class="spinner"><i class="ph ph-spinner"></i></span> Thinking...</div>',
+                content: '<div class="loading-message"><span class="spinner"><i class="ph-spinner"></i></span> Thinking...</div>',
                 time: new Date(),
                 loading: true
             });
@@ -742,7 +851,7 @@
             if (messages.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);"><i class="ph ph-chat-circle-dots"></i></div>
+                        <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);"><i class="ph-chat-circle-dots"></i></div>
                         <p>Ask a question about ${currentScope.title}</p>
                     </div>
                 `;
@@ -774,23 +883,15 @@
                     `;
                 }
 
-                // Build timings display if available
-                let timingsHTML = '';
-                if (msg.timings) {
-                    const t = msg.timings;
-                    const aiModelText = msg.ai_model ? `🤖 ${msg.ai_model}` : '';
-                    timingsHTML = `
-                        <div class="timings-info" style="margin-top: 12px; padding: 8px; background: #f5f5f5; border-radius: 4px; font-size: 12px; color: #666;">
-                            ${aiModelText ? `<span style="font-weight: 600; color: #333;">${aiModelText}</span> | ` : ''}
-                            <span>⏱️ Retrieval: ${t.retrieval_ms}ms</span> | 
-                            <span>🤖 Model: ${t.model_ms}ms</span> | 
-                            <span>📊 Total: ${t.total_ms}ms</span>
-                        </div>
-                    `;
+                // Calculate highest match percentage from sources
+                let highestMatch = 0;
+                if (msg.detailed_sources && msg.detailed_sources.length > 0) {
+                    highestMatch = Math.max(...msg.detailed_sources.map(src => src.score || 0));
                 }
-                
+
                 // Build sources display if available
                 let sourcesHTML = '';
+                let metadataHTML = '';
                 if (msg.detailed_sources && msg.detailed_sources.length > 0) {
                     const sourceLinks = msg.detailed_sources.map((src, idx) => {
                         const lectureId = src.lecture_id || currentScope.id;
@@ -811,11 +912,59 @@
                     }).join('');
                     
                     sourcesHTML = `
-                        <div class="sources-section" style="margin-top: 12px; padding: 8px; background: #f9f9f9; border-left: 3px solid #1976d2; border-radius: 4px;">
-                            <div style="font-weight: 600; font-size: 12px; color: #333; margin-bottom: 6px;">
-                                <i class="ph ph-books"></i> Sources (click to view):
-                            </div>
+                        <div class="sources-section" style="margin-top: 10px; padding: 8px; background: #f9f9f9; border-radius: 4px;">
                             ${sourceLinks}
+                        </div>
+                    `;
+                }
+
+                // Build metadata toggle section (collapsible references + info button)
+                if ((msg.detailed_sources && msg.detailed_sources.length > 0) || msg.timings) {
+                    const msgId = 'msg-' + idx;
+                    const refDisplay = msg.detailed_sources && msg.detailed_sources.length > 0 ? `Reference (${highestMatch}%)` : 'Reference';
+                    
+                    // Build info content
+                    let infoContent = '';
+                    if (msg.timings) {
+                        const t = msg.timings;
+                        const aiModel = msg.ai_model || 'Unknown';
+                        infoContent = `
+                            <div style="margin-top: 10px; padding: 12px; background: #f9f9f9; border-radius: 4px; font-size: 12px;">
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-weight: 600; color: #333; margin-bottom: 4px;"><i class="ph ph-robot"></i> Model: ${aiModel}</div>
+                                </div>
+                                <div style="border-top: 1px solid #e0e0e0; padding-top: 8px;">
+                                    <div style="font-weight: 600; color: #333; margin-bottom: 6px;"><i class="ph ph-hourglass"></i> Timing</div>
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
+                                        <span>Retrieval:</span>
+                                        <span style="color: var(--color-primary); font-weight: 600;">${t.retrieval_ms}ms</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f0f0f0;">
+                                        <span>Model:</span>
+                                        <span style="color: var(--color-primary); font-weight: 600;">${t.model_ms}ms</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                                        <span>Total:</span>
+                                        <span style="color: var(--color-primary); font-weight: 600;">${t.total_ms}ms</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    metadataHTML = `
+                        <div class="message-metadata">
+                            <div class="metadata-toggle" onclick="toggleMetadata('${msgId}-ref', '${msgId}')">
+                                <span>${refDisplay}</span>
+                                <span class="reference-divider">|</span>
+                                <button class="info-btn" onclick="toggleMetadata('${msgId}-info', '${msgId}', event)">Info</button>
+                            </div>
+                            <div class="metadata-content" id="${msgId}-ref-content">
+                                ${sourcesHTML}
+                            </div>
+                            <div class="metadata-content" id="${msgId}-info-content">
+                                ${infoContent}
+                            </div>
                         </div>
                     `;
                 }
@@ -830,8 +979,7 @@
                         ${errorIcon ? '<span style="color: #d32f2f; font-weight: bold;">' + errorIcon + '</span>' : ''}
                         ${thinkingHTML}
                         ${contentHTML}
-                        ${sourcesHTML}
-                        ${timingsHTML}
+                        ${metadataHTML}
                     </div>
                     <div class="message-time">
                         ${msg.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -941,7 +1089,45 @@
             window.open(url, '_blank');
         }
 
+        // Toggle metadata (references or info) visibility - only one open at a time
+        function toggleMetadata(sectionId, msgId, event) {
+            if (event) {
+                event.stopPropagation();
+            }
+            
+            const content = document.getElementById(sectionId + '-content');
+            const isExpanded = content.classList.contains('expanded');
+            
+            if (!isExpanded) {
+                // Close the other section (reference or info)
+                const otherSectionId = sectionId.includes('-ref') ? msgId + '-info' : msgId + '-ref';
+                const otherContent = document.getElementById(otherSectionId + '-content');
+                if (otherContent) {
+                    otherContent.classList.remove('expanded');
+                }
+            }
+            
+            // Toggle current section
+            if (content) {
+                content.classList.toggle('expanded');
+            }
+        }
+
+        // Show info modal with timing and model details
+        function showInfoModal(msgIdx, event) {
+            event.stopPropagation();
+        }
+
+        // Close info modal
+        function closeInfoModal() {
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(event) {
+        });
+
     </script>
+
 </body>
 
 </html>
