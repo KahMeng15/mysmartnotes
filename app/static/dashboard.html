@@ -15,14 +15,44 @@
     <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
     <script src="js/greetings.js"></script>
-    
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .action-btn {
+            padding: var(--spacing-xl);
+            text-align: center;
+            border-radius: var(--radius-lg);
+            transition: all var(--transition-base);
+        }
+
+        .action-btn:hover {
+            transform: translateY(-4px);
+        }
+
+        .icon {
+            font-size: var(--font-size-3xl);
+            margin-bottom: var(--spacing-md);
+        }
+    </style>
 </head>
 
 <body>
 
 
     <!-- Main Content -->
-    <div class="container" class="pad-top-lg">
+    <div class="container" style="padding-top: var(--spacing-2xl);">
         <!-- Welcome Section -->
         <div style="margin-bottom: var(--spacing-2xl);">
             <h1>Welcome back, <span id="userName">Student</span>! <i class="ph ph-hand-waving"></i></h1>
@@ -84,7 +114,7 @@
         <div class="card-content mb-3" style="margin-top: var(--spacing-2xl);">
             <div class="card-header d-flex justify-content-between align-items-center"
                 style="border-bottom: 2px solid var(--color-light-gray); padding-bottom: var(--spacing-md); margin-bottom: var(--spacing-lg);">
-                <h3 class="group-title" class="margin-bottom-0">Your Groups</h3>
+                <h3 class="group-title" style="margin-bottom: 0;">Your Groups</h3>
                 <a href="mynotes.html" class="btn btn-outline btn-small">View All</a>
             </div>
             <div class="dashboard-grid" id="groupsGrid"
@@ -100,7 +130,7 @@
         <div class="card-content mb-3" style="margin-top: var(--spacing-2xl);">
             <div class="card-header d-flex justify-content-between align-items-center"
                 style="border-bottom: 2px solid var(--color-light-gray); padding-bottom: var(--spacing-md); margin-bottom: var(--spacing-lg);">
-                <h3 class="group-title" class="margin-bottom-0">Your Subjects</h3>
+                <h3 class="group-title" style="margin-bottom: 0;">Your Subjects</h3>
                 <a href="mynotes.html" class="btn btn-outline btn-small">View All</a>
             </div>
             <div class="dashboard-grid" id="subjectsGrid"
@@ -116,7 +146,7 @@
         <div class="card-content" style="margin-top: var(--spacing-2xl);">
             <div class="card-header"
                 style="border-bottom: 2px solid var(--color-light-gray); padding-bottom: var(--spacing-md); margin-bottom: var(--spacing-lg);">
-                <h3 class="group-title" class="margin-bottom-0">Recent Notes</h3>
+                <h3 class="group-title" style="margin-bottom: 0;">Recent Notes</h3>
             </div>
             <div id="recentLectures" class="lecture-list">
                 <div class="empty-state">

@@ -15,13 +15,153 @@
     <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
     <script src="js/utils.js"></script>
-    
+    <style>
+        .group-section {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            margin-bottom: var(--spacing-2xl);
+            border: 1px solid var(--color-light-gray);
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            padding-bottom: var(--spacing-md);
+            border-bottom: 2px solid var(--color-light-gray);
+        }
+
+        .group-title {
+            font-size: var(--font-size-xl);
+            font-weight: 700;
+            color: var(--color-text);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .group-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+
+        /* List View Styles */
+        .lecture-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .lecture-item {
+            background: var(--color-background);
+            border: 1px solid var(--color-light-gray);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all var(--transition-base);
+        }
+
+        .lecture-item:hover {
+            transform: translateX(4px);
+            border-color: var(--color-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .lecture-info {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .lecture-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--color-white);
+            color: var(--color-primary);
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 1px solid var(--color-light-gray);
+        }
+
+        .lecture-details h4 {
+            margin: 0;
+            font-size: var(--font-size-base);
+            font-weight: 600;
+        }
+
+        .lecture-details p {
+            margin: 0;
+            font-size: var(--font-size-sm);
+            color: var(--color-gray);
+        }
+
+        .lecture-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-2xl);
+            color: var(--color-gray);
+            background: var(--color-background);
+            border-radius: var(--radius-lg);
+            border: 1px dashed var(--color-light-gray);
+        }
+
+        /* Controls bar styling from notes.html */
+        .controls-bar {
+            display: flex;
+            justify-content: space-between;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: var(--spacing-md) var(--spacing-lg);
+            padding-left: 45px;
+            border: 1px solid var(--color-light-gray);
+            border-radius: var(--radius-full);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--color-primary);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--color-gray);
+            font-size: 20px;
+        }
+    </style>
 </head>
 
 <body>
 
 
-    <div class="container" class="pad-top-lg">
+    <div class="container" style="padding-top: var(--spacing-2xl);">
         <!-- Back Link -->
         <div style="margin-bottom: var(--spacing-md);">
             <a href="mynotes.html" id="backLink"

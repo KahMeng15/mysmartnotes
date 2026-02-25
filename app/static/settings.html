@@ -14,14 +14,94 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
-    
+    <style>
+        .settings-container {
+            /* Removing width constraint, use grid for children */
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: var(--spacing-2xl);
+            width: 100%;
+        }
+
+        .settings-section {
+            background: var(--color-white);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--color-light-gray);
+            transition: all var(--transition-base);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .settings-section:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .settings-section h3 {
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .settings-grid {
+            display: grid;
+            gap: var(--spacing-lg);
+        }
+
+        .toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-md) 0;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background: var(--color-light-gray);
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            transition: background var(--transition-base);
+        }
+
+        .toggle-switch.active {
+            background: var(--color-primary);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left var(--transition-base);
+        }
+
+        .toggle-switch.active::after {
+            left: 26px;
+        }
+
+        .danger-zone {
+            background: rgba(231, 76, 60, 0.05);
+            border: 1px solid rgba(231, 76, 60, 0.2);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+        }
+    </style>
 </head>
 
 <body>
 
 
     <!-- Content -->
-    <div class="container" class="pad-top-lg pad-bottom-lg">
+    <div class="container" style="padding-top: var(--spacing-2xl); padding-bottom: var(--spacing-2xl);">
         <h1 style="margin-bottom: var(--spacing-2xl);">Settings</h1>
 
         <div class="settings-container">
