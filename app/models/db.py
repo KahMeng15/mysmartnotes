@@ -195,6 +195,12 @@ class ChatMessage(Base):
     response = Column(Text, nullable=False)
     sources = Column(Text)  # JSON array of sources
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Conversation threading
+    conversation_id = Column(String(36), nullable=True, index=True)   # UUID grouping messages into a conversation
+    conversation_title = Column(String(255), nullable=True)            # AI-generated or derived title
+    ai_mode = Column(String(50), nullable=True, default="elaboration") # Which AI response mode was used
+    detailed_sources_json = Column(Text, nullable=True)                # JSON: full detailed source objects for history replay
     
     # Relationships
     user = relationship("User")
