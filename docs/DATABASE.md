@@ -1,18 +1,426 @@
 # 🗄️ Database Structure
 
-Complete database schemas and relationships for MySmartNotes.
+Simplified database schema for MySmartNotes using SQLite.
 
 ## Database Overview
 
-MySmartNotes uses three database systems:
+MySmartNotes uses a single **SQLite database** (`app.db`) with an optional **in-memory vector store** for embeddings.
 
-1. **PostgreSQL** - Primary relational database for user data, metadata
-2. **ChromaDB** - Vector database for embeddings and semantic search
-3. **Redis** - In-memory cache and message broker
+- **SQLite** - All application data (users, subjects, lectures, documents)
+- **In-Memory / File-Based** - Vector embeddings (optional backup to JSON)
 
 ---
 
-## PostgreSQL Schema
+## SQLite Schema
+
+### Table: `users`
+
+Stores user account information.
+
+```sql
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    full_name TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP
+);
+
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_username ON users(username);
+```
+
+**Columns:**
+- `id` - Primary key
+- `username` - Unique username for login
+- `email` - User email address
+- `password_hash` - Bcrypt hashed password
+- `full_name` - User's display name
+- `is_active` - Account active status
+- `created_at` - Account creation timestamp
+- `updated_at` - Last update timestamp
+- `last_login` - Last successful login
+
+---
+
+### Table: `subjects`
+
+Stores subject/course information.
+
+```sql
+CREATE TABLE subjects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    color TEXT,  -- Hex color (e.g., '#FF5733')
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, name)
+);
+
+CREATE INDEX idx_subjects_user_id ON subjects(user_id);
+CREATE INDEX idx_subjects_created_at ON subjects(created_at DESC);
+```
+
+**Columns:**
+- `id` - Primary key
+- `user_id` - Foreign key to users
+- `name` - Subject name (e.g., "Physics 101")
+- `description` - Optional description
+- `color` - UI color code for visual identification
+- `created_at` - Creation timestamp
+- `updated_at` - Last update timestamp
+
+---
+
+### Table: `lectures`
+
+Stores lecture/slide upload information.
+
+```sql
+CREATE TABLE lectures (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    description TEXT,
+    file_path TEXT NOT NULL,
+    file_type TEXT NOT NULL,  -- 'pdf', 'pptx'
+    page_count INTEGER,
+    status TEXT DEFAULT 'pending',  -- pending, processing, completed, failed
+    error_message TEXT,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP,
+    processing_time_seconds INTEGER
+);
+
+CREATE INDEX idx_lectures_subject_id ON lectures(subject_id);
+CREATE INDEX idx_lectures_status ON lectures(status);
+CREATE INDEX idx_lectures_uploaded_at ON lectures(uploaded_at DESC);
+```
+
+**Columns:**
+- `id` - Primary key
+- `subject_id` - Foreign key to subjects
+- `name` - Lecture title
+- `description` - Optional notes
+- `file_path` - Path to stored file (/data/uploads/...)
+- `file_type` - pdf or pptx
+- `page_count` - Number of pages/slides
+- `status` - Processing status
+- `error_message` - Error details if failed
+- `uploaded_at` - Upload timestamp
+- `processed_at` - When processing completed
+- `processing_time_seconds` - Duration of processing
+
+**Status Values:**
+- `pending` - Awaiting processing
+- `processing` - Currently being processed
+- `completed` - Successfully processed
+- `failed` - Processing failed
+
+---
+
+### Table: `generated_documents`
+
+Stores generated document metadata.
+
+```sql
+CREATE TABLE generated_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lecture_id INTEGER NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+    doc_type TEXT NOT NULL,  -- 'cheat_sheet', 'quiz', 'flashcards'
+    file_path TEXT NOT NULL,
+    format TEXT NOT NULL,  -- 'docx', 'pdf', 'json'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_gendocs_lecture_id ON generated_documents(lecture_id);
+CREATE INDEX idx_gendocs_type ON generated_documents(doc_type);
+CREATE INDEX idx_gendocs_created_at ON generated_documents(created_at DESC);
+```
+
+**Columns:**
+- `id` - Primary key
+- `lecture_id` - Foreign key to lectures
+- `doc_type` - Type of document
+- `file_path` - Path to generated file
+- `format` - File format
+- `created_at` - Generation timestamp
+
+**Document Types:**
+- `cheat_sheet` - Study guide (DOCX)
+- `quiz` - MCQ quiz (PDF)
+- `flashcards` - Flashcard deck (JSON)
+
+---
+
+### Table: `flashcards`
+
+Stores flashcards for spaced repetition.
+
+```sql
+CREATE TABLE flashcards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lecture_id INTEGER NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    difficulty INTEGER DEFAULT 0,  -- SM-2 difficulty rating
+    interval INTEGER DEFAULT 0,  -- Days until next review
+    repetitions INTEGER DEFAULT 0,  -- Number of successful reviews
+    ease_factor REAL DEFAULT 2.5,  -- SM-2 ease factor
+    next_review TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_reviewed TIMESTAMP
+);
+
+CREATE INDEX idx_flashcards_lecture_id ON flashcards(lecture_id);
+CREATE INDEX idx_flashcards_next_review ON flashcards(next_review);
+```
+
+**Columns:**
+- `id` - Primary key
+- `lecture_id` - Foreign key to lectures
+- `question` - Front of card
+- `answer` - Back of card
+- `difficulty` - SM-2 difficulty rating
+- `interval` - Days until next review
+- `repetitions` - Successful review count
+- `ease_factor` - SM-2 ease factor
+- `next_review` - Next scheduled review
+- `created_at` - Creation timestamp
+- `last_reviewed` - Last review timestamp
+
+---
+
+### Table: `study_sessions`
+
+Tracks study history for analytics.
+
+```sql
+CREATE TABLE study_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    lecture_id INTEGER REFERENCES lectures(id) ON DELETE CASCADE,
+    session_type TEXT NOT NULL,  -- 'chat', 'quiz', 'flashcards'
+    duration_seconds INTEGER,
+    score REAL,  -- Quiz/flashcard score (0-100)
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP
+);
+
+CREATE INDEX idx_study_sessions_user_id ON study_sessions(user_id);
+CREATE INDEX idx_study_sessions_started_at ON study_sessions(started_at DESC);
+```
+
+**Columns:**
+- `id` - Primary key
+- `user_id` - User who performed session
+- `lecture_id` - Related lecture (optional)
+- `session_type` - Type of session
+- `duration_seconds` - Session duration
+- `score` - Performance score
+- `started_at` - Session start
+- `ended_at` - Session end
+
+---
+
+### Table: `tasks`
+
+Tracks background task status.
+
+```sql
+CREATE TABLE tasks (
+    id TEXT PRIMARY KEY,  -- UUID
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    task_type TEXT NOT NULL,  -- 'process_lecture', 'generate_document'
+    status TEXT DEFAULT 'pending',  -- pending, processing, completed, failed
+    progress INTEGER DEFAULT 0,  -- 0-100%
+    result_data TEXT,  -- JSON result
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_tasks_user_id ON tasks(user_id);
+CREATE INDEX idx_tasks_status ON tasks(status);
+```
+
+---
+
+## Vector Embeddings Storage
+
+### In-Memory Store (During Runtime)
+
+```python
+# Using in-memory dictionary
+embeddings_cache = {
+    "lecture_123_page_1_chunk_0": {
+        "embedding": [0.1, 0.2, ..., 0.768],  # 768-dimensional
+        "text": "Original text chunk",
+        "lecture_id": 123,
+        "page_number": 1
+    }
+}
+```
+
+### File-Based Backup (JSON)
+
+```python
+# Store in /data/embeddings/ as JSON for persistence
+{
+    "lecture_123": [
+        {
+            "id": "chunk_0",
+            "embedding": [...],
+            "text": "...",
+            "page": 1
+        }
+    ]
+}
+```
+
+### Local Embedding Generation
+
+```python
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer('all-MiniLM-L6-v2')  # 384-dim, lightweight
+
+# Generate embeddings locally (CPU, <1s per chunk)
+embedding = model.encode(text_chunk)  # Returns np.ndarray (384,)
+```
+
+**No API calls needed for embeddings - all local!**
+
+---
+
+## Database Initialization
+
+### Python Script (SQLAlchemy)
+
+```python
+# models.py
+from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Float
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    full_name = Column(String)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    last_login = Column(DateTime)
+
+class Subject(Base):
+    __tablename__ = "subjects"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    color = Column(String)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+# Create tables
+engine = create_engine("sqlite:///./data/app.db")
+Base.metadata.create_all(bind=engine)
+```
+
+---
+
+## Database Backup
+
+### Simple Backup Strategy
+
+**SQLite is a single file - just copy it!**
+
+```bash
+# Backup
+cp /data/app.db /data/backups/app_$(date +%Y%m%d_%H%M%S).db
+
+# Restore
+cp /data/backups/app_20250120_100000.db /data/app.db
+```
+
+### Automated Backup (Docker volume)
+
+```yaml
+# docker-compose.yml
+volumes:
+  db_backup:
+    driver: local
+
+services:
+  backup:
+    image: alpine
+    command: >
+      sh -c 'while true; do
+        cp /app/data/app.db /backup/app_$(date +%Y%m%d_%H%M%S).db
+        sleep 86400
+      done'
+    volumes:
+      - ./data:/app/data
+      - db_backup:/backup
+```
+
+---
+
+## Relationships
+
+```
+users (1) ──────> (N) subjects
+subjects (1) ────> (N) lectures
+lectures (1) ────> (N) generated_documents
+lectures (1) ────> (N) flashcards
+users (1) ───────> (N) study_sessions
+users (1) ───────> (N) tasks
+```
+
+---
+
+## Queries Reference
+
+```python
+from sqlalchemy import select, and_
+
+# Get all subjects for a user
+session.query(Subject).filter(Subject.user_id == user_id).all()
+
+# Get lectures for a subject
+session.query(Lecture).filter(Lecture.subject_id == subject_id).all()
+
+# Search generated documents by lecture
+docs = session.query(GeneratedDocument).filter(
+    GeneratedDocument.lecture_id == lecture_id
+).all()
+
+# Find flashcards due for review
+due_cards = session.query(Flashcard).filter(
+    Flashcard.next_review <= datetime.now()
+).all()
+
+# Get active tasks
+active_tasks = session.query(Task).filter(
+    Task.status.in_(['pending', 'processing'])
+).all()
+```
+
+For architecture details, see [ARCHITECTURE.md](ARCHITECTURE.md).  
+For development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ### ER Diagram
 

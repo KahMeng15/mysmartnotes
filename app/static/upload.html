@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/nav.js"></script>
+    <script src="js/utils.js"></script>
+    <style>
+        .upload-area {
+            border: 2px dashed var(--color-primary);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-2xl);
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition-base);
+            background: rgba(78, 205, 196, 0.05);
+        }
+
+        .upload-area:hover,
+        .upload-area.drag-over {
+            background: rgba(78, 205, 196, 0.1);
+            border-color: var(--color-primary-dark);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--color-light-gray);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            margin-top: var(--spacing-md);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--color-primary);
+            transition: width var(--transition-base);
+        }
+
+        .file-list {
+            margin-top: var(--spacing-lg);
+        }
+
+        .file-item {
+            padding: var(--spacing-md);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .subject-helper {
+            display: flex;
+            gap: var(--spacing-md);
+            align-items: center;
+        }
+
+        .subject-select-wrapper {
+            flex: 1;
+        }
+
+        .btn-create-subject {
+            background: var(--color-primary);
+            color: white;
+            border: none;
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-create-subject:hover {
+            background: var(--color-primary-dark);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            max-width: 500px;
+            min-height: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-content form {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .modal-content h3 {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: auto;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: var(--spacing-md);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-save {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: var(--color-light-gray);
+            color: var(--color-text);
+        }
+
+        .info-box {
+            margin-top: var(--spacing-2xl);
+            padding: var(--spacing-lg);
+            background: rgba(52, 152, 219, 0.1);
+            border-radius: var(--radius-lg);
+            border-left: 4px solid #3498db;
+        }
+
+        .info-box h4 {
+            color: #3498db;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .info-box ul {
+            color: var(--color-gray);
+            font-size: var(--font-size-sm);
+            margin-left: var(--spacing-lg);
+        }
+
+        .info-box li {
+            margin-bottom: var(--spacing-sm);
+        }
+    </style>
+</head>
+
+<body>
+
+
+    <!-- Main Content -->
+    <div class="container" style="padding-top: var(--spacing-2xl);">
+
+
+        <div class="d-flex justify-content-between align-items-center" style="margin-bottom: var(--spacing-xl);">
+            <div>
+                <h1>Upload</h1>
+                <p style="color: var(--color-gray); margin-bottom: 0;">Upload your slides or notes for processing</p>
+            </div>
+        </div>
+
+        <div class="group-section"
+            style="background: white; border-radius: var(--radius-lg); padding: var(--spacing-xl); border: 1px solid var(--color-light-gray); margin: 0;">
+            <form id="uploadForm" onsubmit="handleUpload(event)">
+
+                <!-- Group Selection -->
+                <div class="form-group">
+                    <label>Group *</label>
+                    <div class="subject-helper">
+                        <div class="subject-select-wrapper">
+                            <select id="groupSelect" onchange="filterSubjects()" required
+                                style="background-color: white;">
+                                <option value="">Select a Group...</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn-create-subject" onclick="showCreateGroupModal()"><i
+                                class="ph ph-plus"></i>
+                            New</button>
+                    </div>
+                </div>
+
+                <!-- Subject Selection -->
+                <div class="form-group">
+                    <label>Subject *</label>
+                    <div class="subject-helper">
+                        <div class="subject-select-wrapper">
+                            <select id="subjectSelect" required style="background-color: white;">
+                                <option value="">Select a subject...</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn-create-subject" onclick="showCreateSubjectModal()"><i
+                                class="ph ph-plus"></i>
+                            New</button>
+                    </div>
+                </div>
+
+                <!-- Lecture Title -->
+                <div class="form-group">
+                    <label>Lecture Title</label>
+                    <input type="text" id="lectureTitle" placeholder="Leave empty to auto-detect from content">
+                </div>
+
+                <!-- File Upload -->
+                <div class="form-group">
+                    <label>Upload File *</label>
+                    <div class="upload-area" id="uploadArea" ondrop="handleDrop(event)"
+                        ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
+                        onclick="document.getElementById('fileInput').click()" style="background-color: white;">
+
+                        <div id="uploadPlaceholder">
+                            <div class="upload-icon"><i class="ph ph-folder-open"></i></div>
+                            <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Drag and drop your file
+                                here
+                            </div>
+                            <div style="color: var(--color-gray); font-size: var(--font-size-sm);">or click to browse
+                            </div>
+                            <div
+                                style="color: var(--color-gray); font-size: var(--font-size-xs); margin-top: var(--spacing-md);">
+                                Supported: PDF, PPTX, PNG, JPG (Max 50MB)
+                            </div>
+                        </div>
+                        <div id="fileDisplay" style="display: none; width: 100%;"></div>
+
+                        <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx,.png,.jpg,.jpeg"
+                            onchange="handleFileSelect(event)">
+                    </div>
+                </div>
+
+                <!-- Progress -->
+                <div id="progressContainer" style="display: none;">
+                    <p style="font-size: var(--font-size-sm); color: var(--color-gray);">Uploading...</p>
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-md);">
+                    <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Upload</button>
+                    <a href="dashboard.html" class="btn btn-outline btn-block"
+                        style="text-decoration: none; text-align: center;">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Info (User commented out) -->
+    <!-- ... -->
+
+    </div>
+
+    <!-- Create Group Modal -->
+    <div id="groupModal" class="modal">
+        <div class="modal-content">
+            <h3>Create New Group</h3>
+            <form onsubmit="createGroup(event)">
+                <div class="form-group">
+                    <label for="newGroupName">Group Name</label>
+                    <input type="text" id="newGroupName" required placeholder="e.g., Semester 1">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Create Group</button>
+                    <button type="button" onclick="closeCreateGroupModal()" class="btn-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create Subject Modal -->
+    <div id="subjectModal" class="modal">
+        <div class="modal-content">
+            <h3>Add New Subject</h3>
+            <form onsubmit="createSubject(event)">
+                <div class="form-group">
+                    <label for="newSubjectName">Subject Name</label>
+                    <input type="text" id="newSubjectName" required placeholder="e.g., Web Development">
+                </div>
+                <div class="form-group">
+                    <label for="newSubjectDescription">Description (Optional)</label>
+                    <textarea id="newSubjectDescription" placeholder="Optional description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="newSubjectColor">Color Tag</label>
+                    <input type="color" id="newSubjectColor" value="#3b82f6"
+                        style="width: 100%; height: 40px; border: none; padding: 0;">
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn-save">Create Subject</button>
+                    <button type="button" onclick="closeCreateSubjectModal()" class="btn-cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const TOKEN_KEY = 'token';
+        const token = localStorage.getItem(TOKEN_KEY);
+        let selectedFile = null;
+        let allSubjects = [];
+
+        window.addEventListener('load', () => {
+            if (!token) {
+                window.location.href = 'index.html';
+                return;
+            }
+            loadData();
+        });
+
+        async function loadData() {
+            try {
+                // 1. Fetch Groups
+                const groupsRes = await fetch('/groups', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (groupsRes.ok) {
+                    const groups = await groupsRes.json();
+                    populateGroups(groups);
+                }
+
+                // 2. Fetch Subjects
+                const subjectsRes = await fetch('/subjects', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (subjectsRes.ok) {
+                    allSubjects = await subjectsRes.json();
+                }
+
+                // 3. Handle URL Params
+                const urlParams = new URLSearchParams(window.location.search);
+                const groupId = urlParams.get('group_id');
+                const subjectId = urlParams.get('subject') || urlParams.get('subject_id');
+
+                if (groupId) {
+                    document.getElementById('groupSelect').value = groupId;
+                }
+
+                // Always populate subjects based on current group selection (or lack thereof)
+                filterSubjects();
+
+                if (subjectId) {
+                    // Try to find subject to verify it exists in current logic
+                    const subj = allSubjects.find(s => s.id == subjectId);
+                    if (subj) {
+                        // If group wasn't selected but subject has group, auto-select group?
+                        if (!groupId && subj.group_id) {
+                            document.getElementById('groupSelect').value = subj.group_id;
+                            filterSubjects();
+                        }
+                        document.getElementById('subjectSelect').value = subjectId;
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+
+        function populateGroups(groups) {
+            const groupSelect = document.getElementById('groupSelect');
+            // Keep default option? User said "not optional".
+            // But if there are no groups, we need a way to create one.
+            // And if we force selection, we need to select the first one.
+            groupSelect.innerHTML = '<option value="">Select a Group...</option>';
+            groups.forEach(g => {
+                const option = document.createElement('option');
+                option.value = g.id;
+                option.textContent = g.name;
+                groupSelect.appendChild(option);
+            });
+        }
+
+        function filterSubjects() {
+            const groupId = document.getElementById('groupSelect').value;
+            let filtered = allSubjects;
+
+            if (groupId) {
+                filtered = allSubjects.filter(s => s.group_id == groupId);
+            } else {
+                // If no group selected, show ALL subjects? Or only ungrouped?
+                // User said "Group box is not optional". This implies we SHOULD select a group.
+                // If user hasn't selected a group, maybe we shouldn't show subjects yet?
+                // But legacy subjects might be ungrouped.
+                // Let's show all for now to avoid breaking legacy flow, but UI encourages group selection.
+            }
+
+            const select = document.getElementById('subjectSelect');
+            select.innerHTML = '<option value="">Select a subject...</option>';
+            filtered.forEach(subject => {
+                const option = document.createElement('option');
+                option.value = subject.id;
+                option.textContent = subject.name;
+                select.appendChild(option);
+            });
+        }
+
+        // --- Group Modal ---
+        function showCreateGroupModal() {
+            document.getElementById('groupModal').classList.add('active');
+        }
+
+        function closeCreateGroupModal() {
+            document.getElementById('groupModal').classList.remove('active');
+            document.getElementById('newGroupName').value = '';
+        }
+
+        async function createGroup(event) {
+            event.preventDefault();
+            const name = document.getElementById('newGroupName').value;
+            try {
+                const res = await fetch('/groups', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    const newGroup = await res.json();
+                    closeCreateGroupModal();
+                    // Reload groups
+                    const groupsRes = await fetch('/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (groupsRes.ok) {
+                        const groups = await groupsRes.json();
+                        populateGroups(groups);
+                        document.getElementById('groupSelect').value = newGroup.id;
+                        filterSubjects();
+                    }
+                    alert('Group created successfully!');
+                } else {
+                    alert('Failed to create group');
+                }
+            } catch (err) {
+                alert('Error creating group: ' + err.message);
+            }
+        }
+
+        // --- Subject Modal ---
+        function showCreateSubjectModal() {
+            document.getElementById('subjectModal').classList.add('active');
+
+            // Auto-generate color
+            const existingColors = allSubjects.map(s => s.color || '#3b82f6');
+            const newColor = generateContrastingColor(existingColors);
+            document.getElementById('newSubjectColor').value = newColor;
+        }
+
+        function closeCreateSubjectModal() {
+            document.getElementById('subjectModal').classList.remove('active');
+            document.getElementById('newSubjectName').value = '';
+            document.getElementById('newSubjectDescription').value = '';
+        }
+
+        async function createSubject(event) {
+            event.preventDefault();
+            const name = document.getElementById('newSubjectName').value;
+            const description = document.getElementById('newSubjectDescription').value;
+            const color = document.getElementById('newSubjectColor').value;
+            const groupId = document.getElementById('groupSelect').value;
+
+            try {
+                const response = await fetch('/subjects', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description,
+                        color,
+                        group_id: groupId ? parseInt(groupId) : null
+                    })
+                });
+
+                if (response.ok) {
+                    const newSubj = await response.json();
+                    closeCreateSubjectModal();
+                    // Reload subjects
+                    const subjectsRes = await fetch('/subjects', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (subjectsRes.ok) {
+                        allSubjects = await subjectsRes.json();
+                        filterSubjects();
+                        document.getElementById('subjectSelect').value = newSubj.id;
+                    }
+                    alert('Subject created successfully!');
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + (error.detail || 'Failed to create subject'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            document.getElementById('uploadArea').classList.add('drag-over');
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            document.getElementById('uploadArea').classList.remove('drag-over');
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            document.getElementById('uploadArea').classList.remove('drag-over');
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect({ target: { files } });
+            }
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                selectedFile = files[0];
+                displayFile(selectedFile);
+            }
+        }
+
+        function displayFile(file) {
+            const placeholder = document.getElementById('uploadPlaceholder');
+            const fileDisplay = document.getElementById('fileDisplay');
+            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+
+            placeholder.style.display = 'none';
+            fileDisplay.style.display = 'block';
+
+            fileDisplay.innerHTML = `
+                <div class="file-item" style="border: none; padding: 0;">
+                    <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                        <div style="font-size: 2rem; color: var(--color-primary);"><i class="ph ph-file-text"></i></div>
+                        <div>
+                            <div style="font-weight: 600; margin-bottom: 0.25rem;">${file.name}</div>
+                            <div style="font-size: 0.9rem; color: var(--color-gray);">${sizeMB} MB</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="event.stopPropagation(); clearFile()" class="btn btn-outline btn-small">Remove</button>
+                </div>
+            `;
+        }
+
+        function clearFile() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('uploadPlaceholder').style.display = 'block';
+            document.getElementById('fileDisplay').style.display = 'none';
+            document.getElementById('fileDisplay').innerHTML = '';
+        }
+
+
+        async function handleUpload(event) {
+            event.preventDefault();
+
+            if (!selectedFile) {
+                alert('Please select a file');
+                return;
+            }
+
+            const subjectId = document.getElementById('subjectSelect').value;
+            if (!subjectId) {
+                alert('Please select a subject');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('title', document.getElementById('lectureTitle').value);
+            formData.append('subject_id', subjectId);
+
+            try {
+                document.getElementById('progressContainer').style.display = 'block';
+                const response = await fetch('/lectures/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert('Lecture uploaded and processed successfully!');
+                    window.location.href = `/note/${result.id}`;
+                } else {
+                    try {
+                        const error = await response.json();
+                        alert('Upload failed: ' + (error.detail || 'Unknown error'));
+                    } catch (e) {
+                        const text = await response.text();
+                        console.error('Response text:', text);
+                        alert('Upload failed: HTTP ' + response.status + ' - ' + (text || 'Unknown error'));
+                    }
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                document.getElementById('progressContainer').style.display = 'none';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem(TOKEN_KEY);
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+
+</html>

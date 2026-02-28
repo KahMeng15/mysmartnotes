@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/nav.js"></script>
+    <script src="/js/marked.min.js"></script>
+    <script>
+        if (typeof marked === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');
+        }
+    </script>
+    <style>
+        .chat-container {
+            display: flex;
+            height: calc(100vh - 80px);
+        }
+
+        .chat-sidebar {
+            width: 300px;
+            min-width: 260px;
+            background: var(--color-white);
+            border-right: 1px solid var(--color-light-gray);
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--color-background);
+        }
+
+        .chat-header {
+            padding: var(--spacing-lg);
+            background: var(--color-white);
+            border-bottom: 1px solid var(--color-light-gray);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .message {
+            display: flex;
+            gap: var(--spacing-md);
+            max-width: 80%;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-radius: var(--radius-lg);
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        .message.ai .message-content {
+            background: var(--color-white);
+            color: var(--color-dark);
+            border: 1px solid var(--color-light-gray);
+        }
+
+        .message.user .message-content {
+            background: var(--color-primary);
+            color: var(--color-white);
+        }
+
+        .message-time {
+            font-size: var(--font-size-xs);
+            color: var(--color-gray);
+            padding: 0 var(--spacing-sm);
+            display: flex;
+            align-items: flex-end;
+            min-width: 60px;
+        }
+
+        /* Spinner Animation */
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            animation: spin 1s linear infinite;
+            width: 24px;
+            height: 24px;
+        }
+
+        /* Thinking Section */
+        .thinking-section {
+            background: var(--color-background);
+            border-left: 3px solid var(--color-primary);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+            overflow: hidden;
+        }
+
+        .thinking-header {
+            padding: var(--spacing-md) var(--spacing-lg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            background: var(--color-white);
+            border-bottom: 1px solid var(--color-light-gray);
+            transition: background-color 0.2s;
+        }
+
+        .thinking-header:hover {
+            background-color: var(--color-background);
+        }
+
+        .thinking-icon {
+            display: flex;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+
+        .thinking-icon.expanded {
+            transform: rotate(90deg);
+        }
+
+        .thinking-content {
+            padding: var(--spacing-lg);
+            font-size: var(--font-size-sm);
+            color: var(--color-gray);
+            line-height: 1.6;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .thinking-content.expanded {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .loading-message {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .chat-input-area {
+            padding: var(--spacing-lg);
+            background: var(--color-white);
+            border-top: 1px solid var(--color-light-gray);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .scope-selection {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .chat-input-form {
+            display: flex;
+            gap: var(--spacing-md);
+        }
+
+        .chat-input-form input {
+            flex: 1;
+            border-radius: var(--radius-full);
+            padding: var(--spacing-md) var(--spacing-lg);
+        }
+        
+        /* Source reference hover effect */
+        .source-item:hover {
+            background: #e3f2fd !important;
+            border-color: #1976d2 !important;
+            transform: translateX(4px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .chat-input-form button {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-size-lg);
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--color-gray);
+            text-align: center;
+            padding: var(--spacing-xl);
+        }
+
+        /* History Items Component */
+        .history-item {
+            padding: var(--spacing-md);
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .history-item:hover {
+            border-color: var(--color-primary);
+            background: var(--color-light-gray);
+        }
+
+        .history-item.active {
+            border-color: var(--color-primary);
+            background: rgba(78, 205, 196, 0.05);
+        }
+
+        .history-msg {
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .history-meta {
+            font-size: var(--font-size-xs);
+            color: var(--color-gray);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Markdown in AI response */
+        .message.ai .message-content p {
+            margin-bottom: 0.5em;
+        }
+
+        .message.ai .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message.ai .message-content pre {
+            background: #f5f5f5;
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+
+        .message.ai .message-content code {
+            background: #f5f5f5;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        /* Past Chats Header with Plus Button */
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .new-chat-btn {
+            background: var(--color-primary);
+            color: var(--color-white);
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: var(--font-size-lg);
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .new-chat-btn:hover {
+            background: var(--color-primary);
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(78, 205, 196, 0.3);
+        }
+
+        .new-chat-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Collapsible Reference Section */
+        .message-metadata {
+
+        }
+
+        .metadata-toggle {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            cursor: pointer;
+            user-select: none;
+            font-size: var(--font-size-xs);
+            color: var(--color-gray);
+            padding: var(--spacing-sm);
+            margin: calc(var(--spacing-sm) * -1);
+        }
+
+        .metadata-toggle-icon {
+            display: inline-flex;
+            transition: transform 0.2s;
+        }
+
+        .metadata-toggle-icon.expanded {
+            transform: rotate(90deg);
+        }
+
+        .reference-divider {
+            display: inline-block;
+            margin: 0 var(--spacing-sm);
+            color: var(--color-gray);
+        }
+
+        .info-btn {
+            background: none;
+            border: none;
+            color: var(--color-gray);
+            cursor: pointer;
+            font-size: var(--font-size-xs);
+            padding: var(--spacing-xs) var(--spacing-sm);
+            transition: color 0.2s;
+        }
+
+        .info-btn:hover {
+            color: var(--color-primary);
+        }
+
+        .metadata-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .metadata-content.expanded {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        /* ── AI Mode Selector ─────────────────────────────────────────── */
+        .ai-mode-bar {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            align-items: center;
+            padding-bottom: 2px;
+        }
+
+        .mode-label-text {
+            font-size: 11px;
+            color: var(--color-gray);
+            font-weight: 500;
+            flex-shrink: 0;
+            margin-right: 2px;
+        }
+
+        .mode-pill {
+            padding: 3px 9px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            border: 1px solid var(--color-light-gray);
+            background: var(--color-background);
+            color: var(--color-gray);
+            cursor: pointer;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+            line-height: 1.4;
+        }
+
+        .mode-pill:hover {
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+            background: rgba(78, 205, 196, 0.06);
+        }
+
+        .mode-pill.active {
+            background: var(--color-primary);
+            border-color: var(--color-primary);
+            color: white;
+        }
+
+        /* ── AI Mode Badge on messages ────────────────────────────────── */
+        .ai-mode-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 10px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            background: rgba(78, 205, 196, 0.08);
+            color: var(--color-primary);
+            border: 1px solid rgba(78, 205, 196, 0.25);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        /* ── Conversation sidebar items ───────────────────────────────── */
+        .date-group-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--color-gray);
+            padding: var(--spacing-sm) 0 4px;
+            border-bottom: 1px solid var(--color-light-gray);
+            margin-bottom: 4px;
+        }
+
+        .conversation-item {
+            padding: 9px 10px;
+            background: var(--color-background);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1px solid transparent;
+            margin-bottom: 4px;
+        }
+
+        .conversation-item:hover {
+            border-color: var(--color-primary);
+            background: rgba(78, 205, 196, 0.04);
+        }
+
+        .conversation-item.active {
+            border-color: var(--color-primary);
+            background: rgba(78, 205, 196, 0.08);
+        }
+
+        .conversation-title {
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 3px;
+            color: var(--color-dark);
+        }
+
+        .conversation-meta {
+            font-size: 11px;
+            color: var(--color-gray);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .conv-msg-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            background: var(--color-light-gray);
+            border-radius: 10px;
+            padding: 1px 6px;
+            font-size: 10px;
+        }
+
+        /* ── Chat header title ────────────────────────────────────────── */
+        .chat-title-row {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        #chatTitle {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 600px;
+        }
+
+        .viewing-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffc107;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Chat Container -->
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <div class="chat-sidebar">
+            <div class="sidebar-header">
+                <h3><i class="ph ph-clock-counter-clockwise"></i> Conversations</h3>
+                <button class="new-chat-btn" onclick="createNewChat()" title="Start a new chat">
+                    <i class="ph ph-plus"></i>
+                </button>
+            </div>
+            <div id="conversationList" style="flex: 1; overflow-y: auto;">
+                <div class="empty-state" style="padding: var(--spacing-md);">
+                    <p style="font-size: var(--font-size-sm);">Loading conversations...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat -->
+        <div class="chat-main">
+            <!-- Header -->
+            <div class="chat-header">
+                <div class="chat-title-row">
+                    <h3 id="chatTitle">Select a scope to start</h3>
+                    <span id="viewingBadge" class="viewing-badge" style="display:none;">
+                        <i class="ph ph-eye"></i> Viewing history
+                    </span>
+                </div>
+                <p id="chatSubtitle" style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions about your notes, subjects, or groups</p>
+            </div>
+
+            <!-- Messages -->
+            <div class="chat-messages" id="messagesContainer">
+                <div class="empty-state">
+                    <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);"><i
+                            class="ph ph-chat-circle-dots"></i></div>
+                    <p>Select a scope (Group/Subject/Note) to begin asking questions</p>
+                </div>
+            </div>
+
+            <!-- Input -->
+            <div class="chat-input-area">
+                <!-- AI Mode Selector -->
+                <div class="ai-mode-bar">
+                    <span class="mode-label-text">Mode:</span>
+                    <button class="mode-pill" data-mode="quick" onclick="setAiMode('quick')" title="One concise sentence from source notes">
+                        <i class="ph ph-lightning"></i> Quick
+                    </button>
+                    <button class="mode-pill" data-mode="quick_point" onclick="setAiMode('quick_point')" title="Key points as a brief list">
+                        <i class="ph ph-list-bullets"></i> Quick Points
+                    </button>
+                    <button class="mode-pill active" data-mode="elaboration" onclick="setAiMode('elaboration')" title="Clear, thorough explanation">
+                        <i class="ph ph-lightbulb"></i> Elaborate
+                    </button>
+                    <button class="mode-pill" data-mode="elaboration_point" onclick="setAiMode('elaboration_point')" title="Thorough explanation in structured bullet points">
+                        <i class="ph ph-list-numbers"></i> Detailed Points
+                    </button>
+                    <button class="mode-pill" data-mode="simple" onclick="setAiMode('simple')" title="Plain language, no jargon">
+                        <i class="ph ph-text-a-underline"></i> Simple Terms
+                    </button>
+                    <button class="mode-pill" data-mode="eli5" onclick="setAiMode('eli5')" title="Explain like I'm 5 years old">
+                        <i class="ph ph-smiley"></i> ELI5
+                    </button>
+                </div>
+
+                <!-- Context + Scope -->
+                <div class="scope-selection">
+                    <span style="font-size: var(--font-size-sm); color: var(--color-gray);">Context:</span>
+                    <button class="btn btn-secondary btn-small"
+                        style="border-radius: var(--radius-full); padding: 4px 12px; font-size: var(--font-size-xs);"
+                        onclick="openScopeModal()">
+                        <i class="ph ph-target"></i> <span id="scopeLabel">Select Note/Subject/Group</span>
+                    </button>
+                </div>
+
+                <div class="chat-input-form">
+                    <input type="text" id="messageInput" placeholder="Ask a question about your notes..." disabled>
+                    <button type="button" id="sendBtn" class="btn btn-primary" disabled onclick="sendMessage()"><i
+                            class="ph ph-paper-plane-right"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scope Selection Modal -->
+    <div id="scopeModal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <h3>Select Chat Scope</h3>
+            <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray); font-size: var(--font-size-sm);">
+                Choose the context the AI should search to answer your questions.</p>
+
+            <div style="margin-bottom: var(--spacing-md);">
+                <label
+                    style="display: block; margin-bottom: var(--spacing-xs); font-weight: 500; font-size: var(--font-size-sm);">Group</label>
+                <select id="groupSelect"
+                    style="width: 100%; padding: var(--spacing-sm); border-radius: var(--radius-md); border: 1px solid var(--color-light-gray);"
+                    onchange="onGroupChange()">
+                    <option value="">-- All Groups --</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: var(--spacing-md);">
+                <label
+                    style="display: block; margin-bottom: var(--spacing-xs); font-weight: 500; font-size: var(--font-size-sm);">Subject</label>
+                <select id="subjectSelect"
+                    style="width: 100%; padding: var(--spacing-sm); border-radius: var(--radius-md); border: 1px solid var(--color-light-gray);"
+                    onchange="onSubjectChange()" disabled>
+                    <option value="">-- Entire Group (Select Group First) --</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: var(--spacing-lg);">
+                <label
+                    style="display: block; margin-bottom: var(--spacing-xs); font-weight: 500; font-size: var(--font-size-sm);">Note</label>
+                <select id="noteSelect"
+                    style="width: 100%; padding: var(--spacing-sm); border-radius: var(--radius-md); border: 1px solid var(--color-light-gray);"
+                    disabled onchange="onNoteChange()">
+                    <option value="">-- Entire Subject (Select Subject First) --</option>
+                </select>
+            </div>
+
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-primary" id="confirmScopeBtn" onclick="confirmScope()"
+                    disabled>Confirm Selection</button>
+                <button type="button" class="btn btn-secondary" onclick="closeScopeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        const token = localStorage.getItem('token');
+
+        // ── State ────────────────────────────────────────────────────────────
+        let conversationMessages = [];   // Array of {role, content, time, ...} for current view
+        let conversations = [];          // List of ConversationSummary from API
+        let currentConversationId = null;// UUID of the active conversation (null = new)
+        let isViewingHistory = false;    // true when browsing a past conversation (read-only)
+
+        let allGroups = [];
+        let allSubjects = [];
+        let allLectures = [];
+
+        let currentScope = { type: null, id: null, title: 'Select a scope to start' };
+        let currentAiMode = localStorage.getItem('chatAiMode') || 'elaboration';
+
+        // Modal state
+        let tempGroupId = null;
+        let tempSubjectId = null;
+        let tempNoteId = null;
+
+        // ── Persistence helpers ───────────────────────────────────────────
+        function loadSavedScope() {
+            const saved = localStorage.getItem('chatScope');
+            if (saved) { try { return JSON.parse(saved); } catch(e) {} }
+            return null;
+        }
+
+        function saveScopeToStorage(scope) {
+            localStorage.setItem('chatScope', JSON.stringify(scope));
+        }
+
+        // ── UUID generator (fallback for older browsers) ──────────────────
+        function generateUUID() {
+            if (crypto && crypto.randomUUID) return crypto.randomUUID();
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        }
+
+        // ── AI Mode helpers ───────────────────────────────────────────────
+        const MODE_META = {
+            quick:             { label: 'Quick Answer',    icon: 'ph-lightning' },
+            quick_point:       { label: 'Quick Points',    icon: 'ph-list-bullets' },
+            elaboration:       { label: 'Elaborate',       icon: 'ph-lightbulb' },
+            elaboration_point: { label: 'Detailed Points', icon: 'ph-list-numbers' },
+            simple:            { label: 'Simple Terms',    icon: 'ph-text-a-underline' },
+            eli5:              { label: 'ELI5',            icon: 'ph-smiley' },
+        };
+
+        function setAiMode(mode) {
+            currentAiMode = mode;
+            document.querySelectorAll('.mode-pill').forEach(p => {
+                p.classList.toggle('active', p.dataset.mode === mode);
+            });
+            localStorage.setItem('chatAiMode', mode);
+        }
+
+        // Apply saved mode on load
+        function applySavedMode() {
+            setAiMode(currentAiMode);
+        }
+
+        // ── Bootstrap ─────────────────────────────────────────────────────
+        window.addEventListener('load', () => {
+            if (!token) { window.location.href = 'index.html'; return; }
+            applySavedMode();
+            loadData();
+            setupMessageInput();
+        });
+
+        async function loadData() {
+            try {
+                const [gRes, sRes, lRes, cRes] = await Promise.all([
+                    fetch('/groups',           { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch('/subjects',         { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch('/lectures',         { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch('/chat/conversations', { headers: { 'Authorization': `Bearer ${token}` } }),
+                ]);
+
+                if (gRes.ok) allGroups    = await gRes.json();
+                if (sRes.ok) allSubjects  = await sRes.json();
+                if (lRes.ok) allLectures  = await lRes.json();
+                if (cRes.ok) conversations = await cRes.json();
+
+                renderConversationList();
+                populateGroupSelect();
+
+                // URL param pre-selection
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlNoteId = urlParams.get('lecture_id') || urlParams.get('note_id');
+                if (urlNoteId) {
+                    const note = allLectures.find(l => l.id == urlNoteId);
+                    if (note) { setScope('note', note.id, `Note: ${note.title}`); }
+                    else        { openScopeModal(); }
+                } else {
+                    const savedScope = loadSavedScope();
+                    if (savedScope && savedScope.type && savedScope.id) {
+                        let exists = false;
+                        if (savedScope.type === 'note')    exists = allLectures.some(l => l.id == savedScope.id);
+                        if (savedScope.type === 'subject') exists = allSubjects.some(s => s.id == savedScope.id);
+                        if (savedScope.type === 'group')   exists = allGroups.some(g => g.id == savedScope.id);
+                        if (exists) { setScope(savedScope.type, savedScope.id, savedScope.title); }
+                        else        { localStorage.removeItem('chatScope'); openScopeModal(); }
+                    } else {
+                        openScopeModal();
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading data', e);
+                document.getElementById('conversationList').innerHTML =
+                    `<p style="color:var(--color-error);padding:var(--spacing-md);text-align:center;">Failed to load conversations.</p>`;
+            }
+        }
+
+        // ── Scope Modal ───────────────────────────────────────────────────
+        function openScopeModal() {
+            document.getElementById('scopeModal').classList.add('active');
+            document.getElementById('groupSelect').value = '';
+            document.getElementById('subjectSelect').value = '';
+            document.getElementById('subjectSelect').disabled = true;
+            document.getElementById('subjectSelect').innerHTML = '<option value="">-- Entire Group (Select Group First) --</option>';
+            document.getElementById('noteSelect').value = '';
+            document.getElementById('noteSelect').disabled = true;
+            document.getElementById('noteSelect').innerHTML = '<option value="">-- Entire Subject (Select Subject First) --</option>';
+            checkConfirmBtn();
+        }
+
+        function closeScopeModal() {
+            document.getElementById('scopeModal').classList.remove('active');
+        }
+
+        function populateGroupSelect() {
+            const select = document.getElementById('groupSelect');
+            select.innerHTML = '<option value="">-- Select a Group --</option>';
+            allGroups.forEach(g => { select.innerHTML += `<option value="${g.id}">${g.name}</option>`; });
+        }
+
+        function onGroupChange() {
+            tempGroupId = document.getElementById('groupSelect').value;
+            const subSelect  = document.getElementById('subjectSelect');
+            const noteSelect = document.getElementById('noteSelect');
+            if (tempGroupId) {
+                subSelect.disabled = false;
+                subSelect.innerHTML = '<option value="">-- Entire Group --</option>';
+                allSubjects.filter(s => s.group_id == tempGroupId)
+                           .forEach(s => { subSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+            } else {
+                subSelect.disabled = true;
+                subSelect.innerHTML = '<option value="">-- Entire Group (Select Group First) --</option>';
+            }
+            noteSelect.disabled = true;
+            noteSelect.innerHTML = '<option value="">-- Entire Subject (Select Subject First) --</option>';
+            checkConfirmBtn();
+        }
+
+        function onSubjectChange() {
+            tempSubjectId = document.getElementById('subjectSelect').value;
+            const noteSelect = document.getElementById('noteSelect');
+            if (tempSubjectId) {
+                noteSelect.disabled = false;
+                noteSelect.innerHTML = '<option value="">-- Entire Subject --</option>';
+                allLectures.filter(l => l.subject_id == tempSubjectId)
+                           .forEach(n => { noteSelect.innerHTML += `<option value="${n.id}">${n.title}</option>`; });
+            } else {
+                noteSelect.disabled = true;
+                noteSelect.innerHTML = '<option value="">-- Entire Subject (Select Subject First) --</option>';
+            }
+            checkConfirmBtn();
+        }
+
+        function onNoteChange() {
+            tempNoteId = document.getElementById('noteSelect').value;
+            checkConfirmBtn();
+        }
+
+        function checkConfirmBtn() {
+            const grp = document.getElementById('groupSelect').value;
+            const sub = document.getElementById('subjectSelect').value;
+            const nte = document.getElementById('noteSelect').value;
+            document.getElementById('confirmScopeBtn').disabled = !(grp || sub || nte);
+        }
+
+        function confirmScope() {
+            const noteId  = document.getElementById('noteSelect').value;
+            const subId   = document.getElementById('subjectSelect').value;
+            const grpId   = document.getElementById('groupSelect').value;
+            if (noteId) {
+                const note = allLectures.find(l => l.id == noteId);
+                setScope('note', noteId, `Note: ${note ? note.title : 'Unknown'}`);
+            } else if (subId) {
+                const sub = allSubjects.find(s => s.id == subId);
+                setScope('subject', subId, `Subject: ${sub ? sub.name : 'Unknown'}`);
+            } else if (grpId) {
+                const grp = allGroups.find(g => g.id == grpId);
+                setScope('group', grpId, `Group: ${grp ? grp.name : 'Unknown'}`);
+            }
+            closeScopeModal();
+        }
+
+        function setScope(type, id, title) {
+            currentScope = { type, id, title };
+            saveScopeToStorage(currentScope);
+            document.getElementById('scopeLabel').textContent = title;
+            document.getElementById('messageInput').disabled = false;
+            document.getElementById('sendBtn').disabled = false;
+
+            // Start a fresh conversation (don't wipe messages if already viewing one)
+            if (!isViewingHistory) {
+                currentConversationId = null;
+                conversationMessages = [];
+                document.getElementById('chatTitle').textContent = title;
+                document.getElementById('viewingBadge').style.display = 'none';
+                document.getElementById('chatSubtitle').textContent =
+                    'Ask questions about your notes, subjects, or groups';
+                displayMessages();
+            }
+            document.getElementById('messageInput').focus();
+        }
+
+        function createNewChat() {
+            currentScope = { type: null, id: null, title: 'New Chat' };
+            currentConversationId = null;
+            conversationMessages = [];
+            isViewingHistory = false;
+            document.getElementById('chatTitle').textContent = 'New Chat';
+            document.getElementById('chatSubtitle').textContent = 'Ask questions about your notes, subjects, or groups';
+            document.getElementById('viewingBadge').style.display = 'none';
+            document.getElementById('scopeLabel').textContent = 'Select Note/Subject/Group';
+            document.getElementById('messageInput').disabled = true;
+            document.getElementById('sendBtn').disabled = true;
+            document.getElementById('messageInput').value = '';
+            // deselect sidebar
+            document.querySelectorAll('.conversation-item').forEach(el => el.classList.remove('active'));
+            displayMessages();
+            openScopeModal();
+        }
+
+        function setupMessageInput() {
+            document.getElementById('messageInput').addEventListener('keypress', e => {
+                if (e.key === 'Enter') sendMessage();
+            });
+        }
+
+        // ── Send Message ──────────────────────────────────────────────────
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message || !currentScope.id) return;
+
+            // Exit history view mode — user is continuing/adding a message
+            isViewingHistory = false;
+            document.getElementById('viewingBadge').style.display = 'none';
+
+            // Generate conversation ID if this is a new chat
+            if (!currentConversationId) {
+                currentConversationId = generateUUID();
+            }
+
+            // Add user message to local state
+            conversationMessages.push({ role: 'user', content: message, time: new Date(), ai_mode: currentAiMode });
+            input.value = '';
+            displayMessages();
+
+            // Loading bubble
+            conversationMessages.push({
+                role: 'ai', loading: true,
+                content: '<div class="loading-message"><span class="spinner"><i class="ph-spinner"></i></span> Thinking…</div>',
+                time: new Date()
+            });
+            displayMessages();
+
+            const payload = {
+                message,
+                ai_mode: currentAiMode,
+                conversation_id: currentConversationId,
+            };
+            if (currentScope.type === 'note')    payload.lecture_id  = parseInt(currentScope.id);
+            else if (currentScope.type === 'subject') payload.subject_id  = parseInt(currentScope.id);
+            else if (currentScope.type === 'group')   payload.group_id    = parseInt(currentScope.id);
+
+            try {
+                const resp = await fetch(`${API_URL}/chat/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payload)
+                });
+
+                conversationMessages.pop(); // remove loading
+
+                if (resp.ok) {
+                    const data = await resp.json();
+
+                    conversationMessages.push({
+                        role: 'ai',
+                        content: data.response,
+                        time: new Date(),
+                        sources: data.sources,
+                        ai_model: data.ai_model,
+                        ai_mode: data.ai_mode || currentAiMode,
+                        detailed_sources: data.detailed_sources || [],
+                        thinking: data.thinking || null,
+                        timings: data.timings,
+                    });
+
+                    // Update conversation ID (backend may have confirmed it)
+                    if (data.conversation_id) currentConversationId = data.conversation_id;
+
+                    // Update chat header title with AI-derived title
+                    if (data.conversation_title) {
+                        document.getElementById('chatTitle').textContent = data.conversation_title;
+                        document.getElementById('chatSubtitle').textContent =
+                            `${currentScope.title}  ·  ${conversationMessages.filter(m => m.role === 'user').length} question(s)`;
+                    }
+
+                    fetchConversations(); // refresh sidebar
+                } else {
+                    conversationMessages.push({
+                        role: 'ai',
+                        content: `Sorry, I encountered an error (${resp.status}). Please try again.`,
+                        time: new Date()
+                    });
+                }
+            } catch (err) {
+                conversationMessages.pop();
+                conversationMessages.push({ role: 'ai', content: 'Network error: ' + err.message, time: new Date() });
+            }
+
+            displayMessages();
+        }
+
+        // ── Display Messages ──────────────────────────────────────────────
+        function displayMessages() {
+            const container = document.getElementById('messagesContainer');
+
+            if (conversationMessages.length === 0) {
+                const scopeLabel = isViewingHistory ? 'this conversation' : (currentScope.title || 'your notes');
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div style="font-size:var(--font-size-3xl);margin-bottom:var(--spacing-lg);">
+                            <i class="ph ph-chat-circle-dots"></i></div>
+                        <p>Ask a question about ${scopeLabel}</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = conversationMessages.map((msg, idx) => {
+                let contentHTML = msg.content;
+                if (msg.role === 'ai' && !msg.loading && typeof marked !== 'undefined') {
+                    try { contentHTML = marked.parse(contentHTML); } catch(e) {}
+                }
+
+                // AI mode badge (on AI messages only)
+                let modeBadgeHTML = '';
+                if (msg.role === 'ai' && !msg.loading && msg.ai_mode) {
+                    const meta = MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
+                    modeBadgeHTML = `<div class="ai-mode-badge"><i class="ph ${meta.icon}"></i> ${meta.label}</div>`;
+                }
+
+                // Thinking section
+                let thinkingHTML = '';
+                if (msg.thinking) {
+                    thinkingHTML = `
+                        <div class="thinking-section">
+                            <div class="thinking-header" onclick="toggleThinking(this)">
+                                <span class="thinking-icon"><i class="ph ph-caret-right"></i></span>
+                                <span>🧠 AI Thinking Process</span>
+                            </div>
+                            <div class="thinking-content">
+                                ${msg.thinking.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+                            </div>
+                        </div>`;
+                }
+
+                // Sources & metadata
+                let sourcesHTML = '';
+                let metadataHTML = '';
+                const hasSources = msg.detailed_sources && msg.detailed_sources.length > 0;
+
+                if (hasSources || msg.ai_model || msg.timings) {
+                    const msgId = 'msg-' + idx;
+                    let highestMatch = 0;
+                    if (hasSources) {
+                        highestMatch = Math.max(...msg.detailed_sources.map(s => s.score || 0));
+                        const sourceLinks = msg.detailed_sources.map((src, si) => {
+                            const lectureId = src.lecture_id || currentScope.id;
+                            const score = src.score ? ` (${src.score}% match)` : '';
+                            const preview = src.text_preview || 'View reference';
+                            return `
+                                <div class="source-item" onclick="openSourceReference(${lectureId}, ${src.position || 0})"
+                                     style="cursor:pointer;padding:6px 10px;margin:4px 0;background:white;border:1px solid #e0e0e0;border-radius:4px;transition:all 0.2s;font-size:11px;">
+                                    <div style="font-weight:600;color:#1976d2;margin-bottom:2px;">
+                                        <i class="ph ph-file-text"></i> Reference ${si + 1}${score}
+                                    </div>
+                                    <div style="color:#666;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                        "${preview}"
+                                    </div>
+                                </div>`;
+                        }).join('');
+                        sourcesHTML = `<div class="sources-section" style="margin-top:10px;padding:8px;background:#f9f9f9;border-radius:4px;">${sourceLinks}</div>`;
+                    }
+
+                    const aiModel = msg.ai_model || null;
+                    const t = msg.timings || null;
+                    let infoContent = `
+                        <div style="margin-top:10px;padding:12px;background:#f9f9f9;border-radius:4px;font-size:12px;">
+                            <div style="margin-bottom:${t ? '10px' : '0'}">
+                                <div style="font-weight:600;color:#333;margin-bottom:4px;"><i class="ph ph-robot"></i> Model: ${aiModel || '<span style="color:#aaa">Unknown</span>'}</div>
+                            </div>
+                            ${t ? `
+                            <div style="border-top:1px solid #e0e0e0;padding-top:8px;">
+                                <div style="font-weight:600;color:#333;margin-bottom:6px;"><i class="ph ph-hourglass"></i> Timing</div>
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;">
+                                    <span>Retrieval:</span><span style="color:var(--color-primary);font-weight:600;">${t.retrieval_ms}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;">
+                                    <span>Model:</span><span style="color:var(--color-primary);font-weight:600;">${t.model_ms}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;">
+                                    <span>Total:</span><span style="color:var(--color-primary);font-weight:600;">${t.total_ms}ms</span>
+                                </div>
+                            </div>` : ''}
+                        </div>`;
+
+                    const refLabel = hasSources ? `Reference (${highestMatch}%)` : 'Reference';
+                    metadataHTML = `
+                        <div class="message-metadata">
+                            <div class="metadata-toggle" onclick="toggleMetadata('${msgId}-ref','${msgId}')">
+                                <span>${refLabel}</span>
+                                <span class="reference-divider">|</span>
+                                <button class="info-btn" onclick="toggleMetadata('${msgId}-info','${msgId}',event)">Info</button>
+                            </div>
+                            <div class="metadata-content" id="${msgId}-ref-content">${sourcesHTML}</div>
+                            <div class="metadata-content" id="${msgId}-info-content">${infoContent}</div>
+                        </div>`;
+                }
+
+                const timeStr = (msg.time instanceof Date ? msg.time : new Date(msg.time))
+                                    .toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+
+                return `
+                <div class="message ${msg.role}">
+                    <div class="message-content">
+                        ${modeBadgeHTML}
+                        ${thinkingHTML}
+                        ${contentHTML}
+                        ${metadataHTML}
+                    </div>
+                    <div class="message-time">${timeStr}</div>
+                </div>`;
+            }).join('');
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function toggleThinking(header) {
+            header.querySelector('.thinking-icon').classList.toggle('expanded');
+            header.nextElementSibling.classList.toggle('expanded');
+        }
+
+        // ── Conversation Sidebar ──────────────────────────────────────────
+        async function fetchConversations() {
+            try {
+                const res = await fetch('/chat/conversations', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) { conversations = await res.json(); renderConversationList(); }
+            } catch(e) { console.error('fetchConversations error', e); }
+        }
+
+        function renderConversationList() {
+            const list = document.getElementById('conversationList');
+            if (!conversations || conversations.length === 0) {
+                list.innerHTML = `<div class="empty-state" style="padding:var(--spacing-md);">
+                    <p style="font-size:var(--font-size-sm);">No conversations yet</p></div>`;
+                return;
+            }
+
+            // Group by date
+            const today     = new Date(); today.setHours(0,0,0,0);
+            const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+            const weekAgo   = new Date(today); weekAgo.setDate(today.getDate() - 7);
+
+            const groups = { 'Today': [], 'Yesterday': [], 'This Week': [], 'Earlier': [] };
+            conversations.forEach(c => {
+                const d = new Date(c.last_message_at); d.setHours(0,0,0,0);
+                if (d >= today)             groups['Today'].push(c);
+                else if (d >= yesterday)    groups['Yesterday'].push(c);
+                else if (d >= weekAgo)      groups['This Week'].push(c);
+                else                        groups['Earlier'].push(c);
+            });
+
+            const scopeIcon = { note: 'ph-file-text', subject: 'ph-books', group: 'ph-folder-open' };
+            const scopeLabel = { note: 'Note', subject: 'Subject', group: 'Group' };
+
+            let html = '';
+            for (const [groupName, items] of Object.entries(groups)) {
+                if (!items.length) continue;
+                html += `<div class="date-group-label">${groupName}</div>`;
+                items.forEach(c => {
+                    const isActive = c.conversation_id === currentConversationId;
+                    const d = new Date(c.last_message_at);
+                    const dateStr = d.toLocaleDateString([], { month:'short', day:'numeric' });
+                    const icon = scopeIcon[c.scope_type] || 'ph-chat-circle';
+                    const scope = scopeLabel[c.scope_type] || '';
+                    const msgWord = c.message_count === 1 ? 'msg' : 'msgs';
+                    html += `
+                        <div class="conversation-item${isActive ? ' active' : ''}"
+                             onclick="loadConversation('${c.conversation_id}')">
+                            <div class="conversation-title" title="${formatEscaped(c.title)}">${formatEscaped(c.title)}</div>
+                            <div class="conversation-meta">
+                                <span><i class="ph ${icon}"></i> ${scope}</span>
+                                <span style="display:flex;align-items:center;gap:5px;">
+                                    <span class="conv-msg-count"><i class="ph ph-chat-dots"></i> ${c.message_count} ${msgWord}</span>
+                                    <span>${dateStr}</span>
+                                </span>
+                            </div>
+                        </div>`;
+                });
+            }
+            list.innerHTML = html;
+        }
+
+        async function loadConversation(convId) {
+            // Mark as active in sidebar
+            document.querySelectorAll('.conversation-item').forEach(el => {
+                el.classList.toggle('active', el.onclick && el.getAttribute('onclick').includes(convId));
+            });
+
+            try {
+                const res = await fetch(`/chat/conversations/${convId}/messages`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) { console.error('Failed to load conversation'); return; }
+                const msgs = await res.json();
+
+                currentConversationId = convId;
+                isViewingHistory = true;
+
+                // Flatten Q&A pairs into the messages array
+                conversationMessages = [];
+                msgs.forEach(m => {
+                    conversationMessages.push({
+                        role: 'user',
+                        content: m.message,
+                        time: new Date(m.created_at),
+                        ai_mode: m.ai_mode,
+                    });
+                    conversationMessages.push({
+                        role: 'ai',
+                        content: m.response,
+                        time: new Date(m.created_at),
+                        ai_mode: m.ai_mode,
+                        ai_model: m.ai_model || null,
+                        sources: m.sources || [],
+                        detailed_sources: m.detailed_sources || [],
+                    });
+                });
+
+                // Restore scope from first message
+                const first = msgs[0];
+                let scopeType = null, scopeId = null, scopeTitle = 'Past Conversation';
+                if (first.lecture_id) {
+                    scopeType = 'note'; scopeId = first.lecture_id;
+                    const l = allLectures.find(x => x.id == first.lecture_id);
+                    if (l) scopeTitle = `Note: ${l.title}`;
+                } else if (first.subject_id) {
+                    scopeType = 'subject'; scopeId = first.subject_id;
+                    const s = allSubjects.find(x => x.id == first.subject_id);
+                    if (s) scopeTitle = `Subject: ${s.name}`;
+                } else if (first.group_id) {
+                    scopeType = 'group'; scopeId = first.group_id;
+                    const g = allGroups.find(x => x.id == first.group_id);
+                    if (g) scopeTitle = `Group: ${g.name}`;
+                }
+
+                currentScope = { type: scopeType, id: scopeId, title: scopeTitle };
+                saveScopeToStorage(currentScope);
+                document.getElementById('scopeLabel').textContent = scopeTitle;
+                document.getElementById('messageInput').disabled = !scopeId;
+                document.getElementById('sendBtn').disabled = !scopeId;
+
+                // Show conversation title (not scope title) in header
+                const convTitle = first.conversation_title || scopeTitle;
+                document.getElementById('chatTitle').textContent = convTitle;
+                document.getElementById('viewingBadge').style.display = 'inline-flex';
+                document.getElementById('chatSubtitle').textContent =
+                    `${scopeTitle}  ·  ${msgs.length} question(s)  ·  Started ${new Date(first.created_at).toLocaleDateString()}`;
+
+                displayMessages();
+            } catch(e) {
+                console.error('loadConversation error', e);
+            }
+        }
+
+        // ── Utility ───────────────────────────────────────────────────────
+        function formatEscaped(str) {
+            return (str || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function openSourceReference(lectureId, position) {
+            if (!lectureId) { alert('Source reference not available'); return; }
+            window.open(`mynotes.html?note_id=${lectureId}#pos-${position}`, '_blank');
+        }
+
+        function toggleMetadata(sectionId, msgId, event) {
+            if (event) event.stopPropagation();
+            const content = document.getElementById(sectionId + '-content');
+            if (!content) return;
+            const isExpanded = content.classList.contains('expanded');
+            if (!isExpanded) {
+                const other = sectionId.includes('-ref') ? msgId + '-info' : msgId + '-ref';
+                const otherEl = document.getElementById(other + '-content');
+                if (otherEl) otherEl.classList.remove('expanded');
+            }
+            content.classList.toggle('expanded');
+        }
+
+    </script>
+
+</body>
+
+</html>

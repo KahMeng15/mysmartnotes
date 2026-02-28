@@ -1,707 +1,510 @@
 # 🏗️ System Architecture
 
-Comprehensive architecture documentation for MySmartNotes microservices-based application.
+Simplified architecture documentation for MySmartNotes - optimized for personal/small team use.
 
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
 2. [Tech Stack](#tech-stack)
-3. [Microservices](#microservices)
+3. [Application Structure](#application-structure)
 4. [Data Flow](#data-flow)
-5. [Communication Patterns](#communication-patterns)
-6. [Scaling Strategy](#scaling-strategy)
+5. [Background Task Processing](#background-task-processing)
+6. [Deployment](#deployment)
 
 ---
 
 ## Architecture Overview
 
-MySmartNotes uses a **microservices architecture** designed for scalability, maintainability, and independent deployment. The system is decomposed into specialized services that communicate through well-defined APIs.
+MySmartNotes uses a **simplified monolithic architecture** designed for easy deployment and maintenance on a single Docker container. All components run in one process with background tasks handled via threading and async/await.
 
 ### Design Principles
 
-1. **Separation of Concerns** - Each service has a single, well-defined responsibility
-2. **Loose Coupling** - Services communicate via APIs and message queues
-3. **Async Processing** - Heavy tasks run in background workers
-4. **Horizontal Scalability** - Add more instances to handle increased load
-5. **Data Isolation** - Each service manages its own data domain
-6. **Fault Tolerance** - Service failures don't cascade
+1. **Simplicity** - Single codebase, easy to understand and modify
+2. **Self-Contained** - All code runs in one Docker container
+3. **Lightweight** - Minimal external dependencies (SQLite, no Ollama)
+4. **External APIs** - Leverage cloud services for AI (Gemini, Hugging Face)
+5. **WebSocket Support** - Real-time updates with simple pub/sub
+6. **Single-File Startup** - Run `python main.py` and everything starts
 
 ### High-Level Architecture
 
 ```
-┌──────────────────── CLIENT LAYER ────────────────────┐
-│                                                        │
-│  ┌──────────────┐         ┌──────────────┐          │
-│  │   Browser    │         │  Mobile App  │          │
-│  │  (Streamlit) │         │   (Future)   │          │
-│  └──────┬───────┘         └──────┬───────┘          │
-│         │                         │                   │
-└─────────┼─────────────────────────┼──────────────────┘
-          │                         │
-          └─────────┬───────────────┘
-                    │
-┌───────────────────▼──── GATEWAY LAYER ────────────────┐
-│                                                         │
-│              ┌────────────────────┐                    │
-│              │  nginx/Proxy       │                    │
-│              │  - Load Balancing  │                    │
-│              │  - SSL/TLS         │                    │
-│              │  - Static Files    │                    │
-│              └─────────┬──────────┘                    │
-│                        │                                │
-└────────────────────────┼────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┐
-         │               │               │
-┌────────▼────┐  ┌───────▼─────┐  ┌─────▼────────┐
-│  Streamlit  │  │   FastAPI   │  │  WebSocket   │
-│  Frontend   │  │   Gateway   │  │   Handler    │
-│  (2-N inst) │  │  (2-N inst) │  │              │
-└─────────────┘  └───────┬─────┘  └──────────────┘
-                         │
-┌────────────────────────▼──── SERVICE LAYER ────────────┐
-│                                                         │
-│              ┌────────────────────┐                    │
-│              │  Redis             │                    │
-│              │  - Message Broker  │                    │
-│              │  - Cache           │                    │
-│              │  - Pub/Sub         │                    │
-│              └─────────┬──────────┘                    │
-│                        │                                │
-│          ┌─────────────┼─────────────┐                │
-│          │             │             │                │
-│  ┌───────▼──────┐ ┌────▼────┐ ┌─────▼─────┐         │
-│  │ OCR Worker   │ │AI Worker│ │  Gen      │         │
-│  │ (2-N inst)   │ │(2-N inst)│ │  Worker   │         │
-│  │              │ │         │ │  (2-N inst)│         │
-│  └──────┬───────┘ └────┬────┘ └─────┬─────┘         │
-│         │              │            │                │
-└─────────┼──────────────┼────────────┼───────────────┘
-          │              │            │
-┌─────────▼──────────────▼────────────▼── DATA LAYER ──┐
-│                                                        │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-│  │PostgreSQL│  │ ChromaDB │  │  Ollama  │           │
-│  │(Metadata)│  │ (Vectors)│  │  (AI/LLM)│           │
-│  └──────────┘  └──────────┘  └──────────┘           │
-│                                                        │
-│  ┌──────────────────────────────────────┐            │
-│  │  Shared File Storage                 │            │
-│  │  /data/uploads, /data/generated      │            │
-│  └──────────────────────────────────────┘            │
-│                                                        │
-└────────────────────────────────────────────────────────┘
+┌────────────────── BROWSER ──────────────────┐
+│                                              │
+│  ┌──────────────────────────────────────┐  │
+│  │   HTML/JavaScript Frontend           │  │
+│  │   (Served from /static/)             │  │
+│  └────────┬─────────────────────────────┘  │
+│           │                                  │
+└───────────┼──────────────────────────────────┘
+            │
+     HTTP/WebSocket
+            │
+            ▼
+┌─────────────────────────────────────────────┐
+│                                             │
+│        FastAPI Application (Single Port)   │
+│                                             │
+│  ┌────────────────────────────────────┐   │
+│  │  REST API Routes                   │   │
+│  │  - /auth/* (login/register)        │   │
+│  │  - /api/subjects/*                 │   │
+│  │  - /api/lectures/*                 │   │
+│  │  - /api/documents/*                │   │
+│  │  - /api/chat                       │   │
+│  └────────────────────────────────────┘   │
+│                                             │
+│  ┌────────────────────────────────────┐   │
+│  │  WebSocket Handler (/ws)           │   │
+│  │  - Real-time progress updates      │   │
+│  │  - Live chat streaming             │   │
+│  └────────────────────────────────────┘   │
+│                                             │
+│  ┌────────────────────────────────────┐   │
+│  │  Background Task Queue             │   │
+│  │  - OCR processing                  │   │
+│  │  - Document generation             │   │
+│  │  - Scheduled tasks                 │   │
+│  │  (Runs in thread pool)             │   │
+│  └────────────────────────────────────┘   │
+│                                             │
+│  ┌────────────────────────────────────┐   │
+│  │  Database & Cache Layer            │   │
+│  │  - SQLite (file-based)             │   │
+│  │  - In-memory cache                 │   │
+│  │  - Vector embeddings (simple)      │   │
+│  └────────────────────────────────────┘   │
+│                                             │
+│  ┌────────────────────────────────────┐   │
+│  │  External Services                 │   │
+│  │  - Gemini API / Hugging Face       │   │
+│  │    (for AI/LLM)                    │   │
+│  │  - DuckDuckGo (web search)         │   │
+│  │  - File storage (uploads)          │   │
+│  └────────────────────────────────────┘   │
+│                                             │
+└─────────────────────────────────────────────┘
+            │
+            ▼
+    /data (Docker volume)
+    ├── app.db (SQLite)
+    ├── uploads/
+    ├── generated/
+    └── embeddings/
 ```
 
 ---
 
 ## Tech Stack
 
-### Frontend Layer
+### Backend
 
 | Technology | Purpose | Why Chosen |
 |------------|---------|------------|
-| **Streamlit** | Web UI framework | Rapid prototyping, Python-native, built-in components |
-| **nginx** | Reverse proxy | Load balancing, SSL termination, static file serving |
-| **WebSocket** | Real-time communication | Live progress updates, chat streaming |
+| **FastAPI** | Web framework | Async, WebSocket, auto-docs, minimal setup |
+| **Uvicorn** | ASGI server | Fast, single process, production-ready |
+| **Pydantic** | Data validation | Type safety, JSON schema generation |
+| **SQLite** | Database | Zero config, file-based, perfect for small apps |
+| **SQLAlchemy** | ORM | Simple model definitions, migrations |
 
-### API Gateway Layer
-
-| Technology | Purpose | Why Chosen |
-|------------|---------|------------|
-| **FastAPI** | REST API framework | Async support, auto-docs, validation, WebSocket support |
-| **Pydantic** | Data validation | Type safety, automatic validation, JSON schema |
-| **python-jose** | JWT authentication | Secure token-based auth |
-| **Uvicorn** | ASGI server | High performance, async support |
-
-### Worker Layer
+### Frontend
 
 | Technology | Purpose | Why Chosen |
 |------------|---------|------------|
-| **Celery** | Distributed task queue | Mature, scalable, supports multiple brokers |
-| **Redis** | Message broker | Fast, persistent, supports pub/sub |
-| **Flower** | Celery monitoring | Real-time task monitoring, web UI |
+| **HTML/CSS/JS** | User interface | Lightweight, served as static files |
+| **WebSocket** | Real-time updates | Live progress, streaming responses |
+| **Fetch API** | HTTP requests | Modern, built-in, no dependencies |
 
-### AI & Processing
+### Background Tasks
 
 | Technology | Purpose | Why Chosen |
 |------------|---------|------------|
-| **Ollama** | LLM inference | Local deployment, CPU-optimized, free |
-| **Llama 3** | Language model | Open-source, good performance, quantized versions |
-| **LayoutParser** | Document layout analysis | Detect figures vs text regions |
-| **Detectron2** | Computer vision | Figure detection, region classification |
-| **Tesseract** | OCR engine | Mature, accurate, free |
-| **pdf2image** | PDF conversion | Convert PDF pages to images |
+| **ThreadPoolExecutor** | Async task processing | Built-in, simple, no Redis needed |
+| **asyncio** | Concurrent processing | Python native, integrates with FastAPI |
+
+### Document Processing
+
+| Technology | Purpose | Why Chosen |
+|------------|---------|------------|
+| **pdf2image** | PDF → images | Extract pages for processing |
+| **Tesseract-OCR** | Text extraction | Accurate, free, open-source |
+| **Pillow** | Image manipulation | Crop, resize, process figures |
 | **python-pptx** | PowerPoint parsing | Extract content from presentations |
+| **python-docx** | Word generation | Create study guides |
+| **fpdf2** | PDF generation | Create quizzes and reports |
 
-### Data Layer
-
-| Technology | Purpose | Why Chosen |
-|------------|---------|------------|
-| **PostgreSQL** | Relational database | ACID compliance, concurrent access, mature |
-| **ChromaDB** | Vector database | Embeddings storage, semantic search |
-| **Redis** | Cache & pub/sub | In-memory speed, persistence support |
-| **SQLAlchemy** | ORM | Database abstraction, migrations |
-
-### Document Generation
+### AI & LLM
 
 | Technology | Purpose | Why Chosen |
 |------------|---------|------------|
-| **python-docx** | Word document creation | Full formatting control, free |
-| **fpdf** | PDF generation | Simple quizzes and reports |
-| **Pillow** | Image processing | Resize, crop, optimize images |
+| **Google Gemini API** | LLM & embeddings | Free tier, powerful, no local setup |
+| **Hugging Face API** | Alternative LLM | Optional alternative, inference API |
+| **sentence-transformers** | Local embeddings | Fast, runs on CPU, no API key |
+| **DuckDuckGo API** | Web search | No API key required, privacy-focused |
 
 ### Utilities
 
 | Technology | Purpose | Why Chosen |
 |------------|---------|------------|
-| **DuckDuckGo API** | Web search | Privacy-focused, no API key required |
-| **bcrypt** | Password hashing | Industry standard, secure |
-| **Python logging** | Application logging | Built-in, flexible configuration |
+| **bcrypt** | Password hashing | Secure, industry standard |
+| **PyJWT** | JWT tokens | Simple authentication |
+| **python-multipart** | File uploads | Handle multipart/form-data |
+| **python-dotenv** | Config management | Environment variables from .env |
 
 ---
 
-## Microservices
+## Application Structure
 
-### 1. Frontend Service
-
-**Technology:** Streamlit  
-**Instances:** 2-N (load balanced)  
-**Responsibilities:**
-- User interface rendering
-- API client communication
-- WebSocket client management
-- Session state management
-
-**Key Components:**
-- `app.py` - Main Streamlit application
-- `/pages` - Multi-page interface (Dashboard, Chat, Quiz, etc.)
-- `/components` - Reusable UI components (sidebar, panels)
-- `/utils` - API client, WebSocket client, helpers
-
-**Communication:**
-- HTTP requests to API Gateway
-- WebSocket connection for real-time updates
-- Session data stored in Redis (via API Gateway)
-
-**Scaling:**
-- Horizontal: Add more instances behind nginx
-- Load balancing: Round-robin or least-connections
-- Session affinity: Sticky sessions if needed
-
----
-
-### 2. API Gateway Service
-
-**Technology:** FastAPI  
-**Instances:** 2-N (load balanced)  
-**Responsibilities:**
-- Request authentication & authorization
-- Request routing and validation
-- WebSocket connection management
-- File upload handling
-- Rate limiting
-- API documentation (auto-generated)
-
-**Key Endpoints:**
-
-**Authentication:**
-- `POST /auth/register` - User registration
-- `POST /auth/login` - User login
-- `POST /auth/refresh` - Refresh access token
-- `POST /auth/logout` - Logout (invalidate tokens)
-
-**Subjects:**
-- `GET /subjects` - List all subjects
-- `POST /subjects` - Create new subject
-- `GET /subjects/{id}` - Get subject details
-- `PUT /subjects/{id}` - Update subject
-- `DELETE /subjects/{id}` - Delete subject
-
-**Lectures:**
-- `GET /subjects/{id}/lectures` - List lectures in subject
-- `POST /subjects/{id}/lectures/upload` - Upload lecture file
-- `GET /lectures/{id}` - Get lecture details
-- `PUT /lectures/{id}` - Update lecture metadata
-- `DELETE /lectures/{id}` - Delete lecture
-
-**Documents:**
-- `GET /lectures/{id}/documents` - List generated documents
-- `POST /documents/generate` - Generate new document
-- `GET /documents/{id}/download` - Download document
-
-**Chat:**
-- `WebSocket /ws/{user_id}` - Real-time chat
-- `POST /chat` - Send chat message (alternative to WebSocket)
-
-**Tasks:**
-- `GET /tasks/{task_id}` - Get task status
-- `DELETE /tasks/{task_id}` - Cancel task
-
-**Middleware Stack:**
-1. CORS - Cross-origin resource sharing
-2. Authentication - JWT verification
-3. Rate Limiting - Request throttling
-4. Logging - Request/response logging
-5. Error Handling - Centralized exception handling
-
-**Scaling:**
-- Horizontal: Add more instances
-- Stateless: No local state (uses Redis for sessions)
-- Load balancing: nginx round-robin
-
----
-
-### 3. OCR Worker Service
-
-**Technology:** Celery + Python  
-**Instances:** 2-N (task queue based)  
-**Queue:** `ocr` (high priority)  
-**Responsibilities:**
-- PDF/PPTX file processing
-- Layout detection (figures vs text)
-- Figure extraction and cropping
-- OCR text extraction
-- Text cleaning and preprocessing
-
-**Task:** `process_lecture(lecture_id, file_path)`
-
-**Processing Pipeline:**
+### Single FastAPI Application
 
 ```python
-1. Load file from storage
-   ↓
-2. Convert to images (300 DPI)
-   ↓
-3. For each page:
-   ├─ Run LayoutParser
-   ├─ Detect figure regions
-   ├─ Crop and save figures
-   ├─ Extract text from non-figure regions
-   └─ Clean and normalize text
-   ↓
-4. Queue AI Worker for embeddings
-   ↓
-5. Update database status
-   ↓
-6. Publish completion event
+# main.py
+from fastapi import FastAPI, WebSocket
+from fastapi.staticfiles import StaticFiles
+
+app = FastAPI()
+
+# Middleware & startup
+# - Database initialization
+# - Configuration loading
+# - Background task queue setup
+
+# API Routes (all in one app)
+# /auth/* - Authentication
+# /api/subjects/* - Subject management
+# /api/lectures/* - Lecture upload & processing
+# /api/documents/* - Generated documents
+# /api/chat - Chat interface
+# /ws - WebSocket for real-time updates
+
+# WebSocket connection manager
+# - Handles client connections
+# - Broadcasts task progress
+# - Streams chat responses
+
+# Background task queue
+# - ThreadPoolExecutor for background work
+# - Task status tracking
+# - Progress notifications
+
+# Serve static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 ```
 
-**Performance Characteristics:**
-- **CPU Bound:** Image processing, OCR, layout detection
-- **Concurrency:** 1-2 tasks per CPU core
-- **Memory:** ~500MB per task
-- **Duration:** ~5-10 seconds per page
+### Project Organization
 
-**Scaling:**
-- Add more worker instances
-- Increase worker concurrency (--concurrency flag)
-- Distribute across multiple machines
-
----
-
-### 4. AI Worker Service
-
-**Technology:** Celery + Python  
-**Instances:** 2-N (task queue based)  
-**Queue:** `ai` (medium priority)  
-**Responsibilities:**
-- Text embedding generation
-- RAG query processing
-- LLM response generation
-- Semantic search
-
-**Tasks:**
-
-**`embed_chunks(lecture_id, chunks)`**
-- Generate embeddings for text chunks
-- Store in ChromaDB with metadata
-- Batch processing for efficiency
-
-**`generate_response(query, context, use_web)`**
-- Embed query
-- Search ChromaDB for similar chunks
-- Optionally query web (DuckDuckGo)
-- Generate LLM response
-- Stream response chunks
-
-**Ollama Integration:**
-```python
-# Embedding generation
-embeddings = ollama.embeddings(
-    model="llama3:8b-instruct-q4_0",
-    prompt=text
-)
-
-# Response generation
-response = ollama.generate(
-    model="llama3:8b-instruct-q4_0",
-    prompt=formatted_prompt,
-    stream=True
-)
 ```
-
-**Performance Characteristics:**
-- **CPU/Memory Bound:** LLM inference
-- **Concurrency:** 2-4 tasks per worker (shared Ollama service)
-- **Memory:** ~2GB per Ollama instance
-- **Duration:** 1-30 seconds per query
-
-**Scaling:**
-- Add more worker instances (share same Ollama)
-- Multiple Ollama instances (if needed)
-- Prioritize interactive queries over batch jobs
-
----
-
-### 5. Generation Worker Service
-
-**Technology:** Celery + Python  
-**Instances:** 2-N (task queue based)  
-**Queue:** `generation` (low priority)  
-**Responsibilities:**
-- Cheat sheet generation (Word)
-- Quiz generation (PDF)
-- Flashcard generation (JSON)
-- Past paper answer generation
-
-**Tasks:**
-
-**`create_cheat_sheet(lecture_id, options)`**
-- Query ChromaDB for summarized content
-- Load cropped figures from storage
-- Generate Word document:
-  - 2-column layout
-  - Arial 9pt body, 11pt headings
-  - 0.5" margins
-  - Figures at 3.2" width
-- Save to `/data/generated/`
-
-**`create_quiz(lecture_id, options)`**
-- Extract key concepts from ChromaDB
-- Use LLM to generate questions
-- Format as PDF with fpdf
-- Include answer key
-
-**`create_flashcards(lecture_id, options)`**
-- Identify Q&A pairs from content
-- Generate flashcard JSON
-- Initialize SM-2 algorithm data
-
-**Performance Characteristics:**
-- **IO Bound:** File operations, database queries
-- **Concurrency:** 4-8 tasks per worker
-- **Memory:** ~200MB per task
-- **Duration:** 10-60 seconds per document
-
-**Scaling:**
-- Add more worker instances
-- High concurrency per worker (IO bound)
-
----
-
-### 6. Database Services
-
-#### PostgreSQL
-
-**Purpose:** Primary relational database  
-**Schema:** See [DATABASE.md](DATABASE.md)  
-**Tables:**
-- users, subjects, lectures
-- generated_documents, flashcards
-- share_links, study_sessions
-
-**Configuration:**
-```yaml
-# Production settings
-max_connections: 100
-shared_buffers: 256MB
-effective_cache_size: 1GB
-work_mem: 4MB
+/app
+├── main.py              # FastAPI app entry point
+├── config.py            # Configuration & environment variables
+├── requirements.txt     # Python dependencies
+│
+├── /routers
+│   ├── auth.py         # Authentication endpoints
+│   ├── subjects.py     # Subject CRUD
+│   ├── lectures.py     # Lecture upload & processing
+│   ├── documents.py    # Generated documents
+│   ├── chat.py         # Chat endpoint
+│   └── tasks.py        # Task status tracking
+│
+├── /models
+│   └── db.py           # SQLAlchemy models
+│
+├── /schemas
+│   └── schemas.py      # Pydantic models
+│
+├── /processing
+│   ├── ocr.py          # OCR processing
+│   ├── ai_client.py    # Gemini/HF API client
+│   ├── generators.py   # Document generation
+│   └── search.py       # Web search
+│
+├── /utils
+│   ├── db.py           # Database utilities
+│   ├── auth.py         # JWT utilities
+│   ├── tasks.py        # Task queue management
+│   └── websocket.py    # WebSocket utilities
+│
+├── /static
+│   ├── index.html      # Main page
+│   ├── style.css       # Styling
+│   ├── app.js          # Frontend logic
+│   └── /assets         # Images, icons
+│
+├── /data (mounted volume)
+│   ├── app.db          # SQLite database
+│   ├── /uploads        # User uploaded files
+│   ├── /generated      # Generated documents
+│   └── /embeddings     # Vector embeddings cache
+│
+└── Dockerfile          # Container configuration
 ```
-
-**Backup Strategy:**
-- Daily full backup (pg_dump)
-- Point-in-time recovery (WAL archiving)
-- Retention: 30 days
-
-**Scaling:**
-- Read replicas for query distribution
-- Connection pooling (PgBouncer)
-- Partitioning for large tables
-
-#### ChromaDB
-
-**Purpose:** Vector database for embeddings  
-**Collections:** One per subject  
-**Configuration:**
-```python
-client = chromadb.PersistentClient(
-    path="/data/chroma_db",
-    settings=Settings(
-        anonymized_telemetry=False
-    )
-)
-```
-
-**Scaling:**
-- Single instance handles millions of vectors
-- For larger scale: Use Chroma server mode
-- Horizontal scaling with sharding
-
-#### Redis
-
-**Purpose:** Cache, message broker, pub/sub  
-**Databases:**
-- DB 0: Celery broker
-- DB 1: Celery results
-- DB 2: Application cache
-- DB 3: User sessions
-- DB 4: Rate limiting
-- DB 5: Pub/Sub
-
-**Configuration:**
-```conf
-maxmemory 2gb
-maxmemory-policy allkeys-lru
-appendonly yes  # Persistence
-```
-
-**Scaling:**
-- Redis Cluster for horizontal scaling
-- Separate instances for broker vs cache
-
----
 
 ## Data Flow
 
-### 1. User Registration Flow
+### 1. User Registration
 
 ```
-Client → API Gateway → PostgreSQL
-         ↓
-      Generate JWT
-         ↓
-      Return tokens
+Browser ──POST /auth/register──> FastAPI
+                                    │
+                                    ▼
+                            Hash password (bcrypt)
+                                    │
+                                    ▼
+                            Save to SQLite
+                                    │
+                                    ▼
+                          Generate JWT token
+                                    │
+                                    ▼
+                        Return token to Browser
 ```
 
-### 2. Lecture Upload & Processing Flow
+### 2. Lecture Upload & Processing
 
 ```
-Client → API Gateway → Save file → PostgreSQL
-         ↓
-      Queue OCR task → Redis → OCR Worker
-                               ↓
-                          Process pages
-                               ↓
-                          Queue AI task → AI Worker
-                                          ↓
-                                   Generate embeddings
-                                          ↓
-                                      ChromaDB
-                               ↓
-                          Update PostgreSQL
-                               ↓
-                          Publish progress → Redis Pub/Sub
-                                            ↓
-                                         WebSocket
-                                            ↓
-                                          Client
+Browser ──POST /api/lectures/upload + file──> FastAPI
+                                                 │
+                                                 ├─ Save file to /data/uploads
+                                                 ├─ Create lecture record in SQLite
+                                                 ├─ Queue background task
+                                                 └─ Return task_id to client
+                                                    │
+                                ┌──────────────────┘
+                                ▼
+                        Background Task (thread)
+                                │
+                    ┌───────────┼───────────┐
+                    ▼           ▼           ▼
+              Extract   Extract   Generate
+              pages    text      embeddings
+              (PDF→    (OCR)     (sentence-
+              images)            transformers)
+                    │           ▼
+                    │      Store in /data/embeddings
+                    │           │
+                    └───────────┼───────────┐
+                                ▼
+                        Update SQLite (completed)
+                                │
+                                ▼
+                    Broadcast to Browser via WebSocket
 ```
 
-### 3. Chat Query Flow
+### 3. Chat Query
 
 ```
-Client → WebSocket → API Gateway → Redis (cache check)
-                                   ↓ (cache miss)
-                              Generate embedding
-                                   ↓
-                              ChromaDB (search)
-                                   ↓
-                              Web search (optional)
-                                   ↓
-                              Queue AI task → AI Worker
-                                              ↓
-                                          Ollama LLM
-                                              ↓
-                                          Stream response
-                                              ↓
-                                          Redis Pub/Sub
-                                              ↓
-                                          WebSocket
-                                              ↓
-                                          Client
+Browser ──WebSocket message──> FastAPI
+                                 │
+                    ┌────────────┼────────────┐
+                    ▼            ▼            ▼
+              Embed query  Search local   Optional:
+              (sentence-   embeddings     Web search
+              transformers) in SQLite     (DuckDuckGo)
+                    │            │            │
+                    └────────────┼────────────┘
+                                 ▼
+                    Build context from results
+                                 │
+                                 ▼
+                    Call Gemini/HF API with context
+                                 │
+                                 ▼
+                    Stream response back via WebSocket
 ```
 
-### 4. Document Generation Flow
+### 4. Document Generation
 
 ```
-Client → API Gateway → Queue task → Redis → Generation Worker
-                                             ↓
-                                        Query ChromaDB
-                                             ↓
-                                        Load figures
-                                             ↓
-                                        Generate document
-                                             ↓
-                                        Save file
-                                             ↓
-                                        PostgreSQL
-                                             ↓
-                                        Notify client
-                                             ↓
-                                        WebSocket
-                                             ↓
-                                        Client
+Browser ──POST /api/documents/generate──> FastAPI
+                                             │
+                                             ├─ Validate request
+                                             ├─ Queue background task
+                                             └─ Return task_id
+                                                │
+                                ┌───────────────┘
+                                ▼
+                        Background Task (thread)
+                                │
+                    ┌───────────┼───────────┐
+                    ▼           ▼           ▼
+               Query      Generate    Generate
+              embeddings  content     formatting
+              from        (AI API)    (python-docx)
+              SQLite                  │
+                    │           ▼
+                    │      Save to /data/generated
+                    │           │
+                    └───────────┼───────────┐
+                                ▼
+                        Update SQLite (completed)
+                                │
+                                ▼
+                    Notify Browser via WebSocket
 ```
 
----
+## Background Task Processing
 
-## Communication Patterns
+### Task Queue (ThreadPoolExecutor)
 
-### 1. Synchronous (REST)
+FastAPI handles background tasks with a simple thread pool:
 
-Used for: CRUD operations, file uploads
-
-```
-Client → API Gateway → Database → API Gateway → Client
-```
-
-**Characteristics:**
-- Request-response pattern
-- Client waits for response
-- Suitable for fast operations (<1s)
-
-### 2. Asynchronous (Task Queue)
-
-Used for: Heavy processing (OCR, AI, generation)
-
-```
-Client → API Gateway → Queue → Worker → Database
-                      ↓
-                  Task ID
-                      ↓
-                   Client
-```
-
-**Characteristics:**
-- Non-blocking
-- Client gets immediate task ID
-- Worker processes in background
-- Status checked via polling or WebSocket
-
-### 3. Event-Driven (Pub/Sub)
-
-Used for: Real-time updates, progress notifications
-
-```
-Worker → Redis Pub/Sub → WebSocket → Client
-```
-
-**Characteristics:**
-- Push-based notifications
-- Real-time updates
-- Multiple subscribers supported
-
-### 4. Streaming (WebSocket)
-
-Used for: Chat, real-time progress
-
-```
-Client ←→ WebSocket ←→ API Gateway ←→ Redis Pub/Sub ←→ Workers
-```
-
-**Characteristics:**
-- Bi-directional communication
-- Low latency
-- Persistent connection
-
----
-
-## Scaling Strategy
-
-### Vertical Scaling (Scale Up)
-
-Add more resources to existing machines:
-
-| Component | CPU | RAM | Storage |
-|-----------|-----|-----|---------|
-| API Gateway | 2-4 cores | 2-4GB | 10GB |
-| Frontend | 1-2 cores | 1-2GB | 10GB |
-| OCR Worker | 4-8 cores | 4-8GB | 50GB |
-| AI Worker | 4-8 cores | 8-16GB | 50GB |
-| Generation Worker | 2-4 cores | 2-4GB | 50GB |
-| PostgreSQL | 4-8 cores | 8-16GB | 100GB+ |
-| Redis | 2-4 cores | 4-8GB | 20GB |
-| Ollama | 4-8 cores | 8-16GB | 50GB |
-
-### Horizontal Scaling (Scale Out)
-
-Add more instances:
-
-| Users | Frontend | API Gateway | OCR Workers | AI Workers | Gen Workers |
-|-------|----------|-------------|-------------|------------|-------------|
-| 1-10 | 1 | 1 | 1 | 2 | 1 |
-| 10-100 | 2 | 2 | 2 | 4 | 2 |
-| 100-1K | 4 | 4 | 4 | 8 | 4 |
-| 1K-10K | 8 | 8 | 8 | 16 | 8 |
-
-### Auto-Scaling Triggers
-
-**Scale Up When:**
-- CPU usage > 70% for 5 minutes
-- Memory usage > 80%
-- Queue length > 100 tasks
-- Response time > 3 seconds
-
-**Scale Down When:**
-- CPU usage < 30% for 15 minutes
-- Queue length < 10 tasks
-- Low request rate
-
-### Load Balancing
-
-**nginx Configuration:**
-```nginx
-upstream frontend {
-    least_conn;  # Route to least busy instance
-    server frontend1:8501;
-    server frontend2:8501;
-    server frontend3:8501;
-}
-
-upstream api_gateway {
-    ip_hash;  # Sticky sessions for WebSocket
-    server gateway1:8000;
-    server gateway2:8000;
-}
-```
-
-### Database Scaling
-
-**Read Scaling:**
-- PostgreSQL read replicas
-- Read-heavy queries to replicas
-- Write operations to primary
-
-**Connection Pooling:**
 ```python
-# SQLAlchemy pool settings
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=10,  # Persistent connections
-    max_overflow=20,  # Extra connections when needed
-    pool_timeout=30,
-    pool_recycle=3600  # Recycle after 1 hour
-)
+from concurrent.futures import ThreadPoolExecutor
+
+executor = ThreadPoolExecutor(max_workers=4)
+
+@app.post("/api/lectures/upload")
+async def upload_lecture(file: UploadFile):
+    # Save file immediately
+    file_path = await save_file(file)
+    
+    # Queue background processing
+    task_id = queue_task(
+        executor.submit(process_lecture, file_path)
+    )
+    
+    # Return immediately to user
+    return {"task_id": task_id, "status": "processing"}
+
+# In background
+def process_lecture(file_path):
+    # Long-running task
+    extract_pages(file_path)
+    perform_ocr(file_path)
+    generate_embeddings(file_path)
+    notify_clients(task_id, "completed")
 ```
 
-**Caching Strategy:**
-- Redis cache for frequently accessed data
-- TTL-based expiration
-- Cache invalidation on writes
+### Task Status Tracking
+
+```python
+# In-memory task store (SQLite for persistence)
+tasks = {
+    "task_123": {
+        "status": "processing",      # processing, completed, failed
+        "progress": 65,               # 0-100%
+        "started_at": "2025-01-20T10:00:00Z",
+        "result": None
+    }
+}
+
+# WebSocket broadcasts progress
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    
+    async for message in websocket:
+        if message["type"] == "subscribe_task":
+            task_id = message["task_id"]
+            # Send updates as task progresses
+            await websocket.send_json({
+                "task_id": task_id,
+                "progress": tasks[task_id]["progress"]
+            })
+```
+
+## WebSocket Real-Time Updates
+
+### Connection Manager
+
+```python
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+    
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+    
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except:
+                pass
+
+# Global manager
+manager = ConnectionManager()
+
+# Broadcast task progress
+async def notify_progress(task_id: str, progress: int):
+    await manager.broadcast({
+        "type": "task_progress",
+        "task_id": task_id,
+        "progress": progress
+    })
+
+# Stream chat response
+async def stream_response(task_id: str, response_text: str):
+    for chunk in response_text.split():
+        await manager.broadcast({
+            "type": "chat_chunk",
+            "task_id": task_id,
+            "chunk": chunk
+        })
+        await asyncio.sleep(0.01)  # Rate limiting
+```
+
+## Deployment
+
+### Docker Container
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy code
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+
+# Expose port
+EXPOSE 8000
+
+# Run app
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+### docker-compose.yml
+
+```yaml
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/app.db
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+```
+
+### Single Command Startup
+
+```bash
+# Local development
+python main.py
+
+# Production (Docker)
+docker run -p 8000:8000 -v $(pwd)/data:/app/data -e GEMINI_API_KEY=$KEY mysmartnotes
+```
 
 ---
 
-For deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).  
-For development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
+For database schema, see [DATABASE.md](DATABASE.md).  
+For development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).  
+For deployment, see [DEPLOYMENT.md](DEPLOYMENT.md).

@@ -1,16 +1,15 @@
 # 💻 Development Guide
 
-Complete development setup and workflow guide for MySmartNotes.
+Simple development setup for MySmartNotes - run everything from a single file!
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Development Setup](#development-setup)
+2. [Quick Start](#quick-start)
 3. [Development Workflow](#development-workflow)
-4. [Code Organization](#code-organization)
+4. [API Documentation](#api-documentation)
 5. [Testing](#testing)
-6. [Debugging](#debugging)
-7. [Migration Path](#migration-path)
+6. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -21,87 +20,412 @@ Complete development setup and workflow guide for MySmartNotes.
 | Software | Version | Purpose |
 |----------|---------|---------|
 | **Python** | 3.11+ | Application runtime |
-| **Node.js** | 18+ (optional) | Frontend tooling |
-| **Docker** | 24+ | Containerization |
-| **Docker Compose** | 2.20+ | Multi-container orchestration |
-| **Git** | 2.40+ | Version control |
+| **pip** | Latest | Package manager |
+| **Git** | Latest | Version control |
+| **Docker** (optional) | 24+ | For production deployment |
 
 ### System Requirements
 
-**Minimum (Development):**
-- CPU: 4 cores
-- RAM: 8GB
-- Storage: 20GB free
+**Minimum:**
+- CPU: 2 cores
+- RAM: 4GB
+- Storage: 10GB free
 
-**Recommended (Development):**
-- CPU: 8 cores
-- RAM: 16GB
-- Storage: 50GB SSD
+**Recommended:**
+- CPU: 4 cores
+- RAM: 8GB  
+- Storage: 20GB SSD
 
 ---
 
-## Development Setup
+## Quick Start
 
-### Option 1: Bare Metal (Full Local Development)
-
-**Step 1: Clone and Setup Environment**
+### 1. Clone Repository
 
 ```bash
-# Clone repository
 git clone <repo-url> mysmartnotes
 cd mysmartnotes
+```
 
-# Create virtual environment
+### 2. Create Virtual Environment
+
+```bash
+# macOS/Linux
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 
-# Install dependencies
-pip install -r requirements-dev.txt
+# Windows
+python -m venv venv
+venv\Scripts\activate
 ```
 
-**Step 2: Install System Dependencies**
-
-**macOS:**
-```bash
-# Homebrew
-brew install redis postgresql tesseract poppler
-
-# Ollama
-brew install ollama
-```
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update
-sudo apt install -y redis-server postgresql tesseract-ocr poppler-utils
-
-# Ollama
-curl https://ollama.ai/install.sh | sh
-```
-
-**Windows:**
-```powershell
-# Using Chocolatey
-choco install redis-64 postgresql tesseract
-
-# Ollama - Download from https://ollama.ai
-```
-
-**Step 3: Configure Environment**
+### 3. Install Dependencies
 
 ```bash
-# Copy environment template
+pip install -r requirements.txt
+```
+
+### 4. Install System Dependencies
+
+```bash
+# macOS (Homebrew)
+brew install tesseract poppler
+
+# Ubuntu/Debian
+sudo apt install tesseract-ocr poppler-utils
+
+# Windows (Chocolatey)
+choco install tesseract poppler
+```
+
+### 5. Configure Environment
+
+```bash
+# Copy template
 cp .env.example .env
 
-# Edit .env file
+# Edit .env with your settings
 nano .env
 ```
 
 **.env file:**
 ```bash
-# Environment
-ENVIRONMENT=development
-DEBUG=true
+# Server
+DATABASE_URL=sqlite:///./data/app.db
+HOST=0.0.0.0
+PORT=8000
+DEBUG=True
+
+# Security
+JWT_SECRET_KEY=your-secret-key-here-change-this
+JWT_ALGORITHM=HS256
+
+# External APIs (get free API keys from these services)
+GEMINI_API_KEY=your-gemini-key-here
+
+# File paths
+UPLOAD_PATH=./data/uploads
+GENERATED_PATH=./data/generated
+EMBEDDINGS_PATH=./data/embeddings
+
+# Optional: Hugging Face API (alternative to Gemini)
+# HUGGINGFACE_API_KEY=your-hf-key-here
+```
+
+### 6. Start Application
+
+```bash
+python main.py
+```
+
+**That's it! Everything starts with one command.**
+
+Your app is now running at:
+- **Frontend:** http://localhost:8000
+- **API Docs:** http://localhost:8000/docs
+- **Database:** `./data/app.db`
+
+---
+
+## Development Workflow
+
+### First Run
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Start the app
+python main.py
+
+# In another terminal, create test data:
+python scripts/seed_data.py
+```
+
+### Daily Development
+
+```bash
+# Activate venv
+source venv/bin/activate
+
+# Start app (auto-reloads on file changes)
+python main.py
+
+# App runs at http://localhost:8000
+# API docs at http://localhost:8000/docs
+```
+
+### Making Changes
+
+The app has hot-reload enabled. When you edit Python files, the server automatically restarts:
+
+```bash
+# Edit a file, save it
+nano app/routers/chat.py
+
+# Server automatically reloads - no need to restart!
+```
+
+**Note:** If changes don't appear, restart manually:
+```bash
+# Ctrl+C to stop
+# python main.py to restart
+```
+
+---
+
+## API Documentation
+
+### Auto-Generated Docs
+
+FastAPI automatically generates interactive API docs:
+
+- **Swagger UI:** http://localhost:8000/docs
+- **ReDoc:** http://localhost:8000/redoc
+
+### Main Endpoints
+
+**Authentication:**
+```bash
+POST /auth/register       # Register new account
+POST /auth/login          # Login and get JWT token
+POST /auth/refresh        # Refresh access token
+```
+
+**Subjects:**
+```bash
+GET /api/subjects         # List all subjects
+POST /api/subjects        # Create new subject
+GET /api/subjects/{id}    # Get subject details
+PUT /api/subjects/{id}    # Update subject
+DELETE /api/subjects/{id} # Delete subject
+```
+
+**Lectures:**
+```bash
+POST /api/lectures/upload       # Upload PDF/PPTX file
+GET /api/lectures/{id}          # Get lecture details
+GET /api/lectures/{id}/documents# List generated documents
+```
+
+**Chat:**
+```bash
+WebSocket /ws              # Real-time chat connection
+```
+
+**Task Status:**
+```bash
+GET /api/tasks/{task_id}   # Check background task status
+```
+
+### Example: Register & Login
+
+```bash
+# Register
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123"
+  }'
+
+# Login (get token)
+TOKEN=$(curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","password":"password123"}' \
+  | jq -r '.access_token')
+
+# Use token in API calls
+curl -X GET http://localhost:8000/api/subjects \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Testing
+
+### Run Tests
+
+```bash
+# Install test dependencies
+pip install pytest pytest-cov
+
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/unit/test_models.py
+
+# Run with coverage
+pytest --cov=app --cov-report=html
+```
+
+### Write a Test
+
+```python
+# tests/unit/test_api.py
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+def test_register():
+    response = client.post("/auth/register", json={
+        "username": "newuser",
+        "email": "new@example.com",
+        "password": "pass123"
+    })
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+
+def test_create_subject(auth_token):
+    response = client.post(
+        "/api/subjects",
+        json={"name": "Biology 101"},
+        headers={"Authorization": f"Bearer {auth_token}"}
+    )
+    assert response.status_code == 200
+    assert response.json()["name"] == "Biology 101"
+```
+
+---
+
+## Troubleshooting
+
+### App Won't Start
+
+```bash
+# Check Python version
+python --version  # Should be 3.11+
+
+# Check dependencies installed
+pip list | grep fastapi
+
+# Check database path exists
+mkdir -p ./data
+
+# Try starting with debug output
+python -u main.py
+```
+
+### Port 8000 Already in Use
+
+```bash
+# Find process using port 8000
+lsof -i :8000
+
+# Kill process
+kill -9 <PID>
+
+# Or use different port
+export PORT=8001
+python main.py
+```
+
+### API Errors
+
+```bash
+# Check logs (printed to console)
+# Error messages appear in real-time
+
+# Check database
+sqlite3 ./data/app.db ".tables"
+
+# Test database connection
+python -c "from app.utils.db import get_db; print('DB OK')"
+```
+
+### Missing Dependencies
+
+```bash
+# Reinstall all dependencies
+pip install -r requirements.txt --force-reinstall
+
+# Check missing packages
+pip list | grep -E "fastapi|sqlalchemy|pydantic"
+```
+
+### Embedding/OCR Issues
+
+```bash
+# Check Tesseract installed
+tesseract --version
+
+# Check Poppler installed
+pdftoimage -h  # macOS
+pdftoppm -h    # Linux
+
+# On macOS
+brew install tesseract poppler
+
+# On Linux
+sudo apt install tesseract-ocr poppler-utils
+```
+
+---
+
+## Development Tips
+
+### 1. Use API Docs for Testing
+
+Visit http://localhost:8000/docs and test endpoints interactively.
+
+### 2. Enable Debug Logging
+
+```python
+# In config.py or main.py
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
+
+### 3. Watch Database Changes
+
+```bash
+# Monitor database in real-time
+sqlite3 ./data/app.db
+
+sqlite> SELECT * FROM users;
+sqlite> SELECT * FROM lectures;
+sqlite> .tables  # List all tables
+```
+
+### 4. Test File Uploads
+
+```bash
+# Create test file
+echo "test content" > test.txt
+
+# Upload via API
+curl -F "file=@test.txt" \
+  -F "subject_id=1" \
+  -H "Authorization: Bearer $TOKEN" \
+  http://localhost:8000/api/lectures/upload
+```
+
+### 5. WebSocket Testing
+
+```javascript
+// In browser console
+const ws = new WebSocket('ws://localhost:8000/ws');
+ws.onmessage = (event) => console.log(event.data);
+ws.send(JSON.stringify({message: "hello"}));
+```
+
+---
+
+## Production Deployment
+
+For production deployment (Docker), see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+---
+
+For API schemas, see [DATA_STRUCTURES.md](DATA_STRUCTURES.md).  
+For troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 # Database
 DATABASE_URL=postgresql://user:devpass@localhost:5432/mysmartnotes_dev
@@ -782,6 +1106,132 @@ task_id = response.json()["task_id"]
 ```bash
 # Create Dockerfiles and docker-compose.yml
 docker-compose up -d
+```
+
+---
+
+## 🚀 Quick Commands Reference
+
+### Basic Operations
+
+```bash
+# Start all services
+bash scripts/start.sh
+
+# Stop all services  
+bash scripts/stop.sh
+
+# View service logs
+docker-compose -f docker/docker-compose.yml logs -f api_gateway
+docker-compose -f docker/docker-compose.yml logs -f worker_ocr
+docker-compose -f docker/docker-compose.yml logs -f postgres
+```
+
+### Service URLs & Credentials
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Frontend | http://localhost:3000 | testuser / password123 |
+| API | http://localhost:8000 | - |
+| API Docs | http://localhost:8000/docs | - |
+| PostgreSQL | localhost:5432 | user / password |
+| Redis | localhost:6379 | - |
+
+### Common API Calls
+
+**Login:**
+```bash
+TOKEN=$(curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","password":"password123"}' \
+  | jq -r '.access_token')
+```
+
+**Upload Lecture:**
+```bash
+curl -X POST http://localhost:8000/api/v1/lectures/upload \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "subject_id=1" \
+  -F "name=Lecture 3" \
+  -F "file=@/path/to/lecture.pdf"
+```
+
+### Docker Compose Commands
+
+```bash
+# View containers
+docker-compose -f docker/docker-compose.yml ps
+
+# View logs (real-time)
+docker-compose -f docker/docker-compose.yml logs -f
+
+# Restart specific service
+docker-compose -f docker/docker-compose.yml restart api_gateway
+
+# Enter shell
+docker-compose -f docker/docker-compose.yml exec api_gateway bash
+
+# Cleanup
+docker-compose -f docker/docker-compose.yml down -v
+```
+
+### Database Operations
+
+```bash
+# Connect to PostgreSQL
+docker-compose -f docker/docker-compose.yml exec postgres \
+  psql -U mysmarnotes_user -d mysmarnotes_db
+
+# List all lectures
+SELECT l.id, l.name, s.name as subject, l.status, l.page_count 
+FROM lectures l 
+JOIN subjects s ON l.subject_id = s.id;
+
+# Check processing status
+SELECT id, name, status, error_message FROM lectures;
+```
+
+### Redis Operations
+
+```bash
+# Connect to Redis CLI
+docker-compose -f docker/docker-compose.yml exec redis redis-cli
+
+# View all keys
+KEYS *
+
+# Monitor pub/sub channels
+SUBSCRIBE progress:lecture:*
+
+# Clear all cache
+FLUSHALL
+```
+
+### Celery Monitoring
+
+```bash
+# View active tasks
+celery -A workers.celery_app inspect active
+
+# Monitor tasks in real-time
+celery -A workers.celery_app events
+
+# Revoke a task
+celery -A workers.celery_app revoke <task_id>
+```
+
+### Quick Troubleshooting
+
+```bash
+# Check service status
+docker-compose -f docker/docker-compose.yml ps
+
+# View error logs
+docker-compose -f docker/docker-compose.yml logs | grep ERROR
+
+# Reset everything
+docker-compose -f docker/docker-compose.yml down -v
+bash scripts/start.sh
 ```
 
 ---
