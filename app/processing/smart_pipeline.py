@@ -59,6 +59,11 @@ class SmartPipeline:
         logger.info(f"Processing PDF: {pdf_path}")
         import pdfplumber
 
+        # Extract tables first (for position tracking)
+        logger.info("Extracting tables...")
+        tables = self._extract_tables_from_pdf(pdf_path)
+        logger.info(f"  Found tables on {len([t for t in tables if t])} pages")
+
         # Font-aware extraction (primary method)
         logger.info("Extracting text via font-aware method...")
         font_results = self.font_extractor.extract(pdf_path, table_bboxes_per_page={})
@@ -69,7 +74,7 @@ class SmartPipeline:
         merged_blocks = self.merger.merge(
             font_blocks=font_results,
             layout_detections=None,
-            tables=[],
+            tables=tables,
         )
 
         # Convert to Markdown
@@ -80,11 +85,101 @@ class SmartPipeline:
         logger.info(f"Output: {stats['total_blocks']} blocks, "
                      f"{stats['headings']} headings, "
                      f"{stats['lists']} list items, "
-                     f"{stats['body']} body paragraphs")
+                     f"{stats['body']} body paragraphs, "
+                     f"{stats.get('tables', 0)} tables")
 
         return markdown
 
-    def _process_pptx(self, pptx_path: str) -> str:
+    def _extract_tables_from_pdf(self, pdf_path: str) -> list:
+        """
+        Extract tables from PDF and convert to markdown format.
+        
+        Returns a list of per-page table data:
+        [
+            [  # Page 1
+                {"y_position": 100, "markdown": "| Header | ..."},
+                ...
+            ],
+            [],  # Page 2 (no tables)
+            ...
+        ]
+        """
+        import pdfplumber
+        
+        all_tables = []
+        
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                for page_num, page in enumerate(pdf.pages, 1):
+                    page_tables = []
+                    
+                    # Extract tables with their bounding boxes
+                    raw_tables = page.extract_tables()
+                    table_settings = page.find_tables()
+                    
+                    if not raw_tables:
+                        all_tables.append([])
+                        continue
+                    
+                    for idx, table in enumerate(raw_tables):
+                        if not table:
+                            continue
+                        
+                        # Convert table to markdown format
+                        markdown_table = self._table_to_markdown(table)
+                        
+                        # Get table Y position from table settings if available
+                        y_position = 0
+                        if idx < len(table_settings):
+                            # Get the top of the table bounding box
+                            table_rect = table_settings[idx].bbox  # (x0, top, x1, bottom)
+                            if table_rect:
+                                y_position = table_rect[1]  # top position
+                        
+                        page_tables.append({
+                            "y_position": y_position,
+                            "markdown": markdown_table,
+                        })
+                    
+                    all_tables.append(page_tables)
+        except Exception as e:
+            logger.warning(f"Table extraction failed: {e}")
+            # Return empty list on failure; document extraction continues
+            return []
+        
+        return all_tables
+
+    def _table_to_markdown(self, table: list) -> str:
+        """
+        Convert a pdfplumber table (list of rows) to markdown table format.
+        
+        Args:
+            table: List of rows, where each row is a list of cell contents
+            
+        Returns:
+            Markdown table string
+        """
+        if not table or not table[0]:
+            return ""
+        
+        # Build header row
+        header_row = table[0]
+        markdown_lines = []
+        
+        # Header
+        header_cells = [str(cell or "").strip() for cell in header_row]
+        markdown_lines.append("| " + " | ".join(header_cells) + " |")
+        
+        # Separator
+        separator_cells = ["-" * max(3, len(cell)) for cell in header_cells]
+        markdown_lines.append("| " + " | ".join(separator_cells) + " |")
+        
+        # Data rows
+        for row in table[1:]:
+            cells = [str(cell or "").strip() for cell in row]
+            markdown_lines.append("| " + " | ".join(cells) + " |")
+        
+        return "\n".join(markdown_lines)
         """Process a PPTX file with shape-level font extraction."""
         try:
             from pptx import Presentation

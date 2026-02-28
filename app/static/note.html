@@ -500,6 +500,14 @@
         if (typeof marked === 'undefined') {
             document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');
         }
+        // Configure marked.js to support tables and other GFM features
+        marked.setOptions({
+            gfm: true,           // GitHub Flavored Markdown (includes tables)
+            breaks: false,        // Don't convert \n to <br>
+            pedantic: false,
+            smartLists: true,
+            smartypants: false
+        });
     </script>
 </head>
 

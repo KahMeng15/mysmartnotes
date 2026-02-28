@@ -42,6 +42,7 @@ class ChatMessageResponse(BaseModel):
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
     ai_mode: Optional[str] = None
+    ai_model: Optional[str] = None
     conversation_id: Optional[str] = None
     conversation_title: Optional[str] = None
 
@@ -380,6 +381,7 @@ async def ask_question(
             conversation_id=conv_id,
             conversation_title=conv_title,
             ai_mode=request.ai_mode,
+            ai_model=ai_model_info,
             detailed_sources_json=json.dumps(detailed_sources) if detailed_sources else None,
         )
         db.add(chat_msg)
@@ -477,6 +479,7 @@ async def get_conversation_messages(
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,
+            ai_model=m.ai_model,
             conversation_id=m.conversation_id,
             conversation_title=m.conversation_title,
         )
@@ -506,6 +509,7 @@ async def get_all_chat_history(
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,
+            ai_model=m.ai_model,
             conversation_id=m.conversation_id,
             conversation_title=m.conversation_title,
         )
@@ -545,6 +549,7 @@ async def get_lecture_chat_history(
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,
+            ai_model=m.ai_model,
             conversation_id=m.conversation_id,
             conversation_title=m.conversation_title,
         )

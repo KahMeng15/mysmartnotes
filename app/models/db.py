@@ -201,6 +201,7 @@ class ChatMessage(Base):
     conversation_title = Column(String(255), nullable=True)            # AI-generated or derived title
     ai_mode = Column(String(50), nullable=True, default="elaboration") # Which AI response mode was used
     detailed_sources_json = Column(Text, nullable=True)                # JSON: full detailed source objects for history replay
+    ai_model = Column(String(255), nullable=True)                      # e.g. "GEMINI (gemini-1.5-flash)"
     
     # Relationships
     user = relationship("User")

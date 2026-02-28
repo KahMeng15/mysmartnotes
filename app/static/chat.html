@@ -1042,7 +1042,7 @@
                 let metadataHTML = '';
                 const hasSources = msg.detailed_sources && msg.detailed_sources.length > 0;
 
-                if (hasSources || msg.timings) {
+                if (hasSources || msg.ai_model || msg.timings) {
                     const msgId = 'msg-' + idx;
                     let highestMatch = 0;
                     if (hasSources) {
@@ -1065,29 +1065,27 @@
                         sourcesHTML = `<div class="sources-section" style="margin-top:10px;padding:8px;background:#f9f9f9;border-radius:4px;">${sourceLinks}</div>`;
                     }
 
-                    let infoContent = '';
-                    if (msg.timings) {
-                        const t = msg.timings;
-                        const aiModel = msg.ai_model || 'Unknown';
-                        infoContent = `
-                            <div style="margin-top:10px;padding:12px;background:#f9f9f9;border-radius:4px;font-size:12px;">
-                                <div style="margin-bottom:10px;">
-                                    <div style="font-weight:600;color:#333;margin-bottom:4px;"><i class="ph ph-robot"></i> Model: ${aiModel}</div>
+                    const aiModel = msg.ai_model || null;
+                    const t = msg.timings || null;
+                    let infoContent = `
+                        <div style="margin-top:10px;padding:12px;background:#f9f9f9;border-radius:4px;font-size:12px;">
+                            <div style="margin-bottom:${t ? '10px' : '0'}">
+                                <div style="font-weight:600;color:#333;margin-bottom:4px;"><i class="ph ph-robot"></i> Model: ${aiModel || '<span style="color:#aaa">Unknown</span>'}</div>
+                            </div>
+                            ${t ? `
+                            <div style="border-top:1px solid #e0e0e0;padding-top:8px;">
+                                <div style="font-weight:600;color:#333;margin-bottom:6px;"><i class="ph ph-hourglass"></i> Timing</div>
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;">
+                                    <span>Retrieval:</span><span style="color:var(--color-primary);font-weight:600;">${t.retrieval_ms}ms</span>
                                 </div>
-                                <div style="border-top:1px solid #e0e0e0;padding-top:8px;">
-                                    <div style="font-weight:600;color:#333;margin-bottom:6px;"><i class="ph ph-hourglass"></i> Timing</div>
-                                    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;">
-                                        <span>Retrieval:</span><span style="color:var(--color-primary);font-weight:600;">${t.retrieval_ms}ms</span>
-                                    </div>
-                                    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;">
-                                        <span>Model:</span><span style="color:var(--color-primary);font-weight:600;">${t.model_ms}ms</span>
-                                    </div>
-                                    <div style="display:flex;justify-content:space-between;padding:4px 0;">
-                                        <span>Total:</span><span style="color:var(--color-primary);font-weight:600;">${t.total_ms}ms</span>
-                                    </div>
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;">
+                                    <span>Model:</span><span style="color:var(--color-primary);font-weight:600;">${t.model_ms}ms</span>
                                 </div>
-                            </div>`;
-                    }
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;">
+                                    <span>Total:</span><span style="color:var(--color-primary);font-weight:600;">${t.total_ms}ms</span>
+                                </div>
+                            </div>` : ''}
+                        </div>`;
 
                     const refLabel = hasSources ? `Reference (${highestMatch}%)` : 'Reference';
                     metadataHTML = `
@@ -1216,9 +1214,9 @@
                         content: m.response,
                         time: new Date(m.created_at),
                         ai_mode: m.ai_mode,
+                        ai_model: m.ai_model || null,
                         sources: m.sources || [],
                         detailed_sources: m.detailed_sources || [],
-                        // timings not stored in DB, so omit
                     });
                 });
 
