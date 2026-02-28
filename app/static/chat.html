@@ -7,9 +7,7 @@
     <title>Chat - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
@@ -23,7 +21,9 @@
     <style>
         .chat-container {
             display: flex;
-            height: calc(100vh - 80px);
+            height: calc(100vh - var(--spacing-lg) * 2);
+            border-radius: var(--radius-xl);
+            overflow: hidden;
         }
 
         .chat-sidebar {
@@ -41,7 +41,7 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: var(--color-background);
+            background: var(--color-white);
         }
 
         .chat-header {
@@ -534,7 +534,7 @@
 <body>
 
     <!-- Chat Container -->
-    <div class="chat-container">
+    <div class="chat-container page-card" style="padding: 0;">
         <!-- Sidebar -->
         <div class="chat-sidebar">
             <div class="sidebar-header">

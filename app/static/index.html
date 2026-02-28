@@ -4,324 +4,586 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MySmartNotes - AI Study Assistant</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <title>MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCHvRKBDv6Ycu9ejoZEIRwT0kvaNXiL6jY",
+            authDomain: "mysmartnotes-965fe.firebaseapp.com",
+            projectId: "mysmartnotes-965fe",
+            storageBucket: "mysmartnotes-965fe.firebasestorage.app",
+            messagingSenderId: "912822914070",
+            appId: "1:912822914070:web:1c0cb36c547229e349b937",
+            measurementId: "G-8PPM1PT63H"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const googleProvider = new GoogleAuthProvider();
+
+        window.firebaseAuth = auth;
+        window.googleProvider = googleProvider;
+        window.signInWithPopup = signInWithPopup;
+    </script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #fff;
             min-height: 100vh;
             display: flex;
-            align-items: center;
+            padding-left: 0 !important; /* override global sidebar offset */
+        }
+
+        /* ── LEFT PANEL ── */
+        .auth-left {
+            width: 58%;
+            background: linear-gradient(160deg, #171738 0%, #593C8F 55%, #8EF9F3 100%);
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        /* ── RIGHT PANEL ── */
+        .auth-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
             justify-content: center;
-            padding: 20px;
+            align-items: flex-start;
+            padding: 60px 72px;
+            background: #fff;
         }
 
-        .container {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 1200px;
-            width: 100%;
-            padding: 40px;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 2.5em;
-        }
-
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 1.1em;
-        }
-
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
+        .brand {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            color: #171738;
             margin-bottom: 40px;
         }
 
-        .feature {
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-        }
+        /* Form panels */
+        .panel { display: none; width: 100%; }
+        .panel.active { display: block; }
 
-        .feature h3 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 1.2em;
-        }
-
-        .feature p {
-            color: #666;
-            line-height: 1.6;
-        }
-
-        .auth-section {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 40px;
-            padding-top: 40px;
-            border-top: 2px solid #eee;
-        }
-
-        .auth-box {
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-
-        .auth-box h2 {
-            color: #333;
-            margin-bottom: 20px;
-            font-size: 1.3em;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
+        .form-label {
             display: block;
-            color: #333;
-            margin-bottom: 5px;
+            font-size: 0.8125rem;
             font-weight: 500;
+            color: #171738;
+            margin-bottom: 8px;
         }
 
-        input {
+        .form-input {
             width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 1em;
-        }
-
-        input:focus {
+            padding: 13px 16px;
+            background: #EAEAE5;
+            border: 1.5px solid transparent;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.9375rem;
+            color: #171738;
+            transition: border-color 0.15s, background 0.15s;
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        button {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        .form-input:focus {
+            background: #fff;
+            border-color: #593C8F;
+            box-shadow: 0 0 0 3px rgba(89,60,143,0.1);
+        }
+
+        .form-group { margin-bottom: 20px; }
+
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 13px 20px;
             border: none;
-            border-radius: 5px;
-            font-size: 1em;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.9375rem;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: opacity 0.15s, transform 0.1s;
+            text-align: center;
         }
 
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        .btn:active { transform: scale(0.98); }
+
+        .btn-google {
+            background: #fff;
+            color: #171738;
+            border: 1.5px solid #EAEAE5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
-        button:active {
-            transform: translateY(0);
+        .btn-google:hover {
+            background: #f5f5f5;
+            border-color: #d0d0d0;
         }
 
-        .message {
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 15px;
+        .google-logo {
+            width: 18px;
+            height: 18px;
+        }
+
+        .btn-next {
+            background: #171738;
+            color: #fff;
+        }
+
+        .btn:hover { opacity: 0.88; }
+
+        .btn-block {
+            width: 100%;
+            flex: none;
+        }
+
+        .toggle-link {
+            margin-top: 24px;
+            font-size: 0.8125rem;
+            color: #75757A;
+        }
+
+        .toggle-link a {
+            color: #593C8F;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .toggle-link a:hover { text-decoration: underline; }
+
+        .message-box {
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            margin-bottom: 16px;
             display: none;
         }
 
-        .message.success {
+        .message-box.success {
             display: block;
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background: rgba(42,157,92,0.12);
+            color: #1a6e3f;
         }
 
-        .message.error {
+        .message-box.error {
             display: block;
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background: rgba(219,84,97,0.1);
+            color: #a02030;
         }
 
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.8em;
-            }
+        @media (max-width: 700px) {
+            .auth-left { display: none; }
+            .auth-right { padding: 40px 28px; }
+        }
 
-            .auth-section {
-                grid-template-columns: 1fr;
-            }
+        /* Google Registration Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
 
-            .container {
-                padding: 20px;
-            }
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #171738;
+            margin-bottom: 8px;
+        }
+
+        .modal-subtitle {
+            font-size: 0.875rem;
+            color: #75757A;
+            margin-bottom: 24px;
+        }
+
+        .modal-form-group {
+            margin-bottom: 20px;
+        }
+
+        .modal-label {
+            display: block;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #171738;
+            margin-bottom: 8px;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px 14px;
+            background: #EAEAE5;
+            border: 1.5px solid transparent;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9375rem;
+            color: #171738;
+            transition: border-color 0.15s, background 0.15s;
+            outline: none;
+        }
+
+        .modal-input:focus {
+            background: #fff;
+            border-color: #593C8F;
+            box-shadow: 0 0 0 3px rgba(89,60,143,0.1);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+        .modal-btn:hover {
+            opacity: 0.88;
+        }
+
+        .modal-btn-confirm {
+            background: #593C8F;
+            color: #fff;
+        }
+
+        .modal-btn-cancel {
+            background: #EAEAE5;
+            color: #171738;
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <h1><i class="ph ph-rocket-launch" style="color: #667eea;"></i> MySmartNotes</h1>
-        <p class="subtitle">AI-Powered Study Assistant - Convert lectures into study materials instantly</p>
+    <div class="auth-left"></div>
 
-        <div class="features">
-            <div class="feature">
-                <h3><i class="ph ph-file-text" style="color: #667eea; margin-right: 5px;"></i> Smart Processing</h3>
-                <p>Upload lecture slides (PDF/PPTX) and extract text and diagrams automatically</p>
+    <div class="auth-right">
+        <div class="brand">my<br>smart<br>notes</div>
+
+        <!-- Login Panel -->
+        <div class="panel active" id="loginPanel">
+            <div id="loginMsg" class="message-box"></div>
+            <div class="form-group">
+                <label class="form-label" for="loginEmail">Email</label>
+                <input class="form-input" type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email">
             </div>
-            <div class="feature">
-                <h3><i class="ph ph-chat-circle-dots" style="color: #667eea; margin-right: 5px;"></i> AI Chat</h3>
-                <p>Ask questions about your notes with semantic search and AI responses</p>
+            <div class="form-group" id="loginPasswordGroup" style="display:none;">
+                <label class="form-label" for="loginPassword">Password</label>
+                <input class="form-input" type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
             </div>
-            <div class="feature">
-                <h3><i class="ph ph-note-pencil" style="color: #667eea; margin-right: 5px;"></i> Cheat Sheets</h3>
-                <p>Auto-generate condensed study guides in Word/PDF format</p>
+            <div class="btn-row" id="loginStep1Btns">
+                <button class="btn btn-google" onclick="handleGoogleSignIn()">
+                    <svg class="google-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Sign in with Google
+                </button>
+                <button class="btn btn-next" onclick="showPasswordField()">Next</button>
             </div>
-            <div class="feature">
-                <h3><i class="ph ph-target" style="color: #667eea; margin-right: 5px;"></i> Quiz Generator</h3>
-                <p>Create practice quizzes from your lectures automatically</p>
+            <div style="display:none;" id="loginStep2Btns">
+                <button class="btn btn-next btn-block" onclick="handleLogin()">Sign In</button>
             </div>
-            <div class="feature">
-                <h3><i class="ph ph-cards" style="color: #667eea; margin-right: 5px;"></i> Flashcards</h3>
-                <p>Build spaced repetition flashcards for self-testing</p>
-            </div>
-            <div class="feature">
-                <h3><i class="ph ph-sparkle" style="color: #667eea; margin-right: 5px;"></i> Simple & Fast</h3>
-                <p>Single command setup with zero infrastructure complexity</p>
-            </div>
+            <p class="toggle-link">Don't have an account? <a onclick="switchPanel('register')">Sign up</a></p>
         </div>
 
-        <div class="auth-section">
-            <div class="auth-box">
-                <h2>Create Account</h2>
-                <div id="registerMessage" class="message"></div>
-                <form id="registerForm">
-                    <div class="form-group">
-                        <label for="regNickname">Nickname</label>
-                        <input type="text" id="regNickname" required placeholder="What should we call you?">
-                    </div>
-                    <div class="form-group">
-                        <label for="regEmail">Email</label>
-                        <input type="email" id="regEmail" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="regFullName">Full Name</label>
-                        <input type="text" id="regFullName">
-                    </div>
-                    <div class="form-group">
-                        <label for="regPassword">Password</label>
-                        <input type="password" id="regPassword" required>
-                    </div>
-                    <button type="submit">Sign Up</button>
-                </form>
+        <!-- Register Panel -->
+        <div class="panel" id="registerPanel">
+            <div id="registerMsg" class="message-box"></div>
+            <div class="form-group">
+                <label class="form-label" for="regNickname">Nickname</label>
+                <input class="form-input" type="text" id="regNickname" placeholder="What should we call you?">
             </div>
+            <div class="form-group">
+                <label class="form-label" for="regEmail">Email</label>
+                <input class="form-input" type="email" id="regEmail" placeholder="you@example.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="regPassword">Password</label>
+                <input class="form-input" type="password" id="regPassword" placeholder="••••••••">
+            </div>
+            <button class="btn btn-next btn-block" style="margin-top:24px;" onclick="handleRegister()">Create Account</button>
+            <p class="toggle-link">Already have an account? <a onclick="switchPanel('login')">Sign in</a></p>
+        </div>
+    </div>
 
-            <div class="auth-box">
-                <h2>Login</h2>
-                <div id="loginMessage" class="message"></div>
-                <form id="loginForm">
-                    <div class="form-group">
-                        <label for="loginEmail">Email</label>
-                        <input type="email" id="loginEmail" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="loginPassword">Password</label>
-                        <input type="password" id="loginPassword" required>
-                    </div>
-                    <button type="submit">Sign In</button>
-                </form>
-            </div>
+    <!-- Google Registration Modal -->
+    <div class="modal-overlay" id="googleRegisterModal">
+        <div class="modal-content">
+            <div class="modal-title">Complete Your Profile</div>
+            <div class="modal-subtitle">Let's get your account set up!</div>
+            <form id="googleRegisterForm" onsubmit="handleGoogleComplete(event)">
+                <div class="modal-form-group">
+                    <label class="modal-label" for="googleEmail">Email</label>
+                    <input class="modal-input" type="email" id="googleEmail" readonly>
+                </div>
+                <div class="modal-form-group">
+                    <label class="modal-label" for="googleFullName">Full Name</label>
+                    <input class="modal-input" type="text" id="googleFullName" readonly>
+                </div>
+                <div class="modal-form-group">
+                    <label class="modal-label" for="googleNickname">Nickname</label>
+                    <input class="modal-input" type="text" id="googleNickname" placeholder="What should we call you?" required>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="modal-btn modal-btn-cancel" onclick="closeGoogleRegisterModal()">Cancel</button>
+                    <button type="submit" class="modal-btn modal-btn-confirm">Create Account</button>
+                </div>
+            </form>
         </div>
     </div>
 
     <script>
-        const API_BASE = '/api';
+        function switchPanel(name) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(name + 'Panel').classList.add('active');
+        }
 
-        // Register form
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const messageEl = document.getElementById('registerMessage');
+        function showMessageBox(id, type, text) {
+            const el = document.getElementById(id);
+            el.className = 'message-box ' + type;
+            el.textContent = text;
+        }
 
-            try {
-                const response = await fetch(`/auth/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        nickname: document.getElementById('regNickname').value,
-                        email: document.getElementById('regEmail').value,
-                        full_name: document.getElementById('regFullName').value,
-                        password: document.getElementById('regPassword').value
-                    })
-                });
-
-                if (response.ok) {
-                    messageEl.className = 'message success';
-                    messageEl.textContent = 'Account created! Please log in.';
-                    document.getElementById('registerForm').reset();
-                } else {
-                    const error = await response.json();
-                    messageEl.className = 'message error';
-                    messageEl.textContent = error.detail || 'Registration failed';
-                }
-            } catch (err) {
-                messageEl.className = 'message error';
-                messageEl.textContent = 'Error: ' + err.message;
+        function showPasswordField() {
+            const email = document.getElementById('loginEmail').value.trim();
+            if (!email) {
+                showMessageBox('loginMsg', 'error', 'Please enter your email first.');
+                return;
             }
-        });
+            document.getElementById('loginPasswordGroup').style.display = 'block';
+            document.getElementById('loginStep1Btns').style.display = 'none';
+            document.getElementById('loginStep2Btns').style.display = 'block';
+            document.getElementById('loginPassword').focus();
+        }
 
-        // Login form
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const messageEl = document.getElementById('loginMessage');
-
+        async function handleLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            if (!email || !password) {
+                showMessageBox('loginMsg', 'error', 'Please enter your email and password.');
+                return;
+            }
             try {
-                const response = await fetch(`/auth/login`, {
+                const res = await fetch('/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: document.getElementById('loginEmail').value,
-                        password: document.getElementById('loginPassword').value
-                    })
+                    body: JSON.stringify({ email, password })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('token', data.access_token);
+                    if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+                    showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
+                    setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
+                } else {
+                    const err = await res.json();
+                    showMessageBox('loginMsg', 'error', err.detail || 'Login failed. Please check your credentials.');
+                }
+            } catch (e) {
+                showMessageBox('loginMsg', 'error', 'Connection error. Please try again.');
+            }
+        }
+
+        async function handleRegister() {
+            const nickname = document.getElementById('regNickname').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value;
+            if (!nickname || !email || !password) {
+                showMessageBox('registerMsg', 'error', 'All fields are required.');
+                return;
+            }
+            try {
+                const res = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nickname, email, password })
+                });
+                if (res.ok) {
+                    showMessageBox('registerMsg', 'success', 'Account created! Please sign in.');
+                    setTimeout(() => switchPanel('login'), 1500);
+                } else {
+                    const err = await res.json();
+                    showMessageBox('registerMsg', 'error', err.detail || 'Registration failed.');
+                }
+            } catch (e) {
+                showMessageBox('registerMsg', 'error', 'Connection error. Please try again.');
+            }
+        }
+
+        async function handleGoogleSignIn() {
+            try {
+                // Wait a moment for Firebase to initialize
+                if (!window.firebaseAuth || !window.googleProvider) {
+                    setTimeout(handleGoogleSignIn, 500);
+                    return;
+                }
+
+                const result = await window.signInWithPopup(window.firebaseAuth, window.googleProvider);
+                const user = result.user;
+                const idToken = await user.getIdToken();
+
+                // Send token to backend to verify
+                const res = await fetch('/auth/google-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idToken })
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    localStorage.setItem('token', data.access_token);
-                    if (data.user) {
-                        localStorage.setItem('user', JSON.stringify(data.user));
+                if (res.ok) {
+                    const data = await res.json();
+                    
+                    if (data.is_new_user) {
+                        // New user - show registration modal
+                        window.googleIdToken = idToken; // Store for later
+                        showGoogleRegisterModal(data);
+                    } else {
+                        // Existing user - log them in
+                        localStorage.setItem('token', data.access_token);
+                        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+                        showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
+                        setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
                     }
-                    messageEl.className = 'message success';
-                    messageEl.textContent = 'Login successful! Redirecting...';
-                    setTimeout(() => {
-                        window.location.href = '/dashboard.html';
-                    }, 1500);
                 } else {
-                    const error = await response.json();
-                    messageEl.className = 'message error';
-                    messageEl.textContent = error.detail || 'Login failed';
+                    const err = await res.json();
+                    showMessageBox('loginMsg', 'error', err.detail || 'Google sign-in failed.');
+                    // Sign out from Firebase if backend failed
+                    window.firebaseAuth.signOut();
                 }
-            } catch (err) {
-                messageEl.className = 'message error';
-                messageEl.textContent = 'Error: ' + err.message;
+            } catch (e) {
+                if (e.code === 'auth/popup-closed-by-user') {
+                    // User closed the popup, no error message needed
+                } else if (e.code === 'auth/popup-blocked') {
+                    showMessageBox('loginMsg', 'error', 'Pop-up blocked. Please allow pop-ups for this site.');
+                } else {
+                    console.error('Google Sign-In error:', e);
+                    showMessageBox('loginMsg', 'error', 'Google sign-in failed. Please try again.');
+                }
+            }
+        }
+
+        function showGoogleRegisterModal(data) {
+            document.getElementById('googleEmail').value = data.email;
+            document.getElementById('googleFullName').value = data.full_name || '(not provided)';
+            document.getElementById('googleNickname').value = data.suggested_nickname || '';
+            document.getElementById('googleRegisterModal').classList.add('active');
+            document.getElementById('googleNickname').focus();
+        }
+
+        function closeGoogleRegisterModal() {
+            document.getElementById('googleRegisterModal').classList.remove('active');
+            window.googleIdToken = null;
+            // Sign out from Firebase when closing modal
+            if (window.firebaseAuth) {
+                window.firebaseAuth.signOut();
+            }
+        }
+
+        async function handleGoogleComplete(event) {
+            event.preventDefault();
+            
+            if (!window.googleIdToken) {
+                showMessageBox('loginMsg', 'error', 'Session expired. Please try again.');
+                closeGoogleRegisterModal();
+                return;
+            }
+
+            const nickname = document.getElementById('googleNickname').value.trim();
+            if (!nickname) {
+                alert('Please enter a nickname.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/auth/google-complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ idToken: window.googleIdToken, nickname })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('token', data.access_token);
+                    if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+                    closeGoogleRegisterModal();
+                    showMessageBox('loginMsg', 'success', 'Welcome! Redirecting…');
+                    setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Registration failed.');
+                }
+            } catch (e) {
+                console.error('Google registration error:', e);
+                alert('An error occurred. Please try again.');
+            }
+        }
+
+        // Allow Enter key to advance form
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                if (document.getElementById('loginPanel').classList.contains('active')) {
+                    if (document.getElementById('loginStep2Btns').style.display === 'block') {
+                        handleLogin();
+                    } else {
+                        showPasswordField();
+                    }
+                } else {
+                    handleRegister();
+                }
             }
         });
     </script>
 </body>
+
+</html>
 
 </html>

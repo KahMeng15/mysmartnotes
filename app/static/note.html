@@ -7,494 +7,12 @@
     <title>Note View - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/style.css?v=2">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/nav.js"></script>
     <script src="/js/utils.js"></script>
-    <style>
-        /* ===== NOTE HEADER ===== */
-        .note-header {
-            padding: var(--spacing-2xl);
-            border-radius: var(--radius-lg);
-            margin-bottom: var(--spacing-2xl);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .note-header h1 {
-            margin: 0 0 var(--spacing-md) 0;
-            font-size: 2rem;
-            color: inherit;
-        }
-
-        .note-header-meta {
-            display: flex;
-            gap: var(--spacing-lg);
-            flex-wrap: wrap;
-            font-size: var(--font-size-sm);
-            align-items: center;
-        }
-
-        .note-header-meta a {
-            text-decoration: none;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            transition: opacity 0.2s;
-        }
-
-        .note-header-meta a:hover {
-            opacity: 0.8;
-        }
-
-        .meta-separator {
-            opacity: 0.5;
-        }
-
-        /* ===== LAYOUT ===== */
-        .note-content {
-            display: grid;
-            grid-template-columns: 1fr 340px;
-            gap: var(--spacing-2xl);
-        }
-
-        .note-main {
-            min-width: 0;
-        }
-
-        .note-sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: var(--spacing-lg);
-            position: sticky;
-            top: 100px;
-            align-self: start;
-            max-height: calc(100vh - 120px);
-            overflow-y: hidden;
-            scrollbar-width: none;
-            /* Firefox */
-            -ms-overflow-style: none;
-            /* IE and Edge */
-        }
-
-        .note-sidebar.can-scroll {
-            overflow-y: auto;
-        }
-
-        .note-sidebar::-webkit-scrollbar {
-            display: none;
-            /* Chrome, Safari and Opera */
-        }
-
-        /* ===== SECTION CARDS ===== */
-        .section-card {
-            background: white;
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-lg);
-            border: 1px solid var(--color-light-gray);
-            overflow: visible;
-        }
-
-        .section-title {
-            font-weight: 600;
-            margin-bottom: var(--spacing-md);
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            font-size: var(--font-size-base);
-        }
-
-        /* ===== INFO ITEMS ===== */
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--spacing-sm);
-            margin-bottom: var(--spacing-md);
-        }
-
-        .info-item {
-            padding: var(--spacing-sm);
-            background: var(--color-background);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            min-width: 0;
-        }
-
-        .info-item.clickable {
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .info-item.clickable:hover {
-            background: var(--color-light-gray);
-        }
-
-        .info-item>div:last-child {
-            min-width: 0;
-        }
-
-        .info-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            flex-shrink: 0;
-            background: white;
-            border: 1px solid var(--color-light-gray);
-            color: var(--color-primary);
-        }
-
-        .info-label {
-            font-size: 0.65rem;
-            color: var(--color-gray);
-            text-transform: uppercase;
-            font-weight: 600;
-        }
-
-        .info-value {
-            font-weight: 500;
-            color: var(--color-dark);
-            font-size: 0.8rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* ===== ACTION GRID ===== */
-        .action-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--spacing-sm);
-        }
-
-        .action-btn {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            padding: var(--spacing-md);
-            border: 1px solid var(--color-light-gray);
-            border-radius: var(--radius-md);
-            background: white;
-            cursor: pointer;
-            font-size: var(--font-size-sm);
-            font-weight: 500;
-            color: var(--color-dark);
-            transition: all 0.2s;
-            font-family: var(--font-primary);
-            text-align: left;
-        }
-
-        .action-btn:hover {
-            background: var(--color-background);
-            border-color: var(--color-primary);
-            color: var(--color-primary);
-        }
-
-        .action-btn.delete-btn:hover {
-            border-color: var(--color-error);
-            color: var(--color-error);
-        }
-
-        .action-btn.coming-soon {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .action-btn i {
-            font-size: 18px;
-        }
-
-        /* ===== SNAPSHOT ITEMS ===== */
-        .snapshot-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .snapshot-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: var(--spacing-md);
-            background: var(--color-background);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--spacing-sm);
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
-
-        .snapshot-item:hover {
-            background: var(--color-light-gray);
-            border-color: var(--color-primary);
-        }
-
-        .snapshot-item.active {
-            border-color: var(--color-primary);
-            background: rgba(78, 205, 196, 0.05);
-        }
-
-        .snapshot-name {
-            font-weight: 500;
-            font-size: var(--font-size-sm);
-        }
-
-        .snapshot-date {
-            font-size: var(--font-size-xs);
-            color: var(--color-gray);
-        }
-
-        .snapshot-delete {
-            background: none;
-            border: none;
-            color: var(--color-gray);
-            cursor: pointer;
-            padding: 4px;
-            font-size: 14px;
-            transition: color 0.2s;
-        }
-
-        .snapshot-delete:hover {
-            color: var(--color-error);
-        }
-
-        /* ===== MARKDOWN (read-only view) ===== */
-        .markdown-content {
-            line-height: 1.6;
-            color: var(--color-dark);
-        }
-
-        .markdown-content>*:first-child {
-            margin-top: 0;
-        }
-
-        .markdown-content h1,
-        .markdown-content h2,
-        .markdown-content h3 {
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
-            font-weight: 600;
-            position: sticky;
-            background: white;
-            z-index: 10;
-        }
-
-        .markdown-content h1 {
-            font-size: 1.8rem;
-            color: #1a1a1a;
-            padding-bottom: 0.3em;
-            padding-top: 15px;
-            padding-bottom: 5px;
-            top: 70px;
-            /* Spacing from navbar */
-            z-index: 13;
-        }
-
-        .markdown-content h2 {
-            font-size: 1.5rem;
-            color: #333;
-            padding-top: 15px;
-            padding-bottom: 5px;
-            top: 150px;
-            /* Clear h1 */
-            z-index: 12;
-        }
-
-        .markdown-content h3 {
-            font-size: 1.25rem;
-            color: #555;
-            padding-top: 15px;
-            padding-bottom: 5px;
-            top: 190px;
-            /* Clear h2 */
-            z-index: 11;
-        }
-
-        .markdown-content p {
-            margin-bottom: 1em;
-        }
-
-        .markdown-content ul,
-        .markdown-content ol {
-            margin-bottom: 1em;
-            padding-left: 2em;
-        }
-
-        .markdown-content li {
-            margin-bottom: 0.25em;
-        }
-
-        .markdown-content table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1.5em 0;
-            font-size: 0.9em;
-        }
-
-        .markdown-content th,
-        .markdown-content td {
-            border: 1px solid #ddd;
-            padding: 8px 12px;
-            text-align: left;
-        }
-
-        .markdown-content th {
-            background-color: #f8f9fa;
-            font-weight: 600;
-        }
-
-        .markdown-content tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-
-        .markdown-content blockquote {
-            border-left: 4px solid #ddd;
-            margin: 0;
-            padding-left: 1em;
-            color: #666;
-            font-style: italic;
-        }
-
-        .markdown-content code {
-            font-family: var(--font-mono);
-            background: #f5f5f5;
-            padding: 0.2em 0.4em;
-            border-radius: 3px;
-            font-size: 0.85em;
-        }
-
-        .markdown-content pre {
-            background: #f5f5f5;
-            padding: 1em;
-            border-radius: 5px;
-            overflow-x: auto;
-            margin-bottom: 1em;
-        }
-
-        .markdown-content pre code {
-            background: none;
-            padding: 0;
-        }
-
-        .markdown-content img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 4px;
-            margin: 1em 0;
-        }
-
-        /* ===== STATUS & PROGRESS ===== */
-        .loading {
-            text-align: center;
-            padding: var(--spacing-2xl);
-            color: var(--color-gray);
-        }
-
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: var(--spacing-lg);
-            border-radius: var(--radius-md);
-            border-left: 4px solid #c33;
-        }
-
-        .progress-container {
-            padding-top: 10px;
-
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: var(--radius-full);
-            overflow: hidden;
-            margin: var(--spacing-md) 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--color-primary), var(--color-primary-dark));
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: var(--spacing-sm) var(--spacing-md);
-            border-radius: var(--radius-full);
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            text-transform: uppercase;
-            margin-bottom: var(--spacing-md);
-        }
-
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .status-running {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-
-        .status-completed {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-failed {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .snapshot-save-row {
-            display: flex;
-            gap: var(--spacing-sm);
-            margin-bottom: var(--spacing-md);
-        }
-
-        .snapshot-save-row input {
-            flex: 1;
-            padding: var(--spacing-sm) var(--spacing-md);
-            font-size: var(--font-size-sm);
-        }
-
-        .snapshot-save-row button {
-            padding: var(--spacing-sm) var(--spacing-md);
-            font-size: var(--font-size-sm);
-            white-space: nowrap;
-        }
-
-        /* Responsive */
-        @media (max-width: 968px) {
-            .note-content {
-                grid-template-columns: 1fr;
-            }
-
-            .note-header h1 {
-                font-size: 1.5rem;
-            }
-
-            .editor-split {
-                grid-template-columns: 1fr;
-            }
-
-            .action-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
     <script src="/js/marked.min.js"></script>
     <script>
         if (typeof marked === 'undefined') {
@@ -513,35 +31,39 @@
 
 <body>
 
-    <div class="container" style="padding-top: var(--spacing-2xl);">
-        <!-- Back Link -->
-        <div style="margin-bottom: var(--spacing-md);">
-            <a href="/mynotes.html" id="backLink"
-                style="color: var(--color-gray); font-size: var(--font-size-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                <i class="ph ph-arrow-left"></i> Back to Notes
-            </a>
-        </div>
+    <div class="note-layout">
+        <div class="page-card note-page-card">
+            <!-- Back Link - Corner (top of card with minimal padding) -->
+            <div style="padding: var(--spacing-sm); position: sticky; top: 0; background: white; z-index: 10; border-bottom: 1px solid rgba(0, 0, 0, 0.04);">
+                <a href="/mynotes.html" id="backLink"
+                    style="color: var(--color-gray); font-size: var(--font-size-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="ph ph-arrow-left"></i> Back to Notes
+                </a>
+            </div>
 
-        <div id="loadingContainer" class="loading">
+            <!-- Content -->
+            <div>
+                <div id="loadingContainer" class="loading">
             <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i></div>
             <p>Loading note...</p>
         </div>
 
-        <div id="lectureContainer" style="display: none;">
-            <!-- Note Header -->
+        <div id="lectureContainer" style="display: none; padding: var(--spacing-2xl); padding-top: var(--spacing-md);">
+            <!-- Note Header: Title comes from first h1 in markdown content -->
             <div class="note-header" id="noteHeader">
-                <h1 id="lectureTitle">Note Title</h1>
+                <div class="note-header-breadcrumb" id="noteBreadcrumb">
+                    <span class="subject-dot" id="subjectDot"></span>
+                    <a href="#" id="metaGroup" style="color:inherit;text-decoration:none;">Group</a>
+                    <span>›</span>
+                    <a href="#" id="metaSubject" style="color:inherit;text-decoration:none;">Subject</a>
+                </div>
                 <div class="note-header-meta">
-                    <a href="#" id="metaSubject"><i class="ph ph-book-open"></i> <span>Subject</span></a>
-                    <span class="meta-separator">•</span>
-                    <a href="#" id="metaGroup"><i class="ph ph-folder"></i> <span>Group</span></a>
+                    <a href="#" id="metaSubjectHidden"><span>Subject</span></a>
                 </div>
             </div>
 
-            <!-- Content Area -->
-            <div class="note-content">
-                <!-- Main Content -->
-                <div class="note-main">
+            <!-- Main Content -->
+            <div class="note-main">
                     <div class="section-card" style="padding-top: 10px;">
                         <!-- Status Badge -->
                         <div id="extractionStatus" style="display: none;">
@@ -584,100 +106,80 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Sidebar -->
-                <div class="note-sidebar">
-                    <!-- Info Card -->
-                    <div class="section-card">
-                        <div class="section-title"><i class="ph ph-info"></i> Info</div>
-                        <div class="info-grid">
-                            <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
-                                onclick="downloadOriginalFile()">
-                                <div class="info-icon"><i class="ph ph-file-arrow-down"></i></div>
-                                <div>
-                                    <div class="info-label">File Name</div>
-                                    <div class="info-value" id="fileName">-</div>
-                                </div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-icon"><i class="ph ph-calendar-blank"></i></div>
-                                <div>
-                                    <div class="info-label">Uploaded</div>
-                                    <div class="info-value" id="uploadedDate">-</div>
-                                </div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-icon"><i class="ph ph-file-text"></i></div>
-                                <div>
-                                    <div class="info-label">File Type</div>
-                                    <div class="info-value" id="fileType">-</div>
-                                </div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-icon"><i class="ph ph-hard-drives"></i></div>
-                                <div>
-                                    <div class="info-label">File Size</div>
-                                    <div class="info-value" id="fileSize">-</div>
-                                </div>
-                            </div>
-                            <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
-                                onclick="reprocessOCR()">
-                                <div class="info-icon"><i class="ph ph-timer"></i></div>
-                                <div>
-                                    <div class="info-label">Processing</div>
-                                    <div class="info-value" id="processingTime">-</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Snapshots Card -->
-                    <div class="section-card">
-                        <div class="section-title"><i class="ph ph-camera"></i> Snapshots</div>
-                        <div class="snapshot-save-row">
-                            <input type="text" id="snapshotNameInput" placeholder="Snapshot name...">
-                            <button class="btn btn-primary btn-small" onclick="createSnapshot()"><i
-                                    class="ph ph-plus"></i> Save</button>
-                        </div>
-                        <div id="snapshotList" class="snapshot-list">
-                            <p
-                                style="color: var(--color-gray); font-size: var(--font-size-sm); text-align: center; padding: var(--spacing-md);">
-                                No snapshots yet</p>
-                        </div>
-                    </div>
-
-                    <!-- Actions Card -->
-                    <div class="section-card">
-                        <div class="section-title"><i class="ph ph-lightning"></i> Actions</div>
-                        <div class="action-grid">
-                            <button class="action-btn" onclick="goToChat()"><i class="ph ph-chat-circle-dots"></i>
-                                Chat</button>
-                            <button class="action-btn" onclick="toggleEdit()" id="editBtn"><i
-                                    class="ph ph-pencil-simple"></i> Edit</button>
-                            <button class="action-btn" onclick="reprocessOCR()" id="autoFormatBtn"><i
-                                    class="ph ph-magic-wand"></i> Auto Format</button>
-                            <button class="action-btn coming-soon" title="Coming Soon"><i
-                                    class="ph ph-text-align-left"></i> Summarize</button>
-                            <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-exam"></i>
-                                Quiz</button>
-                            <button class="action-btn" onclick="generateFlashcards()"><i class="ph ph-cards"></i>
-                                Flashcards</button>
-                            <button class="action-btn" onclick="exportNote()"><i class="ph ph-export"></i>
-                                Export</button>
-                            <button class="action-btn delete-btn" onclick="deleteLecture()"><i class="ph ph-trash"></i>
-                                Delete</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <div id="errorContainer" style="display: none; margin-top: var(--spacing-2xl);">
             <div class="error-message" id="errorMessage">Error loading note</div>
         </div>
-    </div>
+            </div> <!-- /content wrapper -->
+        </div> <!-- /note-page-card -->
 
-    <!-- Save Confirm Modal -->
+        <!-- Note Sidebar (right side) -->
+        <div class="note-sidebar" style="display: none;">
+            <!-- Actions (Top) -->
+            <div class="section-card">
+                <div class="action-grid">
+                    <button class="action-btn" onclick="goToChat()" title="Chat"><i class="ph ph-chat-circle-dots"></i> Chat</button>
+                    <button class="action-btn" onclick="" title="Quiz"><i class="ph ph-exam"></i> Quiz</button>
+                    <button class="action-btn" onclick="generateFlashcards()" title="Flash Card"><i class="ph ph-cards"></i> Flash Card</button>
+                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-text-align-left"></i> Summarize</button>
+                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-list"></i> Point Form</button>
+                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-text-indent"></i> Paragraph</button>
+                    <button class="action-btn" onclick="exportNote()"><i class="ph ph-export"></i> Export</button>
+                </div>
+            </div>
+
+            <div class="sidebar-divider"></div>
+
+            <!-- Edit/View/Save (Below Actions) -->
+            <div class="section-card">
+                <div class="action-grid">
+                    <button class="action-btn" onclick="viewLecture()" id="viewBtn"><i class="ph ph-eye"></i> View</button>
+                    <button class="action-btn" onclick="toggleEdit()" id="editBtn"><i class="ph ph-pencil-simple"></i> Edit</button>
+                </div>
+            </div>
+
+            <!-- Snapshots Section -->
+            <div class="section-card" style="display: none;" id="snapshotsSection">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                    <h4 style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray); margin: 0;">Snapshots</h4>
+                    <button class="action-btn" onclick="promptCreateSnapshot()" title="Create snapshot" style="padding: 4px 8px; font-size: 0.75rem;">
+                        <i class="ph ph-plus" style="margin-right: 4px;"></i>New
+                    </button>
+                </div>
+                <div id="snapshotList" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+
+            <!-- System Info (Bottom - Anchored) -->
+            <div class="section-card">
+                <div class="info-grid">
+                    <div class="sidebar-divider"></div>
+                    <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
+                        onclick="downloadOriginalFile()">
+                        <div class="info-label">File Name</div>
+                        <div class="info-value" id="fileName">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">File Format</div>
+                        <div class="info-value" id="fileType">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">File Size</div>
+                        <div class="info-value" id="fileSize">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Upload Date</div>
+                        <div class="info-value" id="uploadedDate">-</div>
+                    </div>
+                    <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
+                        onclick="reprocessOCR()">
+                        <div class="info-label">Processing</div>
+                        <div class="info-value" id="processingTime">-</div>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- /note-sidebar -->
+    </div> <!-- /note-layout -->
     <div id="saveConfirmModal" class="modal">
         <div class="modal-content" style="min-height: auto;">
             <h3>Save Changes?</h3>
@@ -717,6 +219,10 @@
             </div>
         </div>
     </div>
+
+    <!-- Hidden input for snapshot name -->
+    <input type="hidden" id="snapshotNameInput" value="">
+
     <script>
         const TOKEN_KEY = 'token';
         const token = localStorage.getItem(TOKEN_KEY);
@@ -772,38 +278,37 @@
         function displayLecture() {
             document.getElementById('loadingContainer').style.display = 'none';
             document.getElementById('lectureContainer').style.display = 'block';
+            document.querySelector('.note-sidebar').style.display = '';
 
-            document.getElementById('lectureTitle').textContent = lectureData.title;
+            // Note title will be extracted from first h1 in markdown, no longer set here
 
-            // Header color from subject
-            const subjectColor = lectureData.subject?.color || '#3b82f6';
-            const textColor = getContrastColor(subjectColor);
-            const header = document.getElementById('noteHeader');
-            header.style.background = subjectColor;
-            header.style.color = textColor;
-            // Style links in header
-            header.querySelectorAll('a').forEach(a => a.style.color = textColor);
-            header.querySelectorAll('.meta-separator').forEach(s => s.style.color = textColor);
+            // Subject color dot
+            const subjectColor = lectureData.subject?.color || '#593C8F';
+            const dot = document.getElementById('subjectDot');
+            if (dot) dot.style.background = subjectColor;
 
             // Metadata
             const subjectName = lectureData.subject?.name || 'Unknown Subject';
             const subjectId = lectureData.subject_id;
             const metaSubject = document.getElementById('metaSubject');
-            metaSubject.querySelector('span').textContent = subjectName;
-            metaSubject.href = subjectId ? `/subject.html?id=${subjectId}` : '#';
+            if (metaSubject) {
+                metaSubject.textContent = subjectName;
+                metaSubject.href = subjectId ? `/subject.html?id=${subjectId}` : '#';
+            }
 
             // Fetch group name
             if (lectureData.subject?.group_id) {
                 fetchGroupName(lectureData.subject.group_id);
             } else {
-                document.getElementById('metaGroup').querySelector('span').textContent = 'No Group';
+                const mg = document.getElementById('metaGroup');
+                if (mg) mg.textContent = 'Ungrouped';
             }
 
             // Back link
             const backLink = document.getElementById('backLink');
             if (subjectId) {
                 backLink.href = `/subject.html?id=${subjectId}`;
-                backLink.innerHTML = `<i class="ph ph-arrow-left"></i> Back to Subject`;
+                backLink.innerHTML = `Back to Subject`;
             }
 
             // Sidebar info
@@ -837,6 +342,7 @@
                 document.getElementById('processingTime').textContent = 'N/A';
             }
 
+            document.title = lectureData.title + ' - MySmartNotes';
             updateExtractedText();
         }
 
@@ -847,11 +353,13 @@
                     const groups = await res.json();
                     const group = groups.find(g => g.id == groupId);
                     const metaGroup = document.getElementById('metaGroup');
-                    if (group) {
-                        metaGroup.querySelector('span').textContent = group.name;
-                        metaGroup.href = `/group.html?id=${group.id}`;
-                    } else {
-                        metaGroup.querySelector('span').textContent = 'Unknown Group';
+                    if (metaGroup) {
+                        if (group) {
+                            metaGroup.textContent = group.name;
+                            metaGroup.href = `/group.html?id=${group.id}`;
+                        } else {
+                            metaGroup.textContent = 'Unknown Group';
+                        }
                     }
                 }
             } catch (e) { console.error('Error fetching group:', e); }
@@ -864,7 +372,7 @@
             return (bytes / 1048576).toFixed(2) + ' MB';
         }
 
-        // ===== EXTRACTED TEXT =====
+        // ===== EXTRACTED TEXT & H1 SYNCING =====
         function updateExtractedText() {
             const textContainer = document.getElementById('extractedText');
             textContainer.innerHTML = '';
@@ -876,6 +384,7 @@
                 try {
                     textContainer.innerHTML = marked.parse(lectureData.extracted_text);
                     if (pollingInterval) clearInterval(pollingInterval);
+                    setupH1Editing();
                     return;
                 } catch (e) {
                     console.error('marked.js failed:', e);
@@ -888,6 +397,74 @@
                 textContainer.innerHTML = '<p class="text-center text-muted">No content extracted yet.</p>';
             }
             if (pollingInterval) clearInterval(pollingInterval);
+            setupH1Editing();
+        }
+
+        // Extract first h1 and make it editable
+        function setupH1Editing() {
+            const firstH1 = document.querySelector('.markdown-content h1');
+            if (firstH1) {
+                // Make the h1 editable
+                firstH1.contentEditable = 'true';
+                firstH1.style.cursor = 'text';
+                
+                // Add visual feedback on focus
+                firstH1.addEventListener('focus', function() {
+                    firstH1.style.outline = '2px solid var(--color-primary)';
+                    firstH1.style.outlineOffset = '4px';
+                });
+                
+                firstH1.addEventListener('blur', function() {
+                    firstH1.style.outline = 'none';
+                    const newTitle = firstH1.textContent.trim();
+                    if (newTitle && newTitle !== lectureData.title) {
+                        updateLectureTitle(newTitle);
+                    }
+                });
+                
+                // Update title on keyboard shortcuts (Ctrl+S or Cmd+S)
+                firstH1.addEventListener('keydown', function(e) {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                        e.preventDefault();
+                        firstH1.blur();
+                    }
+                });
+                
+                // Prevent drag and other default contenteditable behaviors
+                firstH1.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const text = e.clipboardData.getData('text/plain');
+                    document.execCommand('insertText', false, text);
+                });
+            }
+        }
+
+        // Update lecture title in the database
+        async function updateLectureTitle(newTitle) {
+            try {
+                const response = await fetch(`/lectures/${lectureId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ title: newTitle })
+                });
+                if (response.ok) {
+                    lectureData.title = newTitle;
+                    document.title = newTitle + ' - MySmartNotes';
+                } else {
+                    console.error('Failed to update lecture title');
+                    // Revert the change
+                    const firstH1 = document.querySelector('.markdown-content h1');
+                    if (firstH1) firstH1.textContent = lectureData.title;
+                }
+            } catch (e) {
+                console.error('Error updating lecture title:', e);
+                // Revert the change
+                const firstH1 = document.querySelector('.markdown-content h1');
+                if (firstH1) firstH1.textContent = lectureData.title;
+            }
         }
 
         // ===== EXTRACTION STATUS =====
@@ -968,6 +545,11 @@
             window.location.href = `/note/${lectureId}/edit`;
         }
 
+        function viewLecture() {
+            // Just refresh the current view page
+            window.location.href = `/note/${lectureId}`;
+        }
+
         // ===== SNAPSHOTS =====
         async function loadSnapshots() {
             try {
@@ -983,19 +565,31 @@
 
         function renderSnapshots(snapshots) {
             const container = document.getElementById('snapshotList');
-            if (!snapshots || snapshots.length === 0) {
-                container.innerHTML = '<p style="color: var(--color-gray); font-size: var(--font-size-sm); text-align: center; padding: var(--spacing-md);">No snapshots yet</p>';
+            const section = document.getElementById('snapshotsSection');
+            
+            if (!container || !section) {
+                console.warn('Snapshots container not found in DOM');
                 return;
             }
+            
+            if (!snapshots || snapshots.length === 0) {
+                section.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+            
+            section.style.display = 'block';
             container.innerHTML = snapshots.map(s => `
-                <div class="snapshot-item" onclick="viewSnapshot(${s.id})">
-                    <div>
-                        <div class="snapshot-name">${escapeHtml(s.name)}</div>
-                        <div class="snapshot-date">${new Date(s.created_at).toLocaleString()}</div>
+                <div class="snapshot-item" onclick="viewSnapshot(${s.id})" style="padding: var(--spacing-sm); border-radius: var(--radius-md); cursor: pointer; margin-bottom: var(--spacing-sm); background: rgba(89, 60, 143, 0.05); transition: background 0.15s;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-sm);">
+                        <div style="flex: 1; min-width: 0;">
+                            <div class="snapshot-name" style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(s.name)}</div>
+                            <div class="snapshot-date" style="font-size: var(--font-size-xs); color: var(--color-gray); margin-top: 2px;">${new Date(s.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <button class="snapshot-delete" onclick="event.stopPropagation(); deleteSnapshot(${s.id})" title="Delete snapshot" style="padding: 4px; background: none; border: none; cursor: pointer; color: var(--color-gray); font-size: 1rem;">
+                            <i class="ph ph-trash"></i>
+                        </button>
                     </div>
-                    <button class="snapshot-delete" onclick="event.stopPropagation(); deleteSnapshot(${s.id})" title="Delete snapshot">
-                        <i class="ph ph-trash"></i>
-                    </button>
                 </div>
             `).join('');
         }
@@ -1022,6 +616,17 @@
                     alert('Failed to create snapshot');
                 }
             } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        function promptCreateSnapshot() {
+            const name = prompt('Enter snapshot name:');
+            if (name && name.trim()) {
+                const input = document.getElementById('snapshotNameInput');
+                if (input) {
+                    input.value = name.trim();
+                    createSnapshot();
+                }
+            }
         }
 
         async function viewSnapshot(snapshotId) {
@@ -1246,6 +851,7 @@
         function showError(message) {
             document.getElementById('loadingContainer').style.display = 'none';
             document.getElementById('lectureContainer').style.display = 'none';
+            document.querySelector('.note-sidebar').style.display = 'none';
             document.getElementById('errorContainer').style.display = 'block';
             document.getElementById('errorMessage').textContent = message;
         }

@@ -1,89 +1,74 @@
 /**
- * Global Navigation Bar
- * - Injects the navbar into the page
- * - Highlights active link
- * - Handles logout (replacing local implementations)
+ * Global Sidebar Navigation
+ * Injects the left sidebar, highlights active link, and handles logout.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    injectNavbar();
+    injectSidebar();
 });
 
-function injectNavbar() {
-    // Standard Navbar HTML
-    const navbarHtml = `
-    <nav class="navbar">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <a href="/dashboard.html" class="navbar-brand"><i class="ph ph-books"></i> MySmartNotes</a>
-                <ul class="navbar-nav">
-                    <li><a href="/dashboard.html" class="nav-link">Dashboard</a></li>
-                    <li><a href="/mynotes.html" class="nav-link">My Notes</a></li>
-                    <li><a href="/chat.html" class="nav-link">Chat</a></li>
-                    <li><a href="/upload.html" class="nav-link">Upload</a></li>
-                </ul>
-                <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
-                    <a href="/settings.html" class="nav-link"><i class="ph ph-gear"></i> Settings</a>
-                    <span id="navUserDisplay" style="font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text);"></span>
-                    <div class="avatar" onclick="logout()" style="cursor: pointer;" title="Logout"><i class="ph ph-user"></i></div>
-                </div>
-            </div>
+function injectSidebar() {
+    const sidebarHtml = `
+    <aside class="app-sidebar" id="appSidebar">
+        <a href="/dashboard.html" class="sidebar-brand">my<br>smart<br>notes</a>
+
+        <ul class="sidebar-nav-list" id="sidebarNav">
+            <li><a href="/dashboard.html" class="sidebar-nav-link" data-page="dashboard.html"><i class="ph ph-house-line"></i><span>Home</span></a></li>
+            <li><a href="/mynotes.html" class="sidebar-nav-link" data-page="mynotes.html"><i class="ph ph-notebook"></i><span>Notes</span></a></li>
+            <li><a href="/chat.html" class="sidebar-nav-link" data-page="chat.html"><i class="ph ph-chat-circle-dots"></i><span>Chat</span></a></li>
+            <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-exam"></i><span>Quiz</span></a></li>
+            <li><a href="/flashcards.html" class="sidebar-nav-link" data-page="flashcards.html"><i class="ph ph-cards"></i><span>Flashcards</span></a></li>
+            <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-clock"></i><span>Pomodoro</span></a></li>
+            <li><a href="/upload.html" class="sidebar-nav-link" data-page="upload.html"><i class="ph ph-upload-simple"></i><span>Upload</span></a></li>
+            <li class="sidebar-divider"></li>
+            <li><a href="/settings.html" class="sidebar-nav-link" data-page="settings.html"><i class="ph ph-gear"></i><span>Settings</span></a></li>
+            <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-clock-user"></i><span>Recent</span></a></li>
+        </ul>
+
+        <div class="sidebar-user" onclick="logout()" title="Logout">
+            <div class="sidebar-avatar" id="sidebarAvatarInitial">?</div>
+            <span class="sidebar-user-name" id="sidebarUserName">...</span>
         </div>
-    </nav>
+    </aside>
     `;
 
-    // 1. Try to find a placeholder (if we decide to use one)
-    // 2. Or insert at the top of the body (standard approach)
-    // 3. Or replace existing <nav> if it exists (for smoother transition if scripts load late?)
-    //    Actually, we are replacing the hardcoded nav in HTML with just the script, so prepending to body is safest.
-
-    // However, some existing pages have <nav> which we will delete in HTML.
-    // So we just prepend to body.
-    document.body.insertAdjacentHTML('afterbegin', navbarHtml);
-
-    // Set active link based on current URL
+    document.body.insertAdjacentHTML('afterbegin', sidebarHtml);
     setActiveLink();
-
-    // Display user name
     displayUser();
 }
 
 function setActiveLink() {
     const currentPath = window.location.pathname;
-    const pageName = currentPath.split('/').pop() || 'index.html';
+    const pageName = currentPath.split('/').pop() || 'dashboard.html';
 
-    const links = document.querySelectorAll('.navbar-nav .nav-link');
-    links.forEach(link => {
-        const href = link.getAttribute('href');
-        if (href === '/' + pageName || href === pageName) {
+    document.querySelectorAll('.sidebar-nav-link[data-page]').forEach(link => {
+        if (link.dataset.page === pageName) {
             link.classList.add('active');
         }
     });
 
-    // Handle Settings separately as it is outside the main list
-    if (pageName === 'settings.html') {
-        const settingsLink = document.querySelector('a[href="/settings.html"]') || document.querySelector('a[href="settings.html"]');
-        if (settingsLink) settingsLink.classList.add('active');
+    // note.html / note_edit.html — highlight Notes
+    if (pageName === '' || currentPath.includes('/note/')) {
+        const notesLink = document.querySelector('.sidebar-nav-link[data-page="mynotes.html"]');
+        if (notesLink) notesLink.classList.add('active');
     }
 }
 
 function displayUser() {
     const userStr = localStorage.getItem('user');
-    if (userStr) {
-        try {
-            const user = JSON.parse(userStr);
-            const display = document.getElementById('navUserDisplay');
-            if (display) {
-                display.textContent = user.nickname || user.full_name || user.username || 'Student';
-            }
-        } catch (e) {
-            console.error('Error parsing user data', e);
-        }
+    if (!userStr) return;
+    try {
+        const user = JSON.parse(userStr);
+        const name = user.nickname || user.full_name || user.username || 'Student';
+        const nameEl = document.getElementById('sidebarUserName');
+        const avatarEl = document.getElementById('sidebarAvatarInitial');
+        if (nameEl) nameEl.textContent = name;
+        if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
+    } catch (e) {
+        console.error('Error parsing user data', e);
     }
 }
 
-// Global Logout Function
-// (Attached to window so it can be called from onclick="logout()")
 window.logout = function () {
     if (confirm('Are you sure you want to logout?')) {
         localStorage.removeItem('token');

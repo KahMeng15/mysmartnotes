@@ -7,9 +7,7 @@
     <title>Subject Details - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
@@ -161,7 +159,7 @@
 <body>
 
 
-    <div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="page-card">
         <!-- Back Link -->
         <div style="margin-bottom: var(--spacing-md);">
             <a href="mynotes.html" id="backLink"
@@ -392,7 +390,7 @@
             document.getElementById('editSubjectModal').classList.add('active');
             document.getElementById('editSubjectNameInput').value = currentSubject.name;
             document.getElementById('editSubjectDescInput').value = currentSubject.description || '';
-            document.getElementById('editSubjectColorInput').value = currentSubject.color || '#3b82f6';
+            document.getElementById('editSubjectColorInput').value = currentSubject.color || '#593C8F';
         }
 
         function closeModal(id) {

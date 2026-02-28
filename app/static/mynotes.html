@@ -7,9 +7,7 @@
     <title>My Notes - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
@@ -92,7 +90,7 @@
 <body>
 
 
-    <div class="container" style="padding-top: var(--spacing-2xl);">
+    <div class="page-card">
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center" style="margin-bottom: var(--spacing-xl);">
             <h1>My Notes</h1>
@@ -158,7 +156,7 @@
                 </div>
                 <div class="form-group">
                     <label>Color Tag</label>
-                    <input type="color" id="subjectColorInput" value="#3b82f6"
+                    <input type="color" id="subjectColorInput" value="#593C8F"
                         style="width: 100%; height: 40px; border: none; padding: 0;">
                 </div>
                 <div class="modal-buttons">
@@ -257,7 +255,7 @@
         function createGroupSection(group, subjects, isUngrouped = false) {
             // Generate Subject Cards
             const subjectsHtml = subjects.length > 0 ? subjects.map(s => `
-                <div class="subject-card" onclick="event.stopPropagation(); openSubject(${s.id})" style="border-left: 4px solid ${s.color || '#3b82f6'};">
+                <div class="subject-card" onclick="event.stopPropagation(); openSubject(${s.id})" style="border-left: 4px solid ${s.color || '#593C8F'};">
                     <div class="subject-title">${s.name}</div>
                     <p style="color: var(--color-gray); font-size: 0.9rem; margin-bottom: 1rem; flex: 1;">
                         ${s.description || 'No description'}
@@ -404,7 +402,7 @@
             document.getElementById('subjectDescInput').value = '';
 
             // Auto-generate color
-            const existingColors = subjectsData.map(s => s.color || '#3b82f6');
+            const existingColors = subjectsData.map(s => s.color || '#593C8F');
             const newColor = generateContrastingColor(existingColors);
             document.getElementById('subjectColorInput').value = newColor;
         }
