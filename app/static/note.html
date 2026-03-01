@@ -7,7 +7,9 @@
     <title>Note View - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/style.css?v=2">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
@@ -29,42 +31,35 @@
     </script>
 </head>
 
-<body>
+<body class="note-page">
 
-    <div class="note-layout">
-        <div class="page-card note-page-card">
-            <!-- Back Link - Corner (top of card with minimal padding) -->
-            <div style="padding: var(--spacing-sm); position: sticky; top: 0; background: white; z-index: 10; border-bottom: 1px solid rgba(0, 0, 0, 0.04);">
-                <a href="/mynotes.html" id="backLink"
-                    style="color: var(--color-gray); font-size: var(--font-size-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                    <i class="ph ph-arrow-left"></i> Back to Notes
+    <div class="app-layout">
+        <!-- NOTE: sidebar is injected here by nav.js as the first child -->
+        <!-- CONTENT CARD (white card) -->
+        <div class="note-content-card page-card">
+            <!-- Sticky header bar with back + breadcrumb -->
+            <div class="note-sticky-header">
+                <a href="/mynotes.html" id="backLink" class="note-nav-back">
+                    <i class="ph ph-arrow-left"></i> Back
                 </a>
-            </div>
-
-            <!-- Content -->
-            <div>
-                <div id="loadingContainer" class="loading">
-            <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i></div>
-            <p>Loading note...</p>
-        </div>
-
-        <div id="lectureContainer" style="display: none; padding: var(--spacing-2xl); padding-top: var(--spacing-md);">
-            <!-- Note Header: Title comes from first h1 in markdown content -->
-            <div class="note-header" id="noteHeader">
-                <div class="note-header-breadcrumb" id="noteBreadcrumb">
+                <div class="note-breadcrumb-row" id="noteBreadcrumb">
                     <span class="subject-dot" id="subjectDot"></span>
-                    <a href="#" id="metaGroup" style="color:inherit;text-decoration:none;">Group</a>
-                    <span>›</span>
-                    <a href="#" id="metaSubject" style="color:inherit;text-decoration:none;">Subject</a>
+                    <a href="#" id="metaGroup" class="note-nav-crumb-link">Group</a>
+                    <span class="note-nav-sep">›</span>
+                    <a href="#" id="metaSubject" class="note-nav-crumb-link">Subject</a>
                 </div>
-                <div class="note-header-meta">
-                    <a href="#" id="metaSubjectHidden"><span>Subject</span></a>
+                <div style="display:none;"><a href="#" id="metaSubjectHidden"><span>Subject</span></a></div>
+            </div>
+            <div id="loadingContainer" class="loading">
+                <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i>
                 </div>
+                <p>Loading note...</p>
             </div>
 
-            <!-- Main Content -->
-            <div class="note-main">
+            <div id="lectureContainer" style="display: none;">
+                <div class="note-main">
                     <div class="section-card" style="padding-top: 10px;">
+                        <div class="note-header" id="noteHeader"></div>
                         <!-- Status Badge -->
                         <div id="extractionStatus" style="display: none;">
                             <div id="statusBadge" class="status-badge status-pending">Pending</div>
@@ -106,80 +101,121 @@
                         </div>
                     </div>
                 </div>
-        </div>
+            </div>
 
-        <div id="errorContainer" style="display: none; margin-top: var(--spacing-2xl);">
-            <div class="error-message" id="errorMessage">Error loading note</div>
-        </div>
-            </div> <!-- /content wrapper -->
-        </div> <!-- /note-page-card -->
+            <div id="errorContainer" style="display: none; margin-top: var(--spacing-2xl);">
+                <div class="error-message" id="errorMessage">Error loading note</div>
+            </div>
+        </div> <!-- /note-content-card -->
 
-        <!-- Note Sidebar (right side) -->
-        <div class="note-sidebar" style="display: none;">
-            <!-- Actions (Top) -->
-            <div class="section-card">
-                <div class="action-grid">
-                    <button class="action-btn" onclick="goToChat()" title="Chat"><i class="ph ph-chat-circle-dots"></i> Chat</button>
-                    <button class="action-btn" onclick="" title="Quiz"><i class="ph ph-exam"></i> Quiz</button>
-                    <button class="action-btn" onclick="generateFlashcards()" title="Flash Card"><i class="ph ph-cards"></i> Flash Card</button>
-                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-text-align-left"></i> Summarize</button>
-                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-list"></i> Point Form</button>
-                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-text-indent"></i> Paragraph</button>
-                    <button class="action-btn" onclick="exportNote()"><i class="ph ph-export"></i> Export</button>
+        <!-- CHAT CARD (white card) — hidden by default -->
+        <div class="note-chat-card page-card" id="noteChatPanel" style="display: none;">
+            <div class="note-chat-header">
+                <h4><i class="ph ph-chat-circle-dots"></i> Chat</h4>
+                <button class="note-chat-close" onclick="toggleChat()" title="Close chat"><i
+                        class="ph ph-x"></i></button>
+                <p class="note-chat-subtitle" id="noteChatSubtitle">Ask questions about this note</p>
+            </div>
+            <div class="note-chat-messages" id="noteChatMessages">
+                <div class="note-chat-empty">
+                    <i class="ph ph-chat-circle-dots" style="font-size: 2rem; margin-bottom: var(--spacing-sm);"></i>
+                    <p>Ask a question about this note</p>
                 </div>
+            </div>
+            <div class="note-chat-input-area">
+                <!-- AI Mode Selector -->
+                <div class="ai-mode-bar">
+                    <span class="mode-label-text">Mode:</span>
+                    <button class="mode-pill" data-mode="quick" onclick="setChatMode('quick')" title="Quick answer"><i
+                            class="ph ph-lightning"></i> Quick</button>
+                    <button class="mode-pill active" data-mode="elaboration" onclick="setChatMode('elaboration')"
+                        title="Elaborate"><i class="ph ph-lightbulb"></i> Elaborate</button>
+                    <button class="mode-pill" data-mode="eli5" onclick="setChatMode('eli5')" title="ELI5"><i
+                            class="ph ph-smiley"></i> ELI5</button>
+                </div>
+                <div class="note-chat-input-row">
+                    <input type="text" id="noteChatInput" placeholder="Ask about this note..." disabled>
+                    <button type="button" id="noteChatSendBtn" class="btn btn-primary" disabled
+                        onclick="sendNoteChat()">
+                        <i class="ph ph-paper-plane-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div> <!-- /note-chat-card -->
+
+        <div class="note-action-panel">
+            <!-- Actions -->
+            <div class="action-grid">
+                <button class="action-btn" onclick="toggleChat()" title="Quick Chat" id="quickChatBtn"><i
+                        class="ph ph-chat-circle-dots"></i> <span>Quick Chat</span></button>
+                <button class="action-btn" onclick="" title="Quiz"><i class="ph ph-exam"></i> <span>Quiz</span></button>
+                <button class="action-btn" onclick="generateFlashcards()" title="Flash Card"><i class="ph ph-cards"></i>
+                    <span>Flash Card</span></button>
+                <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-text-align-left"></i>
+                    <span>Summarize</span></button>
+                <button class="action-btn" onclick="exportNote()"><i class="ph ph-export"></i>
+                    <span>Export</span></button>
             </div>
 
             <div class="sidebar-divider"></div>
 
-            <!-- Edit/View/Save (Below Actions) -->
-            <div class="section-card">
-                <div class="action-grid">
-                    <button class="action-btn" onclick="viewLecture()" id="viewBtn"><i class="ph ph-eye"></i> View</button>
-                    <button class="action-btn" onclick="toggleEdit()" id="editBtn"><i class="ph ph-pencil-simple"></i> Edit</button>
-                </div>
+            <!-- Edit/View -->
+            <div class="action-grid">
+                <button class="action-btn" onclick="viewLecture()" id="viewBtn"><i class="ph ph-eye"></i>
+                    <span>View</span></button>
+                <button class="action-btn" onclick="toggleEdit()" id="editBtn"><i class="ph ph-pencil-simple"></i>
+                    <span>Edit</span></button>
             </div>
 
             <!-- Snapshots Section -->
-            <div class="section-card" style="display: none;" id="snapshotsSection">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
-                    <h4 style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray); margin: 0;">Snapshots</h4>
-                    <button class="action-btn" onclick="promptCreateSnapshot()" title="Create snapshot" style="padding: 4px 8px; font-size: 0.75rem;">
-                        <i class="ph ph-plus" style="margin-right: 4px;"></i>New
+            <div style="display: none;" id="snapshotsSection">
+                <div class="sidebar-divider"></div>
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
+                    <h4
+                        style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0;">
+                        Snapshots</h4>
+                    <button class="action-btn" onclick="promptCreateSnapshot()" title="Create snapshot"
+                        style="padding: 2px 6px; font-size: 0.7rem;">
+                        <i class="ph ph-plus"></i><span>New</span>
                     </button>
                 </div>
-                <div id="snapshotList" style="max-height: 200px; overflow-y: auto;"></div>
+                <div id="snapshotList" style="max-height: 150px; overflow-y: auto;"></div>
             </div>
 
-            <!-- System Info (Bottom - Anchored) -->
-            <div class="section-card">
-                <div class="info-grid">
-                    <div class="sidebar-divider"></div>
-                    <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
-                        onclick="downloadOriginalFile()">
-                        <div class="info-label">File Name</div>
-                        <div class="info-value" id="fileName">-</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">File Format</div>
-                        <div class="info-value" id="fileType">-</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">File Size</div>
-                        <div class="info-value" id="fileSize">-</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Upload Date</div>
-                        <div class="info-value" id="uploadedDate">-</div>
-                    </div>
-                    <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
-                        onclick="reprocessOCR()">
-                        <div class="info-label">Processing</div>
-                        <div class="info-value" id="processingTime">-</div>
-                    </div>
+            <button class="action-toggle" onclick="toggleActionPanel()" title="Collapse" id="actionToggleBtn">
+                <i class="ph ph-caret-right" id="actionToggleIcon"></i>
+            </button>
+
+            <div class="sidebar-divider"></div>
+
+            <!-- System Info -->
+            <div class="info-grid">
+                <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
+                    onclick="downloadOriginalFile()">
+                    <div class="info-label">File</div>
+                    <div class="info-value" id="fileName">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Format</div>
+                    <div class="info-value" id="fileType">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Size</div>
+                    <div class="info-value" id="fileSize">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Uploaded</div>
+                    <div class="info-value" id="uploadedDate">-</div>
+                </div>
+                <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
+                    onclick="reprocessOCR()">
+                    <div class="info-label">Processing</div>
+                    <div class="info-value" id="processingTime">-</div>
                 </div>
             </div>
-        </div> <!-- /note-sidebar -->
-    </div> <!-- /note-layout -->
+        </div> <!-- /note-action-panel -->
+    </div> <!-- /app-layout -->
     <div id="saveConfirmModal" class="modal">
         <div class="modal-content" style="min-height: auto;">
             <h3>Save Changes?</h3>
@@ -231,6 +267,25 @@
         let pollingInterval = null;
         let isEditing = false;
 
+        // ===== INLINE CHAT STATE =====
+        let chatMessages = [];
+        let chatConversationId = null;
+        let chatAiMode = localStorage.getItem('noteChatAiMode') || 'elaboration';
+
+        const MODE_META = {
+            quick: { label: 'Quick Answer', icon: 'ph-lightning' },
+            elaboration: { label: 'Elaborate', icon: 'ph-lightbulb' },
+            eli5: { label: 'ELI5', icon: 'ph-smiley' },
+        };
+
+        function generateUUID() {
+            if (crypto && crypto.randomUUID) return crypto.randomUUID();
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        }
+
 
         // ===== CONTRAST COLOR UTILITY =====
         function getContrastColor(hexColor) {
@@ -278,7 +333,7 @@
         function displayLecture() {
             document.getElementById('loadingContainer').style.display = 'none';
             document.getElementById('lectureContainer').style.display = 'block';
-            document.querySelector('.note-sidebar').style.display = '';
+            document.querySelector('.note-action-panel').style.display = '';
 
             // Note title will be extracted from first h1 in markdown, no longer set here
 
@@ -407,31 +462,31 @@
                 // Make the h1 editable
                 firstH1.contentEditable = 'true';
                 firstH1.style.cursor = 'text';
-                
+
                 // Add visual feedback on focus
-                firstH1.addEventListener('focus', function() {
+                firstH1.addEventListener('focus', function () {
                     firstH1.style.outline = '2px solid var(--color-primary)';
                     firstH1.style.outlineOffset = '4px';
                 });
-                
-                firstH1.addEventListener('blur', function() {
+
+                firstH1.addEventListener('blur', function () {
                     firstH1.style.outline = 'none';
                     const newTitle = firstH1.textContent.trim();
                     if (newTitle && newTitle !== lectureData.title) {
                         updateLectureTitle(newTitle);
                     }
                 });
-                
+
                 // Update title on keyboard shortcuts (Ctrl+S or Cmd+S)
-                firstH1.addEventListener('keydown', function(e) {
+                firstH1.addEventListener('keydown', function (e) {
                     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                         e.preventDefault();
                         firstH1.blur();
                     }
                 });
-                
+
                 // Prevent drag and other default contenteditable behaviors
-                firstH1.addEventListener('paste', function(e) {
+                firstH1.addEventListener('paste', function (e) {
                     e.preventDefault();
                     const text = e.clipboardData.getData('text/plain');
                     document.execCommand('insertText', false, text);
@@ -566,18 +621,18 @@
         function renderSnapshots(snapshots) {
             const container = document.getElementById('snapshotList');
             const section = document.getElementById('snapshotsSection');
-            
+
             if (!container || !section) {
                 console.warn('Snapshots container not found in DOM');
                 return;
             }
-            
+
             if (!snapshots || snapshots.length === 0) {
                 section.style.display = 'none';
                 container.innerHTML = '';
                 return;
             }
-            
+
             section.style.display = 'block';
             container.innerHTML = snapshots.map(s => `
                 <div class="snapshot-item" onclick="viewSnapshot(${s.id})" style="padding: var(--spacing-sm); border-radius: var(--radius-md); cursor: pointer; margin-bottom: var(--spacing-sm); background: rgba(89, 60, 143, 0.05); transition: background 0.15s;">
@@ -851,7 +906,7 @@
         function showError(message) {
             document.getElementById('loadingContainer').style.display = 'none';
             document.getElementById('lectureContainer').style.display = 'none';
-            document.querySelector('.note-sidebar').style.display = 'none';
+            document.querySelector('.note-action-panel').style.display = 'none';
             document.getElementById('errorContainer').style.display = 'block';
             document.getElementById('errorMessage').textContent = message;
         }
@@ -868,15 +923,186 @@
 
         // Toggle sidebar scroll based on window scroll position
         window.addEventListener('scroll', () => {
-            const sidebar = document.querySelector('.note-sidebar');
+            const sidebar = document.querySelector('.note-action-panel');
             if (sidebar) {
-                if (window.scrollY > 0) {
-                    sidebar.classList.add('can-scroll');
-                } else {
-                    sidebar.classList.remove('can-scroll');
-                }
+                sidebar.classList.toggle('can-scroll', window.scrollY > 0);
             }
         });
+
+        // ===== INLINE CHAT =====
+        let chatInitialized = false;
+
+        function toggleChat() {
+            const panel = document.getElementById('noteChatPanel');
+            const isHidden = panel.style.display === 'none';
+            panel.style.display = isHidden ? 'flex' : 'none';
+            if (isHidden && !chatInitialized) {
+                initInlineChat();
+            }
+            if (isHidden) {
+                document.getElementById('noteChatInput').focus();
+            }
+        }
+
+        function toggleActionPanel() {
+            const layout = document.querySelector('.app-layout');
+            if (!layout) return;
+            layout.classList.toggle('action-collapsed');
+            const isCollapsed = layout.classList.contains('action-collapsed');
+            localStorage.setItem('actionCollapsed', isCollapsed);
+            const icon = document.getElementById('actionToggleIcon');
+            if (icon) {
+                icon.className = isCollapsed ? 'ph ph-caret-left' : 'ph ph-caret-right';
+            }
+        }
+
+        // Restore action collapsed state
+        if (localStorage.getItem('actionCollapsed') === 'true') {
+            document.addEventListener('DOMContentLoaded', () => {
+                const layout = document.querySelector('.app-layout');
+                if (layout) {
+                    layout.classList.add('action-collapsed');
+                    const icon = document.getElementById('actionToggleIcon');
+                    if (icon) icon.className = 'ph ph-caret-left';
+                }
+            });
+        }
+
+        function initInlineChat() {
+            chatInitialized = true;
+            const input = document.getElementById('noteChatInput');
+            const sendBtn = document.getElementById('noteChatSendBtn');
+            input.disabled = false;
+            sendBtn.disabled = false;
+            input.addEventListener('keypress', e => { if (e.key === 'Enter') sendNoteChat(); });
+            setChatMode(chatAiMode);
+            loadNoteChatHistory();
+        }
+
+        function setChatMode(mode) {
+            chatAiMode = mode;
+            localStorage.setItem('noteChatAiMode', mode);
+            document.querySelectorAll('.note-chat-card .mode-pill').forEach(p => {
+                p.classList.toggle('active', p.dataset.mode === mode);
+            });
+        }
+
+        async function loadNoteChatHistory() {
+            try {
+                const res = await fetch('/chat/conversations', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const convos = await res.json();
+                // Find the most recent conversation for this note
+                const noteConvo = convos.find(c => c.scope_type === 'note' && c.scope_id == lectureId);
+                if (noteConvo) {
+                    chatConversationId = noteConvo.conversation_id;
+                    // Load messages
+                    const msgRes = await fetch(`/chat/conversations/${chatConversationId}/messages`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (msgRes.ok) {
+                        const msgs = await msgRes.json();
+                        chatMessages = [];
+                        msgs.forEach(m => {
+                            chatMessages.push({ role: 'user', content: m.message, time: new Date(m.created_at), ai_mode: m.ai_mode });
+                            chatMessages.push({ role: 'ai', content: m.response, time: new Date(m.created_at), ai_mode: m.ai_mode, ai_model: m.ai_model });
+                        });
+                        displayChatMessages();
+                    }
+                }
+            } catch (e) { console.error('Error loading chat history:', e); }
+        }
+
+        async function sendNoteChat() {
+            const input = document.getElementById('noteChatInput');
+            const message = input.value.trim();
+            if (!message || !lectureId) return;
+
+            if (!chatConversationId) chatConversationId = generateUUID();
+
+            chatMessages.push({ role: 'user', content: message, time: new Date(), ai_mode: chatAiMode });
+            input.value = '';
+            displayChatMessages();
+
+            // Loading bubble
+            chatMessages.push({
+                role: 'ai', loading: true,
+                content: '<div style="display:flex;align-items:center;gap:8px;"><i class="ph ph-spinner ph-spin"></i> Thinking…</div>',
+                time: new Date()
+            });
+            displayChatMessages();
+
+            try {
+                const resp = await fetch('/chat/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        message,
+                        ai_mode: chatAiMode,
+                        conversation_id: chatConversationId,
+                        lecture_id: parseInt(lectureId)
+                    })
+                });
+
+                chatMessages.pop(); // remove loading
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    chatMessages.push({
+                        role: 'ai',
+                        content: data.response,
+                        time: new Date(),
+                        ai_mode: data.ai_mode || chatAiMode,
+                        ai_model: data.ai_model
+                    });
+                    if (data.conversation_id) chatConversationId = data.conversation_id;
+                    if (data.conversation_title) {
+                        document.getElementById('noteChatSubtitle').textContent = data.conversation_title;
+                    }
+                } else {
+                    chatMessages.push({ role: 'ai', content: `Error (${resp.status}). Please try again.`, time: new Date() });
+                }
+            } catch (err) {
+                chatMessages.pop();
+                chatMessages.push({ role: 'ai', content: 'Network error: ' + err.message, time: new Date() });
+            }
+            displayChatMessages();
+        }
+
+        function displayChatMessages() {
+            const container = document.getElementById('noteChatMessages');
+            if (chatMessages.length === 0) {
+                container.innerHTML = `<div class="note-chat-empty">
+                    <i class="ph ph-chat-circle-dots" style="font-size:2rem;margin-bottom:var(--spacing-sm);"></i>
+                    <p>Ask a question about this note</p></div>`;
+                return;
+            }
+
+            container.innerHTML = chatMessages.map(msg => {
+                let html = msg.content;
+                if (msg.role === 'ai' && !msg.loading && typeof marked !== 'undefined') {
+                    try { html = marked.parse(html); } catch (e) { }
+                }
+                let modeBadge = '';
+                if (msg.role === 'ai' && !msg.loading && msg.ai_mode) {
+                    const m = MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
+                    modeBadge = `<div class="ai-mode-badge"><i class="ph ${m.icon}"></i> ${m.label}</div>`;
+                }
+                const t = (msg.time instanceof Date ? msg.time : new Date(msg.time))
+                    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                return `<div class="note-chat-msg ${msg.role}">
+                    <div class="note-chat-msg-content">${modeBadge}${html}</div>
+                    <div class="note-chat-msg-time">${t}</div>
+                </div>`;
+            }).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function goToChat() {
+            window.location.href = `/chat.html?lecture_id=${lectureId}`;
+        }
     </script>
 </body>
 

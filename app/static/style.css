@@ -3,14 +3,19 @@
 
 :root {
   /* Primary Colors — new palette */
-  --color-primary: #593C8F;        /* Rebecca Purple */
-  --color-primary-dark: #171738;   /* Space Indigo */
+  --color-primary: #593C8F;
+  /* Rebecca Purple */
+  --color-primary-dark: #171738;
+  /* Space Indigo */
   --color-primary-light: #8B6BB5;
 
   /* Accent Colors */
-  --color-accent-pink: #DB5461;    /* Lobster Pink */
-  --color-accent-silk: #FFD9CE;    /* Almond Silk */
-  --color-accent-cyan: #8EF9F3;    /* Soft Cyan */
+  --color-accent-pink: #DB5461;
+  /* Lobster Pink */
+  --color-accent-silk: #FFD9CE;
+  /* Almond Silk */
+  --color-accent-cyan: #8EF9F3;
+  /* Soft Cyan */
 
   /* Secondary Colors */
   --color-secondary: #DB5461;
@@ -114,8 +119,6 @@ body {
   line-height: var(--line-height-normal);
   color: var(--color-dark);
   background-color: var(--color-background);
-  /* Offset for the fixed sidebar + gap on all sides for the page card frame */
-  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-lg) calc(160px + var(--spacing-lg));
 }
 
 h1,
@@ -187,6 +190,7 @@ a:hover {
   padding: var(--spacing-sm);
   min-height: calc(100vh - var(--spacing-lg) * 2);
   box-sizing: border-box;
+  margin: var(--spacing-lg);
 }
 
 .row {
@@ -233,20 +237,95 @@ a:hover {
   flex: 0 0 100%;
 }
 
-/* ===== APP SIDEBAR (replaces top navbar) ===== */
+/* ===== APP LAYOUT (flex wrapper injected by nav.js) ===== */
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+}
 
 .app-sidebar {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
   width: 160px;
+  flex-shrink: 0;
   background: var(--color-background);
   display: flex;
   flex-direction: column;
-  padding: 28px 20px 24px;
-  z-index: 100;
-  border-right: 1px solid var(--color-light-gray);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  transition: width 0.25s ease, padding 0.25s ease;
+  margin-left: var(--spacing-lg);
+  padding: var(--spacing-lg) 0;
+}
+
+/* Sidebar collapse toggle */
+.sidebar-toggle {
+  background: none;
+  border: 1px solid var(--color-light-gray);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-gray);
+  font-size: var(--font-size-sm);
+  padding: 4px 8px;
+  margin-bottom: 12px;
+  margin-top: auto;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+}
+
+.sidebar-toggle:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: rgba(78, 205, 196, 0.06);
+}
+
+/* Collapsed sidebar state */
+.sidebar-collapsed .app-sidebar {
+  width: 52px;
+  padding: 16px 8px;
+  align-items: center;
+}
+
+.sidebar-collapsed .sidebar-brand {
+  font-size: var(--font-size-sm);
+  margin-bottom: 16px;
+  text-align: center;
+  line-height: 1;
+}
+
+.sidebar-collapsed .sidebar-nav-link span {
+  display: none;
+}
+
+.sidebar-collapsed .sidebar-nav-link {
+  justify-content: center;
+  padding: 8px;
+}
+
+.sidebar-collapsed .sidebar-user-name {
+  display: none;
+}
+
+.sidebar-collapsed .sidebar-user {
+  justify-content: center;
+}
+
+.sidebar-collapsed .sidebar-toggle {
+  align-self: center;
 }
 
 .sidebar-brand {
@@ -306,7 +385,7 @@ a:hover {
 
 .sidebar-nav-link:hover {
   color: var(--color-dark);
-  background: rgba(0,0,0,0.04);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .sidebar-nav-link.active {
@@ -330,7 +409,6 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: auto;
   padding-top: 16px;
   cursor: pointer;
   border-top: 1px solid var(--color-light-gray);
@@ -377,65 +455,472 @@ a:hover {
 }
 
 /* ===== NOTE PAGE LAYOUT ===== */
-/* Flex row: [page-card note content] + [note sidebar on right] */
-.note-layout {
+/* Layout: content card | (optional chat card) | action panel */
+
+.note-page .app-layout {
+  --action-width: 160px;
+  --layout-gap: var(--spacing-md);
+
   display: flex;
   gap: 0;
   align-items: stretch;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
-.note-page-card {
-  position: fixed;
-  top: var(--spacing-lg);
-  left: var(--spacing-lg);
-  right: var(--spacing-lg);
-  bottom: var(--spacing-lg);
+.note-page .note-content-card {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+/* STICKY HEADER inside content card */
+.note-sticky-header {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-shrink: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.note-nav-back {
+  color: var(--color-gray);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.note-nav-back:hover {
+  color: var(--color-primary);
+}
+
+.note-breadcrumb-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+}
+
+.note-nav-crumb-link {
+  color: var(--color-gray);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.note-nav-crumb-link:hover {
+  color: var(--color-primary);
+}
+
+.note-nav-sep {
+  color: var(--color-light-gray);
+  font-size: var(--font-size-xs);
+}
+
+.subject-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* CONTENT CARD (white card) */
+.note-content-card {
+  flex: 1;
+  min-width: 0;
   border-radius: var(--radius-xl);
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
-  z-index: 50;
   background: white;
-  margin: 0 var(--spacing-lg);
-  margin-left: 160px;
-  margin-right: 160px;
-}
-
-/* Back link stays sticky at top - stays in place during scroll */
-.note-page-card > div:first-child {
-  position: sticky;
-  top: 0;
-  background: white;
-  z-index: 10;
-  flex-shrink: 0;
-}
-
-/* Content wrapper inside note card - ONLY THIS SCROLLS */
-.note-page-card > div:nth-child(2) {
-  flex: 1;
+  height: fit-content;
+  max-height: calc(100vh - var(--spacing-lg) * 2);
   overflow-y: auto;
-  overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: var(--color-light-gray) transparent;
 }
 
-.note-page-card > div:nth-child(2)::-webkit-scrollbar {
+.note-content-card::-webkit-scrollbar {
   width: 6px;
 }
 
-.note-page-card > div:nth-child(2)::-webkit-scrollbar-track {
+.note-content-card::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.note-page-card > div:nth-child(2)::-webkit-scrollbar-thumb {
+.note-content-card::-webkit-scrollbar-thumb {
   background: var(--color-light-gray);
   border-radius: 3px;
 }
 
-.note-page-card > div:nth-child(2)::-webkit-scrollbar-thumb:hover {
+.note-content-card::-webkit-scrollbar-thumb:hover {
   background: var(--color-gray);
+}
+
+/* CHAT CARD (white card) */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.note-chat-card {
+  width: 340px;
+  flex-shrink: 0;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  background: white;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--spacing-lg) * 2);
+  position: sticky;
+  top: var(--spacing-lg);
+  padding: 0;
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.note-chat-header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.note-chat-header h4 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.note-chat-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-gray);
+  font-size: var(--font-size-base);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+.note-chat-close:hover {
+  color: var(--color-error);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.note-chat-subtitle {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+  margin: 0;
+  width: 100%;
+}
+
+.note-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-light-gray) transparent;
+}
+
+.note-chat-messages::-webkit-scrollbar {
+  width: 5px;
+}
+
+.note-chat-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.note-chat-messages::-webkit-scrollbar-thumb {
+  background: var(--color-light-gray);
+  border-radius: 3px;
+}
+
+.note-chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-gray);
+  text-align: center;
+  font-size: var(--font-size-sm);
+}
+
+.note-chat-msg {
+  display: flex;
+  gap: 6px;
+  max-width: 90%;
+}
+
+.note-chat-msg.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.note-chat-msg-content {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-lg);
+  word-wrap: break-word;
+  line-height: 1.5;
+  font-size: var(--font-size-sm);
+}
+
+.note-chat-msg.ai .note-chat-msg-content {
+  background: var(--color-background);
+  color: var(--color-dark);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.note-chat-msg.user .note-chat-msg-content {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+.note-chat-msg-time {
+  font-size: 10px;
+  color: var(--color-light-gray);
+  display: flex;
+  align-items: flex-end;
+  min-width: 40px;
+}
+
+.note-chat-msg.ai .note-chat-msg-content p {
+  margin-bottom: 0.4em;
+}
+
+.note-chat-msg.ai .note-chat-msg-content p:last-child {
+  margin-bottom: 0;
+}
+
+.note-chat-msg.ai .note-chat-msg-content pre {
+  background: #f5f5f5;
+  padding: 0.5em;
+  border-radius: 5px;
+  overflow-x: auto;
+  margin: 0.3em 0;
+  font-size: var(--font-size-xs);
+}
+
+.note-chat-msg.ai .note-chat-msg-content code {
+  background: #f5f5f5;
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+.note-chat-input-area {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.note-chat-input-area .ai-mode-bar {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.note-chat-input-area .mode-label-text {
+  font-size: 10px;
+  color: var(--color-gray);
+  font-weight: 500;
+  margin-right: 2px;
+}
+
+.note-chat-input-area .mode-pill {
+  padding: 2px 7px;
+  border-radius: 16px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid var(--color-light-gray);
+  background: var(--color-background);
+  color: var(--color-gray);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.note-chat-input-area .mode-pill:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.note-chat-input-area .mode-pill.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.note-chat-input-row {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.note-chat-input-row input {
+  flex: 1;
+  border-radius: var(--radius-full);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.note-chat-input-row button {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-base);
+  flex-shrink: 0;
+}
+
+/* AI Mode Badge (compact for inline chat) */
+.note-chat-card .ai-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(78, 205, 196, 0.08);
+  color: var(--color-primary);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+/* ACTION PANEL (no card) */
+.note-action-panel {
+  width: var(--action-width);
+  flex-shrink: 0;
+  position: sticky;
+  top: var(--spacing-lg);
+  height: calc(100vh - var(--spacing-lg) * 2);
+  max-height: calc(100vh - var(--spacing-lg) * 2);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-light-gray) transparent;
+  transition: width 0.25s ease;
+  margin-right: var(--spacing-lg);
+}
+
+/* Action panel collapse toggle */
+.action-toggle {
+  background: none;
+  border: 1px solid var(--color-light-gray);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-gray);
+  font-size: var(--font-size-xs);
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  margin-top: auto;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+}
+
+.action-toggle:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: rgba(78, 205, 196, 0.06);
+}
+
+/* Collapsed action panel */
+.action-collapsed .note-action-panel {
+  width: 48px;
+  align-items: center;
+}
+
+.action-collapsed .action-btn span {
+  display: none;
+}
+
+.action-collapsed .action-btn i {
+  font-size: var(--font-size-base);
+  margin: 0;
+}
+
+.action-collapsed .action-btn {
+  padding: 10px;
+  justify-content: center;
+}
+
+.action-collapsed .info-grid,
+.action-collapsed .sidebar-divider,
+.action-collapsed #snapshotsSection {
+  display: none !important;
+}
+
+.action-collapsed .sidebar-divider {
+  margin: 6px 0;
+}
+
+.action-collapsed .action-toggle {
+  align-self: center;
+}
+
+.action-collapsed .file-info-grid {
+  display: none;
+}
+
+.note-action-panel::-webkit-scrollbar {
+  width: 5px;
+}
+
+.note-action-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.note-action-panel::-webkit-scrollbar-thumb {
+  background: var(--color-light-gray);
+  border-radius: 3px;
 }
 
 /* ===== CARDS ===== */
@@ -905,7 +1390,8 @@ textarea {
 
 @media (max-width: 768px) {
   body {
-    padding: 56px var(--spacing-sm) var(--spacing-sm) var(--spacing-sm); /* space for mobile header */
+    padding: 56px var(--spacing-sm) var(--spacing-sm) var(--spacing-sm);
+    /* space for mobile header */
   }
 
   .app-sidebar {
@@ -1276,66 +1762,20 @@ textarea {
   padding: var(--spacing-lg);
 }
 
-.note-page-card .note-main .section-card {
+.note-content-card .note-main .section-card {
   background: transparent;
   border: none;
   padding: 0;
 }
 
-/* NOTE SIDEBAR */
-.note-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 160px;
-  background: var(--color-background);
-  border-left: 1px solid var(--color-light-gray);
-  padding: var(--spacing-lg);
-  padding-top: var(--spacing-2xl);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-light-gray) transparent;
-  -ms-overflow-style: thin-scrollbar;
-  z-index: 90;
-}
-
-.note-sidebar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.note-sidebar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.note-sidebar::-webkit-scrollbar-thumb {
-  background: var(--color-light-gray);
-  border-radius: 3px;
-}
-
-.note-sidebar::-webkit-scrollbar-thumb:hover {
-  background: var(--color-gray);
-}
-
-/* SECTION CARDS */
-.section-card {
-  background: white;
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  border: 1px solid var(--color-light-gray);
-  overflow: visible;
-}
-
-.note-sidebar .section-card {
+/* Section cards inside action panel have no card styling */
+.note-action-panel .section-card {
   background: transparent;
   border: none;
   padding: 0;
 }
 
-.note-sidebar .section-card:last-child {
+.note-action-panel .section-card:last-child {
   margin-top: auto;
 }
 
@@ -1356,7 +1796,7 @@ textarea {
   margin-bottom: var(--spacing-md);
 }
 
-.note-sidebar .info-grid {
+.note-action-panel .info-grid {
   grid-template-columns: 1fr;
   gap: var(--spacing-sm);
   margin-bottom: 0;
@@ -1375,7 +1815,7 @@ textarea {
   transition: all 0.2s;
 }
 
-.info-item > div:last-child {
+.info-item>div:last-child {
   min-width: 0;
 }
 
@@ -1395,7 +1835,7 @@ textarea {
 
 .info-label {
   font-size: var(--font-size-2xs);
-  color: var(--color-light-gray);
+  color: var(--color-gray);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -1405,7 +1845,7 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: var(--font-size-xs);
-  color: var(--color-light-gray);
+  color: var(--color-gray);
 }
 
 /* ACTION GRID & BUTTONS */
@@ -1413,10 +1853,9 @@ textarea {
   display: flex;
   gap: 2px;
   flex-direction: column;
-  flex: 1;
 }
 
-.note-sidebar .action-grid {
+.note-action-panel .action-grid {
   grid-template-columns: 1fr;
   gap: var(--spacing-sm);
 }
@@ -1436,7 +1875,7 @@ textarea {
   border: none
 }
 
-.note-sidebar .action-btn {
+.note-action-panel .action-btn {
   text-align: left;
   font-size: var(--font-size-xs);
   gap: var(--spacing-xs);
@@ -1448,7 +1887,7 @@ textarea {
   color: var(--color-primary);
 }
 
-.note-sidebar .action-btn:hover {
+.note-action-panel .action-btn:hover {
   background: var(--color-background);
   border-color: var(--color-primary);
   color: var(--color-primary);
@@ -1468,7 +1907,7 @@ textarea {
   font-size: var(--font-size-xl);
 }
 
-.note-sidebar .action-btn i {
+.note-action-panel .action-btn i {
   font-size: var(--font-size-xl);
 }
 
@@ -1547,9 +1986,13 @@ textarea {
 .markdown-content {
   line-height: var(--line-height-normal);
   color: var(--color-dark);
+  width: 100%;
+  overflow-x: auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
-.markdown-content > *:first-child {
+.markdown-content>*:first-child {
   margin-top: 0;
 }
 
@@ -1607,6 +2050,8 @@ textarea {
   border-collapse: collapse;
   margin: 1.5em 0;
   font-size: 0.9em;
+  max-width: 100%;
+  table-layout: auto;
 }
 
 .markdown-content th,
@@ -2080,7 +2525,6 @@ textarea {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
 }
-}
 
 .table-add-handle.vertical {
   width: 24px;
@@ -2102,32 +2546,89 @@ textarea {
   background-color: rgba(11, 87, 208, 0.05) !important;
 }
 
-/* RESPONSIVE */
-@media (max-width: 968px) {
-  .note-layout {
+/* ===== RESPONSIVE BREAKPOINTS ===== */
+
+/* Large Desktop (1400px+) */
+@media (min-width: 1400px) {
+  .note-page .app-layout {
+    --action-width: 180px;
+    --layout-gap: var(--spacing-lg);
+  }
+
+  .note-chat-card {
+    width: 380px;
+  }
+}
+
+/* Desktop (1024px - 1399px): Standard layout */
+@media (min-width: 1024px) and (max-width: 1399px) {
+  .note-page .app-layout {
+    --action-width: 140px;
+  }
+
+  .note-chat-card {
+    width: 300px;
+  }
+}
+
+/* Tablet Landscape (770px - 1023px) */
+@media (min-width: 770px) and (max-width: 1023px) {
+  .note-page .app-layout {
+    --action-width: 130px;
+    --layout-gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+  }
+
+  .note-chat-card {
+    display: none !important;
+  }
+
+  h1 {
+    font-size: var(--font-size-2xl);
+  }
+}
+
+/* Tablet Portrait / Mobile (< 769px): Stack vertically */
+@media (max-width: 769px) {
+  .note-page .app-layout {
     flex-direction: column;
-    margin-right: 0;
+    padding: var(--spacing-md);
   }
 
-  .note-sidebar {
-    position: relative;
+  .note-content-card {
+    max-height: none;
+    border-radius: var(--radius-lg);
+  }
+
+  .note-chat-card {
     width: 100%;
-    border-left: none;
-    border-top: 1px solid var(--color-light-gray);
-    padding-top: var(--spacing-lg);
-    padding-left: var(--spacing-lg);
-    padding-right: var(--spacing-lg);
-    margin-top: var(--spacing-2xl);
+    height: 400px;
+    position: static;
   }
 
-  .note-header h1 {
-  font-size: var(--font-size-2xl);
-
-  .editor-split {
-    grid-template-columns: 1fr;
+  .note-action-panel {
+    width: 100%;
+    position: static;
+    max-height: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
   }
 
   .action-grid {
-    grid-template-columns: 1fr;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    flex: 1 1 calc(50% - var(--spacing-xs));
+  }
+
+  h1 {
+    font-size: var(--font-size-2xl);
+  }
+
+  h2 {
+    font-size: var(--font-size-xl);
   }
 }

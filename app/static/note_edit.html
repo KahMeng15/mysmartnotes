@@ -7,7 +7,9 @@
     <title>Edit Note - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/style.css?v=2">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
@@ -29,37 +31,39 @@
     </script>
 </head>
 
-<body>
+<body class="note-page">
 
-    <div class="note-layout">
+    <div class="app-layout">
         <div class="page-card note-page-card">
-        <!-- Back Link -->
-        <div style="padding: var(--spacing-sm); position: sticky; top: 0; background: white; z-index: 10; border-bottom: 1px solid rgba(0, 0, 0, 0.04);">
-            <a href="/mynotes.html" id="backLink"
-                style="color: var(--color-gray); font-size: var(--font-size-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                <i class="ph ph-arrow-left"></i> Back to Notes
-            </a>
-        </div>
-
-        <div id="loadingContainer" class="loading">
-            <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i></div>
-            <p>Loading note...</p>
-        </div>
-
-        <div id="lectureContainer" style="display: none;">
-            <!-- Note Header: Title comes from first h1 in editor -->
-            <div class="note-header" id="noteHeader">
-                <div class="note-header-breadcrumb" id="noteBreadcrumb">
-                    <span class="subject-dot" id="subjectDot"></span>
-                    <a href="#" id="metaGroup" style="color:inherit;text-decoration:none;">Group</a>
-                    <span>›</span>
-                    <a href="#" id="metaSubject" style="color:inherit;text-decoration:none;">Subject</a>
-                </div>
-                <div class="note-header-meta"></div>
+            <!-- Back Link -->
+            <div
+                style="padding: var(--spacing-sm); position: sticky; top: 0; background: white; z-index: 10; border-bottom: 1px solid rgba(0, 0, 0, 0.04);">
+                <a href="/mynotes.html" id="backLink"
+                    style="color: var(--color-gray); font-size: var(--font-size-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="ph ph-arrow-left"></i> Back to Notes
+                </a>
             </div>
 
-            <!-- Main Content -->
-            <div class="note-main">
+            <div id="loadingContainer" class="loading">
+                <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i>
+                </div>
+                <p>Loading note...</p>
+            </div>
+
+            <div id="lectureContainer" style="display: none;">
+                <!-- Note Header: Title comes from first h1 in editor -->
+                <div class="note-header" id="noteHeader">
+                    <div class="note-header-breadcrumb" id="noteBreadcrumb">
+                        <span class="subject-dot" id="subjectDot"></span>
+                        <a href="#" id="metaGroup" style="color:inherit;text-decoration:none;">Group</a>
+                        <span>›</span>
+                        <a href="#" id="metaSubject" style="color:inherit;text-decoration:none;">Subject</a>
+                    </div>
+                    <div class="note-header-meta"></div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="note-main">
                     <div class="section-card">
                         <!-- Status Badge -->
                         <div id="extractionStatus" style="display: none;">
@@ -202,11 +206,11 @@
                         </div>
                     </div>
                 </div>
-        </div>
+            </div>
 
-        <div id="errorContainer" style="display: none; margin-top: var(--spacing-2xl);">
-            <div class="error-message" id="errorMessage">Error loading note</div>
-        </div>
+            <div id="errorContainer" style="display: none; margin-top: var(--spacing-2xl);">
+                <div class="error-message" id="errorMessage">Error loading note</div>
+            </div>
         </div> <!-- /note-page-card -->
 
         <!-- Note Sidebar (right side) -->
@@ -215,12 +219,17 @@
             <div class="section-card">
                 <div class="section-title"><i class="ph ph-lightning-bolt"></i> Actions</div>
                 <div class="action-grid">
-                    <button class="action-btn" onclick="goToChat()" title="Chat"><i class="ph ph-chat-circle-dots"></i> Chat</button>
+                    <button class="action-btn" onclick="goToChat()" title="Chat"><i class="ph ph-chat-circle-dots"></i>
+                        Chat</button>
                     <button class="action-btn" onclick="" title="Quiz"><i class="ph ph-exam"></i> Quiz</button>
-                    <button class="action-btn" onclick="generateFlashcards()" title="Flash Card"><i class="ph ph-cards"></i> Flash Card</button>
-                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-text-align-left"></i> Summarize</button>
-                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-list"></i> Point Form</button>
-                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-pilcrow"></i> Paragraph</button>
+                    <button class="action-btn" onclick="generateFlashcards()" title="Flash Card"><i
+                            class="ph ph-cards"></i> Flash Card</button>
+                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-text-align-left"></i>
+                        Summarize</button>
+                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-list"></i> Point
+                        Form</button>
+                    <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-pilcrow"></i>
+                        Paragraph</button>
                     <button class="action-btn" onclick="exportNote()"><i class="ph ph-export"></i> Export</button>
                 </div>
             </div>
@@ -235,7 +244,8 @@
             </div>
 
             <!-- System Info (Bottom - Anchored) -->
-            <div class="section-card" style="margin-top: auto; border-top: 1px solid var(--color-light-gray); padding-top: var(--spacing-lg);">
+            <div class="section-card"
+                style="margin-top: auto; border-top: 1px solid var(--color-light-gray); padding-top: var(--spacing-lg);">
                 <div class="section-title"><i class="ph ph-info"></i> System Info</div>
                 <div class="info-grid">
                     <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
@@ -278,7 +288,7 @@
                 </div>
             </div>
         </div> <!-- /note-sidebar -->
-    </div> <!-- /note-layout -->
+    </div> <!-- /app-layout -->
     <div id="saveConfirmModal" class="modal">
         <div class="modal-content" style="min-height: auto;">
             <h3>Save Changes?</h3>

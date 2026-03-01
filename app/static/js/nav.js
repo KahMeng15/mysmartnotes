@@ -1,6 +1,7 @@
 /**
  * Global Sidebar Navigation
- * Injects the left sidebar, highlights active link, and handles logout.
+ * Injects the left sidebar inside an .app-layout flex wrapper.
+ * Handles collapse toggle and persists state in localStorage.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function injectSidebar() {
+    const isNotePage = document.body.classList.contains('note-page');
+    const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+
     const sidebarHtml = `
     <aside class="app-sidebar" id="appSidebar">
         <a href="/dashboard.html" class="sidebar-brand">my<br>smart<br>notes</a>
@@ -25,6 +29,10 @@ function injectSidebar() {
             <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-clock-user"></i><span>Recent</span></a></li>
         </ul>
 
+        <button class="sidebar-toggle" onclick="toggleSidebar()" title="Collapse sidebar" id="sidebarToggleBtn">
+            <i class="ph ph-caret-left" id="sidebarToggleIcon"></i>
+        </button>
+
         <div class="sidebar-user" onclick="logout()" title="Logout">
             <div class="sidebar-avatar" id="sidebarAvatarInitial">?</div>
             <span class="sidebar-user-name" id="sidebarUserName">...</span>
@@ -32,9 +40,34 @@ function injectSidebar() {
     </aside>
     `;
 
-    document.body.insertAdjacentHTML('afterbegin', sidebarHtml);
+    if (isNotePage) {
+        // Note page: sidebar is a sibling of content/chat/action inside .app-layout
+        // .app-layout already exists in note.html — just prepend sidebar into it
+        const appLayout = document.querySelector('.app-layout');
+        if (appLayout) {
+            appLayout.insertAdjacentHTML('afterbegin', sidebarHtml);
+            if (collapsed) appLayout.classList.add('sidebar-collapsed');
+        }
+    } else {
+        // All other pages: wrap body children in .app-layout > sidebar + .app-main
+        const children = Array.from(document.body.children);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'app-layout' + (collapsed ? ' sidebar-collapsed' : '');
+
+        const main = document.createElement('main');
+        main.className = 'app-main';
+
+        // Move all existing body children into main
+        children.forEach(child => main.appendChild(child));
+
+        wrapper.innerHTML = sidebarHtml;
+        wrapper.appendChild(main);
+        document.body.appendChild(wrapper);
+    }
+
     setActiveLink();
     displayUser();
+    updateToggleIcon();
 }
 
 function setActiveLink() {
@@ -67,6 +100,23 @@ function displayUser() {
     } catch (e) {
         console.error('Error parsing user data', e);
     }
+}
+
+window.toggleSidebar = function () {
+    const layout = document.querySelector('.app-layout');
+    if (!layout) return;
+    layout.classList.toggle('sidebar-collapsed');
+    const isCollapsed = layout.classList.contains('sidebar-collapsed');
+    localStorage.setItem('sidebarCollapsed', isCollapsed);
+    updateToggleIcon();
+};
+
+function updateToggleIcon() {
+    const icon = document.getElementById('sidebarToggleIcon');
+    const layout = document.querySelector('.app-layout');
+    if (!icon || !layout) return;
+    const isCollapsed = layout.classList.contains('sidebar-collapsed');
+    icon.className = isCollapsed ? 'ph ph-caret-right' : 'ph ph-caret-left';
 }
 
 window.logout = function () {
