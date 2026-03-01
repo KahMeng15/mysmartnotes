@@ -88,100 +88,103 @@
 </head>
 
 <body>
-
-
     <div class="page-card">
-        <!-- Header -->
-        <div class="d-flex justify-content-between align-items-center" style="margin-bottom: var(--spacing-xl);">
-            <h1>My Notes</h1>
-            <button onclick="openGroupModal()" class="btn btn-primary">
-                <i class="ph ph-plus"></i> Create Group
-            </button>
-        </div>
-
-        <!-- Controls -->
-        <div class="controls-bar">
-            <div class="search-box">
-                <i class="ph ph-magnifying-glass search-icon"></i>
-                <input type="text" id="searchInput" placeholder="Search groups, subjects, lectures..."
-                    onkeyup="filterNotes()">
+        <!-- Sticky Header Section -->
+        <div class="page-card-header">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>My Notes</h1>
+                <button onclick="openGroupModal()" class="btn btn-primary">
+                    <i class="ph ph-plus"></i> Create Group
+                </button>
             </div>
-            <select id="sortSelect" class="form-control" style="width: auto;" onchange="sortNotes()">
-                <option value="name">Sort by Name (A-Z)</option>
-                <option value="date">Sort by Date Created</option>
-            </select>
-        </div>
 
-        <!-- Groups Container -->
-        <div id="notesContainer">
-            <div class="empty-state">
-                <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>
-                <p>Loading your notes...</p>
+            <!-- Controls -->
+            <div class="controls-bar">
+                <div class="search-box">
+                    <i class="ph ph-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search groups, subjects, lectures..."
+                        onkeyup="filterNotes()">
+                </div>
+                <select id="sortSelect" class="form-control" style="width: auto;" onchange="sortNotes()">
+                    <option value="name">Sort by Name (A-Z)</option>
+                    <option value="date">Sort by Date Created</option>
+                </select>
             </div>
         </div>
-    </div>
 
-    <!-- Create Group Modal -->
-    <div id="groupModal" class="modal">
-        <div class="modal-content">
-            <h2>Create New Group</h2>
-            <form onsubmit="handleCreateGroup(event)">
-                <div class="form-group">
-                    <label>Group Name</label>
-                    <input type="text" id="groupNameInput" class="form-control" placeholder="e.g. Semester 1, Year 2"
-                        required>
+        <div class="page-card-content">
+            <!-- Groups Container -->
+            <div id="notesContainer">
+                <div class="empty-state">
+                    <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>
+                    <p>Loading your notes...</p>
                 </div>
-                <div class="modal-buttons">
-                    <button type="submit" class="btn-save">Create Group</button>
-                    <button type="button" onclick="closeModal('groupModal')" class="btn-cancel">Cancel</button>
-                </div>
-            </form>
+            </div>
         </div>
-    </div>
 
-    <!-- Create Subject Modal -->
-    <div id="subjectModal" class="modal">
-        <div class="modal-content">
-            <h2>Add New Subject</h2>
-            <form onsubmit="handleCreateSubject(event)">
-                <input type="hidden" id="targetGroupId">
-                <div class="form-group">
-                    <label>Subject Name</label>
-                    <input type="text" id="subjectNameInput" class="form-control" placeholder="e.g. Calculus I"
-                        required>
-                </div>
-                <div class="form-group">
-                    <label>Description (Optional)</label>
-                    <textarea id="subjectDescInput" class="form-control" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>Color Tag</label>
-                    <input type="color" id="subjectColorInput" value="#593C8F"
-                        style="width: 100%; height: 40px; border: none; padding: 0;">
-                </div>
-                <div class="modal-buttons">
-                    <button type="submit" class="btn-save">Add Subject</button>
-                    <button type="button" onclick="closeModal('subjectModal')" class="btn-cancel">Cancel</button>
-                </div>
-            </form>
+        <!-- Create Group Modal -->
+        <div id="groupModal" class="modal">
+            <div class="modal-content">
+                <h2>Create New Group</h2>
+                <form onsubmit="handleCreateGroup(event)">
+                    <div class="form-group">
+                        <label>Group Name</label>
+                        <input type="text" id="groupNameInput" class="form-control" placeholder="e.g. Semester 1, Year 2"
+                            required>
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn-save">Create Group</button>
+                        <button type="button" onclick="closeModal('groupModal')" class="btn-cancel">Cancel</button>
+                    </div>
+                </form>
+            </div>
         </div>
-    </div>
 
-    <!-- Edit Group Modal -->
-    <div id="editGroupModal" class="modal">
-        <div class="modal-content">
-            <h2>Edit Group</h2>
-            <form onsubmit="handleEditGroup(event)">
-                <input type="hidden" id="editGroupId">
-                <div class="form-group">
-                    <label>Group Name</label>
-                    <input type="text" id="editGroupNameInput" class="form-control" required>
-                </div>
-                <div class="modal-buttons">
-                    <button type="submit" class="btn-save">Save Changes</button>
-                    <button type="button" onclick="closeModal('editGroupModal')" class="btn-cancel">Cancel</button>
-                </div>
-            </form>
+        <!-- Create Subject Modal -->
+        <div id="subjectModal" class="modal">
+            <div class="modal-content">
+                <h2>Add New Subject</h2>
+                <form onsubmit="handleCreateSubject(event)">
+                    <input type="hidden" id="targetGroupId">
+                    <div class="form-group">
+                        <label>Subject Name</label>
+                        <input type="text" id="subjectNameInput" class="form-control" placeholder="e.g. Calculus I"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description (Optional)</label>
+                        <textarea id="subjectDescInput" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Color Tag</label>
+                        <input type="color" id="subjectColorInput" value="#593C8F"
+                            style="width: 100%; height: 40px; border: none; padding: 0;">
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn-save">Add Subject</button>
+                        <button type="button" onclick="closeModal('subjectModal')" class="btn-cancel">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit Group Modal -->
+        <div id="editGroupModal" class="modal">
+            <div class="modal-content">
+                <h2>Edit Group</h2>
+                <form onsubmit="handleEditGroup(event)">
+                    <input type="hidden" id="editGroupId">
+                    <div class="form-group">
+                        <label>Group Name</label>
+                        <input type="text" id="editGroupNameInput" class="form-control" required>
+                    </div>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn-save">Save Changes</button>
+                        <button type="button" onclick="closeModal('editGroupModal')" class="btn-cancel">Cancel</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -194,6 +197,7 @@
         let groupsData = [];
         let subjectsData = [];
         let ungroupedSubjects = [];
+        let minimizedGroups = new Set(); // Track minimized group IDs
 
         window.addEventListener('load', () => {
             if (!token) window.location.href = 'login.html';
@@ -252,7 +256,36 @@
             }
         }
 
+        function toggleGroupMinimize(groupId) {
+            if (minimizedGroups.has(groupId)) {
+                minimizedGroups.delete(groupId);
+            } else {
+                minimizedGroups.add(groupId);
+            }
+            // Update the DOM to show/hide subjects
+            const groupElement = document.querySelector(`[data-group-id="${groupId}"] .subjects-grid`);
+            if (groupElement) {
+                groupElement.style.display = minimizedGroups.has(groupId) ? 'none' : 'grid';
+            }
+            // Update minimize button icon
+            const minimizeBtn = document.querySelector(`[data-group-id="${groupId}"] .btn-minimize`);
+            if (minimizeBtn) {
+                minimizeBtn.innerHTML = minimizedGroups.has(groupId) ? '<i class="ph ph-caret-right"></i>' : '<i class="ph ph-caret-down"></i>';
+            }
+            // Update group-header border visibility
+            const headerElement = document.querySelector(`[data-group-id="${groupId}"] .group-header`);
+            if (headerElement) {
+                if (minimizedGroups.has(groupId)) {
+                    headerElement.classList.add('minimized');
+                } else {
+                    headerElement.classList.remove('minimized');
+                }
+            }
+        }
+
         function createGroupSection(group, subjects, isUngrouped = false) {
+            const isMinimized = minimizedGroups.has(group.id);
+            
             // Generate Subject Cards
             const subjectsHtml = subjects.length > 0 ? subjects.map(s => `
                 <div class="subject-card" onclick="event.stopPropagation(); openSubject(${s.id})" style="border-left: 4px solid ${s.color || '#593C8F'};">
@@ -284,7 +317,7 @@
                         <button onclick="event.stopPropagation(); openEditGroupModal(${group.id}, '${group.name.replace(/'/g, "\\'")}')" class="btn btn-outline btn-small">
                             <i class="ph ph-pencil-simple"></i>
                         </button>
-                        <button onclick="event.stopPropagation(); deleteGroup(${group.id})" class="btn btn-text btn-small" style="color: var(--color-error);">
+                        <button onclick="event.stopPropagation(); deleteGroup(${group.id})" class="btn btn-outline btn-small"">
                             <i class="ph ph-trash"></i>
                         </button>
                     </div>
@@ -300,16 +333,25 @@
                 `;
             }
 
+            // Build minimize button for non-ungrouped groups
+            const minimizeButtonHtml = !isUngrouped ? `
+                <button onclick="event.stopPropagation(); toggleGroupMinimize(${group.id})" class="btn btn-outline btn-small btn-minimize">
+                    ${isMinimized ? '<i class="ph ph-caret-right"></i>' : '<i class="ph ph-caret-down"></i>'}
+                </button>
+            ` : '';
+
             return `
-                <div class="group-section" ${!isUngrouped ? `onclick="window.location.href='group.html?id=${group.id}'"` : ''} style="${!isUngrouped ? 'cursor: pointer;' : ''}">
-                    <div class="group-header">
-                        <div class="group-title">
-                            <i class="ph ${isUngrouped ? 'ph-folder-open' : 'ph-folder'}"></i>
-                            ${group.name}
+                <div class="group-section" data-group-id="${group.id}" ${!isUngrouped ? `onclick="window.location.href='group.html?id=${group.id}'"` : ''} style="${!isUngrouped ? 'cursor: pointer;' : ''}">
+                    <div class="group-header ${isMinimized ? 'minimized' : ''}">
+                        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                            ${minimizeButtonHtml}
+                            <div class="group-title">
+                                ${group.name}
+                            </div>
                         </div>
                         ${actionsHtml}
                     </div>
-                    <div class="subjects-grid">
+                    <div class="subjects-grid" ${isMinimized ? 'style="display: none;"' : ''}>
                         ${subjectsHtml}
                     </div>
                 </div>
