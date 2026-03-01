@@ -2599,7 +2599,7 @@ body.auth-page {
 .quote-text {
   font-family: 'Instrument Serif', serif;
   font-style: italic;
-  font-size: 4rem;
+  font-size: 5rem;
   line-height: 0.8;
   flex: 1;
 }
@@ -2787,107 +2787,4 @@ body.auth-page {
   .auth-right {
     padding: 40px 28px;
   }
-}
-
-/* Google Registration Modal */
-.modal-overlay {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-overlay.active {
-  display: flex;
-}
-
-.modal-content {
-  background: #fff;
-  border-radius: 12px;
-  padding: 32px;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-}
-
-.modal-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #171738;
-  margin-bottom: 8px;
-}
-
-.modal-subtitle {
-  font-size: 0.875rem;
-  color: #75757A;
-  margin-bottom: 24px;
-}
-
-.modal-form-group {
-  margin-bottom: 20px;
-}
-
-.modal-label {
-  display: block;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #171738;
-  margin-bottom: 8px;
-}
-
-.modal-input {
-  width: 100%;
-  padding: 12px 14px;
-  background: #EAEAE5;
-  border: 1.5px solid transparent;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 0.9375rem;
-  color: #171738;
-  transition: border-color 0.15s, background 0.15s;
-  outline: none;
-}
-
-.modal-input:focus {
-  background: #fff;
-  border-color: #593C8F;
-  box-shadow: 0 0 0 3px rgba(89, 60, 143, 0.1);
-}
-
-.modal-buttons {
-  display: flex;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-.modal-btn {
-  flex: 1;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.modal-btn:hover {
-  opacity: 0.88;
-}
-
-.modal-btn-confirm {
-  background: #593C8F;
-  color: #fff;
-}
-
-.modal-btn-cancel {
-  background: #EAEAE5;
-  color: #171738;
 }

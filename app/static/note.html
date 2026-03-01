@@ -401,7 +401,7 @@
 
         // ===== INIT =====
         window.addEventListener('load', () => {
-            if (!token) { window.location.href = '/index.html'; return; }
+            if (!token) { window.location.href = '/login.html'; return; }
 
             // Extract UUID or integer ID from path /note/123
             const pathParts = window.location.pathname.split('/');
@@ -1820,7 +1820,7 @@
 
         function logout() {
             localStorage.removeItem(TOKEN_KEY);
-            window.location.href = '/index.html';
+            window.location.href = '/login.html';
         }
 
         // Toggle sidebar scroll based on window scroll position

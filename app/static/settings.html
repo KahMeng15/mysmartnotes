@@ -302,7 +302,7 @@
         const user = JSON.parse(localStorage.getItem('user') || '{}');
 
         window.addEventListener('load', () => {
-            if (!token) window.location.href = 'index.html';
+            if (!token) window.location.href = 'login.html';
             loadSettings();
         });
 
@@ -438,7 +438,7 @@
         function clearCache() {
             localStorage.clear();
             alert('Cache cleared');
-            window.location.href = 'index.html';
+            window.location.href = 'login.html';
         }
 
         function changePassword() {

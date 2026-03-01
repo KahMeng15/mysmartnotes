@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
@@ -92,6 +92,14 @@ async def serve_note_view(id: str):
 @app.get("/note/{id}/edit")
 async def serve_note_edit(id: str):
     return FileResponse(os.path.join(static_dir, "note.html"))
+
+@app.get("/login")
+async def serve_login():
+    return FileResponse(os.path.join(static_dir, "login.html"))
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/login")
 
 # Serve static files and templates
 if os.path.exists(static_dir):

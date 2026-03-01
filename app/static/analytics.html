@@ -303,7 +303,7 @@
         const token = localStorage.getItem('token');
 
         window.addEventListener('load', () => {
-            if (!token) window.location.href = 'index.html';
+            if (!token) window.location.href = 'login.html';
             initializeCharts();
         });
 
@@ -391,7 +391,7 @@
             if (confirm('Logout?')) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                window.location.href = 'index.html';
+                window.location.href = 'login.html';
             }
         }
     </script>

@@ -46,6 +46,16 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "gemini"         # Fallback provider
     OLLAMA_BASE_URL: str = ""           # Ollama server URL (e.g., "http://192.168.1.100:11434")
     
+
+    # Firebase Cloud Configuration
+    FIREBASE_API_KEY: str = ""
+    FIREBASE_AUTH_DOMAIN: str = ""
+    FIREBASE_PROJECT_ID: str = "mysmartnotes-965fe"
+    FIREBASE_STORAGE_BUCKET: str = ""
+    FIREBASE_MESSAGING_SENDER_ID: str = ""
+    FIREBASE_APP_ID: str = ""
+    FIREBASE_MEASUREMENT_ID: str = ""
+
     # App Settings
     APP_NAME: str = "MySmartNotes"
     DEBUG: bool = False

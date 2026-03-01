@@ -16,23 +16,30 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyCHvRKBDv6Ycu9ejoZEIRwT0kvaNXiL6jY",
-            authDomain: "mysmartnotes-965fe.firebaseapp.com",
-            projectId: "mysmartnotes-965fe",
-            storageBucket: "mysmartnotes-965fe.firebasestorage.app",
-            messagingSenderId: "912822914070",
-            appId: "1:912822914070:web:1c0cb36c547229e349b937",
-            measurementId: "G-8PPM1PT63H"
-        };
+        async function initFirebase() {
+            try {
+                const res = await fetch('/auth/firebase-config');
+                if (res.ok) {
+                    const firebaseConfig = await res.json();
+                    const app = initializeApp(firebaseConfig);
+                    const auth = getAuth(app);
+                    const googleProvider = new GoogleAuthProvider();
+                    googleProvider.setCustomParameters({
+                        prompt: 'select_account'
+                    });
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const googleProvider = new GoogleAuthProvider();
+                    window.firebaseAuth = auth;
+                    window.googleProvider = googleProvider;
+                    window.signInWithPopup = signInWithPopup;
+                } else {
+                    console.error("Failed to load Firebase config from backend.");
+                }
+            } catch (error) {
+                console.error("Error fetching Firebase config:", error);
+            }
+        }
 
-        window.firebaseAuth = auth;
-        window.googleProvider = googleProvider;
-        window.signInWithPopup = signInWithPopup;
+        initFirebase();
     </script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -50,7 +57,7 @@
     </div>
 
     <div class="auth-right">
-        <div class="sidebar-brand">my<br>smart<br>notes</div>
+        <div class="sidebar-brand" style="font-size: 3rem;">my<br>smart<br>notes</div>
 
         <!-- Login Panel -->
         <div class="panel active" id="loginPanel">
@@ -106,32 +113,28 @@
                 Account</button>
             <p class="toggle-link">Already have an account? <a onclick="switchPanel('login')">Sign in</a></p>
         </div>
-    </div>
 
-    <!-- Google Registration Modal -->
-    <div class="modal-overlay" id="googleRegisterModal">
-        <div class="modal-content">
-            <div class="modal-title">Complete Your Profile</div>
-            <div class="modal-subtitle">Let's get your account set up!</div>
+        <!-- Google Registration Panel -->
+        <div class="panel" id="googleRegisterPanel">
+            <div id="googleRegisterMsg" class="message-box"></div>
+            <h2 style="font-size: 1.5rem; margin-bottom: 8px;">Complete Your Profile</h2>
+            <p style="color: #75757A; margin-bottom: 24px; font-size: 0.9rem;">Let's get your account set up!</p>
             <form id="googleRegisterForm" onsubmit="handleGoogleComplete(event)">
-                <div class="modal-form-group">
-                    <label class="modal-label" for="googleEmail">Email</label>
-                    <input class="modal-input" type="email" id="googleEmail" readonly>
+                <div class="form-group">
+                    <label class="form-label" for="googleEmail">Email</label>
+                    <input class="form-input" type="email" id="googleEmail" readonly>
                 </div>
-                <div class="modal-form-group">
-                    <label class="modal-label" for="googleFullName">Full Name</label>
-                    <input class="modal-input" type="text" id="googleFullName" readonly>
+                <div class="form-group">
+                    <label class="form-label" for="googleFullName">Full Name</label>
+                    <input class="form-input" type="text" id="googleFullName" readonly>
                 </div>
-                <div class="modal-form-group">
-                    <label class="modal-label" for="googleNickname">Nickname</label>
-                    <input class="modal-input" type="text" id="googleNickname" placeholder="What should we call you?"
+                <div class="form-group">
+                    <label class="form-label" for="googleNickname">Nickname</label>
+                    <input class="form-input" type="text" id="googleNickname" placeholder="What should we call you?"
                         required>
                 </div>
-                <div class="modal-buttons">
-                    <button type="button" class="modal-btn modal-btn-cancel"
-                        onclick="closeGoogleRegisterModal()">Cancel</button>
-                    <button type="submit" class="modal-btn modal-btn-confirm">Create Account</button>
-                </div>
+                <button type="submit" class="btn btn-next btn-block" style="margin-top:24px;">Create Account</button>
+                <p class="toggle-link">Changed your mind? <a onclick="closeGoogleRegisterModal()">Cancel</a></p>
             </form>
         </div>
     </div>
@@ -269,14 +272,14 @@
             document.getElementById('googleEmail').value = data.email;
             document.getElementById('googleFullName').value = data.full_name || '(not provided)';
             document.getElementById('googleNickname').value = data.suggested_nickname || '';
-            document.getElementById('googleRegisterModal').classList.add('active');
+            switchPanel('googleRegister');
             document.getElementById('googleNickname').focus();
         }
 
         function closeGoogleRegisterModal() {
-            document.getElementById('googleRegisterModal').classList.remove('active');
+            switchPanel('login');
             window.googleIdToken = null;
-            // Sign out from Firebase when closing modal
+            // Sign out from Firebase when closing panel
             if (window.firebaseAuth) {
                 window.firebaseAuth.signOut();
             }
@@ -293,7 +296,7 @@
 
             const nickname = document.getElementById('googleNickname').value.trim();
             if (!nickname) {
-                alert('Please enter a nickname.');
+                showMessageBox('googleRegisterMsg', 'error', 'Please enter a nickname.');
                 return;
             }
 
@@ -308,16 +311,15 @@
                     const data = await res.json();
                     localStorage.setItem('token', data.access_token);
                     if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
-                    closeGoogleRegisterModal();
-                    showMessageBox('loginMsg', 'success', 'Welcome! Redirecting…');
+                    showMessageBox('googleRegisterMsg', 'success', 'Welcome! Redirecting…');
                     setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
                 } else {
                     const err = await res.json();
-                    alert(err.detail || 'Registration failed.');
+                    showMessageBox('googleRegisterMsg', 'error', err.detail || 'Registration failed.');
                 }
             } catch (e) {
                 console.error('Google registration error:', e);
-                alert('An error occurred. Please try again.');
+                showMessageBox('googleRegisterMsg', 'error', 'An error occurred. Please try again.');
             }
         }
 

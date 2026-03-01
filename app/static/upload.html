@@ -335,7 +335,7 @@
 
         window.addEventListener('load', () => {
             if (!token) {
-                window.location.href = 'index.html';
+                window.location.href = 'login.html';
                 return;
             }
             loadData();
@@ -637,7 +637,7 @@
 
         function logout() {
             localStorage.removeItem(TOKEN_KEY);
-            window.location.href = 'index.html';
+            window.location.href = 'login.html';
         }
     </script>
 </body>

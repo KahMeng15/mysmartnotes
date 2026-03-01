@@ -196,7 +196,7 @@
         let ungroupedSubjects = [];
 
         window.addEventListener('load', () => {
-            if (!token) window.location.href = 'index.html';
+            if (!token) window.location.href = 'login.html';
             fetchData();
         });
 
@@ -516,7 +516,7 @@
             if (confirm('Logout?')) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                window.location.href = 'index.html';
+                window.location.href = 'login.html';
             }
         }
 

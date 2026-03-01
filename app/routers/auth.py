@@ -18,7 +18,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
 
 # Firebase project config
-FIREBASE_PROJECT_ID = "mysmartnotes-965fe"
+
 FIREBASE_VERIFY_URL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken"
 
 
@@ -50,8 +50,8 @@ def verify_firebase_token(id_token_str: str):
         
         # Check audience - Firebase ID tokens should have the project ID as audience
         audience = unverified_claims.get('aud')
-        if audience != FIREBASE_PROJECT_ID:
-            print(f"[DEBUG] Token audience '{audience}' doesn't match project ID '{FIREBASE_PROJECT_ID}'")
+        if audience != settings.FIREBASE_PROJECT_ID:
+            print(f"[DEBUG] Token audience '{audience}' doesn't match project ID '{settings.FIREBASE_PROJECT_ID}'")
             # For now, allow it through as audience might be different formats
         
         # Check token hasn't expired
@@ -74,6 +74,21 @@ def verify_firebase_token(id_token_str: str):
     except Exception as e:
         print(f"[DEBUG] Token verification error: {str(e)}")
         raise ValueError(f"Token verification failed: {str(e)}")
+
+
+
+@router.get("/firebase-config")
+def get_firebase_config():
+    """Return the public Firebase configuration"""
+    return {
+        "apiKey": settings.FIREBASE_API_KEY,
+        "authDomain": settings.FIREBASE_AUTH_DOMAIN,
+        "projectId": settings.FIREBASE_PROJECT_ID,
+        "storageBucket": settings.FIREBASE_STORAGE_BUCKET,
+        "messagingSenderId": settings.FIREBASE_MESSAGING_SENDER_ID,
+        "appId": settings.FIREBASE_APP_ID,
+        "measurementId": settings.FIREBASE_MEASUREMENT_ID
+    }
 
 
 @router.post("/register", response_model=UserSchema)
