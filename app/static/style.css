@@ -482,7 +482,7 @@ a:hover {
   top: 0;
   background: white;
   z-index: 20;
-  padding: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
   align-items: center;
@@ -598,6 +598,7 @@ a:hover {
   top: var(--spacing-lg);
   padding: 0;
   animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  margin-left: 0;
 }
 
 .note-chat-header {
@@ -2007,27 +2008,30 @@ textarea {
 }
 
 .markdown-content h1 {
-  font-size: 1.875rem;
+  font-size: var(--font-size-4xl);
   color: #1a1a1a;
   padding: 1.5rem 0 0.5rem 0;
   top: 35px;
   z-index: 13;
+  font-weight: var(--font-weight-bold);
 }
 
 .markdown-content h2 {
   font-size: var(--font-size-2xl);
   color: #333;
   padding: 1.5rem 0 0.5rem 0;
-  top: 80px;
+  top: 90px;
   z-index: 12;
+  font-weight: var(--font-weight-semibold);
 }
 
 .markdown-content h3 {
   font-size: var(--font-size-xl);
   color: #555;
   padding: 1.5rem 0 0.5rem 0;
-  top: 120px;
+  top: 130px;
   z-index: 11;
+  font-weight: var(--font-weight-semibold);
 }
 
 .markdown-content p {
