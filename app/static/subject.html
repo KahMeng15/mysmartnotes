@@ -332,11 +332,7 @@
         }
 
         function logout() {
-            if (confirm('Logout?')) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                window.location.href = 'login.html';
-            }
+            window.logout();
         }
 
         // Close modal on outside click

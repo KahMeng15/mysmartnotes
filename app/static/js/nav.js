@@ -120,9 +120,38 @@ function updateToggleIcon() {
 }
 
 window.logout = function () {
-    if (confirm('Are you sure you want to logout?')) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login.html';
+    // Create logout modal if it doesn't exist
+    let logoutModal = document.getElementById('logoutConfirmModal');
+    if (!logoutModal) {
+        logoutModal = document.createElement('div');
+        logoutModal.id = 'logoutConfirmModal';
+        logoutModal.className = 'modal';
+        logoutModal.innerHTML = `
+            <div class="modal-content" style="min-height: auto;">
+                <h3>Logout?</h3>
+                <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray);">Are you sure you want to logout? You will need to log in again to access your account.</p>
+                <div class="modal-buttons">
+                    <button type="button" class="btn-save" style="background: var(--color-error);" onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='var(--color-error)'" onclick="confirmLogout()">Logout</button>
+                    <button type="button" class="btn-cancel" onclick="cancelLogout()">Cancel</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(logoutModal);
+    }
+    
+    // Show the modal
+    logoutModal.classList.add('active');
+};
+
+window.confirmLogout = function () {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login.html';
+};
+
+window.cancelLogout = function () {
+    const logoutModal = document.getElementById('logoutConfirmModal');
+    if (logoutModal) {
+        logoutModal.classList.remove('active');
     }
 };
