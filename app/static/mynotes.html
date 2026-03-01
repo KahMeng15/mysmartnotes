@@ -89,8 +89,15 @@
 
 <body>
     <div class="page-card">
+        <!-- Sticky Navigation Header -->
+        <div class="note-sticky-header">
+            <a href="/dashboard" class="note-nav-back">
+                <span>Dashboard</span>
+            </a>
+        </div>
+
         <!-- Sticky Header Section -->
-        <div class="page-card-header">
+        <div class="page-card-header" style="padding-bottom: var(--spacing-md);">
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center">
                 <h1>My Notes</h1>
@@ -113,7 +120,7 @@
             </div>
         </div>
 
-        <div class="page-card-content">
+        <div class="page-card-content" style="padding-top: var(--spacing-md);">
             <!-- Groups Container -->
             <div id="notesContainer">
                 <div class="empty-state">

@@ -194,13 +194,13 @@ a:hover {
   margin: var(--spacing-lg);
   display: flex;
   flex-direction: column;
+  padding: 0;
 }
 
 /* Sticky header section */
 .page-card-header {
   flex-shrink: 0;
-  padding: var(--spacing-xl);
-  border-bottom: 1px solid var(--color-light-gray);
+  padding: var(--spacing-2xl);
   background: var(--color-white);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   position: sticky;
@@ -517,13 +517,14 @@ a:hover {
 
 .note-nav-back {
   color: var(--color-gray);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   transition: color 0.15s;
   flex-shrink: 0;
+  
 }
 
 .note-nav-back:hover {
@@ -2835,11 +2836,10 @@ body.auth-page {
 /* Dashboard Styles */
 .page-card {
   overflow-y: auto;
-  padding: var(--spacing-xl);
 }
 
 .page-card-content {
-  padding: var(--spacing-xl);
+  padding: var(--spacing-2xl);
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
