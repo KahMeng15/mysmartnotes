@@ -1,5 +1,5 @@
 /* MySmartNotes - Master Stylesheet */
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&family=Instrument+Serif:ital,opsz,wght@0,6..28,200..900;1,6..28,200..900&display=swap');
 
 :root {
   /* Primary Colors — new palette */
@@ -187,7 +187,8 @@ a:hover {
   border-radius: var(--radius-xl);
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-  min-height: calc(100vh - var(--spacing-lg) * 2);
+  height: calc(100vh - var(--spacing-lg) * 2);
+  max-height: calc(100vh - var(--spacing-lg) * 2);
   box-sizing: border-box;
   margin: var(--spacing-lg);
 }
@@ -1063,6 +1064,7 @@ textarea {
   background: var(--color-primary-dark);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+  color: var(--color-white);
 }
 
 .btn-secondary {
@@ -1534,7 +1536,7 @@ textarea {
   text-align: center;
   padding: var(--spacing-2xl);
   color: var(--color-gray);
-  background: var(--color-background);
+  background: var(--color-white);
   border-radius: var(--radius-lg);
   border: 1px dashed var(--color-light-gray);
 }
@@ -1547,7 +1549,7 @@ textarea {
 }
 
 .lecture-item {
-  background: var(--color-background);
+  background: var(--color-white);
   border: 1px solid var(--color-light-gray);
   border-radius: var(--radius-md);
   padding: var(--spacing-md);
@@ -1559,7 +1561,6 @@ textarea {
 
 .lecture-item:hover {
   transform: translateX(4px);
-  border-color: var(--color-primary);
   box-shadow: var(--shadow-sm);
   background: var(--color-background);
   /* Override default hover */
