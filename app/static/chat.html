@@ -17,6 +17,13 @@
         if (typeof marked === 'undefined') {
             document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');
         }
+        // Configure marked to enable tables and other features
+        if (typeof marked !== 'undefined') {
+            marked.setOptions({
+                breaks: true,
+                gfm: true
+            });
+        }
     </script>
     <style>
         .chat-container {
@@ -289,6 +296,46 @@
             font-size: 0.9em;
         }
 
+        /* Lists within message content */
+        .message.ai .message-content ul,
+        .message.ai .message-content ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+
+        .message.ai .message-content li {
+            margin: 0.3em 0;
+            line-height: 1.6;
+        }
+
+        /* Tables within message content */
+        .message.ai .message-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0.5em 0;
+            font-size: 0.95em;
+        }
+
+        .message.ai .message-content table thead {
+            background: #f0f0f0;
+        }
+
+        .message.ai .message-content table th {
+            padding: 0.5em;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .message.ai .message-content table td {
+            padding: 0.5em;
+            border-bottom: 1px solid #eee;
+        }
+
+        .message.ai .message-content table tr:hover {
+            background: #f9f9f9;
+        }
+
         /* Past Chats Header with Plus Button */
         .sidebar-header {
             display: flex;
@@ -381,49 +428,62 @@
         }
 
         /* ── AI Mode Selector ─────────────────────────────────────────── */
-        .ai-mode-bar {
+        .ai-controls {
             display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-            align-items: center;
-            padding-bottom: 2px;
+            flex-direction: column;
+            gap: var(--spacing-md);
         }
 
-        .mode-label-text {
-            font-size: 11px;
+        .ai-mode-bar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-label {
+            font-size: var(--font-size-xs);
             color: var(--color-gray);
-            font-weight: 500;
-            flex-shrink: 0;
-            margin-right: 2px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            min-width: 50px;
         }
 
         .mode-pill {
-            padding: 3px 9px;
-            border-radius: 20px;
-            font-size: 11px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: var(--font-size-xs);
             font-weight: 500;
             border: 1px solid var(--color-light-gray);
-            background: var(--color-background);
-            color: var(--color-gray);
+            background: var(--color-white);
+            color: var(--color-dark);
             cursor: pointer;
-            transition: all 0.15s;
+            transition: all 0.2s;
             display: inline-flex;
             align-items: center;
-            gap: 3px;
+            gap: 6px;
             white-space: nowrap;
-            line-height: 1.4;
         }
 
         .mode-pill:hover {
             border-color: var(--color-primary);
+            background: rgba(78, 205, 196, 0.08);
             color: var(--color-primary);
-            background: rgba(78, 205, 196, 0.06);
         }
 
         .mode-pill.active {
             background: var(--color-primary);
             border-color: var(--color-primary);
             color: white;
+        }
+
+        /* Output Format Pills */
+        .output-format-bar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
         }
 
         /* ── AI Mode Badge on messages ────────────────────────────────── */
@@ -503,10 +563,17 @@
         }
 
         /* ── Chat header title ────────────────────────────────────────── */
+        .chat-header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-lg);
+        }
+
         .chat-title-row {
             display: flex;
             align-items: center;
-            gap: var(--spacing-sm);
+            gap: var(--spacing-md);
         }
 
         #chatTitle {
@@ -514,7 +581,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 600px;
+            max-width: 400px;
         }
 
         .viewing-badge {
@@ -528,6 +595,38 @@
             color: #856404;
             border: 1px solid #ffc107;
             flex-shrink: 0;
+        }
+
+        .context-display {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .context-name {
+            font-size: var(--font-size-sm);
+            color: var(--color-dark);
+            font-weight: 500;
+        }
+
+        .change-context-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: var(--font-size-xs);
+            border: 1px solid var(--color-light-gray);
+            background: var(--color-white);
+            color: var(--color-dark);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .change-context-btn:hover {
+            border-color: var(--color-primary);
+            background: rgba(78, 205, 196, 0.08);
+            color: var(--color-primary);
         }
     </style>
 </head>
@@ -555,11 +654,19 @@
         <div class="chat-main">
             <!-- Header -->
             <div class="chat-header">
-                <div class="chat-title-row">
-                    <h3 id="chatTitle">Select a scope to start</h3>
-                    <span id="viewingBadge" class="viewing-badge" style="display:none;">
-                        <i class="ph ph-eye"></i> Viewing history
-                    </span>
+                <div class="chat-header-top">
+                    <div class="chat-title-row">
+                        <h3 id="chatTitle">Select a scope to start</h3>
+                        <span id="viewingBadge" class="viewing-badge" style="display:none;">
+                            <i class="ph ph-eye"></i> Viewing history
+                        </span>
+                    </div>
+                    <div class="context-display" id="contextDisplay" style="display: none;">
+                        <span class="context-name" id="contextName"></span>
+                        <button class="change-context-btn" onclick="openScopeModal()" title="Change chat context">
+                            <i class="ph ph-arrows-left-right"></i> Change
+                        </button>
+                    </div>
                 </div>
                 <p id="chatSubtitle" style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions about your notes, subjects, or groups</p>
             </div>
@@ -575,37 +682,45 @@
 
             <!-- Input -->
             <div class="chat-input-area">
-                <!-- AI Mode Selector -->
-                <div class="ai-mode-bar">
-                    <span class="mode-label-text">Mode:</span>
-                    <button class="mode-pill" data-mode="quick" onclick="setAiMode('quick')" title="One concise sentence from source notes">
-                        <i class="ph ph-lightning"></i> Quick
-                    </button>
-                    <button class="mode-pill" data-mode="quick_point" onclick="setAiMode('quick_point')" title="Key points as a brief list">
-                        <i class="ph ph-list-bullets"></i> Quick Points
-                    </button>
-                    <button class="mode-pill active" data-mode="elaboration" onclick="setAiMode('elaboration')" title="Clear, thorough explanation">
-                        <i class="ph ph-lightbulb"></i> Elaborate
-                    </button>
-                    <button class="mode-pill" data-mode="elaboration_point" onclick="setAiMode('elaboration_point')" title="Thorough explanation in structured bullet points">
-                        <i class="ph ph-list-numbers"></i> Detailed Points
-                    </button>
-                    <button class="mode-pill" data-mode="simple" onclick="setAiMode('simple')" title="Plain language, no jargon">
-                        <i class="ph ph-text-a-underline"></i> Simple Terms
-                    </button>
-                    <button class="mode-pill" data-mode="eli5" onclick="setAiMode('eli5')" title="Explain like I'm 5 years old">
-                        <i class="ph ph-smiley"></i> ELI5
-                    </button>
-                </div>
+                <!-- AI Controls -->
+                <div class="ai-controls">
+                    <!-- Mode Selector -->
+                    <div>
+                        <div class="control-label">Mode</div>
+                        <div class="ai-mode-bar">
+                            <button class="mode-pill" data-mode="quick" onclick="setAiMode('quick')" title="Use less processing to get answer">
+                                <i class="ph ph-lightning"></i> Quick
+                            </button>
+                            <button class="mode-pill" data-mode="simple" onclick="setAiMode('simple')" title="Answer in simple terms">
+                                <i class="ph ph-text-a-underline"></i> Simple
+                            </button>
+                            <button class="mode-pill active" data-mode="elaborate" onclick="setAiMode('elaborate')" title="Provide thorough explanation">
+                                <i class="ph ph-lightbulb"></i> Elaborate
+                            </button>
+                            <button class="mode-pill" data-mode="eli5" onclick="setAiMode('eli5')" title="Explain like I'm 5">
+                                <i class="ph ph-smiley"></i> ELI5
+                            </button>
+                        </div>
+                    </div>
 
-                <!-- Context + Scope -->
-                <div class="scope-selection">
-                    <span style="font-size: var(--font-size-sm); color: var(--color-gray);">Context:</span>
-                    <button class="btn btn-secondary btn-small"
-                        style="border-radius: var(--radius-full); padding: 4px 12px; font-size: var(--font-size-xs);"
-                        onclick="openScopeModal()">
-                        <i class="ph ph-target"></i> <span id="scopeLabel">Select Note/Subject/Group</span>
-                    </button>
+                    <!-- Output Format Selector -->
+                    <div>
+                        <div class="control-label">Output</div>
+                        <div class="output-format-bar">
+                            <button class="mode-pill active" data-format="sentence" onclick="setOutputFormat('sentence')" title="Single paragraph response">
+                                <i class="ph ph-text-t"></i> Sentence
+                            </button>
+                            <button class="mode-pill" data-format="pointform" onclick="setOutputFormat('pointform')" title="Bullet point format">
+                                <i class="ph ph-list-bullets"></i> Pointform
+                            </button>
+                            <button class="mode-pill" data-format="numbered_list" onclick="setOutputFormat('numbered_list')" title="Numbered list format">
+                                <i class="ph ph-list-numbers"></i> Numbered List
+                            </button>
+                            <button class="mode-pill" data-format="table" onclick="setOutputFormat('table')" title="Table format">
+                                <i class="ph ph-table"></i> Table
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="chat-input-form">
@@ -677,7 +792,8 @@
         let allLectures = [];
 
         let currentScope = { type: null, id: null, title: 'Select a scope to start' };
-        let currentAiMode = localStorage.getItem('chatAiMode') || 'elaboration';
+        let currentAiMode = localStorage.getItem('chatAiMode') || 'elaborate';
+        let currentOutputFormat = localStorage.getItem('chatOutputFormat') || 'sentence';
 
         // Modal state
         let tempGroupId = null;
@@ -706,25 +822,39 @@
 
         // ── AI Mode helpers ───────────────────────────────────────────────
         const MODE_META = {
-            quick:             { label: 'Quick Answer',    icon: 'ph-lightning' },
-            quick_point:       { label: 'Quick Points',    icon: 'ph-list-bullets' },
-            elaboration:       { label: 'Elaborate',       icon: 'ph-lightbulb' },
-            elaboration_point: { label: 'Detailed Points', icon: 'ph-list-numbers' },
-            simple:            { label: 'Simple Terms',    icon: 'ph-text-a-underline' },
-            eli5:              { label: 'ELI5',            icon: 'ph-smiley' },
+            quick:       { label: 'Quick',      icon: 'ph-lightning' },
+            simple:      { label: 'Simple',     icon: 'ph-text-a-underline' },
+            elaborate:   { label: 'Elaborate',  icon: 'ph-lightbulb' },
+            eli5:        { label: 'ELI5',       icon: 'ph-smiley' },
+        };
+
+        const OUTPUT_FORMAT_META = {
+            sentence:       { label: 'Sentence',       icon: 'ph-text-t' },
+            pointform:      { label: 'Pointform',      icon: 'ph-list-bullets' },
+            numbered_list:  { label: 'Numbered List',  icon: 'ph-list-numbers' },
+            table:          { label: 'Table',          icon: 'ph-table' },
         };
 
         function setAiMode(mode) {
             currentAiMode = mode;
-            document.querySelectorAll('.mode-pill').forEach(p => {
+            document.querySelectorAll('.ai-mode-bar .mode-pill').forEach(p => {
                 p.classList.toggle('active', p.dataset.mode === mode);
             });
             localStorage.setItem('chatAiMode', mode);
         }
 
-        // Apply saved mode on load
+        function setOutputFormat(format) {
+            currentOutputFormat = format;
+            document.querySelectorAll('.output-format-bar .mode-pill').forEach(p => {
+                p.classList.toggle('active', p.dataset.format === format);
+            });
+            localStorage.setItem('chatOutputFormat', format);
+        }
+
+        // Apply saved mode and output format on load
         function applySavedMode() {
             setAiMode(currentAiMode);
+            setOutputFormat(currentOutputFormat);
         }
 
         // ── Bootstrap ─────────────────────────────────────────────────────
@@ -867,7 +997,8 @@
         function setScope(type, id, title) {
             currentScope = { type, id, title };
             saveScopeToStorage(currentScope);
-            document.getElementById('scopeLabel').textContent = title;
+            document.getElementById('contextName').textContent = title;
+            document.getElementById('contextDisplay').style.display = 'flex';
             document.getElementById('messageInput').disabled = false;
             document.getElementById('sendBtn').disabled = false;
 
@@ -892,7 +1023,7 @@
             document.getElementById('chatTitle').textContent = 'New Chat';
             document.getElementById('chatSubtitle').textContent = 'Ask questions about your notes, subjects, or groups';
             document.getElementById('viewingBadge').style.display = 'none';
-            document.getElementById('scopeLabel').textContent = 'Select Note/Subject/Group';
+            document.getElementById('contextDisplay').style.display = 'none';
             document.getElementById('messageInput').disabled = true;
             document.getElementById('sendBtn').disabled = true;
             document.getElementById('messageInput').value = '';
@@ -939,6 +1070,7 @@
             const payload = {
                 message,
                 ai_mode: currentAiMode,
+                output_format: currentOutputFormat,
                 conversation_id: currentConversationId,
             };
             if (currentScope.type === 'note')    payload.lecture_id  = parseInt(currentScope.id);
@@ -979,7 +1111,7 @@
                             `${currentScope.title}  ·  ${conversationMessages.filter(m => m.role === 'user').length} question(s)`;
                     }
 
-                    fetchConversations(); // refresh sidebar
+                    await fetchConversations(); // refresh sidebar
                 } else {
                     conversationMessages.push({
                         role: 'ai',
@@ -1240,7 +1372,8 @@
 
                 currentScope = { type: scopeType, id: scopeId, title: scopeTitle };
                 saveScopeToStorage(currentScope);
-                document.getElementById('scopeLabel').textContent = scopeTitle;
+                document.getElementById('contextName').textContent = scopeTitle;
+                document.getElementById('contextDisplay').style.display = 'flex';
                 document.getElementById('messageInput').disabled = !scopeId;
                 document.getElementById('sendBtn').disabled = !scopeId;
 

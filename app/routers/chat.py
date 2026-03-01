@@ -27,7 +27,8 @@ class ChatRequest(BaseModel):
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
     message: str
-    ai_mode: str = "elaboration"
+    ai_mode: str = "elaborate"
+    output_format: str = "sentence"
     conversation_id: Optional[str] = None
 
 
@@ -42,6 +43,7 @@ class ChatMessageResponse(BaseModel):
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
     ai_mode: Optional[str] = None
+    output_format: Optional[str] = None
     ai_model: Optional[str] = None
     conversation_id: Optional[str] = None
     conversation_title: Optional[str] = None
@@ -63,6 +65,8 @@ class ChatResponse(BaseModel):
     response: str
     sources: list = []
     timings: Optional[dict] = None
+    ai_mode: Optional[str] = None
+    output_format: Optional[str] = None
     ai_model: Optional[str] = None
     detailed_sources: Optional[list] = []
     conversation_id: Optional[str] = None
@@ -74,12 +78,17 @@ class ChatResponse(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 AI_MODES = {
-    "quick":             {"label": "Quick Answer",    "icon": "ph-lightning",        "description": "One concise sentence from source notes"},
-    "quick_point":       {"label": "Quick Points",    "icon": "ph-list-bullets",      "description": "Key points as a brief list from source notes"},
-    "elaboration":       {"label": "Elaborate",       "icon": "ph-lightbulb",         "description": "Clear, thorough explanation"},
-    "elaboration_point": {"label": "Detailed Points", "icon": "ph-list-numbers",      "description": "Thorough explanation in structured bullet points"},
-    "simple":            {"label": "Simple Terms",    "icon": "ph-text-a-underline",  "description": "Plain language, no technical jargon"},
-    "eli5":              {"label": "ELI5",            "icon": "ph-smiley",            "description": "Explain like I'm 5 years old"},
+    "quick":       {"label": "Quick",      "icon": "ph-lightning",         "description": "Use less processing to get answer"},
+    "simple":      {"label": "Simple",     "icon": "ph-text-a-underline",  "description": "Answer in simple terms"},
+    "elaborate":   {"label": "Elaborate",  "icon": "ph-lightbulb",         "description": "Provide thorough explanation"},
+    "eli5":        {"label": "ELI5",       "icon": "ph-smiley",            "description": "Explain like I'm 5"},
+}
+
+OUTPUT_FORMATS = {
+    "sentence":       "Single paragraph response",
+    "pointform":      "Bullet point format",
+    "numbered_list":  "Numbered list format",
+    "table":          "Table format",
 }
 
 _BASE_GUARD = (
@@ -89,86 +98,43 @@ _BASE_GUARD = (
 )
 
 
-def build_mode_prompt(context: str, question: str, mode: str) -> str:
-    """Return the full system prompt for the selected AI response mode."""
+def build_mode_prompt(context: str, question: str, mode: str, output_format: str = "sentence") -> str:
+    """Return the full system prompt based on AI mode and output format."""
     if question.strip().lower() in {"hi", "hello", "how are you", "how are you?"}:
         return f"You are a friendly assistant. Respond warmly to: '{question}'"
 
-    prompts = {
-        "quick": f"""You are a concise assistant.
-{_BASE_GUARD}
-
-Respond in ONE single sentence only. Be direct and brief — no lists, no paragraphs.
-
-Context:
-{context}
-
-Question: {question}
-
-One-sentence answer:""",
-
-        "quick_point": f"""You are a concise assistant.
-{_BASE_GUARD}
-
-List the key points as a short numbered or bullet list. Keep each point to one line.
-
-Context:
-{context}
-
-Question: {question}
-
-Key points:""",
-
-        "elaboration": f"""You are a knowledgeable and helpful assistant.
-{_BASE_GUARD}
-
-Provide a thorough, clear, and well-structured explanation. Use examples from the context where helpful.
-
-Context:
-{context}
-
-Question: {question}
-
-Detailed explanation:""",
-
-        "elaboration_point": f"""You are a knowledgeable and helpful assistant.
-{_BASE_GUARD}
-
-Provide a thorough, clear explanation structured as organised bullet points or numbered steps. Use sub-points for complex ideas.
-
-Context:
-{context}
-
-Question: {question}
-
-Detailed structured explanation:""",
-
-        "simple": f"""You are a clear communicator who makes complex ideas easy to understand.
-{_BASE_GUARD}
-
-Explain in plain, everyday language. Avoid technical jargon. If you must use a technical term, briefly define it in parentheses.
-
-Context:
-{context}
-
-Question: {question}
-
-Simple explanation:""",
-
-        "eli5": f"""You are a patient, friendly teacher explaining to a 5-year-old child.
-{_BASE_GUARD}
-
-Use very simple words, short sentences, and relatable everyday analogies (like toys, food, or animals). Make it fun and easy!
-
-Context:
-{context}
-
-Question: {question}
-
-Simple explanation (for a young child):""",
+    # Base mode instructions
+    mode_instructions = {
+        "quick": "You are a concise assistant providing brief, focused answers using only the provided context.",
+        "simple": "You are a clear communicator who makes complex ideas easy to understand using plain, everyday language. Avoid technical jargon.",
+        "elaborate": "You are a knowledgeable and helpful assistant providing thorough, clear, and well-structured explanations.",
+        "eli5": "You are a patient, friendly teacher explaining to a 5-year-old child using very simple words, short sentences, and relatable everyday analogies.",
     }
 
-    return prompts.get(mode, prompts["elaboration"])
+    # Output format instructions
+    output_instructions = {
+        "sentence": "Respond as a single paragraph or a few flowing sentences.",
+        "pointform": "Format your answer as a bullet-pointed list (using - or •). Each point should be clear and concise.",
+        "numbered_list": "Format your answer as a numbered list (1. 2. 3. etc.) with clear, well-organized points.",
+        "table": "Format your answer as a markdown table. Use this structure:\n| Column 1 | Column 2 |\n|----------|----------|\n| data     | data     |\n\nCreate logical column headers based on the question content.",
+    }
+
+    mode_inst = mode_instructions.get(mode, mode_instructions["elaborate"])
+    output_inst = output_instructions.get(output_format, output_instructions["sentence"])
+
+    prompt = f"""{mode_inst}
+{_BASE_GUARD}
+
+{output_inst}
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+
+    return prompt
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -322,7 +288,7 @@ async def ask_question(
     if not context:
         context = "No information available."
 
-    prompt = build_mode_prompt(context, request.message, request.ai_mode)
+    prompt = build_mode_prompt(context, request.message, request.ai_mode, request.output_format)
 
     # STEP 5: Call LLM
     ai_client = AIClient(current_user)
@@ -381,18 +347,25 @@ async def ask_question(
             conversation_id=conv_id,
             conversation_title=conv_title,
             ai_mode=request.ai_mode,
+            output_format=request.output_format,
             ai_model=ai_model_info,
             detailed_sources_json=json.dumps(detailed_sources) if detailed_sources else None,
         )
         db.add(chat_msg)
         db.commit()
+        db.refresh(chat_msg)  # Refresh to get the ID
     except Exception as e:
+        db.rollback()
         print(f"[chat] Failed to save to history: {e}")
+        import traceback
+        traceback.print_exc()
 
     return ChatResponse(
         message=request.message,
         response=response,
         sources=snippet_sources,
+        ai_mode=request.ai_mode,
+        output_format=request.output_format,
         ai_model=ai_model_info,
         detailed_sources=detailed_sources,
         conversation_id=conv_id,

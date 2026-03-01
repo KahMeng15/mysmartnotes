@@ -199,7 +199,8 @@ class ChatMessage(Base):
     # Conversation threading
     conversation_id = Column(String(36), nullable=True, index=True)   # UUID grouping messages into a conversation
     conversation_title = Column(String(255), nullable=True)            # AI-generated or derived title
-    ai_mode = Column(String(50), nullable=True, default="elaboration") # Which AI response mode was used
+    ai_mode = Column(String(50), nullable=True, default="elaborate")   # Which AI response mode was used
+    output_format = Column(String(50), nullable=True, default="sentence") # Output format: sentence, pointform, numbered_list, table
     detailed_sources_json = Column(Text, nullable=True)                # JSON: full detailed source objects for history replay
     ai_model = Column(String(255), nullable=True)                      # e.g. "GEMINI (gemini-1.5-flash)"
     
