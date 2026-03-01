@@ -13,200 +13,63 @@
     <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
     <script src="js/utils.js"></script>
-    <style>
-        .group-section {
-            background: white;
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-xl);
-            margin-bottom: var(--spacing-2xl);
-            border: 1px solid var(--color-light-gray);
-        }
-
-        .group-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: var(--spacing-lg);
-            padding-bottom: var(--spacing-md);
-            border-bottom: 2px solid var(--color-light-gray);
-        }
-
-        .group-title {
-            font-size: var(--font-size-xl);
-            font-weight: 700;
-            color: var(--color-text);
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-        }
-
-        .group-actions {
-            display: flex;
-            gap: var(--spacing-sm);
-        }
-
-        /* List View Styles */
-        .lecture-list {
-            display: flex;
-            flex-direction: column;
-            gap: var(--spacing-md);
-        }
-
-        .lecture-item {
-            background: var(--color-background);
-            border: 1px solid var(--color-light-gray);
-            border-radius: var(--radius-md);
-            padding: var(--spacing-md);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            transition: all var(--transition-base);
-        }
-
-        .lecture-item:hover {
-            transform: translateX(4px);
-            border-color: var(--color-primary);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .lecture-info {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-md);
-            flex: 1;
-            cursor: pointer;
-        }
-
-        .lecture-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--color-white);
-            color: var(--color-primary);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            border: 1px solid var(--color-light-gray);
-        }
-
-        .lecture-details h4 {
-            margin: 0;
-            font-size: var(--font-size-base);
-            font-weight: 600;
-        }
-
-        .lecture-details p {
-            margin: 0;
-            font-size: var(--font-size-sm);
-            color: var(--color-gray);
-        }
-
-        .lecture-actions {
-            display: flex;
-            gap: var(--spacing-sm);
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: var(--spacing-2xl);
-            color: var(--color-gray);
-            background: var(--color-background);
-            border-radius: var(--radius-lg);
-            border: 1px dashed var(--color-light-gray);
-        }
-
-        /* Controls bar styling from notes.html */
-        .controls-bar {
-            display: flex;
-            justify-content: space-between;
-            gap: var(--spacing-md);
-            margin-bottom: var(--spacing-xl);
-            flex-wrap: wrap;
-        }
-
-        .search-box {
-            flex: 1;
-            min-width: 300px;
-            position: relative;
-        }
-
-        .search-box input {
-            width: 100%;
-            padding: var(--spacing-md) var(--spacing-lg);
-            padding-left: 45px;
-            border: 1px solid var(--color-light-gray);
-            border-radius: var(--radius-full);
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .search-box input:focus {
-            border-color: var(--color-primary);
-        }
-
-        .search-icon {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--color-gray);
-            font-size: 20px;
-        }
-    </style>
 </head>
 
 <body>
 
-
     <div class="page-card">
-        <!-- Back Link -->
-        <div style="margin-bottom: var(--spacing-md);">
-            <a href="mynotes.html" id="backLink"
-                style="color: var(--color-gray); font-size: var(--font-size-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                <i class="ph ph-arrow-left"></i> Back to Notes
-            </a>
-        </div>
-
-        <!-- Main Header (Like My Notes) -->
-        <div class="d-flex justify-content-between align-items-center" style="margin-bottom: var(--spacing-xl);">
-            <div>
-                <h1 id="subjectTitle" style="margin-bottom: var(--spacing-xs);">Loading Subject...</h1>
-                <p id="subjectDesc" style="color: var(--color-gray); margin-bottom: 0;"></p>
-            </div>
-            <div class="d-flex gap-2">
-                <button onclick="openEditSubjectModal()" class="btn btn-outline">
-                    <i class="ph ph-pencil-simple"></i> Edit
-                </button>
-                <button onclick="goToUpload()" class="btn btn-primary">
-                    <i class="ph ph-upload-simple"></i> Upload
-                </button>
-                <button onclick="deleteSubject()" class="btn btn-text" style="color: var(--color-error);">
-                    <i class="ph ph-trash"></i> Delete
-                </button>
+        <!-- Sticky Navigation Header -->
+        <div class="note-sticky-header">
+            <div class="note-nav-back">
+                <span id="breadcrumbGroup" style="display: none;">
+                    <a id="groupLink" href="#"></a>
+                </span>
             </div>
         </div>
 
-        <!-- Controls (Like match notes.html) -->
-        <div class="controls-bar">
-            <div class="search-box">
-                <i class="ph ph-magnifying-glass search-icon"></i>
-                <input type="text" id="searchInput" placeholder="Search lectures..." onkeyup="filterLectures()">
+        <!-- Sticky Header Section -->
+        <div class="page-card-header" style="padding-bottom: var(--spacing-md);">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 id="subjectTitle">Loading Subject...</h1>
+                    <p id="subjectDesc" style="color: var(--color-gray); margin-bottom: 0;"></p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button onclick="openEditSubjectModal()" class="btn btn-outline">
+                        <i class="ph ph-pencil-simple"></i> Edit
+                    </button>
+                    <button onclick="goToUpload()" class="btn btn-primary">
+                        <i class="ph ph-upload-simple"></i> Upload
+                    </button>
+                    <button onclick="deleteSubject()" class="btn btn-text" style="color: var(--color-error);">
+                        <i class="ph ph-trash"></i> Delete
+                    </button>
+                </div>
             </div>
-            <select id="sortSelect" class="form-control" style="width: auto;" onchange="filterLectures()">
-                <option value="recent">Most Recent</option>
-                <option value="oldest">Oldest First</option>
-                <option value="name">Name (A-Z)</option>
-            </select>
+
+            <!-- Controls -->
+            <div class="controls-bar">
+                <div class="search-box">
+                    <i class="ph ph-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search lectures..." onkeyup="filterLectures()">
+                </div>
+                <select id="sortSelect" class="form-control" style="width: auto;" onchange="filterLectures()">
+                    <option value="recent">Most Recent</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="name">Name (A-Z)</option>
+                </select>
+            </div>
         </div>
 
-        <!-- Lecture List Container (White Box) -->
-        <div class="group-section">
-            <!-- Lecture List -->
-            <div id="lecturesList" class="lecture-list">
-                <div class="empty-state">
-                    <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>
-                    <p>Loading lectures...</p>
+        <div class="page-card-content" style="padding-top: var(--spacing-md);">
+            <!-- Lecture List Container -->
+            <div class="group-section">
+                <div id="lecturesList" class="lecture-list">
+                    <div class="empty-state">
+                        <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>
+                        <p>Loading lectures...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -272,14 +135,21 @@
                         document.getElementById('subjectTitle').textContent = currentSubject.name;
                         document.getElementById('subjectDesc').textContent = currentSubject.description || '';
 
-                        // Update Path/Back Link
-                        const backLink = document.getElementById('backLink');
+                        // Update breadcrumb with group info if available
                         if (currentSubject.group_id) {
-                            backLink.href = `group.html?id=${currentSubject.group_id}`;
-                            backLink.innerHTML = `<i class="ph ph-arrow-left"></i> Back to Group`;
-                        } else {
-                            backLink.href = 'notes.html';
-                            backLink.innerHTML = `<i class="ph ph-arrow-left"></i> Back to Notes`;
+                            // Fetch group details
+                            const groupsRes = await fetch(`${API_URL}/groups`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            if (groupsRes.ok) {
+                                const groups = await groupsRes.json();
+                                const group = groups.find(g => g.id === currentSubject.group_id);
+                                if (group) {
+                                    document.getElementById('groupLink').href = `group.html?id=${group.id}`;
+                                    document.getElementById('groupLink').textContent = group.name;
+                                    document.getElementById('breadcrumbGroup').style.display = 'inline';
+                                }
+                            }
                         }
                     } else {
                         document.getElementById('subjectTitle').textContent = 'Subject Not Found';
@@ -355,7 +225,7 @@
                         <button onclick="openLecture(${lecture.id})" class="btn btn-outline btn-small">
                             View
                         </button>
-                        <button onclick="deleteLecture(${lecture.id})" class="btn btn-text btn-small" style="color: var(--color-error);">
+                        <button onclick="deleteLecture(${lecture.id})" class="btn btn-outline btn-small" style="color: var(--color-error);">
                             <i class="ph ph-trash"></i>
                         </button>
                     </div>

@@ -14,58 +14,127 @@
     <script src="js/nav.js"></script>
     <script src="js/utils.js"></script>
     <style>
-        /* Local overrides if needed, otherwise using style.css */
+        /* Modal Styles (reused/inline for simplicity) */
+        /* Modal Styles from upload.html */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            max-width: 500px;
+            min-height: 400px;
+            /* Slightly smaller min-height for edit modals */
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-content h2 {
+            margin-bottom: var(--spacing-lg);
+            font-size: 1.5rem;
+        }
+
+        .modal-content form {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        /* Push buttons to bottom */
+        .modal-buttons {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: auto;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: var(--spacing-md);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-save {
+            background: var(--color-primary);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: var(--color-light-gray);
+            color: var(--color-text);
+        }
     </style>
 </head>
 
 <body>
 
-
     <div class="page-card">
-        <!-- Back Link -->
-        <div style="margin-bottom: var(--spacing-md);">
-            <a href="mynotes.html"
-                style="color: var(--color-gray); font-size: var(--font-size-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                <i class="ph ph-arrow-left"></i> Back to Notes
+        <!-- Sticky Navigation Header -->
+        <div class="note-sticky-header">
+            <a href="mynotes.html" class="note-nav-back">
+                <span>My Notes</span>
             </a>
         </div>
 
-        <!-- Main Header -->
-        <div class="d-flex justify-content-between align-items-center" style="margin-bottom: var(--spacing-xl);">
-            <div>
-                <h1 id="groupTitle" style="margin-bottom: var(--spacing-xs);">Loading Group...</h1>
+        <!-- Sticky Header Section -->
+        <div class="page-card-header" style="padding-bottom: var(--spacing-md);">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 id="groupTitle">Loading Group...</h1>
+                <div class="d-flex gap-2">
+                    <button onclick="openEditGroupModal()" class="btn btn-outline">
+                        <i class="ph ph-pencil-simple"></i> Edit Group
+                    </button>
+                    <button onclick="goToUpload()" class="btn btn-primary">
+                        <i class="ph ph-upload-simple"></i> Upload
+                    </button>
+                    <button onclick="deleteGroup()" class="btn btn-text" style="color: var(--color-error);">
+                        <i class="ph ph-trash"></i> Delete Group
+                    </button>
+                </div>
             </div>
-            <div class="d-flex gap-2">
-                <button onclick="openEditGroupModal()" class="btn btn-outline">
-                    <i class="ph ph-pencil-simple"></i> Edit Group
-                </button>
-                <button onclick="goToUpload()" class="btn btn-primary">
-                    <i class="ph ph-upload-simple"></i> Upload
-                </button>
-                <button onclick="deleteGroup()" class="btn btn-text" style="color: var(--color-error);">
-                    <i class="ph ph-trash"></i> Delete Group
-                </button>
+
+            <!-- Controls -->
+            <div class="controls-bar">
+                <div class="search-box">
+                    <i class="ph ph-magnifying-glass search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Search subjects..." onkeyup="filterSubjects()">
+                </div>
+                <select id="sortSelect" class="form-control" style="width: auto;" onchange="sortSubjects()">
+                    <option value="name">Name (A-Z)</option>
+                    <option value="recent">Date Created</option>
+                </select>
             </div>
         </div>
 
-        <!-- Controls -->
-        <div class="controls-bar">
-            <div class="search-box">
-                <i class="ph ph-magnifying-glass search-icon"></i>
-                <input type="text" id="searchInput" placeholder="Search subjects..." onkeyup="filterSubjects()">
-            </div>
-            <select id="sortSelect" class="form-control" style="width: auto;" onchange="sortSubjects()">
-                <option value="name">Name (A-Z)</option>
-                <option value="recent">Date Created</option>
-            </select>
-        </div>
-
-        <!-- Subjects Grid Container -->
-        <div class="group-section">
-            <div id="subjectsGrid" class="subjects-grid">
-                <div class="empty-state">
-                    <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>
-                    <p>Loading subjects...</p>
+        <div class="page-card-content" style="padding-top: var(--spacing-md);">
+            <!-- Subjects Grid Container -->
+            <div class="group-section">
+                <div id="subjectsGrid" class="subjects-grid">
+                    <div class="empty-state">
+                        <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>
+                        <p>Loading subjects...</p>
+                    </div>
                 </div>
             </div>
         </div>
