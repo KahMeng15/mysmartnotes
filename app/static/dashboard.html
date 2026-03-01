@@ -13,138 +13,80 @@
     <script src="js/auth.js"></script>
     <script src="js/nav.js"></script>
     <script src="js/greetings.js"></script>
-    <style>
-        .page-card {
-            overflow-y: auto;
-            padding: var(--spacing-xl);
-        }
-
-        .page-card-content {
-            padding: var(--spacing-xl);
-        }
-
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: var(--spacing-lg);
-            margin-bottom: var(--spacing-2xl);
-        }
-
-        .quick-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: var(--spacing-lg);
-            margin-bottom: var(--spacing-2xl);
-        }
-
-        .action-btn {
-            padding: var(--spacing-xl);
-            text-align: center;
-            border-radius: var(--radius-lg);
-            transition: all var(--transition-base);
-        }
-
-        .action-btn:hover {
-            transform: translateY(-4px);
-        }
-
-        .icon {
-            font-size: var(--font-size-3xl);
-            margin-bottom: var(--spacing-md);
-        }
-
-        .welcome-heading {
-            font-family: 'Instrument Serif', serif;
-            font-size: 4rem;
-            font-weight: 700;
-            line-height: 0.5;
-        }
-    </style>
 </head>
 
 <body>
-
-
     <!-- Main Content -->
     <div class="page-card">
         <div class="page-card-content">
             <!-- Welcome Section -->
             <div style="margin-bottom: var(--spacing-2xl);">
                 <h1 class="welcome-heading"><em>Welcome back, <span id="userName">Student</span></em></h1>
-                <p style="color: var(--color-gray); font-size: var(--font-size-lg);">Let's continue your learning journey
-                </p>
+                <p style="color: var(--color-gray); font-size: var(--font-size-lg);">Let's continue your learning journey</p>
             </div>
 
-        <!-- Quick Stats -->
-        <div class="dashboard-grid">
-            <div class="card card-stat">
-                <div class="card-stat-value" id="totalSubjectsValue">0</div>
-                <div class="card-stat-label">Total Subjects</div>
-                <div class="card-stat-delta positive"><i class="ph ph-check"></i> Active</div>
+            <!-- Quick Stats -->
+            <div class="dashboard-grid">
+                <div class="card card-stat">
+                    <div class="card-stat-value" id="totalSubjectsValue">0</div>
+                    <div class="card-stat-label">Total Subjects</div>
+                    <div class="card-stat-delta positive"><i class="ph ph-check"></i> Active</div>
+                </div>
+                <div class="card card-stat">
+                    <div class="card-stat-value" id="totalNotesValue">0</div>
+                    <div class="card-stat-label">Total Notes</div>
+                    <div class="card-stat-delta positive"><i class="ph ph-trend-up"></i> Updated</div>
+                </div>
+                <div class="card card-stat coming-soon">
+                    <div class="coming-soon-badge">Coming Soon</div>
+                    <div class="card-stat-value">--</div>
+                    <div class="card-stat-label">Study Time</div>
+                </div>
+                <div class="card card-stat coming-soon">
+                    <div class="coming-soon-badge">Coming Soon</div>
+                    <div class="card-stat-value">--</div>
+                    <div class="card-stat-label">Questions Asked</div>
+                </div>
             </div>
-            <div class="card card-stat">
-                <div class="card-stat-value" id="totalNotesValue">0</div>
-                <div class="card-stat-label">Total Notes</div>
-                <div class="card-stat-delta positive"><i class="ph ph-trend-up"></i> Updated</div>
-            </div>
-            <div class="card card-stat coming-soon">
-                <div class="coming-soon-badge">Coming Soon</div>
-                <div class="card-stat-value">--</div>
-                <div class="card-stat-label">Study Time</div>
-            </div>
-            <div class="card card-stat coming-soon">
-                <div class="coming-soon-badge">Coming Soon</div>
-                <div class="card-stat-value">--</div>
-                <div class="card-stat-label">Questions Asked</div>
-            </div>
-        </div>
 
             <!-- Quick Actions -->
             <h2 style="margin-top: var(--spacing-2xl);">Quick Actions</h2>
             <div class="quick-actions">
                 <!-- Upload -->
-                <a href="upload.html" class="card action-btn"
-                    style="background: var(--color-accent-silk); color: var(--color-dark); text-decoration: none;">
+                <a href="upload.html" class="card action-btn" style="background: var(--color-accent-silk); color: var(--color-dark); text-decoration: none;">
                     <div class="icon"><i class="ph ph-upload-simple"></i></div>
                     <div style="font-weight: 600;">Upload</div>
                 </a>
                 <!-- My Notes -->
-                <a href="mynotes.html" class="card action-btn"
-                    style="background: var(--color-accent-silk); color: var(--color-dark); text-decoration: none;">
+                <a href="mynotes.html" class="card action-btn" style="background: var(--color-accent-silk); color: var(--color-dark); text-decoration: none;">
                     <div class="icon"><i class="ph ph-books"></i></div>
                     <div style="font-weight: 600;">My Notes</div>
                 </a>
                 <!-- Chat -->
-                <a href="chat.html" class="card action-btn"
-                    style="background: var(--color-primary); color: white; text-decoration: none;">
+                <a href="chat.html" class="card action-btn" style="background: var(--color-primary); color: white; text-decoration: none;">
                     <div class="icon"><i class="ph ph-chat-dots"></i></div>
                     <div style="font-weight: 600;">Chat</div>
                 </a>
                 <!-- Start Quiz -->
-                <a href="#" class="card action-btn"
-                    style="background: var(--color-accent-pink); color: white; text-decoration: none;" onclick="alert('Quiz feature coming soon');">
+                <a href="#" class="card action-btn" style="background: var(--color-accent-pink); color: white; text-decoration: none;" onclick="alert('Quiz feature coming soon');">
                     <div class="icon"><i class="ph ph-lightning"></i></div>
                     <div style="font-weight: 600;">Start Quiz</div>
                 </a>
                 <!-- View Flashcards -->
-                <a href="flashcards.html" class="card action-btn"
-                    style="background: var(--color-accent-cyan); color: var(--color-dark); text-decoration: none;">
+                <a href="flashcards.html" class="card action-btn" style="background: var(--color-accent-cyan); color: var(--color-dark); text-decoration: none;">
                     <div class="icon"><i class="ph ph-cards"></i></div>
                     <div style="font-weight: 600;">Flashcards</div>
                 </a>
                 <!-- Start Pomodoro -->
-                <a href="#" class="card action-btn"
-                    style="background: var(--color-warning); color: white; text-decoration: none;" onclick="alert('Pomodoro feature coming soon');">
+                <a href="#" class="card action-btn" style="background: var(--color-warning); color: white; text-decoration: none;" onclick="alert('Pomodoro feature coming soon');">
                     <div class="icon"><i class="ph ph-timer"></i></div>
                     <div style="font-weight: 600;">Pomodoro</div>
                 </a>
             </div>
 
-
-
-            <!-- Recent Notes (Redesigned in Card) -->
+            <!-- Recent Notes -->
             <div style="margin-top: var(--spacing-2xl);">
-                    <h2 style="margin-top: var(--spacing-2xl);">Recent Notes</h2>
+                <h2 style="margin-top: var(--spacing-2xl);">Recent Notes</h2>
                 <div id="recentLectures" class="lecture-list">
                     <div class="empty-state">
                         <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>
@@ -180,210 +122,7 @@
         </div>
     </div>
 
-    <style>
-        .lecture-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: var(--spacing-lg);
-        }
-        .lecture-item {
-            background: var(--color-bg-card, #fff);
-            border-radius: var(--radius-lg);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-            padding: var(--spacing-lg);
-            transition: box-shadow 0.2s;
-        }
-        .lecture-item:hover {
-            box-shadow: 0 4px 16px rgba(0,0,0,0.10);
-        }
-    </style>
-    <script>
-        const API_URL = '';
-        const token = localStorage.getItem('token');
-
-        // Check authentication
-        window.addEventListener('load', async () => {
-            if (!token) {
-                window.location.href = 'login.html';
-                return;
-            }
-            loadUserInfo();
-            await loadSubjects(); // Wait for subjects to load first
-            loadRecentLectures(); // Then load lectures
-        });
-
-        async function loadUserInfo() {
-            let user = JSON.parse(localStorage.getItem('user') || '{}');
-            let name = user.nickname || user.full_name || user.username;
-
-            // If name is missing but we have a token, try to fetch user info
-            if (!name) {
-                try {
-                    const response = await fetch('/auth/me');
-                    if (response.ok) {
-                        user = await response.json();
-                        localStorage.setItem('user', JSON.stringify(user));
-                        name = user.nickname || user.full_name || user.username;
-                    } else if (response.status === 401) {
-                        // Token invalid/expired, redirect to login
-                        window.location.href = 'login.html';
-                        return;
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch user info:", e);
-                }
-            }
-
-            name = name || 'Student';
-
-            // Use random greeting if available
-            if (typeof getRandomGreeting === 'function') {
-                const greeting = getRandomGreeting(name);
-                const h1 = document.querySelector('h1.welcome-heading');
-                if (h1) {
-                    h1.innerHTML = `<em>${greeting}</em>`;
-                }
-            } else {
-                document.getElementById('userName').textContent = name;
-            }
-        }
-
-        async function loadSubjects() {
-            try {
-                // Fetch subjects
-                const subjectsRes = await fetch(`${API_URL}/subjects`, { headers: { 'Authorization': `Bearer ${token}` } });
-
-                if (subjectsRes.ok) {
-                    const subjects = await subjectsRes.json();
-                    document.getElementById('totalSubjectsValue').textContent = subjects.length;
-                    window.allSubjects = subjects;
-                }
-            } catch (error) {
-                console.error('Error loading subjects:', error);
-            }
-        }
-
-        async function loadRecentLectures() {
-            try {
-                const response = await fetch(`${API_URL}/lectures`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const lectures = await response.json();
-                    document.getElementById('totalNotesValue').textContent = lectures.length;
-
-                    // Display recent notes (top 5)
-
-                    // Display recent notes (top 5)
-                    // Sort by date desc just in case
-                    lectures.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                    displayRecentLectures(lectures.slice(0, 5));
-                }
-            } catch (error) {
-                console.error('Error loading lectures:', error);
-            }
-        }
-
-        function displayRecentLectures(lectures) {
-            const list = document.getElementById('recentLectures');
-            if (!lectures || lectures.length === 0) {
-                list.innerHTML = `
-                   <div class="empty-state">
-                        <i class="ph ph-files" style="font-size: 48px; margin-bottom: 1rem;"></i>
-                        <p>No notes yet.</p>
-                        <a href="upload.html" class="btn btn-primary" style="margin-top: 1rem;">Upload First Note</a>
-                    </div>
-                `;
-                return;
-            }
-
-            list.innerHTML = `<div class='lecture-grid'>` + lectures.map(lecture => {
-                const subject = window.allSubjects ? window.allSubjects.find(s => s.id == lecture.subject_id) : null;
-                const subjectName = subject ? subject.name : 'Unknown Subject';
-                const groupName = subject && subject.groupName ? subject.groupName : null;
-                const type = lecture.file_type ? lecture.file_type.split('/')[1].toUpperCase() : 'FILE';
-
-                return `
-                <div class="lecture-item">
-                    <div class="lecture-info" onclick="openLecture(${lecture.id})">
-                        <div class="lecture-icon">
-                            <i class="ph ${getIconForType(lecture.file_type)}"></i>
-                        </div>
-                        <div class="lecture-details">
-                            <h4>${lecture.title}</h4>
-                            <p>
-                                ${subjectName} • 
-                                ${groupName ? ` ${groupName} • ` : ''}
-                                ${new Date(lecture.created_at).toLocaleDateString()}
-                            </p>
-                        </div>
-                    </div>
-                    <div class="lecture-actions">
-                        <button onclick="openLecture(${lecture.id})" class="btn btn-outline btn-small">
-                            View
-                        </button>
-                    </div>
-                </div>
-            `}).join('') + `</div>`;
-        }
-
-        function getIconForType(mimeType) {
-            if (!mimeType) return 'ph-file';
-            if (mimeType.includes('pdf')) return 'ph-file-pdf';
-            if (mimeType.includes('image')) return 'ph-file-image';
-            if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return 'ph-presentation';
-            return 'ph-file-text';
-        }
-
-        async function createSubject(event) {
-            event.preventDefault();
-            try {
-                const response = await fetch(`${API_URL}/subjects`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        name: document.getElementById('subjectName').value,
-                        description: document.getElementById('subjectDescription').value,
-                        color: document.getElementById('subjectColor').value
-                    })
-                });
-
-                if (response.ok) {
-                    closeModal('subjectModal');
-                    loadSubjects();
-                }
-            } catch (error) {
-                alert('Error creating subject: ' + error.message);
-            }
-        }
-
-        function selectSubject(id) {
-            window.location.href = `subject.html?id=${id}`;
-        }
-
-        function openLecture(id) {
-            window.location.href = `/note/${id}`;
-        }
-
-        function openModal(id) {
-            document.getElementById(id).classList.add('show');
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).classList.remove('show');
-        }
-
-        function logout() {
-            if (confirm('Are you sure you want to logout?')) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                window.location.href = 'login.html';
-            }
-        }
-    </script>
+    <script src="js/dashboard.js"></script>
 </body>
 
 </html>

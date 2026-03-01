@@ -97,6 +97,10 @@ async def serve_note_edit(id: str):
 async def serve_login():
     return FileResponse(os.path.join(static_dir, "login.html"))
 
+@app.get("/dashboard")
+async def serve_dashboard():
+    return FileResponse(os.path.join(static_dir, "dashboard.html"))
+
 @app.get("/")
 async def root():
     return RedirectResponse(url="/login")
