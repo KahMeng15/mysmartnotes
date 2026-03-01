@@ -39,9 +39,7 @@
         <div class="note-content-card page-card">
             <!-- Sticky header bar with back + breadcrumb -->
             <div class="note-sticky-header">
-                <a href="/mynotes.html" id="backLink" class="note-nav-back">
-                    <i class="ph ph-arrow-left"></i> Back
-                </a>
+
                 <div class="note-breadcrumb-row" id="noteBreadcrumb">
                     <span class="subject-dot" id="subjectDot"></span>
                     <a href="#" id="metaGroup" class="note-nav-crumb-link">Group</a>
@@ -359,12 +357,7 @@
                 if (mg) mg.textContent = 'Ungrouped';
             }
 
-            // Back link
-            const backLink = document.getElementById('backLink');
-            if (subjectId) {
-                backLink.href = `/subject.html?id=${subjectId}`;
-                backLink.innerHTML = `Back to Subject`;
-            }
+
 
             // Sidebar info
             document.getElementById('fileName').textContent = lectureData.file_name || '-';
@@ -440,6 +433,7 @@
                     textContainer.innerHTML = marked.parse(lectureData.extracted_text);
                     if (pollingInterval) clearInterval(pollingInterval);
                     setupH1Editing();
+                    setupStickyHeaderFading();
                     return;
                 } catch (e) {
                     console.error('marked.js failed:', e);
@@ -453,6 +447,7 @@
             }
             if (pollingInterval) clearInterval(pollingInterval);
             setupH1Editing();
+            setupStickyHeaderFading();
         }
 
         // Extract first h1 and make it editable
@@ -520,6 +515,57 @@
                 const firstH1 = document.querySelector('.markdown-content h1');
                 if (firstH1) firstH1.textContent = lectureData.title;
             }
+        }
+
+        // ===== DYNAMIC HEADER FADING =====
+        let stickyScrollListenerAttached = false;
+        function setupStickyHeaderFading() {
+            const contentCard = document.querySelector('.note-content-card');
+            if (!contentCard) return;
+
+            function handleScroll() {
+                const h1s = document.querySelectorAll('.markdown-content h1');
+                const h2s = document.querySelectorAll('.markdown-content h2');
+                const h3s = document.querySelectorAll('.markdown-content h3');
+
+                // Reset all color properties
+                h1s.forEach(h => { h.style.transition = 'color 0.2s'; h.style.color = '#1a1a1a'; });
+                h2s.forEach(h => { h.style.transition = 'color 0.2s'; h.style.color = '#333'; });
+                h3s.forEach(h => { h.style.transition = 'color 0.2s'; h.style.color = '#555'; });
+
+                // Define sticky thresholds (must match style.css tops + minor buffer of 2px for precision)
+                const h1Offset = 36;
+                const h2Offset = 81;
+                const h3Offset = 121;
+
+                const cardRect = contentCard.getBoundingClientRect();
+
+                const getStuckHeader = (headers, stickyTop) => {
+                    return Array.from(headers).reverse().find(h => {
+                        const rect = h.getBoundingClientRect();
+                        return (rect.top - cardRect.top) <= stickyTop;
+                    });
+                };
+
+                const stuckH1 = getStuckHeader(h1s, h1Offset);
+                const stuckH2 = getStuckHeader(h2s, h2Offset);
+                const stuckH3 = getStuckHeader(h3s, h3Offset);
+
+                // Apply opacity logic
+                if (stuckH3) {
+                    if (stuckH1) { stuckH1.style.color = '#ccc'; }
+                    if (stuckH2) { stuckH2.style.color = '#999'; }
+                } else if (stuckH2) {
+                    if (stuckH1) { stuckH1.style.color = '#ccc'; }
+                }
+            }
+
+            if (!stickyScrollListenerAttached) {
+                contentCard.addEventListener('scroll', handleScroll, { passive: true });
+                stickyScrollListenerAttached = true;
+            }
+            // Trigger immediately to evaluate initial load view correctly
+            handleScroll();
         }
 
         // ===== EXTRACTION STATUS =====
