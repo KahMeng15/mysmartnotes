@@ -339,9 +339,9 @@
         /* Past Chats Header with Plus Button */
         .sidebar-header {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
-            margin-bottom: var(--spacing-lg);
+            margin-bottom: var(--spacing-sm);
         }
 
         .new-chat-btn {
@@ -430,8 +430,16 @@
         /* ── AI Mode Selector ─────────────────────────────────────────── */
         .ai-controls {
             display: flex;
+            flex-direction: row;
+            gap: var(--spacing-lg);
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .ai-controls > div {
+            display: flex;
             flex-direction: column;
-            gap: var(--spacing-md);
+            gap: var(--spacing-sm);
         }
 
         .ai-mode-bar {
@@ -510,17 +518,17 @@
             color: var(--color-gray);
             padding: var(--spacing-sm) 0 4px;
             border-bottom: 1px solid var(--color-light-gray);
-            margin-bottom: 4px;
+            margin-bottom: var(--spacing-md);
         }
 
         .conversation-item {
             padding: 9px 10px;
-            background: var(--color-background);
+            background: var(--color-white);
             border-radius: var(--radius-md);
             cursor: pointer;
             transition: all 0.15s;
-            border: 1px solid transparent;
-            margin-bottom: 4px;
+            border: 1px solid var(--color-light-gray);
+            margin-bottom: var(--spacing-sm);
         }
 
         .conversation-item:hover {
@@ -567,21 +575,19 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: var(--spacing-lg);
         }
 
         .chat-title-row {
-            display: flex;
+            display: block;
             align-items: center;
             gap: var(--spacing-md);
         }
 
         #chatTitle {
             flex: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 400px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 600px;
         }
 
         .viewing-badge {
@@ -607,6 +613,7 @@
             font-size: var(--font-size-sm);
             color: var(--color-dark);
             font-weight: 500;
+            display: none;
         }
 
         .change-context-btn {
@@ -638,7 +645,7 @@
         <!-- Sidebar -->
         <div class="chat-sidebar">
             <div class="sidebar-header">
-                <h3><i class="ph ph-clock-counter-clockwise"></i> Conversations</h3>
+                <h3 style="margin: 0;"><i class="ph ph-clock-counter-clockwise"></i> Conversations</h3>
                 <button class="new-chat-btn" onclick="createNewChat()" title="Start a new chat">
                     <i class="ph ph-plus"></i>
                 </button>
@@ -656,19 +663,17 @@
             <div class="chat-header">
                 <div class="chat-header-top">
                     <div class="chat-title-row">
-                        <h3 id="chatTitle">Select a scope to start</h3>
-                        <span id="viewingBadge" class="viewing-badge" style="display:none;">
-                            <i class="ph ph-eye"></i> Viewing history
-                        </span>
+                        <h3 id="chatTitle" style="margin: 0;">Select a scope to start</h3>
+                        <p id="chatSubtitle" style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions about your notes, subjects, or groups</p>
+                        <p id="chatMeta" style="color: var(--color-gray); font-size: var(--font-size-xs); display: none; margin: 0;"></p>
                     </div>
                     <div class="context-display" id="contextDisplay" style="display: none;">
                         <span class="context-name" id="contextName"></span>
                         <button class="change-context-btn" onclick="openScopeModal()" title="Change chat context">
-                            <i class="ph ph-arrows-left-right"></i> Change
+                            <i class="ph ph-arrows-left-right"></i> Change Context
                         </button>
                     </div>
                 </div>
-                <p id="chatSubtitle" style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions about your notes, subjects, or groups</p>
             </div>
 
             <!-- Messages -->
@@ -811,6 +816,46 @@
             localStorage.setItem('chatScope', JSON.stringify(scope));
         }
 
+        // ── Build hierarchy title (main title only) ───────────────────────
+        function buildHierarchyTitle(type, id) {
+            /** Build title for just the current item (note/subject/group) */
+            if (type === 'note') {
+                const note = allLectures.find(l => l.id == id);
+                return note ? note.title : 'Note';
+            } else if (type === 'subject') {
+                const subject = allSubjects.find(s => s.id == id);
+                return subject ? subject.name : 'Subject';
+            } else if (type === 'group') {
+                const group = allGroups.find(g => g.id == id);
+                return group ? group.name : 'Group';
+            }
+            return 'Scope';
+        }
+
+        // ── Build hierarchy breadcrumb ────────────────────────────────────
+        function buildHierarchyBreadcrumb(type, id) {
+            /** Build breadcrumb path like "Group > Subject > Note" */
+            if (type === 'note') {
+                const note = allLectures.find(l => l.id == id);
+                if (!note) return '';
+                const subject = allSubjects.find(s => s.id == note.subject_id);
+                if (!subject) return '';
+                const group = allGroups.find(g => g.id == subject.group_id);
+                if (!group) return subject.name;
+                return `${group.name} > ${subject.name}`;
+            } else if (type === 'subject') {
+                const subject = allSubjects.find(s => s.id == id);
+                if (!subject) return '';
+                const group = allGroups.find(g => g.id == subject.group_id);
+                if (!group) return subject.name;
+                return `${group.name} > ${subject.name}`;
+            } else if (type === 'group') {
+                const group = allGroups.find(g => g.id == id);
+                return group ? group.name : '';
+            }
+            return '';
+        }
+
         // ── UUID generator (fallback for older browsers) ──────────────────
         function generateUUID() {
             if (crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -912,14 +957,48 @@
         // ── Scope Modal ───────────────────────────────────────────────────
         function openScopeModal() {
             document.getElementById('scopeModal').classList.add('active');
-            document.getElementById('groupSelect').value = '';
-            document.getElementById('subjectSelect').value = '';
-            document.getElementById('subjectSelect').disabled = true;
-            document.getElementById('subjectSelect').innerHTML = '<option value="">-- Entire Group (Select Group First) --</option>';
-            document.getElementById('noteSelect').value = '';
-            document.getElementById('noteSelect').disabled = true;
-            document.getElementById('noteSelect').innerHTML = '<option value="">-- Entire Subject (Select Subject First) --</option>';
-            checkConfirmBtn();
+            
+            // First, populate group select
+            populateGroupSelect();
+            
+            // Preselect current scope
+            if (currentScope.type === 'group' && currentScope.id) {
+                document.getElementById('groupSelect').value = currentScope.id;
+                onGroupChange();
+            } else if (currentScope.type === 'subject' && currentScope.id) {
+                // Find subject's group and set group first
+                const subject = allSubjects.find(s => s.id == currentScope.id);
+                if (subject) {
+                    document.getElementById('groupSelect').value = subject.group_id;
+                    onGroupChange();
+                    document.getElementById('subjectSelect').value = currentScope.id;
+                    onSubjectChange();
+                }
+            } else if (currentScope.type === 'note' && currentScope.id) {
+                // Find note's subject and group, then set all three
+                const note = allLectures.find(l => l.id == currentScope.id);
+                if (note) {
+                    const subject = allSubjects.find(s => s.id == note.subject_id);
+                    if (subject) {
+                        document.getElementById('groupSelect').value = subject.group_id;
+                        onGroupChange();
+                        document.getElementById('subjectSelect').value = note.subject_id;
+                        onSubjectChange();
+                        document.getElementById('noteSelect').value = currentScope.id;
+                        onNoteChange();
+                    }
+                }
+            } else {
+                // No current scope, reset to defaults
+                document.getElementById('groupSelect').value = '';
+                document.getElementById('subjectSelect').value = '';
+                document.getElementById('subjectSelect').disabled = true;
+                document.getElementById('subjectSelect').innerHTML = '<option value="">-- Entire Group (Select Group First) --</option>';
+                document.getElementById('noteSelect').value = '';
+                document.getElementById('noteSelect').disabled = true;
+                document.getElementById('noteSelect').innerHTML = '<option value="">-- Entire Subject (Select Subject First) --</option>';
+                checkConfirmBtn();
+            }
         }
 
         function closeScopeModal() {
@@ -997,7 +1076,6 @@
         function setScope(type, id, title) {
             currentScope = { type, id, title };
             saveScopeToStorage(currentScope);
-            document.getElementById('contextName').textContent = title;
             document.getElementById('contextDisplay').style.display = 'flex';
             document.getElementById('messageInput').disabled = false;
             document.getElementById('sendBtn').disabled = false;
@@ -1006,10 +1084,11 @@
             if (!isViewingHistory) {
                 currentConversationId = null;
                 conversationMessages = [];
-                document.getElementById('chatTitle').textContent = title;
-                document.getElementById('viewingBadge').style.display = 'none';
-                document.getElementById('chatSubtitle').textContent =
-                    'Ask questions about your notes, subjects, or groups';
+                const hierarchyTitle = buildHierarchyTitle(type, id);
+                const breadcrumb = buildHierarchyBreadcrumb(type, id);
+                document.getElementById('chatTitle').textContent = hierarchyTitle;
+                document.getElementById('chatSubtitle').textContent = breadcrumb || 'Ask questions about your notes, subjects, or groups';
+                document.getElementById('chatMeta').style.display = 'none';
                 displayMessages();
             }
             document.getElementById('messageInput').focus();
@@ -1022,7 +1101,7 @@
             isViewingHistory = false;
             document.getElementById('chatTitle').textContent = 'New Chat';
             document.getElementById('chatSubtitle').textContent = 'Ask questions about your notes, subjects, or groups';
-            document.getElementById('viewingBadge').style.display = 'none';
+            document.getElementById('chatMeta').style.display = 'none';
             document.getElementById('contextDisplay').style.display = 'none';
             document.getElementById('messageInput').disabled = true;
             document.getElementById('sendBtn').disabled = true;
@@ -1047,7 +1126,7 @@
 
             // Exit history view mode — user is continuing/adding a message
             isViewingHistory = false;
-            document.getElementById('viewingBadge').style.display = 'none';
+            document.getElementById('chatMeta').style.display = 'none';
 
             // Generate conversation ID if this is a new chat
             if (!currentConversationId) {
@@ -1104,12 +1183,10 @@
                     // Update conversation ID (backend may have confirmed it)
                     if (data.conversation_id) currentConversationId = data.conversation_id;
 
-                    // Update chat header title with AI-derived title
-                    if (data.conversation_title) {
-                        document.getElementById('chatTitle').textContent = data.conversation_title;
-                        document.getElementById('chatSubtitle').textContent =
-                            `${currentScope.title}  ·  ${conversationMessages.filter(m => m.role === 'user').length} question(s)`;
-                    }
+                    // Update meta with question count
+                    const questionCount = conversationMessages.filter(m => m.role === 'user').length;
+                    document.getElementById('chatMeta').textContent = `${questionCount} question(s)`;
+                    document.getElementById('chatMeta').style.display = 'block';
 
                     await fetchConversations(); // refresh sidebar
                 } else {
@@ -1137,7 +1214,7 @@
                     <div class="empty-state">
                         <div style="font-size:var(--font-size-3xl);margin-bottom:var(--spacing-lg);">
                             <i class="ph ph-chat-circle-dots"></i></div>
-                        <p>Ask a question about ${scopeLabel}</p>
+                        <p>Ask a question</p>
                     </div>`;
                 return;
             }
@@ -1148,11 +1225,10 @@
                     try { contentHTML = marked.parse(contentHTML); } catch(e) {}
                 }
 
-                // AI mode badge (on AI messages only)
-                let modeBadgeHTML = '';
+                // AI mode badge (will be moved to metadata section)
+                let modeMeta = null;
                 if (msg.role === 'ai' && !msg.loading && msg.ai_mode) {
-                    const meta = MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
-                    modeBadgeHTML = `<div class="ai-mode-badge"><i class="ph ${meta.icon}"></i> ${meta.label}</div>`;
+                    modeMeta = MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
                 }
 
                 // Thinking section
@@ -1175,7 +1251,7 @@
                 let metadataHTML = '';
                 const hasSources = msg.detailed_sources && msg.detailed_sources.length > 0;
 
-                if (hasSources || msg.ai_model || msg.timings) {
+                if (hasSources || msg.ai_model || msg.timings || modeMeta) {
                     const msgId = 'msg-' + idx;
                     let highestMatch = 0;
                     if (hasSources) {
@@ -1221,12 +1297,18 @@
                         </div>`;
 
                     const refLabel = hasSources ? `Reference (${highestMatch}%)` : 'Reference';
+                    let toggleContent = '';
+                    
+                    if (modeMeta) {
+                        toggleContent += `<span style="display:inline-flex;align-items:center;gap:4px;color:#666;"><i class="ph ${modeMeta.icon}"></i> ${modeMeta.label}</span><span class="reference-divider">|</span>`;
+                    }
+                    
+                    toggleContent += `<span onclick="toggleMetadata('${msgId}-ref','${msgId}')" style="cursor:pointer;">${refLabel}</span><span class="reference-divider">|</span><button class="info-btn" onclick="toggleMetadata('${msgId}-info','${msgId}',event)">Info</button>`;
+                    
                     metadataHTML = `
                         <div class="message-metadata">
-                            <div class="metadata-toggle" onclick="toggleMetadata('${msgId}-ref','${msgId}')">
-                                <span>${refLabel}</span>
-                                <span class="reference-divider">|</span>
-                                <button class="info-btn" onclick="toggleMetadata('${msgId}-info','${msgId}',event)">Info</button>
+                            <div class="metadata-toggle">
+                                ${toggleContent}
                             </div>
                             <div class="metadata-content" id="${msgId}-ref-content">${sourcesHTML}</div>
                             <div class="metadata-content" id="${msgId}-info-content">${infoContent}</div>
@@ -1239,7 +1321,6 @@
                 return `
                 <div class="message ${msg.role}">
                     <div class="message-content">
-                        ${modeBadgeHTML}
                         ${thinkingHTML}
                         ${contentHTML}
                         ${metadataHTML}
@@ -1300,10 +1381,24 @@
                     const icon = scopeIcon[c.scope_type] || 'ph-chat-circle';
                     const scope = scopeLabel[c.scope_type] || '';
                     const msgWord = c.message_count === 1 ? 'msg' : 'msgs';
+                    
+                    // Get scope name based on scope type and ID
+                    let scopeName = '';
+                    if (c.scope_type === 'note') {
+                        const note = allLectures.find(x => x.id == c.scope_id);
+                        scopeName = note ? note.title : 'Note';
+                    } else if (c.scope_type === 'subject') {
+                        const subj = allSubjects.find(x => x.id == c.scope_id);
+                        scopeName = subj ? subj.name : 'Subject';
+                    } else if (c.scope_type === 'group') {
+                        const grp = allGroups.find(x => x.id == c.scope_id);
+                        scopeName = grp ? grp.name : 'Group';
+                    }
+                    
                     html += `
                         <div class="conversation-item${isActive ? ' active' : ''}"
                              onclick="loadConversation('${c.conversation_id}')">
-                            <div class="conversation-title" title="${formatEscaped(c.title)}">${formatEscaped(c.title)}</div>
+                            <div class="conversation-title" title="${formatEscaped(scopeName)}">${formatEscaped(scopeName)}</div>
                             <div class="conversation-meta">
                                 <span><i class="ph ${icon}"></i> ${scope}</span>
                                 <span style="display:flex;align-items:center;gap:5px;">
@@ -1372,17 +1467,18 @@
 
                 currentScope = { type: scopeType, id: scopeId, title: scopeTitle };
                 saveScopeToStorage(currentScope);
-                document.getElementById('contextName').textContent = scopeTitle;
-                document.getElementById('contextDisplay').style.display = 'flex';
+                document.getElementById('contextDisplay').style.display = (scopeId ? 'flex' : 'none');
                 document.getElementById('messageInput').disabled = !scopeId;
                 document.getElementById('sendBtn').disabled = !scopeId;
 
-                // Show conversation title (not scope title) in header
-                const convTitle = first.conversation_title || scopeTitle;
-                document.getElementById('chatTitle').textContent = convTitle;
-                document.getElementById('viewingBadge').style.display = 'inline-flex';
-                document.getElementById('chatSubtitle').textContent =
-                    `${scopeTitle}  ·  ${msgs.length} question(s)  ·  Started ${new Date(first.created_at).toLocaleDateString()}`;
+                // Show conversation title (with hierarchy) in header
+                const hierarchyTitle = buildHierarchyTitle(scopeType, scopeId);
+                const breadcrumb = buildHierarchyBreadcrumb(scopeType, scopeId);
+                document.getElementById('chatTitle').textContent = hierarchyTitle;
+                document.getElementById('chatSubtitle').textContent = breadcrumb || 'Ask questions about your notes, subjects, or groups';
+                document.getElementById('chatMeta').textContent =
+                    `${msgs.length} question(s)  |  Started ${new Date(first.created_at).toLocaleDateString()}`;
+                document.getElementById('chatMeta').style.display = 'block';
 
                 displayMessages();
             } catch(e) {

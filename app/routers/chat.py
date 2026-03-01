@@ -47,6 +47,8 @@ class ChatMessageResponse(BaseModel):
     ai_model: Optional[str] = None
     conversation_id: Optional[str] = None
     conversation_title: Optional[str] = None
+    timings: Optional[dict] = None
+    timings: Optional[dict] = None
 
 
 class ConversationSummary(BaseModel):
@@ -336,6 +338,13 @@ async def ask_question(
 
     # STEP 7: Save to chat history
     try:
+        # Prepare timings dict for storage
+        timings_dict = {
+            "retrieval_ms": round(retrieval_ms, 2),
+            "model_ms": round(model_ms, 2),
+            "total_ms": round(total_ms, 2),
+        }
+        
         chat_msg = ChatMessage(
             user_id=current_user.id,
             lecture_id=request.lecture_id,
@@ -350,6 +359,7 @@ async def ask_question(
             output_format=request.output_format,
             ai_model=ai_model_info,
             detailed_sources_json=json.dumps(detailed_sources) if detailed_sources else None,
+            timings_json=json.dumps(timings_dict),
         )
         db.add(chat_msg)
         db.commit()
@@ -455,6 +465,8 @@ async def get_conversation_messages(
             ai_model=m.ai_model,
             conversation_id=m.conversation_id,
             conversation_title=m.conversation_title,
+            output_format=m.output_format,
+            timings=json.loads(m.timings_json) if m.timings_json else None,
         )
         for m in messages
     ]
@@ -485,6 +497,8 @@ async def get_all_chat_history(
             ai_model=m.ai_model,
             conversation_id=m.conversation_id,
             conversation_title=m.conversation_title,
+            output_format=m.output_format,
+            timings=json.loads(m.timings_json) if m.timings_json else None,
         )
         for m in messages
     ]
@@ -525,6 +539,8 @@ async def get_lecture_chat_history(
             ai_model=m.ai_model,
             conversation_id=m.conversation_id,
             conversation_title=m.conversation_title,
+            output_format=m.output_format,
+            timings=json.loads(m.timings_json) if m.timings_json else None,
         )
         for m in messages
     ]
