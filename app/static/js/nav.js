@@ -80,7 +80,7 @@ function setActiveLink() {
         }
     });
 
-    // note.html / note_edit.html — highlight Notes
+    // note.html — highlight Notes
     if (pageName === '' || currentPath.includes('/note/')) {
         const notesLink = document.querySelector('.sidebar-nav-link[data-page="mynotes.html"]');
         if (notesLink) notesLink.classList.add('active');

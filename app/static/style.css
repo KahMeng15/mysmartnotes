@@ -2182,48 +2182,42 @@ textarea {
 .editor-container.active {
   display: flex;
   flex-direction: column;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 9999;
-  background: white;
+  position: relative;
+  width: 100%;
+  padding-bottom: 24px;
 }
 
-.editor-topbar {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: 8px 16px;
-  background: var(--color-dark);
-  color: white;
-  flex-shrink: 0;
-}
-
-.editor-logo {
-  font-family: var(--font-heading);
-  font-weight: var(--font-weight-bold);
-  font-size: 1.1rem;
-  color: white;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  margin-right: var(--spacing-md);
-}
-
-.editor-logo i {
-  font-size: 1.3rem;
-}
-
-.editor-toolbar {
+.floating-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
   align-items: center;
-  flex: 1;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: 8px 16px;
+  background: white;
+  color: var(--color-dark);
+  border: 1px solid var(--color-light-gray);
+  border-radius: 40px;
+  position: sticky;
+  bottom: 24px;
+  width: max-content;
+  max-width: 90%;
+  margin: 0 auto;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
 }
+
+.wysiwyg-area.markdown-content h1,
+.wysiwyg-area.markdown-content h2,
+.wysiwyg-area.markdown-content h3 {
+  position: relative !important;
+  background: transparent !important;
+  top: auto !important;
+  z-index: auto !important;
+  width: auto !important;
+}
+
+.wysiwyg-area.markdown-content {}
 
 .toolbar-btn {
   display: flex;
@@ -2233,17 +2227,18 @@ textarea {
   height: 30px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.03);
   cursor: pointer;
   font-size: var(--font-size-tiny);
   font-weight: var(--font-weight-semibold);
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--color-gray);
   transition: all 0.15s;
   font-family: var(--font-primary);
 }
 
 .toolbar-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-dark);
 }
 
 .toolbar-btn.active {
@@ -2255,7 +2250,7 @@ textarea {
 .toolbar-sep {
   width: 1px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.1);
   margin: 0 3px;
 }
 
@@ -2268,17 +2263,18 @@ textarea {
   height: 30px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.03);
   cursor: pointer;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--color-gray);
   transition: all 0.15s;
   font-family: var(--font-primary);
 }
 
 .toolbar-toggle:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-dark);
 }
 
 .toolbar-toggle.active {
@@ -2291,161 +2287,66 @@ textarea {
   display: flex;
   gap: 8px;
   align-items: center;
-  margin-left: var(--spacing-md);
   flex-shrink: 0;
 }
 
 .editor-topbar-actions .btn {
-  padding: 6px 16px;
-  font-size: var(--font-size-sm);
+  padding: 6px 12px;
+  font-size: var(--font-size-xs);
+  border-radius: 20px;
 }
 
 .editor-topbar-actions .btn-outline {
-  color: rgba(255, 255, 255, 0.8);
-  border-color: rgba(255, 255, 255, 0.3);
+  color: var(--color-dark);
+  border-color: rgba(0, 0, 0, 0.2);
 }
 
 .editor-topbar-actions .btn-outline:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--color-dark);
 }
 
 .editor-body {
   flex: 1;
-  overflow-y: auto;
   display: block;
-  background: var(--color-background);
 }
 
 .wysiwyg-area {
   width: 100%;
-  max-width: 900px;
   min-height: 100%;
-  margin: 0 auto;
   box-sizing: border-box;
-  padding: 48px 64px;
   outline: none;
-  line-height: var(--line-height-relaxed);
-  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
   color: var(--color-dark);
-  background: white;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.06);
 }
 
 .wysiwyg-area:focus {
   outline: none;
 }
 
-.wysiwyg-area h1,
-.wysiwyg-area h2,
-.wysiwyg-area h3,
-.wysiwyg-area h4,
-.wysiwyg-area h5 {
-  margin-top: 1.2em;
-  margin-bottom: 0.5em;
-  font-weight: var(--font-weight-semibold);
-}
-
-.wysiwyg-area h1 {
-  font-size: var(--font-size-4xl);
-  border-bottom: 2px solid #eee;
-  padding-bottom: 0.3em;
-}
-
-.wysiwyg-area h2 {
-  font-size: 1.625rem;
-}
-
-.wysiwyg-area h3 {
-  font-size: 1.3125rem;
-}
-
-.wysiwyg-area p {
-  margin-bottom: 0.8em;
-}
-
-.wysiwyg-area ul,
-.wysiwyg-area ol {
-  margin-bottom: 1em;
-  padding-left: 2em;
-}
-
-.wysiwyg-area li {
-  margin-bottom: 0.25em;
-}
-
-.wysiwyg-area blockquote {
-  border-left: 4px solid #ddd;
-  margin: 0.5em 0;
-  padding-left: 1em;
-  color: #666;
-}
-
-.wysiwyg-area code {
-  font-family: var(--font-mono);
-  background: #f5f5f5;
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-size: 0.85em;
-}
-
-.wysiwyg-area pre {
-  background: #f5f5f5;
-  padding: 1em;
-  border-radius: 5px;
-  overflow-x: auto;
-  margin: 1em 0;
-}
-
-.wysiwyg-area pre code {
-  background: none;
-  padding: 0;
-}
-
-.wysiwyg-area table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1em 0;
-}
-
-.wysiwyg-area th,
-.wysiwyg-area td {
-  border: 1px solid #ddd;
-  padding: 8px 12px;
-  text-align: left;
-}
-
-.wysiwyg-area th {
-  background: #f8f9fa;
-  font-weight: var(--font-weight-semibold);
-}
-
-.wysiwyg-area img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 4px;
-}
-
 .source-textarea {
   width: 100%;
-  max-width: 900px;
-  min-height: 100%;
-  margin: 0 auto;
+  min-height: 200px;
+  height: auto;
   box-sizing: border-box;
-  padding: 48px 64px;
-  border: none;
+  padding: 16px;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0;
   resize: none;
+  overflow: hidden;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-loose);
-  outline: none;
-  background: white;
+  outline: none !important;
   color: var(--color-dark);
   display: none;
 }
 
 .source-textarea:focus {
-  outline: none;
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .table-context-menu {

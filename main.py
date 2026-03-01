@@ -91,7 +91,7 @@ async def serve_note_view(id: str):
 
 @app.get("/note/{id}/edit")
 async def serve_note_edit(id: str):
-    return FileResponse(os.path.join(static_dir, "note_edit.html"))
+    return FileResponse(os.path.join(static_dir, "note.html"))
 
 # Serve static files and templates
 if os.path.exists(static_dir):

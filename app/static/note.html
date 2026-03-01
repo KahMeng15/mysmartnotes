@@ -97,6 +97,109 @@
                                     Loading...</p>
                             </div>
                         </div>
+
+                        <!-- Edit Mode: Fullscreen WYSIWYG Editor -->
+                        <div id="editorContainer" class="editor-container" style="display: none;">
+                            <div class="editor-body" id="editorBody">
+                                <div id="wysiwygArea" class="wysiwyg-area markdown-content" contenteditable="true">
+                                </div>
+                                <textarea id="sourceTextarea" class="source-textarea" spellcheck="false"
+                                    style="display:none;"></textarea>
+                            </div>
+
+                            <!-- Table Context Menu -->
+                            <div id="tableContextMenu" class="table-context-menu">
+                                <button class="table-context-btn"
+                                    onmousedown="event.preventDefault(); insertHtmlRow('before')"
+                                    title="Add Row Above"><i class="ph ph-arrow-line-up"></i></button>
+                                <button class="table-context-btn"
+                                    onmousedown="event.preventDefault(); insertHtmlRow('after')"
+                                    title="Add Row Below"><i class="ph ph-arrow-line-down"></i></button>
+                                <div class="table-context-divider"></div>
+                                <button class="table-context-btn"
+                                    onmousedown="event.preventDefault(); insertHtmlCol('before')"
+                                    title="Add Column Left"><i class="ph ph-arrow-line-left"></i></button>
+                                <button class="table-context-btn"
+                                    onmousedown="event.preventDefault(); insertHtmlCol('after')"
+                                    title="Add Column Right"><i class="ph ph-arrow-line-right"></i></button>
+                                <div class="table-context-divider"></div>
+                                <button class="table-context-btn" onmousedown="event.preventDefault(); mergeHtmlCells()"
+                                    id="btnMergeCells" title="Merge Right"><i class="ph ph-intersect"></i></button>
+                                <div class="table-context-divider"></div>
+                                <button class="table-context-btn danger"
+                                    onmousedown="event.preventDefault(); deleteHtmlRow()" title="Delete Row">
+                                    <i class="ph ph-trash"></i> <span
+                                        style="font-size: 11px; margin-left: 4px; font-weight: 600;">Row</span>
+                                </button>
+                                <button class="table-context-btn danger"
+                                    onmousedown="event.preventDefault(); deleteHtmlCol()" title="Delete Column">
+                                    <i class="ph ph-trash"></i> <span
+                                        style="font-size: 11px; margin-left: 4px; font-weight: 600;">Col</span>
+                                </button>
+                                <button class="table-context-btn danger"
+                                    onmousedown="event.preventDefault(); deleteHtmlTable()" title="Delete Table">
+                                    <i class="ph ph-trash"></i> <span
+                                        style="font-size: 11px; margin-left: 4px; font-weight: 600;">Table</span>
+                                </button>
+                            </div>
+
+                            <!-- Table Add Handles -->
+                            <div id="colAddHandle" class="table-add-handle vertical"
+                                onmousedown="event.preventDefault(); insertHtmlCol('after')" title="Add Column Right">
+                                <i class="ph ph-plus"></i>
+                            </div>
+                            <div id="rowAddHandle" class="table-add-handle horizontal"
+                                onmousedown="event.preventDefault(); insertHtmlRow('after')" title="Add Row Below">
+                                <i class="ph ph-plus"></i>
+                            </div>
+
+                            <!-- Floating Toolbar -->
+                            <div class="floating-toolbar" id="editorToolbar">
+                                <button class="toolbar-btn" id="btnH1" onclick="execCmd('formatBlock','H1')"
+                                    title="Heading 1">H1</button>
+                                <button class="toolbar-btn" id="btnH2" onclick="execCmd('formatBlock','H2')"
+                                    title="Heading 2">H2</button>
+                                <button class="toolbar-btn" id="btnH3" onclick="execCmd('formatBlock','H3')"
+                                    title="Heading 3">H3</button>
+                                <div class="toolbar-sep"></div>
+                                <button class="toolbar-btn" id="btnBold" onclick="execCmd('bold')"
+                                    title="Bold (Ctrl+B)"><b>B</b></button>
+                                <button class="toolbar-btn" id="btnItalic" onclick="execCmd('italic')"
+                                    title="Italic (Ctrl+I)"><i>I</i></button>
+                                <button class="toolbar-btn" id="btnUnderline" onclick="execCmd('underline')"
+                                    title="Underline (Ctrl+U)"><u>U</u></button>
+                                <button class="toolbar-btn" id="btnStrike" onclick="execCmd('strikeThrough')"
+                                    title="Strikethrough"><s>S</s></button>
+                                <div class="toolbar-sep"></div>
+                                <button class="toolbar-btn" id="btnUl" onclick="execCmd('insertUnorderedList')"
+                                    title="Bullet List"><i class="ph ph-list-bullets"></i></button>
+                                <button class="toolbar-btn" id="btnOl" onclick="execCmd('insertOrderedList')"
+                                    title="Numbered List"><i class="ph ph-list-numbers"></i></button>
+                                <div class="toolbar-sep"></div>
+                                <button class="toolbar-btn" onclick="insertTableWysiwyg()" title="Insert Table"><i
+                                        class="ph ph-table"></i></button>
+                                <button class="toolbar-btn" id="btnQuote" onclick="toggleBlockquote()"
+                                    title="Blockquote"><i class="ph ph-quotes"></i></button>
+                                <button class="toolbar-btn" onclick="insertCodeBlock()" title="Code Block"><i
+                                        class="ph ph-code"></i></button>
+                                <div class="toolbar-sep"></div>
+                                <button class="toolbar-btn" onclick="document.execCommand('undo')"
+                                    title="Undo (Ctrl+Z)"><i class="ph ph-arrow-counter-clockwise"></i></button>
+                                <button class="toolbar-btn" onclick="document.execCommand('redo')"
+                                    title="Redo (Ctrl+Shift+Z)"><i class="ph ph-arrow-clockwise"></i></button>
+                                <button class="toolbar-toggle" id="sourceToggle" onclick="toggleSource()"
+                                    title="View raw markdown">
+                                    <i class="ph ph-code"></i> Source
+                                </button>
+                                <div class="toolbar-sep" style="margin: 0 8px;"></div>
+                                <div class="editor-topbar-actions" style="margin-left: 0;">
+                                    <button class="btn btn-outline" style="padding: 4px 12px; font-size: 12px;"
+                                        onclick="showDiscardModal()">Cancel</button>
+                                    <button class="btn btn-primary" style="padding: 4px 12px; font-size: 12px;"
+                                        onclick="showSaveModal()"><i class="ph ph-floppy-disk"></i> Save</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -642,13 +745,766 @@
             } catch (error) { console.error('Error reloading:', error); }
         }
 
+        // ===== WYSIWYG EDITOR =====
+        let showingSource = false;
+
         function toggleEdit() {
-            window.location.href = `/note/${lectureId}/edit`;
+            if (isEditing) {
+                cancelEdit();
+            } else {
+                isEditing = true;
+                const editorContainer = document.getElementById('editorContainer');
+                const viewContainer = document.getElementById('viewContainer');
+
+                viewContainer.style.display = 'none';
+                editorContainer.style.display = 'flex';
+                editorContainer.classList.add('active');
+
+                // Update URL without reloading
+                if (!window.location.pathname.endsWith('/edit')) {
+                    history.pushState(null, '', `/note/${lectureId}/edit`);
+                }
+
+                const area = document.getElementById('wysiwygArea');
+                const md = lectureData.extracted_text || '';
+                try {
+                    area.innerHTML = marked.parse(md);
+                } catch (e) {
+                    area.innerHTML = md.replace(/\n/g, '<br>');
+                }
+                area.focus();
+                showingSource = false;
+                document.getElementById('sourceToggle').classList.remove('active');
+            }
+        }
+
+        function cancelEdit() {
+            isEditing = false;
+            const editorContainer = document.getElementById('editorContainer');
+            const viewContainer = document.getElementById('viewContainer');
+
+            editorContainer.style.display = 'none';
+            editorContainer.classList.remove('active');
+            viewContainer.style.display = 'block';
+
+            // Revert URL
+            history.pushState(null, '', `/note/${lectureId}`);
         }
 
         function viewLecture() {
-            // Just refresh the current view page
-            window.location.href = `/note/${lectureId}`;
+            if (isEditing) {
+                cancelEdit();
+            } else {
+                window.location.href = `/note/${lectureId}`;
+            }
+        }
+
+        // Execute formatting command on the WYSIWYG area
+        function execCmd(command, value) {
+            const area = document.getElementById('wysiwygArea');
+            if (document.activeElement !== area) area.focus();
+
+            if (command === 'formatBlock' && value && value.match(/^H[1-3]$/)) {
+                if (globalCurrentTable) return;
+            }
+
+            if (command === 'formatBlock') {
+                document.execCommand('formatBlock', false, '<' + value + '>');
+            } else {
+                document.execCommand(command, false, value || null);
+            }
+            updateToolbarState();
+        }
+
+        function toggleBlockquote() {
+            const area = document.getElementById('wysiwygArea');
+            if (document.activeElement !== area) area.focus();
+
+            const sel = window.getSelection();
+            let inBlockquote = false;
+
+            if (sel && sel.rangeCount > 0) {
+                let node = sel.focusNode;
+                while (node && node !== area) {
+                    if (node.nodeType === 1 && node.tagName === 'BLOCKQUOTE') {
+                        inBlockquote = true;
+                        break;
+                    }
+                    node = node.parentNode;
+                }
+            }
+
+            if (inBlockquote) {
+                document.execCommand('outdent');
+            } else {
+                document.execCommand('formatBlock', false, '<BLOCKQUOTE>');
+            }
+            updateToolbarState();
+        }
+
+        // Modals
+        function showSaveModal() {
+            document.getElementById('saveConfirmModal').classList.add('active');
+        }
+
+        function closeSaveModal() {
+            document.getElementById('saveConfirmModal').classList.remove('active');
+        }
+
+        function confirmSave() {
+            closeSaveModal();
+            saveContent();
+        }
+
+        function showDiscardModal() {
+            document.getElementById('discardConfirmModal').classList.add('active');
+        }
+
+        function closeDiscardModal() {
+            document.getElementById('discardConfirmModal').classList.remove('active');
+        }
+
+        function confirmDiscard() {
+            closeDiscardModal();
+            cancelEdit();
+        }
+
+        function insertTableWysiwyg() {
+            const area = document.getElementById('wysiwygArea');
+            area.focus();
+            const html = '<table><thead><tr><th>Header 1</th><th>Header 2</th><th>Header 3</th></tr></thead><tbody><tr><td>Cell 1</td><td>Cell 2</td><td>Cell 3</td></tr><tr><td>Cell 4</td><td>Cell 5</td><td>Cell 6</td></tr></tbody></table><p><br></p>';
+            document.execCommand('insertHTML', false, html);
+        }
+
+        function insertCodeBlock() {
+            const area = document.getElementById('wysiwygArea');
+            area.focus();
+            const html = '<pre><code>// your code here</code></pre><p><br></p>';
+            document.execCommand('insertHTML', false, html);
+        }
+
+        // Globals for table context
+        let globalCurrentTableCell = null;
+        let globalCurrentTable = null;
+        let currentSelectedCells = [];
+        let isTableSelecting = false;
+        let startTableCell = null;
+        let isMouseDownInTable = false;
+        let isResizing = false;
+        let resizeType = null;
+        let resizeTarget = null;
+        let startX = 0, startY = 0, startWidth = 0, startHeight = 0;
+        let hoverResizeType = null;
+        let hoverResizeTarget = null;
+
+        function clearCellSelection() {
+            document.querySelectorAll('.active-table-cell').forEach(c => c.classList.remove('active-table-cell'));
+            currentSelectedCells = [];
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const editorBody = document.getElementById('editorBody');
+            if (!editorBody) return;
+
+            editorBody.addEventListener('mousemove', (e) => {
+                if (!isEditing || showingSource) return;
+
+                if (isResizing) {
+                    if (resizeType === 'col') {
+                        const newWidth = startWidth + (e.pageX - startX);
+                        if (newWidth > 20) resizeTarget.style.width = newWidth + 'px';
+                    } else if (resizeType === 'row') {
+                        const newHeight = startHeight + (e.pageY - startY);
+                        if (newHeight > 20) resizeTarget.style.height = newHeight + 'px';
+                    }
+
+                    document.getElementById('tableContextMenu').classList.remove('visible');
+                    const editorRect = editorBody.parentElement.getBoundingClientRect();
+                    const targetRect = resizeTarget.getBoundingClientRect();
+
+                    if (resizeType === 'col') {
+                        const colHandle = document.getElementById('colAddHandle');
+                        if (colHandle) colHandle.style.left = (targetRect.right - editorRect.left + 2) + 'px';
+                    } else if (resizeType === 'row') {
+                        const rowHandle = document.getElementById('rowAddHandle');
+                        if (rowHandle) rowHandle.style.top = (targetRect.bottom - editorRect.top + 2) + 'px';
+                    }
+
+                    e.preventDefault();
+                    return;
+                }
+
+                if (!isMouseDownInTable && e.target.closest) {
+                    const td = e.target.closest('td, th');
+                    if (td) {
+                        const rect = td.getBoundingClientRect();
+                        const x = e.clientX;
+                        const y = e.clientY;
+
+                        const nearRight = (rect.right - x) < 12 && (rect.right - x) >= -6;
+                        const nearBottom = (rect.bottom - y) < 12 && (rect.bottom - y) >= -6;
+
+                        if (nearRight) {
+                            editorBody.style.cursor = 'col-resize';
+                            hoverResizeType = 'col';
+                            hoverResizeTarget = td;
+                        } else if (nearBottom) {
+                            editorBody.style.cursor = 'row-resize';
+                            hoverResizeType = 'row';
+                            hoverResizeTarget = td;
+                        } else {
+                            editorBody.style.cursor = '';
+                            hoverResizeType = null;
+                            hoverResizeTarget = null;
+                        }
+                    } else {
+                        editorBody.style.cursor = '';
+                        hoverResizeType = null;
+                        hoverResizeTarget = null;
+                    }
+                }
+            });
+
+            editorBody.addEventListener('mousedown', (e) => {
+                if (!isEditing || showingSource) return;
+
+                if (hoverResizeType && hoverResizeTarget) {
+                    isResizing = true;
+                    resizeType = hoverResizeType;
+                    resizeTarget = hoverResizeTarget;
+                    startX = e.pageX;
+                    startY = e.pageY;
+                    startWidth = resizeTarget.offsetWidth;
+                    startHeight = resizeTarget.offsetHeight;
+                    e.preventDefault();
+                    return;
+                }
+
+                const td = e.target.closest('td, th');
+                if (td) {
+                    isMouseDownInTable = true;
+                    if (e.shiftKey && startTableCell && startTableCell.closest('table') === td.closest('table')) {
+                        e.preventDefault();
+                        isTableSelecting = true;
+                        selectCellsBetween(startTableCell, td);
+                    } else {
+                        startTableCell = td;
+                        isTableSelecting = false;
+                        if (!td.classList.contains('active-table-cell') || currentSelectedCells.length > 1) {
+                            clearCellSelection();
+                            td.classList.add('active-table-cell');
+                            currentSelectedCells = [td];
+                            setTimeout(updateToolbarState, 10);
+                        }
+                    }
+                } else {
+                    startTableCell = null;
+                    clearCellSelection();
+                    setTimeout(updateToolbarState, 10);
+                }
+            });
+
+            editorBody.addEventListener('mouseover', (e) => {
+                if (isMouseDownInTable && startTableCell) {
+                    const td = e.target.closest('td, th');
+                    if (td && td !== startTableCell && startTableCell.closest('table') === td.closest('table')) {
+                        isTableSelecting = true;
+                        selectCellsBetween(startTableCell, td);
+                        window.getSelection().removeAllRanges();
+                    }
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    editorBody.style.cursor = '';
+                    resizeTarget = null;
+                    setTimeout(updateToolbarState, 10);
+                }
+                isMouseDownInTable = false;
+                isTableSelecting = false;
+            });
+
+            // Auto open editor if URL path ends with /edit
+            if (window.location.pathname.endsWith('/edit')) {
+                // Polling wait until lectureData is loaded to open edit view
+                const checkAndEdit = setInterval(() => {
+                    if (lectureData) {
+                        clearInterval(checkAndEdit);
+                        toggleEdit();
+                    }
+                }, 100);
+            }
+        });
+
+        function selectCellsBetween(startCell, endCell) {
+            clearCellSelection();
+            const table = startCell.closest('table');
+            if (!table) return;
+
+            const rows = Array.from(table.rows);
+            let startRowIndex = -1, startColIndex = -1, endRowIndex = -1, endColIndex = -1;
+
+            const startTr = startCell.closest('tr');
+            const endTr = endCell.closest('tr');
+            if (startTr && endTr) {
+                startRowIndex = startTr.rowIndex;
+                endRowIndex = endTr.rowIndex;
+                startColIndex = Array.from(startTr.children).indexOf(startCell);
+                endColIndex = Array.from(endTr.children).indexOf(endCell);
+            }
+            if (startRowIndex === -1 || endRowIndex === -1) return;
+
+            const minRow = Math.min(startRowIndex, endRowIndex);
+            const maxRow = Math.max(startRowIndex, endRowIndex);
+            const minCol = Math.min(startColIndex, endColIndex);
+            const maxCol = Math.max(startColIndex, endColIndex);
+
+            for (let i = minRow; i <= maxRow; i++) {
+                const row = rows[i];
+                if (!row) continue;
+                for (let j = minCol; j <= maxCol; j++) {
+                    const cell = row.children[j];
+                    if (cell) {
+                        cell.classList.add('active-table-cell');
+                        currentSelectedCells.push(cell);
+                    }
+                }
+            }
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function updateToolbarState() {
+            const sel = window.getSelection();
+            let currentHeading = null;
+            let hasBoldTag = false;
+            let inBlockquote = false;
+            let currentTableCellNode = null;
+            let currentTableNode = null;
+
+            if (currentSelectedCells.length > 0) {
+                currentTableCellNode = currentSelectedCells[0];
+                currentTableNode = currentTableCellNode.closest('table');
+            }
+
+            if (sel && sel.rangeCount > 0) {
+                let node = sel.focusNode;
+                while (node && node !== document.getElementById('wysiwygArea')) {
+                    if (node && node.nodeType === 1) {
+                        if (/^H[1-6]$/i.test(node.tagName)) currentHeading = node.tagName.toUpperCase();
+                        if (node.tagName === 'B' || node.tagName === 'STRONG') hasBoldTag = true;
+                        if (node.tagName === 'BLOCKQUOTE') inBlockquote = true;
+                        if (node.tagName === 'TD' || node.tagName === 'TH') {
+                            if (currentSelectedCells.length <= 1) currentTableCellNode = node;
+                        }
+                        if (node.tagName === 'TABLE') {
+                            if (currentSelectedCells.length <= 1) currentTableNode = node;
+                        }
+                    }
+                    node = node.parentNode;
+                }
+            }
+
+            globalCurrentTableCell = currentTableCellNode;
+            globalCurrentTable = currentTableNode;
+            const menu = document.getElementById('tableContextMenu');
+            const colHandle = document.getElementById('colAddHandle');
+            const rowHandle = document.getElementById('rowAddHandle');
+
+            if (currentTableNode && currentTableCellNode && !showingSource) {
+                if (currentSelectedCells.length <= 1) {
+                    clearCellSelection();
+                    currentTableCellNode.classList.add('active-table-cell');
+                    currentSelectedCells = [currentTableCellNode];
+                }
+
+                const editorRect = document.getElementById('editorContainer').getBoundingClientRect();
+                let minTop = Infinity, minLeft = Infinity, maxBottom = -Infinity, maxRight = -Infinity;
+
+                currentSelectedCells.forEach(c => {
+                    const r = c.getBoundingClientRect();
+                    if (r.top < minTop) minTop = r.top;
+                    if (r.left < minLeft) minLeft = r.left;
+                    if (r.bottom > maxBottom) maxBottom = r.bottom;
+                    if (r.right > maxRight) maxRight = r.right;
+                });
+
+                menu.style.top = Math.max(0, (minTop - editorRect.top - 45)) + 'px';
+                menu.style.left = (minLeft - editorRect.left) + 'px';
+                menu.classList.add('visible');
+
+                if (colHandle) {
+                    colHandle.style.top = Math.max(0, (minTop - editorRect.top + (maxBottom - minTop) / 2)) + 'px';
+                    colHandle.style.left = (maxRight - editorRect.left + 2) + 'px';
+                    colHandle.style.height = '';
+                    colHandle.classList.add('visible');
+                }
+
+                if (rowHandle) {
+                    rowHandle.style.top = (maxBottom - editorRect.top + 2) + 'px';
+                    rowHandle.style.left = (minLeft - editorRect.left + (maxRight - minLeft) / 2) + 'px';
+                    rowHandle.style.width = '';
+                    rowHandle.classList.add('visible');
+                }
+
+                const btnMerge = document.getElementById('btnMergeCells');
+                if (btnMerge) {
+                    const canMerge = currentSelectedCells.length > 1 || !!currentTableCellNode.nextElementSibling;
+                    btnMerge.style.opacity = canMerge ? '1' : '0.3';
+                    btnMerge.style.pointerEvents = canMerge ? 'auto' : 'none';
+                }
+            } else {
+                clearCellSelection();
+                menu.classList.remove('visible');
+                if (colHandle) colHandle.classList.remove('visible');
+                if (rowHandle) rowHandle.classList.remove('visible');
+            }
+
+            const h1 = document.getElementById('btnH1');
+            const h2 = document.getElementById('btnH2');
+            const h3 = document.getElementById('btnH3');
+            if (h1) h1.classList.toggle('active', currentHeading === 'H1');
+            if (h2) h2.classList.toggle('active', currentHeading === 'H2');
+            if (h3) h3.classList.toggle('active', currentHeading === 'H3');
+
+            [h1, h2, h3].forEach(btn => {
+                if (btn) {
+                    btn.disabled = !!currentTableNode;
+                    btn.style.opacity = currentTableNode ? '0.3' : '1';
+                    btn.style.pointerEvents = currentTableNode ? 'none' : 'auto';
+                }
+            });
+
+            const btnQuote = document.getElementById('btnQuote');
+            if (btnQuote) btnQuote.classList.toggle('active', inBlockquote);
+
+            const cmds = { 'btnBold': 'bold', 'btnItalic': 'italic', 'btnUnderline': 'underline', 'btnStrike': 'strikeThrough' };
+            for (const [id, cmd] of Object.entries(cmds)) {
+                const btn = document.getElementById(id);
+                if (!btn) continue;
+                let state = document.queryCommandState(cmd);
+                if (cmd === 'bold' && currentHeading && state) state = hasBoldTag;
+                btn.classList.toggle('active', state);
+            }
+
+            const btnUl = document.getElementById('btnUl');
+            const btnOl = document.getElementById('btnOl');
+            if (btnUl) btnUl.classList.toggle('active', document.queryCommandState('insertUnorderedList'));
+            if (btnOl) btnOl.classList.toggle('active', document.queryCommandState('insertOrderedList'));
+        }
+
+        // --- Table Context Functions ---
+        function getTableContext() {
+            return { cell: globalCurrentTableCell, table: globalCurrentTable };
+        }
+
+        function insertHtmlRow(position) {
+            const { cell } = getTableContext();
+            if (!cell) return;
+            const tr = cell.closest('tr');
+            if (!tr) return;
+            const newTr = document.createElement('tr');
+            const cellCount = tr.children.length;
+            for (let i = 0; i < cellCount; i++) {
+                const td = document.createElement('td');
+                td.innerHTML = '<br>';
+                newTr.appendChild(td);
+            }
+            if (position === 'before') {
+                tr.parentNode.insertBefore(newTr, tr);
+            } else {
+                tr.parentNode.insertBefore(newTr, tr.nextSibling);
+            }
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function insertHtmlCol(position) {
+            const { cell, table } = getTableContext();
+            if (!cell || !table) return;
+            const tr = cell.closest('tr');
+            const cellIndex = Array.from(tr.children).indexOf(cell);
+
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                const newCell = document.createElement(row.parentNode.tagName === 'THEAD' ? 'th' : 'td');
+                newCell.innerHTML = '<br>';
+                if (position === 'before') {
+                    row.insertBefore(newCell, row.children[cellIndex]);
+                } else {
+                    row.insertBefore(newCell, row.children[cellIndex].nextSibling);
+                }
+            });
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function deleteHtmlRow() {
+            const { cell, table } = getTableContext();
+            if (!cell || !table) return;
+            const tr = cell.closest('tr');
+            tr.remove();
+            if (table.querySelectorAll('tr').length === 0) table.remove();
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function deleteHtmlCol() {
+            const { cell, table } = getTableContext();
+            if (!cell || !table) return;
+            const tr = cell.closest('tr');
+            const cellIndex = Array.from(tr.children).indexOf(cell);
+
+            const rows = table.querySelectorAll('tr');
+            rows.forEach(row => {
+                if (row.children[cellIndex]) {
+                    row.children[cellIndex].remove();
+                }
+            });
+
+            const firstRow = table.querySelector('tr');
+            if (!firstRow || firstRow.children.length === 0) table.remove();
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function deleteHtmlTable() {
+            const { table } = getTableContext();
+            if (table) table.remove();
+            globalCurrentTable = null;
+            globalCurrentTableCell = null;
+            setTimeout(updateToolbarState, 10);
+        }
+
+        function mergeHtmlCells() {
+            if (globalCurrentTable && currentSelectedCells.length > 1) {
+                const firstCell = currentSelectedCells[0];
+                const startRowIndex = firstCell.closest('tr').rowIndex;
+                const startColIndex = Array.from(firstCell.closest('tr').children).indexOf(firstCell);
+
+                let maxRowIdx = startRowIndex;
+                let maxColIdx = startColIndex;
+
+                currentSelectedCells.forEach(cell => {
+                    const rIdx = cell.closest('tr').rowIndex;
+                    const cIdx = Array.from(cell.closest('tr').children).indexOf(cell);
+                    if (rIdx > maxRowIdx) maxRowIdx = rIdx;
+                    if (cIdx > maxColIdx) maxColIdx = cIdx;
+                });
+
+                const rowSpan = maxRowIdx - startRowIndex + 1;
+                const colSpan = maxColIdx - startColIndex + 1;
+
+                let mergedContent = '';
+                currentSelectedCells.forEach(cell => {
+                    let html = cell.innerHTML.trim();
+                    if (html && html !== '<br>') mergedContent += html + ' <br> ';
+                    if (cell !== firstCell) cell.remove();
+                });
+
+                mergedContent = mergedContent.replace(/(<br\s*\/?>\s*)+$/gi, '').trim();
+                firstCell.innerHTML = mergedContent || '<br>';
+
+                if (rowSpan > 1) firstCell.setAttribute('rowspan', rowSpan);
+                if (colSpan > 1) firstCell.setAttribute('colspan', colSpan);
+
+                firstCell.focus();
+                currentSelectedCells = [firstCell];
+                setTimeout(updateToolbarState, 10);
+            } else {
+                const { cell } = getTableContext();
+                if (!cell) return;
+                const nextCell = cell.nextElementSibling;
+                if (nextCell) {
+                    const colspan = parseInt(cell.getAttribute('colspan') || '1');
+                    const nextColspan = parseInt(nextCell.getAttribute('colspan') || '1');
+                    cell.setAttribute('colspan', colspan + nextColspan);
+
+                    const cellText = cell.innerText.trim();
+                    const nextText = nextCell.innerText.trim();
+                    if (nextText) cell.innerHTML += ' <br> ' + nextCell.innerHTML;
+                    nextCell.remove();
+                    cell.focus();
+
+                    setTimeout(updateToolbarState, 10);
+                }
+            }
+        }
+
+        document.addEventListener('selectionchange', () => {
+            if (isEditing && !showingSource) updateToolbarState();
+        });
+
+        // Source toggle
+        function toggleSource() {
+            const area = document.getElementById('wysiwygArea');
+            const src = document.getElementById('sourceTextarea');
+            const toggle = document.getElementById('sourceToggle');
+
+            if (showingSource) {
+                showingSource = false;
+                toggle.classList.remove('active');
+                const md = src.value;
+                try {
+                    area.innerHTML = marked.parse(md);
+                } catch (e) {
+                    area.innerHTML = md.replace(/\n/g, '<br>');
+                }
+                area.style.display = '';
+                src.style.display = 'none';
+                area.focus();
+            } else {
+                showingSource = true;
+                toggle.classList.add('active');
+                src.value = htmlToMarkdown(area.innerHTML);
+                area.style.display = 'none';
+                src.style.display = 'block';
+
+                src.oninput = function () {
+                    this.style.height = 'auto';
+                    this.style.height = this.scrollHeight + 'px';
+                };
+                src.oninput(); // trigger initial resize
+
+                src.focus();
+            }
+        }
+
+        function htmlToMarkdown(html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            return nodeToMd(doc.body).trim();
+        }
+
+        function nodeToMd(node) {
+            let result = '';
+            for (const child of node.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    result += child.textContent;
+                } else if (child.nodeType === Node.ELEMENT_NODE) {
+                    const tag = child.tagName.toLowerCase();
+                    const inner = nodeToMd(child);
+                    switch (tag) {
+                        case 'h1': result += '\n# ' + inner.trim() + '\n\n'; break;
+                        case 'h2': result += '\n## ' + inner.trim() + '\n\n'; break;
+                        case 'h3': result += '\n### ' + inner.trim() + '\n\n'; break;
+                        case 'h4': result += '\n#### ' + inner.trim() + '\n\n'; break;
+                        case 'h5': result += '\n##### ' + inner.trim() + '\n\n'; break;
+                        case 'p': result += inner.trim() + '\n\n'; break;
+                        case 'br': result += '\n'; break;
+                        case 'strong': case 'b': result += '**' + inner + '**'; break;
+                        case 'em': case 'i': result += '*' + inner + '*'; break;
+                        case 'u': result += '<u>' + inner + '</u>'; break;
+                        case 's': case 'strike': case 'del': result += '~~' + inner + '~~'; break;
+                        case 'code':
+                            if (child.parentElement && child.parentElement.tagName === 'PRE') {
+                                result += inner;
+                            } else {
+                                result += '`' + inner + '`';
+                            }
+                            break;
+                        case 'pre': result += '\n```\n' + inner.trim() + '\n```\n\n'; break;
+                        case 'blockquote': {
+                            const lines = inner.trim().split('\n');
+                            result += '\n' + lines.map(l => '> ' + l).join('\n') + '\n\n';
+                            break;
+                        }
+                        case 'ul': {
+                            const items = child.querySelectorAll(':scope > li');
+                            items.forEach(li => { result += '- ' + nodeToMd(li).trim() + '\n'; });
+                            result += '\n';
+                            break;
+                        }
+                        case 'ol': {
+                            const items = child.querySelectorAll(':scope > li');
+                            items.forEach((li, i) => { result += (i + 1) + '. ' + nodeToMd(li).trim() + '\n'; });
+                            result += '\n';
+                            break;
+                        }
+                        case 'li': result += inner; break;
+                        case 'table': {
+                            let tableMd = '\n\n';
+                            let maxCols = 0;
+                            const rows = child.querySelectorAll('tbody > tr, thead > tr, tr');
+                            const uniqueRows = [];
+                            rows.forEach(tr => {
+                                if (uniqueRows.includes(tr) || tr.closest('table') !== child) return;
+                                uniqueRows.push(tr);
+                                const cells = tr.querySelectorAll('th, td');
+                                maxCols = Math.max(maxCols, cells.length);
+                            });
+
+                            uniqueRows.forEach((tr, i) => {
+                                const cells = Array.from(tr.querySelectorAll('th, td'));
+                                let rowMd = '|';
+                                for (let c = 0; c < maxCols; c++) {
+                                    const cell = cells[c];
+                                    const cellText = cell ? nodeToMd(cell).replace(/\n/g, '<br>').trim() : '';
+                                    rowMd += ' ' + cellText + ' |';
+                                }
+                                tableMd += rowMd + '\n';
+                                if (i === 0) {
+                                    tableMd += '|';
+                                    for (let c = 0; c < maxCols; c++) {
+                                        tableMd += ' --- |';
+                                    }
+                                    tableMd += '\n';
+                                }
+                            });
+                            result += tableMd + '\n';
+                            break;
+                        }
+                        case 'a': result += '[' + inner + '](' + (child.getAttribute('href') || '') + ')'; break;
+                        case 'img': result += '![' + (child.getAttribute('alt') || '') + '](' + (child.getAttribute('src') || '') + ')'; break;
+                        case 'hr': result += '\n---\n\n'; break;
+                        case 'div': case 'section': case 'article': case 'span':
+                            result += inner;
+                            break;
+                        default:
+                            result += inner;
+                    }
+                }
+            }
+            return result;
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (!isEditing) return;
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 's') { e.preventDefault(); saveContent(); }
+            }
+        });
+
+        async function saveContent() {
+            let mdText;
+            if (showingSource) {
+                mdText = document.getElementById('sourceTextarea').value;
+            } else {
+                mdText = htmlToMarkdown(document.getElementById('wysiwygArea').innerHTML);
+            }
+            try {
+                const res = await fetch(`/lectures/${lectureId}/content`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ extracted_text: mdText })
+                });
+                if (res.ok) {
+                    lectureData.extracted_text = mdText;
+                    updateExtractedText();
+
+                    // Show a quick success indicator before returning to view
+                    const saveBtn = document.querySelector('.btn-primary i.ph-floppy-disk').parentNode;
+                    const origHtml = saveBtn.innerHTML;
+                    saveBtn.innerHTML = '<i class="ph ph-check"></i> Saved';
+                    setTimeout(() => {
+                        saveBtn.innerHTML = origHtml;
+                        cancelEdit();
+                    }, 500);
+                } else {
+                    alert('Failed to save content');
+                }
+            } catch (err) {
+                alert('Error saving: ' + err.message);
+            }
         }
 
         // ===== SNAPSHOTS =====
