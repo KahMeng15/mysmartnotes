@@ -1493,7 +1493,7 @@
 
         function openSourceReference(lectureId, position) {
             if (!lectureId) { alert('Source reference not available'); return; }
-            window.open(`mynotes.html?note_id=${lectureId}#pos-${position}`, '_blank');
+            window.open(`/note/${lectureId}#pos-${position}`, '_blank');
         }
 
         function toggleMetadata(sectionId, msgId, event) {

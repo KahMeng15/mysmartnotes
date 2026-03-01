@@ -29,6 +29,20 @@
             smartypants: false
         });
     </script>
+    <style>
+        /* Reference highlight animation */
+        .reference-highlight {
+            animation: referenceHighlight 0.5s ease-in-out;
+            background-color: rgba(255, 193, 7, 0.3) !important;
+            border-left: 3px solid #FFC107 !important;
+            padding-left: 8px !important;
+        }
+
+        @keyframes referenceHighlight {
+            0% { background-color: rgba(255, 193, 7, 0.6); }
+            100% { background-color: rgba(255, 193, 7, 0.3); }
+        }
+    </style>
 </head>
 
 <body class="note-page">
@@ -398,6 +412,70 @@
             return luminance > 0.5 ? '#1a1a1a' : '#ffffff';
         }
 
+        // ===== HASH NAVIGATION (cross-compatible with chat references) =====
+        async function navigateToReferencePosition(position) {
+            "use strict";
+            // Wait for content to render
+            const maxTries = 50;
+            for (let i = 0; i < maxTries; i++) {
+                if (document.getElementById('extractedText')?.children.length > 0) {
+                    setTimeout(() => scrollToPosition(position), 100);
+                    return;
+                }
+                await new Promise(r => setTimeout(r, 100));
+            }
+        }
+
+        function scrollToPosition(position) {
+            "use strict";
+            const container = document.getElementById('extractedText');
+            if (!container) return;
+            
+            // Get all text nodes from the container
+            const textNodes = [];
+            let charCount = 0;
+            
+            function collectTextNodes(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (node.textContent.trim().length > 0) {
+                        textNodes.push({
+                            node: node,
+                            start: charCount,
+                            end: charCount + node.textContent.length,
+                            element: node.parentElement
+                        });
+                        charCount += node.textContent.length;
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    for (let child of node.childNodes) {
+                        collectTextNodes(child);
+                    }
+                }
+            }
+            
+            collectTextNodes(container);
+            
+            // Find the text node containing the target position
+            let foundElement = null;
+            for (let textNodeInfo of textNodes) {
+                if (position >= textNodeInfo.start && position <= textNodeInfo.end) {
+                    foundElement = textNodeInfo.element;
+                    break;
+                }
+            }
+            
+            if (foundElement) {
+                // Highlight the element
+                foundElement.classList.add('reference-highlight');
+                foundElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Remove highlight after 3 seconds
+                setTimeout(() => {
+                    foundElement.classList.remove('reference-highlight');
+                }, 3000);
+            }
+        }
+
         // ===== INIT =====
         window.addEventListener('load', () => {
             if (!token) { window.location.href = '/login.html'; return; }
@@ -411,6 +489,15 @@
                 return;
             }
             loadLecture();
+            
+            // Handle reference navigation from chat (hash-based)
+            const hash = window.location.hash;
+            if (hash.startsWith('#pos-')) {
+                const position = parseInt(hash.substring(5), 10);
+                if (!isNaN(position)) {
+                    navigateToReferencePosition(position);
+                }
+            }
         });
 
         // ===== LOAD LECTURE =====
