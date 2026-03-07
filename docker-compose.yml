@@ -5,8 +5,9 @@ services:
     build: .
     container_name: mysmartnotes
     ports:
-      - "8000:8000"
+      - "${PORT:-8000}:${PORT:-8000}"
     environment:
+      - PORT=${PORT:-8000}
       - DATABASE_URL=sqlite:///./data/app.db
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-}

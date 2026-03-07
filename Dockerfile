@@ -53,12 +53,12 @@ ENV DATABASE_URL=sqlite:///./data/app.db \
     FIREBASE_APP_ID="" \
     FIREBASE_MEASUREMENT_ID=""
 
-# Expose port
+# Note: EXPOSE is mostly for documentation when using docker-compose, but we document 8000 here
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+    CMD python -c "import requests, os; requests.get(f'http://localhost:{os.environ.get(\"PORT\", 8000)}/health')"
 
 # Run application
 CMD ["python", "main.py"]
