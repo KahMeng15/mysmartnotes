@@ -204,6 +204,8 @@ class ChatMessage(Base):
     detailed_sources_json = Column(Text, nullable=True)                # JSON: full detailed source objects for history replay
     ai_model = Column(String(255), nullable=True)                      # e.g. "GEMINI (gemini-1.5-flash)"
     timings_json = Column(Text, nullable=True)                         # JSON: {retrieval_ms, model_ms, total_ms}
+    is_pinned = Column(Boolean, default=False)
+    is_favourite = Column(Boolean, default=False)
     
     # Relationships
     user = relationship("User")

@@ -60,6 +60,8 @@ class ConversationSummary(BaseModel):
     subject_id: Optional[int] = None
     group_id: Optional[int] = None
     scope_type: Optional[str] = None
+    is_pinned: bool = False
+    is_favourite: bool = False
 
 
 class ChatResponse(BaseModel):
@@ -100,7 +102,7 @@ _BASE_GUARD = (
 )
 
 
-def build_mode_prompt(context: str, question: str, mode: str, output_format: str = "sentence") -> str:
+def build_mode_prompt(context: str, question: str, mode: str, output_format: str = "sentence", is_web_search: bool = False) -> str:
     """Return the full system prompt based on AI mode and output format."""
     if question.strip().lower() in {"hi", "hello", "how are you", "how are you?"}:
         return f"You are a friendly assistant. Respond warmly to: '{question}'"
@@ -124,8 +126,17 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
     mode_inst = mode_instructions.get(mode, mode_instructions["elaborate"])
     output_inst = output_instructions.get(output_format, output_instructions["sentence"])
 
+    guard = _BASE_GUARD
+    if is_web_search:
+        guard = (
+            "You are answering using snippets obtained from a web search. "
+            "Ignore any irrelevant information in the snippets. "
+            "If the answer is NOT found in the snippets, respond with exactly: \"I don't know.\" "
+            "Do NOT make up facts or invent information."
+        )
+
     prompt = f"""{mode_inst}
-{_BASE_GUARD}
+{guard}
 
 {output_inst}
 
@@ -137,6 +148,28 @@ Question: {question}
 Answer:"""
 
     return prompt
+
+
+async def classify_query(client: AIClient, question: str) -> str:
+    """Classify the user intent to avoid unnecessary retrieval or off-topic web searches."""
+    prompt = (
+        "Classify this user query into strictly one of three categories:\n"
+        "1. CONVERSATIONAL: Simple greetings, praise, thanks, goodbyes, or small talk (e.g. 'hello', 'thanks', 'how are you').\n"
+        "2. OFF_TOPIC: Requests unrelated to answering questions from notes, such as asking to write a poem, generate code, personal advice, or tell a joke.\n"
+        "3. INFORMATIONAL: Questions asking for facts, explanations, summaries, or knowledge.\n\n"
+        "Reply with EXACTLY ONE WORD: CONVERSATIONAL, OFF_TOPIC, or INFORMATIONAL."
+    )
+    try:
+        res = await asyncio.wait_for(
+            client.answer_question(question=question, context="", system_prompt=prompt),
+            timeout=3.0
+        )
+        res_upper = res.strip().upper()
+        if "CONVERSATIONAL" in res_upper: return "CONVERSATIONAL"
+        if "OFF_TOPIC" in res_upper: return "OFF_TOPIC"
+        return "INFORMATIONAL"
+    except Exception:
+        return "INFORMATIONAL"  # Default to informational if classification fails
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -162,33 +195,55 @@ def generate_conversation_title(first_question: str) -> str:
     return title or "New Conversation"
 
 
-async def web_search(query: str, timeout: float = 2.5) -> tuple:
-    """Quick web search using DuckDuckGo instant answer API."""
+async def web_search(query: str, timeout: float = 10.0) -> tuple:
+    """Quick web search using ddgs. Returns (snippet, source, error_status).
+    error_status: None = success, 'timeout' = slow/taking too long, 'unavailable' = error (DDG down)
+    """
     try:
-        import httpx
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            params = {"q": query, "format": "json", "no_html": 1, "skip_disambig": 1}
-            resp = await client.get("https://api.duckduckgo.com/", params=params)
-            if resp.status_code != 200:
-                return "", ""
-            data = resp.json()
-            snippets = []
-            abstract = data.get("AbstractText", "").strip()
-            if abstract:
-                snippets.append(abstract)
-            for topic in data.get("RelatedTopics", [])[:2]:
-                if isinstance(topic, dict):
-                    text = topic.get("Text", "").strip()
-                    if text:
-                        snippets.append(text)
-            if snippets:
-                combined = "\n\n".join(snippets[:300])
-                source = data.get("Heading", "Web Search")
-                return combined, source
-            return "", ""
+        from ddgs import DDGS
+        import asyncio
+        
+        def run_search():
+            try:
+                # Provide a small timeout for the search itself
+                ddgs_instance = DDGS(timeout=5)
+                return list(ddgs_instance.text(query, max_results=5))
+            except Exception as e:
+                print(f"[chat] DDGS error: {e}")
+                return []
+
+        try:
+            results = await asyncio.wait_for(asyncio.to_thread(run_search), timeout=timeout)
+        except asyncio.TimeoutError:
+            print(f"[chat] Web search timed out after {timeout}s")
+            return "", "", "timeout"
+        
+        snippets = []
+        sources = []
+        for r in results:
+            body = r.get("body", "").strip()
+            url = r.get("href", "")
+            title = r.get("title", "")
+            if body:
+                # Combine title and body for better context
+                snippet = f"{title}: {body}" if title else body
+                snippets.append(snippet)
+                if url:
+                    sources.append(url)
+        
+        print(f"[chat] DDGS retrieved {len(snippets)} snippets from {len(results)} results")
+        if snippets:
+            combined = "\n\n".join(snippets[:5])  # Take up to 5 snippets
+            main_source = sources[0] if sources else "Web Search"
+            return combined, main_source, None
+        
+        print(f"[chat] DDGS returned results but no body content extracted")
+        return "", "", None
     except Exception as e:
-        print(f"[chat] Web search failed: {e}")
-        return "", ""
+        import traceback
+        print(f"[chat] Web search failed with Exception: {type(e).__name__}: {e}")
+        traceback.print_exc()
+        return "", "", "unavailable"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -250,55 +305,82 @@ async def ask_question(
 
     retrieval_ms = (time.time() - t_start) * 1000.0
 
-    # STEP 2: Retrieve relevant chunks from pre-computed embeddings
+    # Initialize AI client early for classification
+    ai_client = AIClient(current_user)
+    
+    # STEP 2: Classify Query Intent
+    intent = await classify_query(ai_client, request.message)
+
     context = ""
     snippet_sources = []
     detailed_sources = []
 
-    if lecture_ids:
-        try:
-            from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
-            chunks = retrieve_relevant_chunks(
-                query=request.message,
-                lecture_ids=lecture_ids,
-                db=db,
-                top_k=3
-            )
-            if chunks:
-                snippets = [
-                    {"text": chunk["text"], "position": chunk["position"], "score": chunk["score"]}
-                    for chunk in chunks
-                ]
-                context = combine_snippets(snippets, max_chars=2000)
-                for chunk in chunks:
-                    detailed_sources.append({
-                        "text_preview": chunk["text"][:100] + "..." if len(chunk["text"]) > 100 else chunk["text"],
-                        "position": chunk["position"],
-                        "score": chunk["score"],
-                        "lecture_id": chunk["lecture_id"]
-                    })
-                snippet_sources = list(set(sources))[:2] if sources else []
-            retrieval_ms = (time.time() - t_start) * 1000.0
-        except Exception as e:
-            print(f"[chat] Vector retrieval failed: {e}")
-            retrieval_ms = (time.time() - t_start) * 1000.0
+    if intent == "CONVERSATIONAL":
+        # Skip retrieval completely for conversational queries
+        context = "User is just making conversation. Provide a friendly, brief response."
+        prompt = "You are a friendly study assistant. Provide a brief, warm response to the user's conversational message. Do not provide facts or knowledge."
+    elif intent == "OFF_TOPIC":
+        # Skip retrieval completely for off-topic queries
+        context = "User is asking an off-topic question."
+        prompt = "You are an AI study assistant. The user's query is off-topic. Politely decline to answer, stating that you can only answer questions related to their notes or general educational topics, and cannot look up the answer to their off-topic query."
+    else:
+        # STEP 3: Retrieve relevant chunks from pre-computed embeddings (INFORMATIONAL)
+        if lecture_ids:
+            try:
+                from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
+                chunks = retrieve_relevant_chunks(
+                    query=request.message,
+                    lecture_ids=lecture_ids,
+                    db=db,
+                    top_k=3
+                )
+                if chunks:
+                    snippets = [
+                        {"text": chunk["text"], "position": chunk["position"], "score": chunk["score"]}
+                        for chunk in chunks
+                    ]
+                    context = combine_snippets(snippets, max_chars=2000)
+                    for chunk in chunks:
+                        detailed_sources.append({
+                            "text_preview": chunk["text"][:100] + "..." if len(chunk["text"]) > 100 else chunk["text"],
+                            "position": chunk["position"],
+                            "score": chunk["score"],
+                            "lecture_id": chunk["lecture_id"]
+                        })
+                    snippet_sources = list(set(sources))[:2] if sources else []
+                retrieval_ms = (time.time() - t_start) * 1000.0
+            except Exception as e:
+                print(f"[chat] Vector retrieval failed: {e}")
+                retrieval_ms = (time.time() - t_start) * 1000.0
 
-    # STEP 3: Web search fallback if no local context
-    if not context or len(context) < 100:
-        print(f"[chat] No sufficient local context ({len(context)} chars), trying web search...")
-        web_snippet, web_source = await web_search(request.message, timeout=2.5)
-        if web_snippet:
-            context = web_snippet
-            snippet_sources = [f"Web: {web_source}"]
-
-    # STEP 4: Build mode-specific prompt
-    if not context:
-        context = "No information available."
-
-    prompt = build_mode_prompt(context, request.message, request.ai_mode, request.output_format)
-
-    # STEP 5: Call LLM
-    ai_client = AIClient(current_user)
+        # STEP 4: Web search fallback if no local context
+        if not context or len(context) < 100:
+            print(f"[chat] No sufficient local context ({len(context)} chars), trying web search...")
+            web_snippet, web_source, web_error = await web_search(request.message, timeout=10.0)
+            if web_error == "timeout":
+                context = "[DDG is slow but searching... please wait]"
+                snippet_sources = ["Web: DuckDuckGo (searching)"]
+            elif web_error == "unavailable":
+                context = "[DuckDuckGo is unavailable]"
+                snippet_sources = ["Web Search: Unavailable"]
+            elif web_snippet:
+                context = web_snippet
+                snippet_sources = [f"Web: {web_source}"]
+                detailed_sources = [{
+                    "text_preview": web_snippet[:100] + "...",
+                    "position": 0,
+                    "score": 100,
+                    "lecture_id": 0,
+                    "is_web": True,
+                    "url": web_source
+                }]
+                
+        # STEP 5: Build mode-specific prompt for informational queries
+        if not context:
+            context = "No information available."
+        prompt = build_mode_prompt(context, request.message, request.ai_mode, request.output_format)
+    
+    # STEP 6: Call LLM
     t_model_start = time.time()
 
     ai_model_info = f"{ai_client.provider.upper()}"
@@ -314,6 +396,43 @@ async def ask_question(
             ),
             timeout=4.5
         )
+        
+        # Checking if local context didn't have the answer
+        if response.strip().lower() in ["i don't know", "i don't know.", '"i don\'t know."']:
+            print(f"[chat] LLM responded 'I don't know' using local context. Trying web search...")
+            web_snippet, web_source, web_error = await web_search(request.message, timeout=10.0)
+            print(f"[chat] web_snippet fetched length: {len(web_snippet)}, error: {web_error}")
+            if web_error == "timeout":
+                response = "DuckDuckGo is taking a while to search... Could you try rephrasing your question or check your internet connection?"
+                snippet_sources = ["Web: DuckDuckGo (timeout)"]
+            elif web_error == "unavailable":
+                response = "DuckDuckGo is currently unavailable. I wasn't able to find information about this in your notes. Please try again later."
+                snippet_sources = ["Web Search: Unavailable"]
+            elif web_snippet:
+                # Override context and prompt for web search retry
+                context = web_snippet
+                snippet_sources = [f"Web: {web_source}"]
+                detailed_sources = [{
+                    "text_preview": web_snippet[:100] + "...",
+                    "position": 0,
+                    "score": 100,
+                    "lecture_id": 0,
+                    "is_web": True,
+                    "url": web_source
+                }]
+                prompt = build_mode_prompt(context, request.message, request.ai_mode, request.output_format, is_web_search=True)
+                
+                # Ask LLM again with web snippet as context
+                response = await asyncio.wait_for(
+                    ai_client.answer_question(
+                        question=request.message,
+                        context=context,
+                        system_prompt=prompt
+                    ),
+                    timeout=8.0
+                )
+                print(f"[chat] LLM 2nd response: {response}")
+
     except asyncio.TimeoutError:
         response = "I'm thinking… this is taking longer than expected. Could you try rephrasing your question?"
     except Exception as e:
@@ -408,13 +527,18 @@ async def get_conversations(
             func.max(ChatMessage.lecture_id).label("lecture_id"),
             func.max(ChatMessage.subject_id).label("subject_id"),
             func.max(ChatMessage.group_id).label("group_id"),
+            func.max(ChatMessage.is_pinned).label("is_pinned"),
+            func.max(ChatMessage.is_favourite).label("is_favourite"),
         )
         .filter(
             ChatMessage.user_id == current_user.id,
             ChatMessage.conversation_id.isnot(None),
         )
         .group_by(ChatMessage.conversation_id)
-        .order_by(func.max(ChatMessage.created_at).desc())
+        .order_by(
+            func.max(ChatMessage.is_pinned).desc(),
+            func.max(ChatMessage.created_at).desc()
+        )
         .all()
     )
 
@@ -430,6 +554,8 @@ async def get_conversations(
             subject_id=row.subject_id,
             group_id=row.group_id,
             scope_type=scope_type,
+            is_pinned=bool(row.is_pinned),
+            is_favourite=bool(row.is_favourite),
         ))
 
     return result
@@ -549,6 +675,62 @@ async def get_lecture_chat_history(
         )
         for m in messages
     ]
+
+
+@router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete an entire conversation."""
+    db.query(ChatMessage).filter(
+        ChatMessage.conversation_id == conversation_id,
+        ChatMessage.user_id == current_user.id
+    ).delete()
+    db.commit()
+
+
+@router.put("/conversations/{conversation_id}/pin")
+async def toggle_pin_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Toggle the pinned state of a conversation."""
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.conversation_id == conversation_id,
+        ChatMessage.user_id == current_user.id
+    ).all()
+    if not messages:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    new_state = not messages[0].is_pinned
+    for msg in messages:
+        msg.is_pinned = new_state
+    db.commit()
+    return {"is_pinned": new_state}
+
+
+@router.put("/conversations/{conversation_id}/favourite")
+async def toggle_favourite_conversation(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Toggle the favourite state of a conversation."""
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.conversation_id == conversation_id,
+        ChatMessage.user_id == current_user.id
+    ).all()
+    if not messages:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    new_state = not messages[0].is_favourite
+    for msg in messages:
+        msg.is_favourite = new_state
+    db.commit()
+    return {"is_favourite": new_state}
 
 
 @router.delete("/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
