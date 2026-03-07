@@ -39,8 +39,13 @@
         }
 
         @keyframes referenceHighlight {
-            0% { background-color: rgba(255, 193, 7, 0.6); }
-            100% { background-color: rgba(255, 193, 7, 0.3); }
+            0% {
+                background-color: rgba(255, 193, 7, 0.6);
+            }
+
+            100% {
+                background-color: rgba(255, 193, 7, 0.3);
+            }
         }
     </style>
 </head>
@@ -232,7 +237,7 @@
             </div>
             <div class="note-chat-messages" id="noteChatMessages">
                 <div class="note-chat-empty">
-                    <i class="ph ph-chat-circle-dots" style="font-size: 2rem; margin-bottom: var(--spacing-sm);"></i>
+                    <i class="ph ph-chat-circle-dots" style="font-size: 2rem;"></i>
                     <p>Ask a question about this note</p>
                 </div>
             </div>
@@ -430,11 +435,11 @@
             "use strict";
             const container = document.getElementById('extractedText');
             if (!container) return;
-            
+
             // Get all text nodes from the container
             const textNodes = [];
             let charCount = 0;
-            
+
             function collectTextNodes(node) {
                 if (node.nodeType === Node.TEXT_NODE) {
                     if (node.textContent.trim().length > 0) {
@@ -452,9 +457,9 @@
                     }
                 }
             }
-            
+
             collectTextNodes(container);
-            
+
             // Find the text node containing the target position
             let foundElement = null;
             for (let textNodeInfo of textNodes) {
@@ -463,12 +468,12 @@
                     break;
                 }
             }
-            
+
             if (foundElement) {
                 // Highlight the element
                 foundElement.classList.add('reference-highlight');
                 foundElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
+
                 // Remove highlight after 3 seconds
                 setTimeout(() => {
                     foundElement.classList.remove('reference-highlight');
@@ -489,7 +494,7 @@
                 return;
             }
             loadLecture();
-            
+
             // Handle reference navigation from chat (hash-based)
             const hash = window.location.hash;
             if (hash.startsWith('#pos-')) {
@@ -2062,7 +2067,7 @@
             const container = document.getElementById('noteChatMessages');
             if (chatMessages.length === 0) {
                 container.innerHTML = `<div class="note-chat-empty">
-                    <i class="ph ph-chat-circle-dots" style="font-size:2rem;margin-bottom:var(--spacing-sm);"></i>
+                    <i class="ph ph-chat-circle-dots" style="font-size:2rem;"></i>
                     <p>Ask a question about this note</p></div>`;
                 return;
             }

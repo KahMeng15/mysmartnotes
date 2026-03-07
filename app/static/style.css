@@ -1606,7 +1606,6 @@ textarea {
   color: var(--color-gray);
   background: var(--color-white);
   border-radius: var(--radius-lg);
-  border: 1px dashed var(--color-light-gray);
 }
 
 /* Lecture List Item Styles (Shared) */
@@ -2902,11 +2901,11 @@ body.auth-page {
 .lecture-item {
   background: var(--color-bg-card, #fff);
   border-radius: var(--radius-lg);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   padding: var(--spacing-lg);
   transition: box-shadow 0.2s;
 }
 
 .lecture-item:hover {
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
 }

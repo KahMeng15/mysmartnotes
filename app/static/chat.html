@@ -7,7 +7,9 @@
     <title>Chat - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="js/auth.js"></script>
@@ -110,6 +112,7 @@
             from {
                 transform: rotate(0deg);
             }
+
             to {
                 transform: rotate(360deg);
             }
@@ -181,12 +184,11 @@
         }
 
         .chat-input-area {
-            padding: var(--spacing-lg);
+            padding: var(--spacing-md);
             background: var(--color-white);
             border-top: 1px solid var(--color-light-gray);
             display: flex;
             flex-direction: column;
-            gap: var(--spacing-md);
         }
 
         .scope-selection {
@@ -204,14 +206,15 @@
             flex: 1;
             border-radius: var(--radius-full);
             padding: var(--spacing-md) var(--spacing-lg);
+            margin-top: var(--spacing-md);
         }
-        
+
         /* Source reference hover effect */
         .source-item:hover {
             background: #e3f2fd !important;
             border-color: #1976d2 !important;
             transform: translateX(4px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .chat-input-form button {
@@ -371,9 +374,7 @@
         }
 
         /* Collapsible Reference Section */
-        .message-metadata {
-
-        }
+        .message-metadata {}
 
         .metadata-toggle {
             display: flex;
@@ -436,7 +437,7 @@
             flex-wrap: wrap;
         }
 
-        .ai-controls > div {
+        .ai-controls>div {
             display: flex;
             flex-direction: column;
             gap: var(--spacing-sm);
@@ -664,8 +665,12 @@
                 <div class="chat-header-top">
                     <div class="chat-title-row">
                         <h3 id="chatTitle" style="margin: 0;">Select a scope to start</h3>
-                        <p id="chatSubtitle" style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions about your notes, subjects, or groups</p>
-                        <p id="chatMeta" style="color: var(--color-gray); font-size: var(--font-size-xs); display: none; margin: 0;"></p>
+                        <p id="chatSubtitle"
+                            style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions
+                            about your notes, subjects, or groups</p>
+                        <p id="chatMeta"
+                            style="color: var(--color-gray); font-size: var(--font-size-xs); display: none; margin: 0;">
+                        </p>
                     </div>
                     <div class="context-display" id="contextDisplay" style="display: none;">
                         <span class="context-name" id="contextName"></span>
@@ -679,9 +684,10 @@
             <!-- Messages -->
             <div class="chat-messages" id="messagesContainer">
                 <div class="empty-state">
-                    <div style="font-size: var(--font-size-3xl); margin-bottom: var(--spacing-lg);"><i
+                    <div style="font-size: var(--font-size-3xl); margin-bottom: 0;"><i
                             class="ph ph-chat-circle-dots"></i></div>
-                    <p>Select a scope (Group/Subject/Note) to begin asking questions</p>
+                    <p style="margin-top: var(--spacing-md);">Ready to dive in? Select a scope and uncover the insights
+                        hidden in your notes!</p>
                 </div>
             </div>
 
@@ -693,16 +699,20 @@
                     <div>
                         <div class="control-label">Mode</div>
                         <div class="ai-mode-bar">
-                            <button class="mode-pill" data-mode="quick" onclick="setAiMode('quick')" title="Use less processing to get answer">
+                            <button class="mode-pill" data-mode="quick" onclick="setAiMode('quick')"
+                                title="Use less processing to get answer">
                                 <i class="ph ph-lightning"></i> Quick
                             </button>
-                            <button class="mode-pill" data-mode="simple" onclick="setAiMode('simple')" title="Answer in simple terms">
+                            <button class="mode-pill" data-mode="simple" onclick="setAiMode('simple')"
+                                title="Answer in simple terms">
                                 <i class="ph ph-text-a-underline"></i> Simple
                             </button>
-                            <button class="mode-pill active" data-mode="elaborate" onclick="setAiMode('elaborate')" title="Provide thorough explanation">
+                            <button class="mode-pill active" data-mode="elaborate" onclick="setAiMode('elaborate')"
+                                title="Provide thorough explanation">
                                 <i class="ph ph-lightbulb"></i> Elaborate
                             </button>
-                            <button class="mode-pill" data-mode="eli5" onclick="setAiMode('eli5')" title="Explain like I'm 5">
+                            <button class="mode-pill" data-mode="eli5" onclick="setAiMode('eli5')"
+                                title="Explain like I'm 5">
                                 <i class="ph ph-smiley"></i> ELI5
                             </button>
                         </div>
@@ -712,16 +722,20 @@
                     <div>
                         <div class="control-label">Output</div>
                         <div class="output-format-bar">
-                            <button class="mode-pill active" data-format="sentence" onclick="setOutputFormat('sentence')" title="Single paragraph response">
+                            <button class="mode-pill active" data-format="sentence"
+                                onclick="setOutputFormat('sentence')" title="Single paragraph response">
                                 <i class="ph ph-text-t"></i> Sentence
                             </button>
-                            <button class="mode-pill" data-format="pointform" onclick="setOutputFormat('pointform')" title="Bullet point format">
+                            <button class="mode-pill" data-format="pointform" onclick="setOutputFormat('pointform')"
+                                title="Bullet point format">
                                 <i class="ph ph-list-bullets"></i> Pointform
                             </button>
-                            <button class="mode-pill" data-format="numbered_list" onclick="setOutputFormat('numbered_list')" title="Numbered list format">
+                            <button class="mode-pill" data-format="numbered_list"
+                                onclick="setOutputFormat('numbered_list')" title="Numbered list format">
                                 <i class="ph ph-list-numbers"></i> Numbered List
                             </button>
-                            <button class="mode-pill" data-format="table" onclick="setOutputFormat('table')" title="Table format">
+                            <button class="mode-pill" data-format="table" onclick="setOutputFormat('table')"
+                                title="Table format">
                                 <i class="ph ph-table"></i> Table
                             </button>
                         </div>
@@ -730,8 +744,12 @@
 
                 <div class="chat-input-form">
                     <input type="text" id="messageInput" placeholder="Ask a question about your notes..." disabled>
-                    <button type="button" id="sendBtn" class="btn btn-primary" disabled onclick="sendMessage()"><i
-                            class="ph ph-paper-plane-right"></i></button>
+                    <button type="button" id="sendBtn" class="btn btn-primary" disabled onclick="sendMessage()"
+                        style="margin-top: var(--spacing-md);"><i class="ph ph-paper-plane-right"></i></button>
+                </div>
+                <div
+                    style="text-align: center; font-size: 11px; color: var(--color-gray); margin-top: var(--spacing-md);">
+                    AI can make mistakes. Always double check the answers.
                 </div>
             </div>
         </div>
@@ -808,7 +826,7 @@
         // ── Persistence helpers ───────────────────────────────────────────
         function loadSavedScope() {
             const saved = localStorage.getItem('chatScope');
-            if (saved) { try { return JSON.parse(saved); } catch(e) {} }
+            if (saved) { try { return JSON.parse(saved); } catch (e) { } }
             return null;
         }
 
@@ -867,17 +885,17 @@
 
         // ── AI Mode helpers ───────────────────────────────────────────────
         const MODE_META = {
-            quick:       { label: 'Quick',      icon: 'ph-lightning' },
-            simple:      { label: 'Simple',     icon: 'ph-text-a-underline' },
-            elaborate:   { label: 'Elaborate',  icon: 'ph-lightbulb' },
-            eli5:        { label: 'ELI5',       icon: 'ph-smiley' },
+            quick: { label: 'Quick', icon: 'ph-lightning' },
+            simple: { label: 'Simple', icon: 'ph-text-a-underline' },
+            elaborate: { label: 'Elaborate', icon: 'ph-lightbulb' },
+            eli5: { label: 'ELI5', icon: 'ph-smiley' },
         };
 
         const OUTPUT_FORMAT_META = {
-            sentence:       { label: 'Sentence',       icon: 'ph-text-t' },
-            pointform:      { label: 'Pointform',      icon: 'ph-list-bullets' },
-            numbered_list:  { label: 'Numbered List',  icon: 'ph-list-numbers' },
-            table:          { label: 'Table',          icon: 'ph-table' },
+            sentence: { label: 'Sentence', icon: 'ph-text-t' },
+            pointform: { label: 'Pointform', icon: 'ph-list-bullets' },
+            numbered_list: { label: 'Numbered List', icon: 'ph-list-numbers' },
+            table: { label: 'Table', icon: 'ph-table' },
         };
 
         function setAiMode(mode) {
@@ -913,15 +931,15 @@
         async function loadData() {
             try {
                 const [gRes, sRes, lRes, cRes] = await Promise.all([
-                    fetch('/groups',           { headers: { 'Authorization': `Bearer ${token}` } }),
-                    fetch('/subjects',         { headers: { 'Authorization': `Bearer ${token}` } }),
-                    fetch('/lectures',         { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch('/groups', { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch('/subjects', { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch('/lectures', { headers: { 'Authorization': `Bearer ${token}` } }),
                     fetch('/chat/conversations', { headers: { 'Authorization': `Bearer ${token}` } }),
                 ]);
 
-                if (gRes.ok) allGroups    = await gRes.json();
-                if (sRes.ok) allSubjects  = await sRes.json();
-                if (lRes.ok) allLectures  = await lRes.json();
+                if (gRes.ok) allGroups = await gRes.json();
+                if (sRes.ok) allSubjects = await sRes.json();
+                if (lRes.ok) allLectures = await lRes.json();
                 if (cRes.ok) conversations = await cRes.json();
 
                 renderConversationList();
@@ -933,16 +951,16 @@
                 if (urlNoteId) {
                     const note = allLectures.find(l => l.id == urlNoteId);
                     if (note) { setScope('note', note.id, `Note: ${note.title}`); }
-                    else        { openScopeModal(); }
+                    else { openScopeModal(); }
                 } else {
                     const savedScope = loadSavedScope();
                     if (savedScope && savedScope.type && savedScope.id) {
                         let exists = false;
-                        if (savedScope.type === 'note')    exists = allLectures.some(l => l.id == savedScope.id);
+                        if (savedScope.type === 'note') exists = allLectures.some(l => l.id == savedScope.id);
                         if (savedScope.type === 'subject') exists = allSubjects.some(s => s.id == savedScope.id);
-                        if (savedScope.type === 'group')   exists = allGroups.some(g => g.id == savedScope.id);
+                        if (savedScope.type === 'group') exists = allGroups.some(g => g.id == savedScope.id);
                         if (exists) { setScope(savedScope.type, savedScope.id, savedScope.title); }
-                        else        { localStorage.removeItem('chatScope'); openScopeModal(); }
+                        else { localStorage.removeItem('chatScope'); openScopeModal(); }
                     } else {
                         openScopeModal();
                     }
@@ -957,10 +975,10 @@
         // ── Scope Modal ───────────────────────────────────────────────────
         function openScopeModal() {
             document.getElementById('scopeModal').classList.add('active');
-            
+
             // First, populate group select
             populateGroupSelect();
-            
+
             // Preselect current scope
             if (currentScope.type === 'group' && currentScope.id) {
                 document.getElementById('groupSelect').value = currentScope.id;
@@ -1013,13 +1031,13 @@
 
         function onGroupChange() {
             tempGroupId = document.getElementById('groupSelect').value;
-            const subSelect  = document.getElementById('subjectSelect');
+            const subSelect = document.getElementById('subjectSelect');
             const noteSelect = document.getElementById('noteSelect');
             if (tempGroupId) {
                 subSelect.disabled = false;
                 subSelect.innerHTML = '<option value="">-- Entire Group --</option>';
                 allSubjects.filter(s => s.group_id == tempGroupId)
-                           .forEach(s => { subSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+                    .forEach(s => { subSelect.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
             } else {
                 subSelect.disabled = true;
                 subSelect.innerHTML = '<option value="">-- Entire Group (Select Group First) --</option>';
@@ -1036,7 +1054,7 @@
                 noteSelect.disabled = false;
                 noteSelect.innerHTML = '<option value="">-- Entire Subject --</option>';
                 allLectures.filter(l => l.subject_id == tempSubjectId)
-                           .forEach(n => { noteSelect.innerHTML += `<option value="${n.id}">${n.title}</option>`; });
+                    .forEach(n => { noteSelect.innerHTML += `<option value="${n.id}">${n.title}</option>`; });
             } else {
                 noteSelect.disabled = true;
                 noteSelect.innerHTML = '<option value="">-- Entire Subject (Select Subject First) --</option>';
@@ -1057,9 +1075,9 @@
         }
 
         function confirmScope() {
-            const noteId  = document.getElementById('noteSelect').value;
-            const subId   = document.getElementById('subjectSelect').value;
-            const grpId   = document.getElementById('groupSelect').value;
+            const noteId = document.getElementById('noteSelect').value;
+            const subId = document.getElementById('subjectSelect').value;
+            const grpId = document.getElementById('groupSelect').value;
             if (noteId) {
                 const note = allLectures.find(l => l.id == noteId);
                 setScope('note', noteId, `Note: ${note ? note.title : 'Unknown'}`);
@@ -1152,9 +1170,9 @@
                 output_format: currentOutputFormat,
                 conversation_id: currentConversationId,
             };
-            if (currentScope.type === 'note')    payload.lecture_id  = parseInt(currentScope.id);
-            else if (currentScope.type === 'subject') payload.subject_id  = parseInt(currentScope.id);
-            else if (currentScope.type === 'group')   payload.group_id    = parseInt(currentScope.id);
+            if (currentScope.type === 'note') payload.lecture_id = parseInt(currentScope.id);
+            else if (currentScope.type === 'subject') payload.subject_id = parseInt(currentScope.id);
+            else if (currentScope.type === 'group') payload.group_id = parseInt(currentScope.id);
 
             try {
                 const resp = await fetch(`${API_URL}/chat/ask`, {
@@ -1212,9 +1230,9 @@
                 const scopeLabel = isViewingHistory ? 'this conversation' : (currentScope.title || 'your notes');
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div style="font-size:var(--font-size-3xl);margin-bottom:var(--spacing-lg);">
+                        <div style="font-size:var(--font-size-3xl);margin-bottom:0;">
                             <i class="ph ph-chat-circle-dots"></i></div>
-                        <p>Ask a question</p>
+                        <p style="margin-top:var(--spacing-md);">Ready to dive in? Ask a question and uncover the insights hidden in your notes!</p>
                     </div>`;
                 return;
             }
@@ -1222,7 +1240,7 @@
             container.innerHTML = conversationMessages.map((msg, idx) => {
                 let contentHTML = msg.content;
                 if (msg.role === 'ai' && !msg.loading && typeof marked !== 'undefined') {
-                    try { contentHTML = marked.parse(contentHTML); } catch(e) {}
+                    try { contentHTML = marked.parse(contentHTML); } catch (e) { }
                 }
 
                 // AI mode badge (will be moved to metadata section)
@@ -1241,7 +1259,7 @@
                                 <span>🧠 AI Thinking Process</span>
                             </div>
                             <div class="thinking-content">
-                                ${msg.thinking.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+                                ${msg.thinking.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
                             </div>
                         </div>`;
                 }
@@ -1298,13 +1316,13 @@
 
                     const refLabel = hasSources ? `Reference (${highestMatch}%)` : 'Reference';
                     let toggleContent = '';
-                    
+
                     if (modeMeta) {
                         toggleContent += `<span style="display:inline-flex;align-items:center;gap:4px;color:#666;"><i class="ph ${modeMeta.icon}"></i> ${modeMeta.label}</span><span class="reference-divider">|</span>`;
                     }
-                    
+
                     toggleContent += `<span onclick="toggleMetadata('${msgId}-ref','${msgId}')" style="cursor:pointer;">${refLabel}</span><span class="reference-divider">|</span><button class="info-btn" onclick="toggleMetadata('${msgId}-info','${msgId}',event)">Info</button>`;
-                    
+
                     metadataHTML = `
                         <div class="message-metadata">
                             <div class="metadata-toggle">
@@ -1316,7 +1334,7 @@
                 }
 
                 const timeStr = (msg.time instanceof Date ? msg.time : new Date(msg.time))
-                                    .toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+                    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
                 return `
                 <div class="message ${msg.role}">
@@ -1342,7 +1360,7 @@
             try {
                 const res = await fetch('/chat/conversations', { headers: { 'Authorization': `Bearer ${token}` } });
                 if (res.ok) { conversations = await res.json(); renderConversationList(); }
-            } catch(e) { console.error('fetchConversations error', e); }
+            } catch (e) { console.error('fetchConversations error', e); }
         }
 
         function renderConversationList() {
@@ -1354,17 +1372,17 @@
             }
 
             // Group by date
-            const today     = new Date(); today.setHours(0,0,0,0);
+            const today = new Date(); today.setHours(0, 0, 0, 0);
             const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-            const weekAgo   = new Date(today); weekAgo.setDate(today.getDate() - 7);
+            const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
 
             const groups = { 'Today': [], 'Yesterday': [], 'This Week': [], 'Earlier': [] };
             conversations.forEach(c => {
-                const d = new Date(c.last_message_at); d.setHours(0,0,0,0);
-                if (d >= today)             groups['Today'].push(c);
-                else if (d >= yesterday)    groups['Yesterday'].push(c);
-                else if (d >= weekAgo)      groups['This Week'].push(c);
-                else                        groups['Earlier'].push(c);
+                const d = new Date(c.last_message_at); d.setHours(0, 0, 0, 0);
+                if (d >= today) groups['Today'].push(c);
+                else if (d >= yesterday) groups['Yesterday'].push(c);
+                else if (d >= weekAgo) groups['This Week'].push(c);
+                else groups['Earlier'].push(c);
             });
 
             const scopeIcon = { note: 'ph-file-text', subject: 'ph-books', group: 'ph-folder-open' };
@@ -1377,31 +1395,53 @@
                 items.forEach(c => {
                     const isActive = c.conversation_id === currentConversationId;
                     const d = new Date(c.last_message_at);
-                    const dateStr = d.toLocaleDateString([], { month:'short', day:'numeric' });
+                    const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
                     const icon = scopeIcon[c.scope_type] || 'ph-chat-circle';
                     const scope = scopeLabel[c.scope_type] || '';
                     const msgWord = c.message_count === 1 ? 'msg' : 'msgs';
-                    
-                    // Get scope name based on scope type and ID
-                    let scopeName = '';
+
+                    let convTitle = c.title || 'Untitled Conversation';
+                    let scopeDetail = scope;
+
                     if (c.scope_type === 'note') {
-                        const note = allLectures.find(x => x.id == c.scope_id);
-                        scopeName = note ? note.title : 'Note';
+                        const note = allLectures.find(x => x.id == c.lecture_id);
+                        if (note) convTitle = note.title;
+
+                        let subjId = c.subject_id;
+                        if (note && !subjId) subjId = note.subject_id;
+
+                        const subj = allSubjects.find(x => x.id == subjId);
+
+                        let grpId = c.group_id;
+                        if (subj && !grpId) grpId = subj.group_id;
+
+                        const grp = allGroups.find(x => x.id == grpId);
+
+                        if (subj && grp) scopeDetail = `${subj.name} (${grp.name})`;
+                        else if (subj) scopeDetail = subj.name;
+                        else if (grp) scopeDetail = grp.name;
                     } else if (c.scope_type === 'subject') {
-                        const subj = allSubjects.find(x => x.id == c.scope_id);
-                        scopeName = subj ? subj.name : 'Subject';
+                        const subj = allSubjects.find(x => x.id == c.subject_id);
+                        if (subj) convTitle = subj.name;
+
+                        let grpId = c.group_id;
+                        if (subj && !grpId) grpId = subj.group_id;
+
+                        const grp = allGroups.find(x => x.id == grpId);
+                        if (grp) scopeDetail = grp.name;
                     } else if (c.scope_type === 'group') {
-                        const grp = allGroups.find(x => x.id == c.scope_id);
-                        scopeName = grp ? grp.name : 'Group';
+                        const grp = allGroups.find(x => x.id == c.group_id);
+                        if (grp) convTitle = grp.name;
+                        scopeDetail = 'Group';
                     }
-                    
+
                     html += `
                         <div class="conversation-item${isActive ? ' active' : ''}"
                              onclick="loadConversation('${c.conversation_id}')">
-                            <div class="conversation-title" title="${formatEscaped(scopeName)}">${formatEscaped(scopeName)}</div>
+                            <div class="conversation-title" title="${formatEscaped(convTitle)}">${formatEscaped(convTitle)}</div>
                             <div class="conversation-meta">
-                                <span><i class="ph ${icon}"></i> ${scope}</span>
-                                <span style="display:flex;align-items:center;gap:5px;">
+                                <span title="${formatEscaped(scopeDetail)}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-right: 5px;"><i class="ph ${icon}"></i> ${formatEscaped(scopeDetail)}</span>
+                                <span style="display:flex;align-items:center;gap:5px; flex-shrink: 0;">
                                     <span class="conv-msg-count"><i class="ph ph-chat-dots"></i> ${c.message_count} ${msgWord}</span>
                                     <span>${dateStr}</span>
                                 </span>
@@ -1481,14 +1521,14 @@
                 document.getElementById('chatMeta').style.display = 'block';
 
                 displayMessages();
-            } catch(e) {
+            } catch (e) {
                 console.error('loadConversation error', e);
             }
         }
 
         // ── Utility ───────────────────────────────────────────────────────
         function formatEscaped(str) {
-            return (str || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            return (str || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
         function openSourceReference(lectureId, position) {

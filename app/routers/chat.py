@@ -144,12 +144,17 @@ Answer:"""
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_conversation_title(first_question: str) -> str:
-    """Derive a clean, readable conversation title from the first question."""
+    """Derive a clean, readable conversation title from the first question (max 8 words)."""
     title = first_question.strip()
     if title.endswith("?"):
         title = title[:-1].strip()
     if title:
         title = title[0].upper() + title[1:]
+        
+    words = title.split()
+    if len(words) > 8:
+        title = " ".join(words[:8]) + "…"
+
     if len(title) > 80:
         truncated = title[:77]
         last_space = truncated.rfind(" ")
