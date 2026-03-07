@@ -196,18 +196,60 @@ def generate_conversation_title(first_question: str) -> str:
 
 
 async def web_search(query: str, timeout: float = 10.0) -> tuple:
-    """Quick web search using ddgs. Returns (snippet, source, error_status).
+    """Quick web search using ddgs with relevance filtering. Returns (snippet, sources_list, error_status).
+    sources_list: list of {"url": url, "title": title, "text_preview": snippet, "relevance_score": %}
     error_status: None = success, 'timeout' = slow/taking too long, 'unavailable' = error (DDG down)
     """
     try:
         from ddgs import DDGS
         import asyncio
         
+        def calculate_relevance(query_str: str, title: str, body: str) -> float:
+            """Calculate realistic relevance score (0-100) based on semantic matching."""
+            import re
+            
+            query_lower = query_str.lower()
+            title_lower = title.lower()
+            body_lower = body.lower()
+            
+            # Extract important query terms (>2 chars, not stop words)
+            query_words = [w for w in query_lower.split() if len(w) > 2 and w not in {'what', 'this', 'that', 'with', 'from', 'into', 'have', 'been', 'does', 'is', 'a', 'an', 'the'}]
+            
+            if not query_words:
+                return 0.0
+            
+            score = 0.0
+            
+            # 1. Title relevance (40% weight) - very important
+            title_matches = sum(1 for word in query_words if word in title_lower)
+            title_score = (title_matches / len(query_words)) * 100 if query_words else 0
+            score += title_score * 0.40
+            
+            # 2. Keyword density in body (35% weight)
+            body_words = re.findall(r'\\b\\w+\\b', body_lower)
+            if body_words:
+                keyword_count = sum(1 for word in body_words if word in query_words)
+                density = keyword_count / len(body_words)
+                # Non-linear: high density rewards are capped
+                density_score = min(density * 150, 100)  
+                score += density_score * 0.35
+            
+            # 3. Phrase matching bonus (25% weight) - if keywords appear together
+            phrase_bonus = 0
+            for i in range(len(query_words) - 1):
+                phrase = f'{query_words[i]} {query_words[i+1]}'
+                if phrase in body_lower or phrase in title_lower:
+                    phrase_bonus += 15
+            phrase_bonus = min(phrase_bonus, 100)
+            score += phrase_bonus * 0.25
+            
+            # Cap at 100% and round
+            return min(score, 100.0)
+        
         def run_search():
             try:
-                # Provide a small timeout for the search itself
                 ddgs_instance = DDGS(timeout=5)
-                return list(ddgs_instance.text(query, max_results=5))
+                return list(ddgs_instance.text(query, max_results=8))  # Get more to filter
             except Exception as e:
                 print(f"[chat] DDGS error: {e}")
                 return []
@@ -216,34 +258,49 @@ async def web_search(query: str, timeout: float = 10.0) -> tuple:
             results = await asyncio.wait_for(asyncio.to_thread(run_search), timeout=timeout)
         except asyncio.TimeoutError:
             print(f"[chat] Web search timed out after {timeout}s")
-            return "", "", "timeout"
+            return "", [], "timeout"
         
-        snippets = []
-        sources = []
+        sources_list = []
         for r in results:
             body = r.get("body", "").strip()
             url = r.get("href", "")
             title = r.get("title", "")
             if body:
-                # Combine title and body for better context
-                snippet = f"{title}: {body}" if title else body
-                snippets.append(snippet)
-                if url:
-                    sources.append(url)
+                # Calculate relevance score
+                relevance = calculate_relevance(query, title, body)
+                
+                # Filter out low relevance results (< 20% with new algorithm)
+                if relevance < 20.0:
+                    print(f"[chat] Skipping low-relevance result: {title[:50]}... (score: {relevance:.1f}%)")
+                    continue
+                
+                print(f"[chat] Result: {title[:50]}... (relevance: {relevance:.1f}%)")
+                
+                # Store detailed source info with relevance
+                sources_list.append({
+                    "url": url,
+                    "title": title,
+                    "text_preview": body[:150] + "..." if len(body) > 150 else body,
+                    "relevance_score": round(relevance, 1)
+                })
         
-        print(f"[chat] DDGS retrieved {len(snippets)} snippets from {len(results)} results")
-        if snippets:
-            combined = "\n\n".join(snippets[:5])  # Take up to 5 snippets
-            main_source = sources[0] if sources else "Web Search"
-            return combined, main_source, None
+        # Sort by relevance score descending
+        sources_list.sort(key=lambda x: x["relevance_score"], reverse=True)
         
-        print(f"[chat] DDGS returned results but no body content extracted")
-        return "", "", None
+        print(f"[chat] DDGS retrieved {len(sources_list)} relevant snippets (relevance >= 20%)")
+        if sources_list:
+            # Reconstruct snippets from sorted sources
+            snippets = [s["text_preview"].replace("...", "").strip() for s in sources_list[:5]]
+            combined = "\n\n".join(snippets)
+            return combined, sources_list[:5], None
+        
+        print(f"[chat] No relevant results found from DDGS")
+        return "", [], None
     except Exception as e:
         import traceback
         print(f"[chat] Web search failed with Exception: {type(e).__name__}: {e}")
         traceback.print_exc()
-        return "", "", "unavailable"
+        return "", [], "unavailable"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -356,7 +413,7 @@ async def ask_question(
         # STEP 4: Web search fallback if no local context
         if not context or len(context) < 100:
             print(f"[chat] No sufficient local context ({len(context)} chars), trying web search...")
-            web_snippet, web_source, web_error = await web_search(request.message, timeout=10.0)
+            web_snippet, web_sources, web_error = await web_search(request.message, timeout=10.0)
             if web_error == "timeout":
                 context = "[DDG is slow but searching... please wait]"
                 snippet_sources = ["Web: DuckDuckGo (searching)"]
@@ -365,15 +422,19 @@ async def ask_question(
                 snippet_sources = ["Web Search: Unavailable"]
             elif web_snippet:
                 context = web_snippet
-                snippet_sources = [f"Web: {web_source}"]
-                detailed_sources = [{
-                    "text_preview": web_snippet[:100] + "...",
-                    "position": 0,
-                    "score": 100,
-                    "lecture_id": 0,
-                    "is_web": True,
-                    "url": web_source
-                }]
+                snippet_sources = [s["url"] for s in web_sources if s.get("url")] or ["Web Search"]
+                detailed_sources = [
+                    {
+                        "text_preview": s["text_preview"],
+                        "position": 0,
+                        "score": s["relevance_score"],
+                        "lecture_id": 0,
+                        "is_web": True,
+                        "url": s["url"],
+                        "title": s["title"]
+                    }
+                    for s in web_sources
+                ]
                 
         # STEP 5: Build mode-specific prompt for informational queries
         if not context:
@@ -400,7 +461,7 @@ async def ask_question(
         # Checking if local context didn't have the answer
         if response.strip().lower() in ["i don't know", "i don't know.", '"i don\'t know."']:
             print(f"[chat] LLM responded 'I don't know' using local context. Trying web search...")
-            web_snippet, web_source, web_error = await web_search(request.message, timeout=10.0)
+            web_snippet, web_sources, web_error = await web_search(request.message, timeout=10.0)
             print(f"[chat] web_snippet fetched length: {len(web_snippet)}, error: {web_error}")
             if web_error == "timeout":
                 response = "DuckDuckGo is taking a while to search... Could you try rephrasing your question or check your internet connection?"
@@ -411,15 +472,19 @@ async def ask_question(
             elif web_snippet:
                 # Override context and prompt for web search retry
                 context = web_snippet
-                snippet_sources = [f"Web: {web_source}"]
-                detailed_sources = [{
-                    "text_preview": web_snippet[:100] + "...",
-                    "position": 0,
-                    "score": 100,
-                    "lecture_id": 0,
-                    "is_web": True,
-                    "url": web_source
-                }]
+                snippet_sources = [s["url"] for s in web_sources if s.get("url")] or ["Web Search"]
+                detailed_sources = [
+                    {
+                        "text_preview": s["text_preview"],
+                        "position": 0,
+                        "score": s["relevance_score"],
+                        "lecture_id": 0,
+                        "is_web": True,
+                        "url": s["url"],
+                        "title": s["title"]
+                    }
+                    for s in web_sources
+                ]
                 prompt = build_mode_prompt(context, request.message, request.ai_mode, request.output_format, is_web_search=True)
                 
                 # Ask LLM again with web snippet as context

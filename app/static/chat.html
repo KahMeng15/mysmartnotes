@@ -1355,21 +1355,22 @@
                         }
 
                         const sourceLinks = msg.detailed_sources.map((src, si) => {
+                            const score = src.score ? ` (${src.score}% match)` : '';
                             if (src.is_web) {
                                 return `
                                     <div class="source-item" onclick="window.open('${src.url}', '_blank')"
                                          style="cursor:pointer;padding:6px 10px;margin:4px 0;background:white;border:1px solid #e0e0e0;border-radius:4px;transition:all 0.2s;font-size:11px;">
                                         <div style="font-weight:600;color:#1976d2;margin-bottom:2px;">
-                                            <i class="ph ph-globe"></i> Web Reference
+                                            <i class="ph ph-globe"></i> Web Reference${score}
                                         </div>
                                         <div style="color:#666;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                                             ${src.url}
                                         </div>
+                                        <div style="color:#999;font-size:9px;margin-top:2px;">${src.title || ''}</div>
                                     </div>`;
                             }
 
                             const lectureId = src.lecture_id || currentScope.id;
-                            const score = src.score ? ` (${src.score}% match)` : '';
                             const preview = src.text_preview || 'View reference';
                             return `
                                 <div class="source-item" onclick="openSourceReference(${lectureId}, ${src.position || 0})"
