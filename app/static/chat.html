@@ -1429,8 +1429,7 @@
                         </div>`;
                 }
 
-                const timeStr = (msg.time instanceof Date ? msg.time : new Date(msg.time))
-                    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const timeStr = formatMessageTime(msg.time instanceof Date ? msg.time : new Date(msg.time));
 
                 return `
                 <div class="message ${msg.role}">
@@ -1467,10 +1466,12 @@
                 return;
             }
 
-            // Group by date
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-            const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+            // Group by date (using device's local timezone)
+            const today = getDateInTimezone(new Date());
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            const weekAgo = new Date(today);
+            weekAgo.setDate(today.getDate() - 7);
 
             const groups = { 'Pinned': [], 'Today': [], 'Yesterday': [], 'This Week': [], 'Earlier': [] };
             conversations.forEach(c => {
@@ -1478,7 +1479,7 @@
                     groups['Pinned'].push(c);
                     return;
                 }
-                const d = new Date(c.last_message_at); d.setHours(0, 0, 0, 0);
+                const d = getDateInTimezone(parseUTCDate(c.last_message_at));
                 if (d >= today) groups['Today'].push(c);
                 else if (d >= yesterday) groups['Yesterday'].push(c);
                 else if (d >= weekAgo) groups['This Week'].push(c);
@@ -1494,8 +1495,8 @@
                 html += `<div class="date-group-label">${groupName}</div>`;
                 items.forEach(c => {
                     const isActive = c.conversation_id === currentConversationId;
-                    const d = new Date(c.last_message_at);
-                    const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                    const d = parseUTCDate(c.last_message_at);
+                    const dateStr = formatMessageDateAndTime(d);
                     const icon = scopeIcon[c.scope_type] || 'ph-chat-circle';
                     const scope = scopeLabel[c.scope_type] || '';
                     const msgWord = c.message_count === 1 ? 'msg' : 'msgs';
@@ -1598,13 +1599,13 @@
                     conversationMessages.push({
                         role: 'user',
                         content: m.message,
-                        time: new Date(m.created_at),
+                        time: parseUTCDate(m.created_at),
                         ai_mode: m.ai_mode,
                     });
                     conversationMessages.push({
                         role: 'ai',
                         content: m.response,
-                        time: new Date(m.created_at),
+                        time: parseUTCDate(m.created_at),
                         ai_mode: m.ai_mode,
                         ai_model: m.ai_model || null,
                         sources: m.sources || [],
@@ -1641,7 +1642,7 @@
                 document.getElementById('chatTitle').textContent = hierarchyTitle;
                 document.getElementById('chatSubtitle').textContent = breadcrumb || 'Ask questions about your notes, subjects, or groups';
                 document.getElementById('chatMeta').textContent =
-                    `${msgs.length} question(s)  |  Started ${new Date(first.created_at).toLocaleDateString()}`;
+                    `${msgs.length} question(s)  |  Started ${formatMessageDate(parseUTCDate(first.created_at))}`;
                 document.getElementById('chatMeta').style.display = 'block';
 
                 displayMessages();
@@ -1653,6 +1654,70 @@
         // ── Utility ───────────────────────────────────────────────────────
         function formatEscaped(str) {
             return (str || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function parseUTCDate(dateString) {
+            // Backend sends naive UTC strings without 'Z' suffix
+            // Treat them as UTC by appending 'Z' if not present
+            if (typeof dateString === 'string' && !dateString.endsWith('Z')) {
+                dateString = dateString + 'Z';
+            }
+            return new Date(dateString);
+        }
+
+        function formatMessageTime(date) {
+            if (!(date instanceof Date)) {
+                date = new Date(date);
+            }
+            
+            // Use device's native local timezone (don't specify timeZone)
+            const timeStr = date.toLocaleString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            return timeStr;
+        }
+
+        function formatMessageDate(date, options = {}) {
+            if (!(date instanceof Date)) {
+                date = new Date(date);
+            }
+            
+            const defaultOptions = {
+                month: 'short',
+                day: 'numeric'
+            };
+            
+            const finalOptions = { ...defaultOptions, ...options };
+            const dateStr = date.toLocaleDateString([], finalOptions);
+            
+            return dateStr;
+        }
+
+        function formatMessageDateAndTime(date) {
+            if (!(date instanceof Date)) {
+                date = new Date(date);
+            }
+            
+            // Use device's native local timezone
+            const dateStr = date.toLocaleString([], {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            return dateStr;
+        }
+
+        function getDateInTimezone(date) {
+            if (!(date instanceof Date)) {
+                date = new Date(date);
+            }
+            // Get midnight of the date in device's local timezone
+            const localDateStr = date.toLocaleDateString('en-CA');
+            return new Date(localDateStr + 'T00:00:00');
         }
 
         function openSourceReference(lectureId, position) {
@@ -1710,13 +1775,51 @@
 
         async function deleteConv(e, convId) {
             e.stopPropagation();
-            if (!confirm('Are you sure you want to delete this entire conversation?')) return;
+            showDeleteConfirmModal(() => {
+                performDeleteConv(convId);
+            });
+        }
+
+        async function performDeleteConv(convId) {
             try {
                 await fetch(`/chat/conversations/${convId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
                 if (currentConversationId === convId) createNewChat();
                 await fetchConversations();
             } catch (err) { console.error(err); }
         }
+
+        function showDeleteConfirmModal(onConfirm) {
+            let modal = document.getElementById('deleteConfirmModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'deleteConfirmModal';
+                modal.className = 'modal';
+                modal.innerHTML = `
+                    <div class="modal-content" style="min-height: auto;">
+                        <h3>Delete Conversation?</h3>
+                        <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray);">Are you sure you want to delete this entire conversation? This action cannot be undone.</p>
+                        <div class="modal-buttons">
+                            <button type="button" class="btn-save" style="background: var(--color-error);" onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='var(--color-error)'" onclick="confirmDeleteConv()">Delete</button>
+                            <button type="button" class="btn-cancel" onclick="cancelDeleteConv()">Cancel</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+            modal.classList.add('active');
+            window._deleteConfirmCallback = onConfirm;
+        }
+
+        window.confirmDeleteConv = function() {
+            const modal = document.getElementById('deleteConfirmModal');
+            if (modal) modal.classList.remove('active');
+            if (window._deleteConfirmCallback) window._deleteConfirmCallback();
+        };
+
+        window.cancelDeleteConv = function() {
+            const modal = document.getElementById('deleteConfirmModal');
+            if (modal) modal.classList.remove('active');
+        };
 
         async function exportConv(e, convId) {
             e.stopPropagation();
