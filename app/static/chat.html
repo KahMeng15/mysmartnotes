@@ -73,6 +73,7 @@
             display: flex;
             gap: var(--spacing-md);
             max-width: 80%;
+            position: relative;
         }
 
         .message.user {
@@ -80,11 +81,166 @@
             flex-direction: row-reverse;
         }
 
+        .message-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+            z-index: 10;
+            box-shadow: none;
+        }
+
+        .message:hover .message-actions {
+            display: flex;
+        }
+
+        .message.user .message-actions {
+            right: 8px;
+            left: auto;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px 4px;
+            color: var(--color-gray);
+            transition: all 0.2s;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+        }
+
+        .action-btn:hover {
+            color: var(--color-primary);
+            background: rgba(78, 205, 196, 0.1);
+            transform: scale(1.15);
+        }
+
+        .reply-indicator {
+            background: var(--color-background);
+            border-left: 4px solid var(--color-primary);
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+            font-size: var(--font-size-sm);
+            animation: slideUp 0.2s ease-out;
+            box-shadow: 0 2px 6px rgba(78, 205, 196, 0.15);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .reply-indicator-header {
+            font-weight: 600;
+            color: var(--color-primary);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .reply-indicator-content {
+            color: var(--color-gray);
+            font-size: var(--font-size-xs);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            padding: 4px 0;
+            font-style: italic;
+            background: rgba(0,0,0,0.02);
+            padding: 6px 8px;
+            border-radius: 4px;
+        }
+
+        .close-reply-btn {
+            background: none;
+            border: none;
+            color: var(--color-gray);
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: auto;
+            padding: 0;
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .close-reply-btn:hover {
+            color: var(--color-primary);
+        }
+
+        /* WhatsApp-style reply in message bubble */
+        .message-reply-quote {
+            background: rgba(78, 205, 196, 0.08);
+            border-left: 3px solid var(--color-primary);
+            padding: 8px 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            font-size: var(--font-size-xs);
+        }
+
+        .message-reply-quote-author {
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: 2px;
+            display: block;
+        }
+
+        .message-reply-quote-text {
+            color: var(--color-gray);
+            white-space: normal;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+        }
+
+        /* Highlight replied message */
+        .message.highlighted-for-reply {
+            background: rgba(78, 205, 196, 0.1);
+            border-left: 3px solid var(--color-primary) !important;
+            border-radius: var(--radius-lg);
+            animation: highlight 0.5s ease-out;
+        }
+
+        @keyframes highlight {
+            from {
+                background: rgba(78, 205, 196, 0.3);
+            }
+            to {
+                background: rgba(78, 205, 196, 0.1);
+            }
+        }
+
         .message-content {
             padding: var(--spacing-md) var(--spacing-lg);
             border-radius: var(--radius-lg);
             word-wrap: break-word;
             line-height: 1.5;
+            position: relative;
         }
 
         .message.ai .message-content {
@@ -215,6 +371,173 @@
             border-color: #1976d2 !important;
             transform: translateX(4px);
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Wikipedia-style reference links */
+        .reference-link {
+            display: inline;
+            font-size: 0.75em !important;
+            vertical-align: super;
+            color: #0645ad;
+            cursor: pointer;
+            text-decoration: none;
+            padding: 0 1px;
+            position: relative;
+            transition: color 0.2s;
+        }
+
+        .reference-link:hover {
+            color: #3366bb;
+            text-decoration: underline;
+        }
+
+        .reference-tooltip {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            border: 1px solid #bbb;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 11px;
+            color: #333;
+            white-space: nowrap;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            margin-bottom: 4px;
+        }
+
+        .reference-link:hover .reference-tooltip {
+            display: block;
+        }
+
+        /* References section at end of AI messages */
+        .references-section {
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .references-section-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: #333;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .reference-item {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 4px;
+            padding: 4px 0;
+            font-size: 11px;
+        }
+
+        .reference-item-number {
+            color: #0645ad;
+            font-weight: 600;
+            min-width: 14px;
+        }
+
+        .reference-item-text {
+            color: #666;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        .reference-item-text:hover {
+            color: #333;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        /* Citation links in message text */
+        .citation-link {
+            display: inline;
+            font-size: 0.75em;
+            vertical-align: super;
+            color: #0645ad;
+            cursor: pointer;
+            text-decoration: none;
+            padding: 0 2px;
+            font-weight: 600;
+            transition: all 0.2s;
+            border-radius: 2px;
+        }
+
+        .citation-link:hover {
+            color: #fff;
+            background-color: #0645ad;
+            padding: 0 3px;
+        }
+
+        .citation-link.highlighted {
+            color: #fff;
+            background-color: #1976d2;
+            padding: 0 3px;
+            animation: highlightPulse 0.4s ease-out;
+        }
+
+        @keyframes highlightPulse {
+            0% {
+                background-color: #ffeb3b;
+                color: #333;
+            }
+            100% {
+                background-color: #1976d2;
+                color: #fff;
+            }
+        }
+
+        /* Expanded sources section */
+        .sources-section {
+            margin-top: 10px;
+            padding: 8px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            display: block !important;
+        }
+
+        .source-item {
+            cursor: pointer;
+            padding: 8px 10px;
+            margin: 6px 0;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            transition: all 0.2s;
+            font-size: 11px;
+        }
+
+        .source-item:hover {
+            background: #e3f2fd;
+            border-color: #1976d2;
+            transform: translateX(4px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .source-item.highlighted-source {
+            background: #1976d2;
+            border-color: #1976d2;
+            color: white;
+        }
+
+        .source-item.highlighted-source > div {
+            color: white;
+        }
+
+        .reference-item-text:hover {
+            color: #333;
+            text-decoration: underline;
+            cursor: pointer;
         }
 
         .chat-input-form button {
@@ -885,6 +1208,8 @@
         let conversations = [];          // List of ConversationSummary from API
         let currentConversationId = null;// UUID of the active conversation (null = new)
         let isViewingHistory = false;    // true when browsing a past conversation (read-only)
+        window.replyingToMessageId = null; // Index of message being replied to
+        window.replyingToMessageContent = null; // Content of message being replied to
 
         let allGroups = [];
         let allSubjects = [];
@@ -1227,9 +1552,26 @@
                 currentConversationId = generateUUID();
             }
 
+            // Capture reply info before clearing
+            const replyInfo = window.replyingToMessageId !== null && window.replyingToMessageId !== undefined ? {
+                id: window.replyingToMessageId,
+                content: window.replyingToMessageContent
+            } : null;
+
             // Add user message to local state
-            conversationMessages.push({ role: 'user', content: message, time: new Date(), ai_mode: currentAiMode });
+            const userMsg = { 
+                role: 'user', 
+                content: message, 
+                time: new Date(), 
+                ai_mode: currentAiMode,
+                replyTo: replyInfo  // Include reply information
+            };
+            conversationMessages.push(userMsg);
             input.value = '';
+            
+            // Clear reply indicator after sending
+            clearReply();
+            
             displayMessages();
 
             // Loading bubble
@@ -1245,6 +1587,7 @@
                 ai_mode: currentAiMode,
                 output_format: currentOutputFormat,
                 conversation_id: currentConversationId,
+                auto_detect_conversation: true,  // Enable auto-detection
             };
             if (currentScope.type === 'note') payload.lecture_id = parseInt(currentScope.id);
             else if (currentScope.type === 'subject') payload.subject_id = parseInt(currentScope.id);
@@ -1274,7 +1617,7 @@
                         timings: data.timings,
                     });
 
-                    // Update conversation ID (backend may have confirmed it)
+                    // Update conversation ID (backend may have confirmed it or changed it)
                     if (data.conversation_id) currentConversationId = data.conversation_id;
 
                     // Update meta with question count
@@ -1298,6 +1641,21 @@
             displayMessages();
         }
 
+        // ── Reply Functions ───────────────────────────────────────────────
+        function setReply(messageIndex) {
+            const msg = conversationMessages[messageIndex];
+            window.replyingToMessageId = messageIndex;
+            window.replyingToMessageContent = msg.content.replace(/<[^>]*>/g, '').substring(0, 100); // Strip HTML and limit length
+            displayMessages();
+            document.getElementById('messageInput').focus();
+        }
+
+        function clearReply() {
+            window.replyingToMessageId = null;
+            window.replyingToMessageContent = null;
+            displayMessages();
+        }
+
         // ── Display Messages ──────────────────────────────────────────────
         function displayMessages() {
             const container = document.getElementById('messagesContainer');
@@ -1313,10 +1671,35 @@
                 return;
             }
 
-            container.innerHTML = conversationMessages.map((msg, idx) => {
+            // Build reply indicator if replying to a specific message
+            let replyIndicatorHTML = '';
+            if (window.replyingToMessageId !== null && window.replyingToMessageId !== undefined) {
+                const replyMsg = conversationMessages[window.replyingToMessageId];
+                if (replyMsg) {
+                    const replyPreview = replyMsg.content.substring(0, 50).replace(/<[^>]*>/g, '') + (replyMsg.content.length > 50 ? '...' : '');
+                    replyIndicatorHTML = `
+                        <div class="reply-indicator">
+                            <div class="reply-indicator-header">
+                                <i class="ph ph-arrow-bend-up-right"></i>
+                                Replying to ${replyMsg.role === 'user' ? 'your message' : 'AI'}
+                                <button class="close-reply-btn" onclick="clearReply()">
+                                    <i class="ph ph-x"></i>
+                                </button>
+                            </div>
+                            <div class="reply-indicator-content">"${replyPreview}"</div>
+                        </div>`;
+                }
+            }
+
+            let messagesHTML = conversationMessages.map((msg, idx) => {
                 let contentHTML = msg.content;
+                let referencesHTML = '';
                 if (msg.role === 'ai' && !msg.loading && typeof marked !== 'undefined') {
                     try { contentHTML = marked.parse(contentHTML); } catch (e) { }
+                    // Parse citations in the response if there are sources
+                    if (msg.detailed_sources && msg.detailed_sources.length > 0) {
+                        contentHTML = parseCitations(contentHTML);
+                    }
                 }
 
                 // AI mode badge (will be moved to metadata section)
@@ -1357,13 +1740,14 @@
                         }
 
                         const sourceLinks = msg.detailed_sources.map((src, si) => {
+                            const citationNum = si + 1;
                             const score = src.score ? ` (${src.score}% match)` : '';
                             if (src.is_web) {
                                 return `
                                     <div class="source-item" onclick="window.open('${src.url}', '_blank')"
                                          style="cursor:pointer;padding:6px 10px;margin:4px 0;background:white;border:1px solid #e0e0e0;border-radius:4px;transition:all 0.2s;font-size:11px;">
                                         <div style="font-weight:600;color:#1976d2;margin-bottom:2px;">
-                                            <i class="ph ph-globe"></i> Web Reference${score}
+                                            <i class="ph ph-globe"></i> [${citationNum}] Web Reference${score}
                                         </div>
                                         <div style="color:#666;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                                             ${src.url}
@@ -1378,7 +1762,7 @@
                                 <div class="source-item" onclick="openSourceReference(${lectureId}, ${src.position || 0})"
                                      style="cursor:pointer;padding:6px 10px;margin:4px 0;background:white;border:1px solid #e0e0e0;border-radius:4px;transition:all 0.2s;font-size:11px;">
                                     <div style="font-weight:600;color:#1976d2;margin-bottom:2px;">
-                                        <i class="ph ph-file-text"></i> Reference ${si + 1}${score}
+                                        <i class="ph ph-file-text"></i> [${citationNum}] Reference${score}
                                     </div>
                                     <div style="color:#666;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                                         "${preview}"
@@ -1431,9 +1815,35 @@
 
                 const timeStr = formatMessageTime(msg.time instanceof Date ? msg.time : new Date(msg.time));
 
+                // WhatsApp-style reply quote
+                let replyQuoteHTML = '';
+                if (msg.replyTo && msg.role === 'user') {
+                    const replyAuthor = msg.replyTo.id !== undefined ? (conversationMessages[msg.replyTo.id]?.role === 'user' ? 'You' : 'AI') : 'Unknown';
+                    const replyText = msg.replyTo.content?.substring(0, 60).replace(/<[^>]*>/g, '') || 'Replied message';
+                    replyQuoteHTML = `
+                        <div class="message-reply-quote">
+                            <span class="message-reply-quote-author">↳ ${replyAuthor}</span>
+                            <span class="message-reply-quote-text">"${replyText}${(msg.replyTo.content?.length || 0) > 60 ? '...' : ''}"</span>
+                        </div>`;
+                }
+
+                // Check if this message is the one being replied to
+                const isHighlightedForReply = (window.replyingToMessageId === idx) ? ' highlighted-for-reply' : '';
+
+                // Reply button only for non-loading messages
+                let actionsHTML = '';
+                if (!msg.loading && !isViewingHistory) {
+                    actionsHTML = `
+                        <button class="action-btn" title="Reply to this message" onclick="setReply(${idx})">
+                            <i class="ph ph-arrow-bend-up-right"></i>
+                        </button>`;
+                }
+
                 return `
-                <div class="message ${msg.role}">
+                <div class="message ${msg.role}${isHighlightedForReply}">
                     <div class="message-content">
+                        ${actionsHTML ? `<div class="message-actions">${actionsHTML}</div>` : ''}
+                        ${replyQuoteHTML}
                         ${thinkingHTML}
                         ${contentHTML}
                         ${metadataHTML}
@@ -1442,6 +1852,8 @@
                 </div>`;
             }).join('');
 
+            // Combine reply indicator and messages
+            container.innerHTML = replyIndicatorHTML + messagesHTML;
             container.scrollTop = container.scrollHeight;
         }
 
@@ -1665,6 +2077,58 @@
             return new Date(dateString);
         }
 
+        function convertSnippetReferencesToWikipediaStyle(content) {
+            // Look for bracketed text (potential snippet references)
+            // Pattern: [ arbitrary text with or without quotes ]
+            const bracketPattern = /\[([^\]]*)\]/g;
+            const references = [];
+            const matches = [];
+            
+            // Find all bracketed content
+            let match;
+            while ((match = bracketPattern.exec(content)) !== null) {
+                const bracketedText = match[1].trim();
+                // Only treat as reference if it's substantial text (not just numbers)
+                if (bracketedText.length > 3 && !/^\d+$/.test(bracketedText)) {
+                    matches.push({ full: match[0], text: bracketedText, index: match.index });
+                }
+            }
+            
+            // Replace all bracketed snippets with superscript numbers
+            let convertedContent = content;
+            let offset = 0;
+            matches.forEach((match, idx) => {
+                const refNum = idx + 1;
+                const replacement = `<span class="reference-link">[${refNum}]</span>`;
+                const startPos = match.index + offset;
+                const endPos = startPos + match.full.length;
+                convertedContent = convertedContent.substring(0, startPos) + replacement + convertedContent.substring(endPos);
+                offset += replacement.length - match.full.length;
+                
+                // Clean up the text for display
+                let refText = match.text.replace(/^"|"$/g, '').replace(/\.\.\.$/, '').trim();
+                if (refText.length > 80) refText = refText.substring(0, 80) + '...';
+                references.push({ num: refNum, text: refText });
+            });
+            
+            // Build references section if any found
+            let referencesHTML = '';
+            if (references.length > 0) {
+                referencesHTML = `
+                    <div class="references-section">
+                        <div class="references-section-title">References</div>
+                        ${references.map(ref => `
+                            <div class="reference-item">
+                                <span class="reference-item-number">[${ref.num}]</span>
+                                <span class="reference-item-text">${ref.text}</span>
+                            </div>
+                        `).join('')}
+                    </div>`;
+            }
+            
+            return { content: convertedContent, referencesHTML };
+        }
+
         function formatMessageTime(date) {
             if (!(date instanceof Date)) {
                 date = new Date(date);
@@ -1843,6 +2307,78 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             } catch (err) { console.error(err); }
+        }
+
+        // ── Citation Parsing & Rendering ──────────────────────────────────
+        function parseCitations(text) {
+            /**
+             * Parse text with [1], [2], etc. citations and convert them to clickable links.
+             * Returns HTML with citations as clickable spans.
+             */
+            // Pattern to match [1], [2], etc.
+            const citationPattern = /\[(\d+)\]/g;
+            let converted = text;
+            
+            converted = converted.replace(citationPattern, (match, num) => {
+                return `<span class="citation-link" data-citation-num="${num}" onclick="handleCitationClick(event, ${num})">[${num}]</span>`;
+            });
+            
+            return converted;
+        }
+
+        function handleCitationClick(event, citationNum) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Find the corresponding source item in the same message
+            const messageContent = event.target.closest('.message-content');
+            if (!messageContent) return;
+            
+            const message = messageContent.closest('.message');
+            if (!message) return;
+            
+            // Find all source items in this message's metadata
+            const sourceItems = message.querySelectorAll('.source-item');
+            if (citationNum > 0 && citationNum <= sourceItems.length) {
+                const targetSource = sourceItems[citationNum - 1];
+                
+                // Trigger the source item's onclick behavior
+                // Check if it's a web source or note source by examining the onclick or data attributes
+                const onclickAttr = targetSource.getAttribute('onclick');
+                if (onclickAttr) {
+                    // Execute the onclick handler
+                    eval(onclickAttr);
+                } else {
+                    // Fallback: scroll to highlight
+                    highlightCitation(event, citationNum);
+                }
+            }
+        }
+
+        function highlightCitation(event, citationNum) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            // Remove previous highlights
+            document.querySelectorAll('.citation-link.highlighted, .source-item.highlighted-source').forEach(el => {
+                el.classList.remove('highlighted', 'highlighted-source');
+            });
+            
+            // Highlight the clicked citation
+            const clickedCitation = event.target;
+            if (clickedCitation.classList.contains('citation-link')) {
+                clickedCitation.classList.add('highlighted');
+            }
+            
+            // Find and highlight the corresponding source (nth-child starts at 1)
+            const sourceItems = document.querySelectorAll('.source-item');
+            if (citationNum > 0 && citationNum <= sourceItems.length) {
+                const targetSource = sourceItems[citationNum - 1];
+                targetSource.classList.add('highlighted-source');
+                
+                // Scroll the source into view
+                targetSource.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         }
 
     </script>

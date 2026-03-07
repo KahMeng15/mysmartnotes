@@ -30,6 +30,8 @@ class ChatRequest(BaseModel):
     ai_mode: str = "elaborate"
     output_format: str = "sentence"
     conversation_id: Optional[str] = None
+    auto_detect_conversation: bool = True  # Auto-detect if this is a conversation continuation
+    reply_to_message_id: Optional[int] = None  # Reply to a specific message in conversation
 
 
 class ChatMessageResponse(BaseModel):
@@ -96,31 +98,32 @@ OUTPUT_FORMATS = {
 }
 
 _BASE_GUARD = (
-    "Answer ONLY using the provided context. "
-    "If the answer is NOT found in the context, respond with exactly: \"I don't know.\" "
-    "Do NOT make up facts or invent information."
+    "CRITICAL: Answer ONLY using the provided context. "
+    "If the answer is NOT found in the context, respond with EXACTLY: \"I don't know.\" "
+    "Do NOT make up facts, hallucinate information, or guess. "
+    "Never provide information outside the provided context."
 )
 
 
-def build_mode_prompt(context: str, question: str, mode: str, output_format: str = "sentence", is_web_search: bool = False) -> str:
+def build_mode_prompt(context: str, question: str, mode: str, output_format: str = "sentence", is_web_search: bool = False, conversation_context: str = "") -> str:
     """Return the full system prompt based on AI mode and output format."""
     if question.strip().lower() in {"hi", "hello", "how are you", "how are you?"}:
         return f"You are a friendly assistant. Respond warmly to: '{question}'"
 
-    # Base mode instructions
+    # Base mode instructions with STRICTER constraints
     mode_instructions = {
-        "quick": "You are a concise assistant providing brief, focused answers using only the provided context.",
-        "simple": "You are a clear communicator who makes complex ideas easy to understand using plain, everyday language. Avoid technical jargon.",
-        "elaborate": "You are a knowledgeable and helpful assistant providing thorough, clear, and well-structured explanations.",
-        "eli5": "You are a patient, friendly teacher explaining to a 5-year-old child using very simple words, short sentences, and relatable everyday analogies.",
+        "quick": "You are a concise assistant. Extract the most important facts from the context. Be specific and factual. If context lacks details, say 'I don't know.'",
+        "simple": "Explain using ONLY the provided context. Use plain, everyday language. Avoid jargon. If unclear in context, say 'I don't know.'",
+        "elaborate": "Provide thorough, well-structured explanations grounded in the context. Be detailed but accurate. Never assume facts not in context.",
+        "eli5": "Explain like to a 5-year-old using ONLY context material. Use short sentences and relatable analogies from the context only.",
     }
 
     # Output format instructions
     output_instructions = {
-        "sentence": "Respond as a single paragraph or a few flowing sentences.",
-        "pointform": "Format your answer as a bullet-pointed list (using - or •). Each point should be clear and concise.",
-        "numbered_list": "Format your answer as a numbered list (1. 2. 3. etc.) with clear, well-organized points.",
-        "table": "Format your answer as a markdown table. Use this structure:\n| Column 1 | Column 2 |\n|----------|----------|\n| data     | data     |\n\nCreate logical column headers based on the question content.",
+        "sentence": "Respond as 1-3 clear sentences.",
+        "pointform": "Use bullet points (- or •). 3-5 points. Keep each point short and factual.",
+        "numbered_list": "Use numbered format (1. 2. 3.). 3-7 items. Be concise and specific.",
+        "table": "Create markdown table with 2-3 relevant columns based on the context content.",
     }
 
     mode_inst = mode_instructions.get(mode, mode_instructions["elaborate"])
@@ -129,26 +132,46 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
     guard = _BASE_GUARD
     if is_web_search:
         guard = (
-            "You are answering using snippets obtained from a web search. "
-            "Ignore any irrelevant information in the snippets. "
-            "If the answer is NOT found in the snippets, respond with exactly: \"I don't know.\" "
-            "Do NOT make up facts or invent information."
+            "CRITICAL: Answer using ONLY the web search snippets provided. "
+            "Do NOT add external knowledge. "
+            "If the answer is NOT found in snippets, respond with EXACTLY: \"I don't know.\" "
+            "Never hallucinate or guess."
         )
 
     prompt = f"""{mode_inst}
+
 {guard}
 
 {output_inst}
 
-Do NOT include introductory phrases like "Here's what...", "Based on the information provided:", "Let me explain:", or similar. Answer directly and get straight to the point.
+RULES:
+- NO introductory phrases like "Based on...", "Let me explain...", "Here's what..."
+- Answer directly and concisely
+- PARAPHRASE the context in your own words—do NOT copy-paste source text
+- Do NOT include quotes or brackets 
+- Do NOT include author names or dates in the answer
+- Simply answer naturally; numerical citations [1], [2], etc. will be added automatically
+- If uncertain, say "I don't know"
+- Never add information outside the provided context
+- Check facts twice before responding
+"""
 
-Context:
+    if conversation_context:
+        prompt += f"""
+PREVIOUS CONVERSATION (for context):
+{conversation_context}
+
+Use this to understand the discussion, but focus on the current question.
+"""
+
+    prompt += f"""
+CONTEXT:
 {context}
 
-Question: {question}
+QUESTION: {question}
 
-Answer:"""
-
+ANSWER (be accurate and honest):"""
+    
     return prompt
 
 
@@ -172,6 +195,73 @@ async def classify_query(client: AIClient, question: str) -> str:
         return "INFORMATIONAL"
     except Exception:
         return "INFORMATIONAL"  # Default to informational if classification fails
+
+
+async def is_conversation_continuation(
+    client: AIClient, 
+    current_question: str, 
+    last_question: Optional[str],
+    last_answer: Optional[str]
+) -> bool:
+    """Determine if the current question is a follow-up/continuation of the last conversation.
+    
+    Returns True if the question appears to be directly related to the last exchange.
+    Examples:
+    - Last: "What is photosynthesis?" → Current: "How does it work?" → True
+    - Last: "Explain gravity" → Current: "Tell me about physics" → False (likely new topic)
+    """
+    if not last_question or not last_answer:
+        return False  # No previous context = new conversation
+    
+    prompt = f"""Determine if the CURRENT question is a direct follow-up or continuation of the LAST Q&A exchange.
+
+LAST QUESTION: {last_question}
+LAST ANSWER (preview): {last_answer[:200]}...
+
+CURRENT QUESTION: {current_question}
+
+Is the CURRENT question a direct follow-up/continuation? Answer with EXACTLY ONE WORD: YES or NO.
+
+Examples of YES: 
+- Last: "What is photosynthesis?" → Current: "How does it work?" 
+- Last: "Explain gravity" → Current: "Can you give more examples?"
+- Last: "What's the capital of France?" → Current: "What about Germany?"
+
+Examples of NO:
+- Last: "What is photosynthesis?" → Current: "Tell me a joke"
+- Last: "Explain photosynthesis" → Current: "Explain gravity instead"
+- Last: "What's the weather?" → Current: "Unrelated question about cooking"
+"""
+    
+    try:
+        res = await asyncio.wait_for(
+            client.answer_question(question=current_question, context="", system_prompt=prompt),
+            timeout=3.0
+        )
+        res_upper = res.strip().upper()
+        return "YES" in res_upper
+    except Exception:
+        return False  # Default to new conversation if detection fails
+
+
+def build_conversation_context(messages: List[ChatMessage], max_messages: int = 3) -> str:
+    """Build formatted context from previous messages in the conversation.
+    
+    Returns a formatted string with the last N messages to include as context for the AI.
+    """
+    if not messages:
+        return ""
+    
+    # Get the last N messages (most recent)
+    recent_messages = messages[-max_messages:]
+    
+    context_parts = ["Previous conversation context:"]
+    for i, msg in enumerate(recent_messages, 1):
+        context_parts.append(f"\n[Message {i}]")
+        context_parts.append(f"Q: {msg.message}")
+        context_parts.append(f"A: {msg.response[:300]}...")  # Truncate long responses
+    
+    return "\n".join(context_parts)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -306,6 +396,111 @@ async def web_search(query: str, timeout: float = 10.0) -> tuple:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Citation Injection
+# ─────────────────────────────────────────────────────────────────────────────
+
+def inject_citations(response: str, detailed_sources: List[dict]) -> str:
+    """
+    Intelligently inject [1], [2], etc. citations into the response text.
+    
+    This function matches detailed_sources to relevant parts of the response
+    and injects citation markers at the end of sentences (not in the middle).
+    
+    Args:
+        response: AI-generated response text
+        detailed_sources: List of source dictionaries with text_preview, score, etc.
+    
+    Returns:
+        Response text with [1], [2], etc. citations injected
+    """
+    if not detailed_sources or not response:
+        return response
+    
+    import re
+    
+    # Split response into sentences, keeping track of positions
+    # Match sentences ending with . ! or ?
+    sentences = re.split(r'(?<=[.!?])\s+', response.strip())
+    if not sentences:
+        return response
+    
+    # Map each source to its best matching sentence
+    sentence_citations = {}  # {sentence_index: citation_number}
+    used_sources = set()
+    
+    for src_idx, source in enumerate(detailed_sources[:10]):  # Limit to 10 sources
+        if src_idx in used_sources:
+            continue
+            
+        citation_num = src_idx + 1
+        source_preview = source.get("text_preview", "").lower()
+        
+        if not source_preview or len(source_preview) < 3:
+            continue
+        
+        # Find the sentence with best keyword overlap with this source
+        best_sentence_idx = -1
+        best_overlap = 0
+        
+        for sent_idx, sentence in enumerate(sentences):
+            if sent_idx in sentence_citations:
+                continue  # Already cited this sentence
+            
+            sentence_lower = sentence.lower()
+            
+            # Extract key terms (words > 3 chars) from source, excluding common words
+            key_terms = [
+                w for w in re.findall(r'\b\w{3,}\b', source_preview) 
+                if w not in {'the', 'and', 'for', 'are', 'was', 'were', 'been', 'have', 'that', 'this', 'with', 'from', 'into', 'can', 'your', 'will', 'also'}
+            ]
+            
+            if not key_terms:
+                continue
+            
+            # Count how many key terms appear in the sentence
+            overlap = sum(1 for term in key_terms if term in sentence_lower)
+            
+            # Require at least 40% of key terms to match (improved threshold)
+            match_percentage = (overlap / len(key_terms)) * 100 if key_terms else 0
+            
+            if match_percentage >= 40 and overlap > best_overlap:
+                best_overlap = overlap
+                best_sentence_idx = sent_idx
+        
+        # If we found a matching sentence, add citation to it
+        if best_sentence_idx >= 0 and best_overlap > 0:
+            sentence_citations[best_sentence_idx] = citation_num
+            used_sources.add(src_idx)
+    
+    # If no sentences matched from content matching, cite the first few sentences
+    if not sentence_citations and detailed_sources:
+        for i in range(min(len(detailed_sources), min(3, len(sentences)))):
+            if i not in sentence_citations:
+                sentence_citations[i] = i + 1
+    
+    # Rebuild response with citations placed at the end of sentences
+    cited_sentences = []
+    for sent_idx, sentence in enumerate(sentences):
+        sentence = sentence.rstrip()  # Remove trailing whitespace
+        
+        # Check if this sentence should be cited
+        if sent_idx in sentence_citations:
+            citation_num = sentence_citations[sent_idx]
+            
+            # Find the period/punctuation at the end
+            if sentence and sentence[-1] in '.!?':
+                # Insert citation before the punctuation
+                sentence = sentence[:-1] + f" [{citation_num}]{sentence[-1]}"
+            else:
+                # No punctuation, just add at end
+                sentence = sentence + f" [{citation_num}]"
+        
+        cited_sentences.append(sentence)
+    
+    return ' '.join(cited_sentences)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -366,6 +561,51 @@ async def ask_question(
 
     # Initialize AI client early for classification
     ai_client = AIClient(current_user)
+    
+    # STEP 1B: Auto-detect conversation continuation (do FIRST before context retrieval)
+    conv_id = request.conversation_id
+    conversation_context = ""
+    
+    if request.auto_detect_conversation and not request.conversation_id:
+        # Try to find recent messages to check for continuation
+        recent_messages = db.query(ChatMessage).filter(
+            ChatMessage.user_id == current_user.id,
+            ChatMessage.conversation_id.isnot(None)
+        ).order_by(ChatMessage.created_at.desc()).limit(1).all()
+        
+        if recent_messages:
+            last_msg = recent_messages[0]
+            # Check if this is a continuation of the last conversation
+            try:
+                is_continuation = await is_conversation_continuation(
+                    client=ai_client,
+                    current_question=request.message,
+                    last_question=last_msg.message,
+                    last_answer=last_msg.response
+                )
+                
+                if is_continuation:
+                    # Treat as continuation - fetch last few messages from that conversation
+                    conv_id = last_msg.conversation_id
+                    earlier_messages = db.query(ChatMessage).filter(
+                        ChatMessage.conversation_id == conv_id,
+                        ChatMessage.user_id == current_user.id
+                    ).order_by(ChatMessage.created_at.desc()).limit(2).all()
+                    
+                    if earlier_messages:
+                        conversation_context = build_conversation_context(earlier_messages)
+                        print(f"[chat] Auto-detected conversation continuation. Conv ID: {conv_id}")
+                else:
+                    # New topic - start fresh conversation
+                    conv_id = str(uuid.uuid4())
+                    print(f"[chat] Auto-detected new conversation topic. New Conv ID: {conv_id}")
+            except Exception as e:
+                print(f"[chat] Auto-detection failed: {e}, starting new conversation")
+                conv_id = str(uuid.uuid4())
+    
+    # If still no conversation ID, create a new one
+    if not conv_id:
+        conv_id = str(uuid.uuid4())
     
     # STEP 2: Classify Query Intent
     intent = await classify_query(ai_client, request.message)
@@ -441,7 +681,13 @@ async def ask_question(
         # STEP 5: Build mode-specific prompt for informational queries
         if not context:
             context = "No information available."
-        prompt = build_mode_prompt(context, request.message, request.ai_mode, request.output_format)
+        prompt = build_mode_prompt(
+            context, 
+            request.message, 
+            request.ai_mode, 
+            request.output_format,
+            conversation_context=conversation_context  # Include context from earlier messages
+        )
     
     # STEP 6: Call LLM
     t_model_start = time.time()
@@ -509,9 +755,11 @@ async def ask_question(
     model_ms = (time.time() - t_model_start) * 1000.0
     total_ms = (time.time() - t_start) * 1000.0
 
-    # STEP 6: Resolve conversation identity and title
-    conv_id = request.conversation_id or str(uuid.uuid4())
+    # STEP 7: Inject citations into response
+    if detailed_sources:
+        response = inject_citations(response, detailed_sources)
 
+    # STEP 8: Resolve conversation title
     existing_count = db.query(func.count(ChatMessage.id)).filter(
         ChatMessage.conversation_id == conv_id,
         ChatMessage.user_id == current_user.id
@@ -527,7 +775,7 @@ async def ask_question(
         ).first()
         conv_title = existing_title[0] if existing_title else generate_conversation_title(request.message)
 
-    # STEP 7: Save to chat history
+    # STEP 9: Save to chat history
     try:
         # Prepare timings dict for storage
         timings_dict = {
