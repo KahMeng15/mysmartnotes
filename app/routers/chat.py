@@ -140,6 +140,8 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
 
 {output_inst}
 
+Do NOT include introductory phrases like "Here's what...", "Based on the information provided:", "Let me explain:", or similar. Answer directly and get straight to the point.
+
 Context:
 {context}
 
