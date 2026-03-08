@@ -96,6 +96,23 @@ class Lecture(Base):
     embeddings = relationship("LectureEmbedding", back_populates="lecture", cascade="all, delete-orphan")
 
 
+class ExportTemplate(Base):
+    """User-defined export templates"""
+    __tablename__ = "export_templates"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # NULL = system default
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    is_default = Column(Boolean, default=False)
+    config = Column(JSON, nullable=False)  # Full template configuration
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")
+
+
 class GeneratedDocument(Base):
     """Generated cheat sheets, quizzes, etc."""
     __tablename__ = "generated_documents"

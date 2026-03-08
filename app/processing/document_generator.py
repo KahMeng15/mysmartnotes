@@ -95,6 +95,24 @@ class StyleSheet:
                 spaceBefore=8,
                 fontName="Helvetica-Bold",
             ),
+            "H4": ParagraphStyle(
+                name="H4_custom",
+                parent=styles["Heading3"],
+                fontSize=11,
+                textColor=colors.HexColor("#476978"),
+                spaceAfter=6,
+                spaceBefore=6,
+                fontName="Helvetica-Bold",
+            ),
+            "H5": ParagraphStyle(
+                name="H5_custom",
+                parent=styles["Heading3"],
+                fontSize=10,
+                textColor=colors.HexColor("#566b7f"),
+                spaceAfter=4,
+                spaceBefore=4,
+                fontName="Helvetica-Bold",
+            ),
             "Body": ParagraphStyle(
                 name="Body_custom",
                 parent=styles["BodyText"],
@@ -112,6 +130,23 @@ class StyleSheet:
                 leftIndent=20,
                 textColor=colors.HexColor("#2c3e50"),
                 spaceAfter=4,
+            ),
+            "OrderedList": ParagraphStyle(
+                name="OrderedList_custom",
+                parent=styles["BodyText"],
+                fontSize=11,
+                leading=14,
+                leftIndent=20,
+                textColor=colors.HexColor("#2c3e50"),
+                spaceAfter=4,
+            ),
+            "TableRow": ParagraphStyle(
+                name="TableRow_custom",
+                parent=styles["BodyText"],
+                fontSize=10,
+                textColor=colors.HexColor("#2c3e50"),
+                spaceAfter=4,
+                fontName="Courier",
             ),
             "Caption": ParagraphStyle(
                 name="Caption_custom",
@@ -165,6 +200,10 @@ class DocumentGenerator:
         self,
         content_segments: List[ContentSegment],
         extracted_images: Optional[List[ExtractedImage]] = None,
+        include_toc: bool = True,
+        include_cover: bool = True,
+        template_config: Optional[dict] = None,
+        progress_callback=None,
     ) -> str:
         """
         Generate styled PDF from content segments
@@ -172,33 +211,60 @@ class DocumentGenerator:
         """
         try:
             extracted_images = extracted_images or []
+            self._template_config = template_config
+            
+            if progress_callback:
+                progress_callback("Preparing document", 10)
+            
+            # Apply template margins if provided (margins are in mm, convert to inches)
+            margins_mm = {"top": 25, "bottom": 25, "left": 19, "right": 19}
+            if template_config and "page" in template_config:
+                page_cfg = template_config["page"]
+                if "margins" in page_cfg:
+                    margins_mm.update(page_cfg["margins"])
+            
+            # Convert mm to inches (1 inch = 25.4 mm)
+            margins_in = {k: v / 25.4 for k, v in margins_mm.items()}
             
             # Create document
             doc = SimpleDocTemplate(
                 self.output_pdf,
                 pagesize=self.page_size,
-                rightMargin=0.75 * inch,
-                leftMargin=0.75 * inch,
-                topMargin=0.75 * inch,
-                bottomMargin=0.75 * inch,
+                rightMargin=margins_in["right"] * inch,
+                leftMargin=margins_in["left"] * inch,
+                topMargin=margins_in["top"] * inch,
+                bottomMargin=margins_in["bottom"] * inch,
             )
             
             # Build story
             story = []
             
             # Add title page
-            story.extend(self._create_title_page())
-            story.append(PageBreak())
+            if include_cover:
+                if progress_callback:
+                    progress_callback("Creating cover page", 20)
+                story.extend(self._create_title_page())
+                story.append(PageBreak())
             
             # Add table of contents
-            story.extend(self._create_table_of_contents(content_segments))
-            story.append(PageBreak())
+            if include_toc:
+                if progress_callback:
+                    progress_callback("Building table of contents", 35)
+                story.extend(self._create_table_of_contents(content_segments))
+                story.append(PageBreak())
             
             # Add content
+            if progress_callback:
+                progress_callback("Rendering content", 50)
             story.extend(self._create_content(content_segments, extracted_images))
             
             # Build PDF
+            if progress_callback:
+                progress_callback("Building PDF", 80)
             doc.build(story, onFirstPage=self._on_page, onLaterPages=self._on_page)
+            
+            if progress_callback:
+                progress_callback("Complete", 100)
             
             logger.info(f"Generated PDF: {self.output_pdf}")
             return self.output_pdf
@@ -317,8 +383,22 @@ class DocumentGenerator:
                 story.append(Paragraph(segment.content, self.styles["H3"]))
                 story.append(Spacer(1, 0.08 * inch))
                 
+            elif segment.content_type == ContentType.H4:
+                story.append(Paragraph(segment.content, self.styles["H4"]))
+                story.append(Spacer(1, 0.06 * inch))
+                
+            elif segment.content_type == ContentType.H5:
+                story.append(Paragraph(segment.content, self.styles["H5"]))
+                story.append(Spacer(1, 0.05 * inch))
+                
             elif segment.content_type == ContentType.LIST:
                 story.append(Paragraph(f"• {segment.content}", self.styles["List"]))
+                
+            elif segment.content_type == ContentType.ORDERED_LIST:
+                story.append(Paragraph(segment.content, self.styles["OrderedList"]))
+                
+            elif segment.content_type == ContentType.TABLE_ROW:
+                story.append(Paragraph(segment.content, self.styles["TableRow"]))
                 
             elif segment.content_type == ContentType.CODE:
                 story.append(Paragraph(segment.content, self.styles["Code"]))
@@ -369,12 +449,19 @@ class DocumentGenerator:
         """Callback for page drawing"""
         canvas_obj.saveState()
         
-        # Draw page number
-        page_size = self.page_size
+        page_width = self.page_size[0]
+        
+        # Draw branded footer (left side)
+        canvas_obj.setFont("Helvetica", 7)
+        generated_date = datetime.now().strftime("%B %d, %Y %I:%M %p")
+        footer_text = f"Generated by mysmartnotes.vercel.app | Create notes and study smart! | {generated_date}"
+        canvas_obj.drawString(0.5 * inch, 0.35 * inch, footer_text)
+        
+        # Draw page number (right side)
         canvas_obj.setFont("Helvetica", 8)
         canvas_obj.drawRightString(
-            page_size[0] - 0.5 * inch,
-            0.4 * inch,
+            page_width - 0.5 * inch,
+            0.35 * inch,
             f"Page {doc.page}"
         )
         

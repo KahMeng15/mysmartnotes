@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 import uuid
@@ -404,6 +405,7 @@ async def delete_lecture(
 @router.post("/{lecture_id}/generate-pdf", response_model=dict)
 async def generate_pdf(
     lecture_id: int,
+    body: dict = {},
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -421,57 +423,73 @@ async def generate_pdf(
             detail="Lecture not found"
         )
     
+    # Extract options from body
+    include_toc = body.get("include_toc", True)
+    include_cover = body.get("include_cover", True)
+    
     try:
-        # Check if structured content exists
-        if not lecture.extracted_content_structured:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Lecture content not yet processed. Please wait for OCR to complete."
-            )
-        
-        # Parse structured content
-        structured_data = json.loads(lecture.extracted_content_structured)
-        images_data = json.loads(lecture.extracted_images_metadata) if lecture.extracted_images_metadata else []
-        
-        # Convert structured data back to ContentSegment objects
+        # Build segments from structured content or markdown
         from app.processing.text_processor import ContentSegment
         segments = []
-        for item in structured_data:
-            segment = ContentSegment(
-                content=item["content"],
-                content_type=ContentType(item["type"]),
-                page_number=item["page"],
-                confidence=item.get("confidence", 0.9),
-                metadata=item.get("metadata", {})
-            )
-            segments.append(segment)
-        
-        # Convert images data back to ExtractedImage objects
-        from app.processing.image_extractor import ExtractedImage
         images = []
-        for img_data in images_data:
-            img = ExtractedImage(
-                filename=img_data["filename"],
-                page_number=img_data["page"],
-                position_x=img_data["position"]["x"],
-                position_y=img_data["position"]["y"],
-                width=img_data["dimensions"]["width"],
-                height=img_data["dimensions"]["height"],
-                caption=img_data.get("caption", ""),
-                text_content=img_data.get("text_content", ""),
-                confidence=img_data.get("confidence", 0.8),
-                is_diagram=img_data.get("is_diagram", False),
-                file_path=img_data.get("file_path", "")
+        
+        if lecture.extracted_content_structured:
+            # Parse structured content
+            structured_data = json.loads(lecture.extracted_content_structured)
+            for item in structured_data:
+                segment = ContentSegment(
+                    content=item["content"],
+                    content_type=ContentType(item["type"]),
+                    page_number=item["page"],
+                    confidence=item.get("confidence", 0.9),
+                    metadata=item.get("metadata", {})
+                )
+                segments.append(segment)
+            # Images currently disabled - feature not yet implemented
+        elif lecture.extracted_text:
+            # Markdown-only: convert to segments
+            structured_data = _markdown_to_segments(lecture.extracted_text)
+            for item in structured_data:
+                segment = ContentSegment(
+                    content=item["content"],
+                    content_type=ContentType(item["type"]),
+                    page_number=item.get("page", 1),
+                    confidence=item.get("confidence", 0.9),
+                    metadata=item.get("metadata", {})
+                )
+                segments.append(segment)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Lecture has no content to export. Please wait for processing to complete."
             )
-            images.append(img)
         
-        logger.info(f"Processed lecture {lecture_id}")
+        # Actually generate the PDF
+        from app.processing.document_generator import DocumentGenerator
+        generator = DocumentGenerator(
+            lecture_id=lecture.id,
+            lecture_title=lecture.title,
+            base_output_dir=GENERATED_DIR,
+        )
         
+        output_path = generator.generate_pdf(
+            content_segments=segments,
+            extracted_images=images,
+            include_toc=include_toc,
+            include_cover=include_cover,
+        )
+        
+        # Save the output path
+        lecture.output_pdf_path = output_path
+        lecture.updated_at = datetime.utcnow()
         db.commit()
+        
+        logger.info(f"Generated PDF for lecture {lecture_id}: {output_path}")
         
         return {
             "success": True,
-            "message": "Lecture processed successfully",
+            "message": "PDF generated successfully",
+            "download_url": f"/lectures/{lecture_id}/download-pdf",
             "segments_count": len(segments),
             "images_count": len(images)
         }
@@ -482,8 +500,10 @@ async def generate_pdf(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid structured content format"
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error generating PDF: {e}")
+        logger.error(f"Error generating PDF: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating PDF: {str(e)}"
@@ -533,6 +553,236 @@ async def download_pdf(
             detail="Error downloading PDF"
         )
 
+
+@router.post("/{lecture_id}/export", response_model=dict)
+async def export_lecture(
+    lecture_id: int,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Export lecture as PDF or DOCX"""
+    import uuid
+    task_id = str(uuid.uuid4())[:8]
+    _export_progress[task_id] = {"step": "Starting", "percent": 0, "status": "running"}
+    
+    def progress_callback(step, percent):
+        _export_progress[task_id] = {"step": step, "percent": percent, "status": "running" if percent < 100 else "complete"}
+    
+    export_format = body.get("format", "pdf").lower()
+    if export_format not in ("pdf", "docx"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Format must be 'pdf' or 'docx'"
+        )
+    
+    include_toc = body.get("include_toc", True)
+    include_cover = body.get("include_cover", True)
+    template_id = body.get("template_id", None)
+    
+    # Load template config if provided
+    template_config = None
+    if template_id:
+        from app.models.db import ExportTemplate
+        tmpl = db.query(ExportTemplate).filter(
+            ExportTemplate.id == template_id,
+            (ExportTemplate.user_id == current_user.id) | (ExportTemplate.user_id.is_(None))
+        ).first()
+        if tmpl:
+            template_config = tmpl.config
+    
+    # Get lecture
+    lecture = db.query(Lecture).filter(
+        Lecture.id == lecture_id,
+        Lecture.user_id == current_user.id
+    ).first()
+    
+    if not lecture:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lecture not found"
+        )
+    
+    try:
+        # Build segments from structured content or markdown
+        from app.processing.text_processor import ContentSegment
+        segments = []
+        images = []  # Currently disabled - image feature not yet implemented
+        
+        if lecture.extracted_content_structured:
+            structured_data = json.loads(lecture.extracted_content_structured)
+            for item in structured_data:
+                segment = ContentSegment(
+                    content=item["content"],
+                    content_type=ContentType(item["type"]),
+                    page_number=item["page"],
+                    confidence=item.get("confidence", 0.9),
+                    metadata=item.get("metadata", {})
+                )
+                segments.append(segment)
+            # Images currently disabled - feature not yet implemented
+        elif lecture.extracted_text:
+            structured_data = _markdown_to_segments(lecture.extracted_text)
+            for item in structured_data:
+                segment = ContentSegment(
+                    content=item["content"],
+                    content_type=ContentType(item["type"]),
+                    page_number=item.get("page", 1),
+                    confidence=item.get("confidence", 0.9),
+                    metadata=item.get("metadata", {})
+                )
+                segments.append(segment)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Lecture has no content to export. Please wait for processing to complete."
+            )
+        
+        # Generate the document
+        safe_title = "".join(c for c in lecture.title if c.isalnum() or c in (' ', '-', '_')).strip()
+        
+        if export_format == "pdf":
+            from app.processing.document_generator import DocumentGenerator
+            generator = DocumentGenerator(
+                lecture_id=lecture.id,
+                lecture_title=lecture.title,
+                base_output_dir=GENERATED_DIR,
+            )
+            output_path = generator.generate_pdf(
+                content_segments=segments,
+                extracted_images=images,
+                include_toc=include_toc,
+                include_cover=include_cover,
+                template_config=template_config,
+                progress_callback=progress_callback,
+            )
+            lecture.output_pdf_path = output_path
+            download_filename = f"{safe_title}.pdf"
+        else:
+            from app.processing.docx_generator import DocxGenerator
+            generator = DocxGenerator(
+                lecture_id=lecture.id,
+                lecture_title=lecture.title,
+                base_output_dir=GENERATED_DIR,
+            )
+            output_path = generator.generate_docx(
+                content_segments=segments,
+                extracted_images=images,
+                include_toc=include_toc,
+                include_cover=include_cover,
+                template_config=template_config,
+                progress_callback=progress_callback,
+            )
+            download_filename = f"{safe_title}.docx"
+        
+        # Store in GeneratedDocument
+        from app.models.db import GeneratedDocument
+        gen_doc = GeneratedDocument(
+            lecture_id=lecture.id,
+            title=f"{lecture.title} ({export_format.upper()})",
+            file_path=output_path,
+            document_type=export_format,
+        )
+        db.add(gen_doc)
+        lecture.updated_at = datetime.utcnow()
+        db.commit()
+        
+        logger.info(f"Exported {export_format.upper()} for lecture {lecture_id}: {output_path}")
+        
+        return {
+            "success": True,
+            "message": f"{export_format.upper()} generated successfully",
+            "download_url": f"/lectures/{lecture_id}/download-export?format={export_format}",
+            "task_id": task_id,
+            "segments_count": len(segments),
+            "images_count": len(images)
+        }
+    
+    except json.JSONDecodeError as e:
+        logger.error(f"Error parsing structured content: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid structured content format"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting {export_format}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error exporting {export_format}: {str(e)}"
+        )
+
+
+# In-memory export progress tracking
+_export_progress = {}
+
+
+@router.get("/{lecture_id}/export-status/{task_id}")
+async def get_export_status(
+    lecture_id: int,
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Get export task progress"""
+    progress = _export_progress.get(task_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return progress
+
+
+@router.get("/{lecture_id}/download-export")
+async def download_export(
+    lecture_id: int,
+    format: str = "pdf",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download generated export file (PDF or DOCX)"""
+    
+    export_format = format.lower()
+    if export_format not in ("pdf", "docx"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Format must be 'pdf' or 'docx'"
+        )
+    
+    lecture = db.query(Lecture).filter(
+        Lecture.id == lecture_id,
+        Lecture.user_id == current_user.id
+    ).first()
+    
+    if not lecture:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lecture not found"
+        )
+    
+    # Look for the generated file
+    from app.models.db import GeneratedDocument
+    gen_doc = db.query(GeneratedDocument).filter(
+        GeneratedDocument.lecture_id == lecture_id,
+        GeneratedDocument.document_type == export_format,
+    ).order_by(GeneratedDocument.created_at.desc()).first()
+    
+    if not gen_doc or not os.path.exists(gen_doc.file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{export_format.upper()} not generated yet. Please generate it first."
+        )
+    
+    safe_title = "".join(c for c in lecture.title if c.isalnum() or c in (' ', '-', '_')).strip()
+    
+    mime_types = {
+        "pdf": "application/pdf",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    
+    return FileResponse(
+        path=gen_doc.file_path,
+        filename=f"{safe_title}.{export_format}",
+        media_type=mime_types[export_format],
+    )
 
 @router.put("/{lecture_id}/content", response_model=LectureResponse)
 async def update_lecture_content(

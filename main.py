@@ -10,7 +10,7 @@ import os
 
 from app.config import get_settings
 from app.utils.db import init_db
-from app.routers import auth, subjects, lectures, chat, documents, flashcards, study_sessions, search, analytics, processing, groups, snapshots
+from app.routers import auth, subjects, lectures, chat, documents, flashcards, study_sessions, search, analytics, processing, groups, snapshots, templates
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +26,16 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.APP_NAME}")
     init_db()
     logger.info("Database initialized")
+    
+    # Seed default export templates
+    from app.utils.db import SessionLocal
+    try:
+        db = SessionLocal()
+        templates.seed_default_templates(db)
+        db.close()
+    except Exception as e:
+        logger.warning(f"Could not seed default templates: {e}")
+    
     yield
     # Shutdown
     logger.info("Shutting down application")
@@ -61,6 +71,7 @@ app.include_router(analytics.router)
 app.include_router(processing.router)
 app.include_router(groups.router)
 app.include_router(snapshots.router)
+app.include_router(templates.router)
 
 # Serve generated files (images, PDFs, etc.)
 generated_dir = os.path.join(os.path.dirname(__file__), "generated")
@@ -100,6 +111,10 @@ async def serve_login():
 @app.get("/dashboard")
 async def serve_dashboard():
     return FileResponse(os.path.join(static_dir, "dashboard.html"))
+
+@app.get("/templates")
+async def serve_templates():
+    return FileResponse(os.path.join(static_dir, "templates.html"))
 
 @app.get("/")
 async def root():

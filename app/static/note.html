@@ -69,7 +69,8 @@
                 <div style="display:none;"><a href="#" id="metaSubjectHidden"><span>Subject</span></a></div>
             </div>
             <div id="loadingContainer" class="loading">
-                <div class="spinner" style="margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i></div>
+                <div class="spinner" style="margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i>
+                </div>
                 <p>Loading note...</p>
             </div>
 
@@ -252,13 +253,16 @@
             <div class="note-chat-input-area">
                 <!-- AI Controls: Compact Display -->
                 <div class="ai-controls-compact" id="noteChatControlsCompact">
-                    <span style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Mode</span>
+                    <span
+                        style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Mode</span>
                     <button class="control-badge" onclick="toggleNoteChatMode()" title="Click to change mode">
                         <i class="ph" id="noteModeIcon"></i>
                         <span id="noteModeLabel"></span>
                     </button>
-                    <span style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Output</span>
-                    <button class="control-badge" onclick="toggleNoteChatOutput()" title="Click to change output format">
+                    <span
+                        style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Output</span>
+                    <button class="control-badge" onclick="toggleNoteChatOutput()"
+                        title="Click to change output format">
                         <i class="ph" id="noteOutputIcon"></i>
                         <span id="noteOutputLabel"></span>
                     </button>
@@ -268,7 +272,8 @@
                 <div class="ai-controls-expanded" id="noteChatControlsExpanded" style="display: none;">
                     <!-- Mode Selection -->
                     <div id="noteModeSelection" style="display: none;">
-                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">Select Mode</div>
+                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">
+                            Select Mode</div>
                         <div class="ai-mode-bar" style="flex-direction: row; gap: 6px;">
                             <button class="mode-pill" data-mode="quick" onclick="setNoteChatMode('quick')"
                                 title="Use less processing to get answer">
@@ -278,8 +283,8 @@
                                 title="Answer in simple terms">
                                 <i class="ph ph-text-a-underline"></i> Simple
                             </button>
-                            <button class="mode-pill active" data-mode="elaborate" onclick="setNoteChatMode('elaborate')"
-                                title="Provide thorough explanation">
+                            <button class="mode-pill active" data-mode="elaborate"
+                                onclick="setNoteChatMode('elaborate')" title="Provide thorough explanation">
                                 <i class="ph ph-lightbulb"></i> Elaborate
                             </button>
                             <button class="mode-pill" data-mode="eli5" onclick="setNoteChatMode('eli5')"
@@ -291,14 +296,15 @@
 
                     <!-- Output Selection -->
                     <div id="noteOutputSelection" style="display: none;">
-                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">Select Output</div>
+                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">
+                            Select Output</div>
                         <div class="output-format-bar" style="flex-direction: row; gap: 6px;">
                             <button class="mode-pill active" data-format="sentence"
                                 onclick="setNoteChatOutputFormat('sentence')" title="Single paragraph response">
                                 <i class="ph ph-text-t"></i> Sentence
                             </button>
-                            <button class="mode-pill" data-format="pointform" onclick="setNoteChatOutputFormat('pointform')"
-                                title="Bullet point format">
+                            <button class="mode-pill" data-format="pointform"
+                                onclick="setNoteChatOutputFormat('pointform')" title="Bullet point format">
                                 <i class="ph ph-list-bullets"></i> Pointform
                             </button>
                             <button class="mode-pill" data-format="numbered_list"
@@ -440,6 +446,135 @@
             </div>
         </div>
     </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content" style="min-height: auto; max-width: 420px;">
+            <h3 style="margin-bottom: var(--spacing-md);"><i class="ph ph-export" style="margin-right: 6px;"></i> Export
+                Note</h3>
+
+            <!-- Format Selector -->
+            <div style="margin-bottom: var(--spacing-lg);">
+                <label
+                    style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray); display: block; margin-bottom: var(--spacing-sm);">Format</label>
+                <div style="display: flex; gap: 8px;">
+                    <button class="export-format-btn active" data-format="pdf" onclick="selectExportFormat('pdf')">
+                        <i class="ph ph-file-pdf" style="font-size: 1.2em; color: #e74c3c;"></i> PDF
+                    </button>
+                    <button class="export-format-btn" data-format="docx" onclick="selectExportFormat('docx')">
+                        <i class="ph ph-file-doc" style="font-size: 1.2em; color: #2b579a;"></i> Word (DOCX)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Template Selector -->
+            <div style="margin-bottom: var(--spacing-lg);">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
+                    <label
+                        style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray);">Template</label>
+                    <a href="/templates" target="_blank"
+                        style="font-size: 11px; color: var(--color-primary); text-decoration: none;">
+                        <i class="ph ph-gear"></i> Manage Templates
+                    </a>
+                </div>
+                <select id="exportTemplateSelect"
+                    style="width: 100%; padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-family: 'Instrument Sans', sans-serif; font-size: var(--font-size-sm);">
+                    <option value="">Default (no template)</option>
+                </select>
+            </div>
+
+            <!-- Options -->
+            <div style="margin-bottom: var(--spacing-lg);">
+                <label
+                    style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray); display: block; margin-bottom: var(--spacing-sm);">Options</label>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label class="export-toggle-label">
+                        <input type="checkbox" id="exportIncludeCover" checked>
+                        <span>Include Cover Page</span>
+                    </label>
+                    <label class="export-toggle-label">
+                        <input type="checkbox" id="exportIncludeTOC" checked>
+                        <span>Include Table of Contents</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Progress -->
+            <div id="exportProgress" style="display: none; margin-bottom: var(--spacing-lg);">
+                <div style="padding: 12px; background: var(--color-bg); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <div class="spinner" style="width: 16px; height: 16px;"><i class="ph ph-spinner ph-spin"
+                                style="font-size: 16px;"></i></div>
+                        <span id="exportProgressText"
+                            style="font-size: var(--font-size-sm); color: var(--color-gray); flex: 1;">Starting...</span>
+                        <span id="exportProgressPercent"
+                            style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary);">0%</span>
+                    </div>
+                    <div
+                        style="width: 100%; height: 6px; background: var(--color-light-gray); border-radius: 3px; overflow: hidden;">
+                        <div id="exportProgressBar"
+                            style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--color-primary), #7c5cbf); border-radius: 3px; transition: width 0.3s ease;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="modal-buttons">
+                <button type="button" class="btn-save" id="exportSubmitBtn" onclick="doExport()"><i
+                        class="ph ph-download-simple"></i> Export</button>
+                <button type="button" class="btn-cancel" onclick="closeExportModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .export-format-btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: 2px solid var(--color-border);
+            border-radius: 8px;
+            background: var(--color-white);
+            cursor: pointer;
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            font-family: 'Instrument Sans', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            color: var(--color-dark);
+        }
+
+        .export-format-btn:hover {
+            border-color: var(--color-primary);
+            background: rgba(89, 60, 143, 0.04);
+        }
+
+        .export-format-btn.active {
+            border-color: var(--color-primary);
+            background: rgba(89, 60, 143, 0.08);
+            color: var(--color-primary);
+        }
+
+        .export-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: var(--font-size-sm);
+            color: var(--color-dark);
+        }
+
+        .export-toggle-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--color-primary);
+            cursor: pointer;
+        }
+    </style>
 
     <!-- Hidden input for snapshot name -->
     <input type="hidden" id="snapshotNameInput" value="">
@@ -1815,31 +1950,103 @@
             } catch (error) { alert('Error: ' + error.message); }
         }
 
-        function exportNote() {
-            // Use existing PDF generation
-            generatePDF();
-        }
+        let selectedExportFormat = 'pdf';
 
-        async function generatePDF() {
-            const button = document.querySelector('.action-btn[onclick="exportNote()"]');
-            if (button) { button.disabled = true; button.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Exporting...'; }
+        async function exportNote() {
+            document.getElementById('exportModal').style.display = 'flex';
+            document.getElementById('exportProgress').style.display = 'none';
+            document.getElementById('exportSubmitBtn').disabled = false;
+
+            // Load templates for dropdown
             try {
-                const response = await fetch(`/lectures/${lectureId}/generate-pdf`, {
-                    method: 'POST',
+                const res = await fetch('/templates', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
+                if (res.ok) {
+                    const templates = await res.json();
+                    const select = document.getElementById('exportTemplateSelect');
+                    select.innerHTML = '<option value="">Default (no template)</option>';
+                    templates.forEach(t => {
+                        const badge = t.is_system ? ' ★' : '';
+                        select.innerHTML += `<option value="${t.id}">${t.name}${badge}</option>`;
+                    });
+                }
+            } catch (e) { console.error('Failed to load templates:', e); }
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportModal').style.display = 'none';
+        }
+
+        function selectExportFormat(format) {
+            selectedExportFormat = format;
+            document.querySelectorAll('.export-format-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.format === format);
+            });
+        }
+
+        async function doExport() {
+            const format = selectedExportFormat;
+            const includeCover = document.getElementById('exportIncludeCover').checked;
+            const includeTOC = document.getElementById('exportIncludeTOC').checked;
+
+            const templateSelect = document.getElementById('exportTemplateSelect');
+            const templateId = templateSelect.value ? parseInt(templateSelect.value) : null;
+
+            // Show progress
+            document.getElementById('exportProgress').style.display = 'block';
+            document.getElementById('exportSubmitBtn').disabled = true;
+            updateExportProgress('Preparing export...', 5);
+
+            // Simulate progress during the synchronous request
+            const progressSteps = [
+                { text: 'Building content...', pct: 15, delay: 500 },
+                { text: 'Rendering document...', pct: 35, delay: 1500 },
+                { text: 'Adding styles...', pct: 55, delay: 2500 },
+                { text: 'Generating file...', pct: 70, delay: 4000 },
+                { text: 'Finalizing...', pct: 85, delay: 6000 },
+            ];
+            const progressTimers = progressSteps.map(step =>
+                setTimeout(() => updateExportProgress(step.text, step.pct), step.delay)
+            );
+
+            try {
+                const payload = {
+                    format: format,
+                    include_cover: includeCover,
+                    include_toc: includeTOC
+                };
+                if (templateId) payload.template_id = templateId;
+
+                const response = await fetch(`/lectures/${lectureId}/export`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                // Clear simulated timers
+                progressTimers.forEach(t => clearTimeout(t));
+
                 if (response.ok) {
-                    // Auto-download
-                    const dlRes = await fetch(`/lectures/${lectureId}/download-pdf`, {
+                    const data = await response.json();
+                    updateExportProgress('Downloading file...', 95);
+
+                    // Download the file
+                    const dlRes = await fetch(data.download_url, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     if (dlRes.ok) {
+                        updateExportProgress('Complete!', 100);
                         const blob = await dlRes.blob();
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.style.display = 'none';
                         a.href = url;
-                        a.download = `${lectureData.title || 'lecture'}_OUTPUT.pdf`;
+                        const ext = format === 'docx' ? 'docx' : 'pdf';
+                        a.download = `${lectureData.title || 'note'}.${ext}`;
                         document.body.appendChild(a);
                         a.click();
                         setTimeout(() => {
@@ -1847,15 +2054,23 @@
                             a.remove();
                         }, 1000);
                     }
-                    alert('✅ PDF exported!');
+                    setTimeout(() => closeExportModal(), 500);
                 } else {
                     const error = await response.json();
-                    alert('Error: ' + (error.detail || 'Failed to export'));
+                    updateExportProgress('❌ ' + (error.detail || 'Export failed'), 0);
+                    document.getElementById('exportSubmitBtn').disabled = false;
                 }
-            } catch (error) { alert('Error: ' + error.message); }
-            finally {
-                if (button) { button.disabled = false; button.innerHTML = '<i class="ph ph-export"></i> Export'; }
+            } catch (error) {
+                progressTimers.forEach(t => clearTimeout(t));
+                updateExportProgress('❌ ' + error.message, 0);
+                document.getElementById('exportSubmitBtn').disabled = false;
             }
+        }
+
+        function updateExportProgress(text, percent) {
+            document.getElementById('exportProgressText').textContent = text;
+            document.getElementById('exportProgressPercent').textContent = percent + '%';
+            document.getElementById('exportProgressBar').style.width = percent + '%';
         }
 
         async function downloadOriginalFile() {
@@ -2079,7 +2294,7 @@
             const expanded = document.getElementById('noteChatControlsExpanded');
             const modeSelection = document.getElementById('noteModeSelection');
             const outputSelection = document.getElementById('noteOutputSelection');
-            
+
             if (modeSelection.style.display === 'none') {
                 compact.style.display = 'none';
                 expanded.style.display = 'block';
@@ -2097,7 +2312,7 @@
             const expanded = document.getElementById('noteChatControlsExpanded');
             const modeSelection = document.getElementById('noteModeSelection');
             const outputSelection = document.getElementById('noteOutputSelection');
-            
+
             if (outputSelection.style.display === 'none') {
                 compact.style.display = 'none';
                 expanded.style.display = 'block';
@@ -2131,12 +2346,12 @@
         function updateNoteChatCompactDisplay() {
             const modeMeta = MODE_META[chatAiMode];
             const outputMeta = OUTPUT_FORMAT_META[chatOutputFormat];
-            
+
             if (modeMeta) {
                 document.getElementById('noteModeIcon').className = 'ph ' + modeMeta.icon;
                 document.getElementById('noteModeLabel').textContent = modeMeta.label;
             }
-            
+
             if (outputMeta) {
                 document.getElementById('noteOutputIcon').className = 'ph ' + outputMeta.icon;
                 document.getElementById('noteOutputLabel').textContent = outputMeta.label;

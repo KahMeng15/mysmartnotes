@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export Templates - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/nav.js"></script>
+    <style>
+        .templates-layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: var(--spacing-xl);
+            min-height: calc(100vh - 200px);
+        }
+
+        /* ─── Sidebar ─── */
+        .template-sidebar {
+            background: var(--color-white);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--color-light-gray);
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 160px);
+            position: sticky;
+            top: 100px;
+        }
+
+        .template-sidebar h3 {
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .template-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .template-item {
+            padding: 10px 12px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .template-item:hover {
+            background: var(--color-bg);
+        }
+
+        .template-item.active {
+            background: rgba(89, 60, 143, 0.08);
+            border-color: var(--color-primary);
+        }
+
+        .template-item .item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .template-item .item-name {
+            font-weight: 600;
+            font-size: var(--font-size-sm);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .template-item .item-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background: var(--color-primary);
+            color: white;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .template-item .item-badge.user {
+            background: var(--color-success);
+        }
+
+        /* ─── Editor Panel ─── */
+        .editor-panel {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: var(--spacing-lg);
+        }
+
+        .editor-header {
+            background: var(--color-white);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--color-light-gray);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .editor-header input {
+            flex: 1;
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            border: none;
+            outline: none;
+            background: transparent;
+            font-family: 'Instrument Sans', sans-serif;
+        }
+
+        .editor-header .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .editor-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-lg);
+        }
+
+        /* ─── Settings Sections ─── */
+        .settings-panel {
+            background: var(--color-white);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--color-light-gray);
+            overflow-y: auto;
+            max-height: calc(100vh - 260px);
+        }
+
+        .settings-group {
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .settings-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .settings-group h4 {
+            font-size: var(--font-size-sm);
+            font-weight: 700;
+            color: var(--color-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-xs);
+            border-bottom: 2px solid rgba(89, 60, 143, 0.1);
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 0;
+        }
+
+        .setting-row label {
+            font-size: var(--font-size-sm);
+            color: var(--color-dark);
+            font-weight: 500;
+        }
+
+        .setting-row select,
+        .setting-row input[type="number"],
+        .setting-row input[type="text"],
+        .setting-row input[type="color"] {
+            font-family: 'Instrument Sans', sans-serif;
+            font-size: var(--font-size-sm);
+            padding: 5px 8px;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: var(--color-white);
+        }
+
+        .setting-row select {
+            min-width: 130px;
+        }
+
+        .setting-row input[type="number"] {
+            width: 70px;
+        }
+
+        .setting-row input[type="color"] {
+            width: 36px;
+            height: 28px;
+            padding: 2px;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+        }
+
+        .element-style-card {
+            background: var(--color-bg);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm) var(--spacing-md);
+            margin-bottom: 8px;
+        }
+
+        .element-style-card .element-name {
+            font-weight: 600;
+            font-size: var(--font-size-sm);
+            margin-bottom: 6px;
+            color: var(--color-primary);
+        }
+
+        .element-style-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 12px;
+        }
+
+        .element-style-grid .setting-row {
+            padding: 3px 0;
+        }
+
+        /* ─── Live Preview ─── */
+        .preview-panel {
+            background: var(--color-white);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--color-light-gray);
+            overflow-y: auto;
+            max-height: calc(100vh - 260px);
+        }
+
+        .preview-panel h4 {
+            font-size: var(--font-size-sm);
+            font-weight: 700;
+            color: var(--color-dark-gray);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .preview-page {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 40px 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            min-height: 560px;
+            font-family: 'Instrument Sans', sans-serif;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .preview-content {
+            flex: 1;
+        }
+
+        .preview-cover {
+            text-align: center;
+            padding: 60px 20px;
+            border-bottom: 1px dashed #ddd;
+            margin-bottom: 20px;
+        }
+
+        .preview-footer {
+            margin-top: auto;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+            font-size: 7pt;
+            color: #95a5a6;
+            text-align: center;
+            column-span: all;
+        }
+
+        /* ─── Buttons ─── */
+        .btn-icon {
+            background: none;
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            padding: 6px 8px;
+            cursor: pointer;
+            color: var(--color-dark-gray);
+            transition: all 0.15s ease;
+            font-size: 14px;
+        }
+
+        .btn-icon:hover {
+            background: var(--color-bg);
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+        }
+
+        .btn-icon.danger:hover {
+            border-color: var(--color-error);
+            color: var(--color-error);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--color-gray);
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            display: block;
+            margin-bottom: var(--spacing-md);
+        }
+
+        /* Toggle switch */
+        .mini-toggle {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background: var(--color-light-gray);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .mini-toggle.active {
+            background: var(--color-primary);
+        }
+
+        .mini-toggle::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.15s ease;
+        }
+
+        .mini-toggle.active::after {
+            left: 18px;
+        }
+
+        @media (max-width: 1100px) {
+            .templates-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .template-sidebar {
+                position: static;
+                max-height: none;
+            }
+
+            .editor-body {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page-card">
+        <h1 style="margin-bottom: var(--spacing-xl);"><i class="ph ph-palette" style="margin-right: 8px;"></i> Export
+            Templates</h1>
+
+        <div class="templates-layout">
+            <!-- Sidebar: Template list -->
+            <div class="template-sidebar">
+                <h3><i class="ph ph-list-dashes"></i> Templates</h3>
+                <div class="template-list" id="templateList">
+                    <!-- Populated by JS -->
+                </div>
+                <button class="btn btn-primary btn-block" onclick="createNewTemplate()">
+                    <i class="ph ph-plus"></i> New Template
+                </button>
+            </div>
+
+            <!-- Editor -->
+            <div class="editor-panel" id="editorPanel">
+                <div class="empty-state" id="emptyState">
+                    <i class="ph ph-pencil-ruler"></i>
+                    <h3>Select a template to edit</h3>
+                    <p>Choose a template from the sidebar or create a new one.</p>
+                </div>
+
+                <!-- Editor Header (hidden until template selected) -->
+                <div class="editor-header" id="editorHeader" style="display: none;">
+                    <i class="ph ph-text-aa" style="font-size: 20px; color: var(--color-primary);"></i>
+                    <input type="text" id="templateName" placeholder="Template Name" oninput="markDirty()">
+                    <div class="header-actions">
+                        <button class="btn-icon" onclick="duplicateSelectedTemplate()" title="Duplicate"><i
+                                class="ph ph-copy"></i></button>
+                        <button class="btn-icon danger" onclick="deleteSelectedTemplate()" title="Delete"
+                            id="deleteBtn"><i class="ph ph-trash"></i></button>
+                        <button class="btn btn-primary" onclick="saveTemplate()" id="saveBtn"
+                            style="padding: 6px 16px; font-size: var(--font-size-sm);"><i class="ph ph-floppy-disk"></i>
+                            Save</button>
+                    </div>
+                </div>
+
+                <!-- Editor Body (hidden until template selected) -->
+                <div class="editor-body" id="editorBody" style="display: none;">
+                    <!-- Settings -->
+                    <div class="settings-panel">
+                        <!-- Page Setup -->
+                        <div class="settings-group">
+                            <h4><i class="ph ph-file"></i> Page Setup</h4>
+                            <div class="setting-row">
+                                <label>Page Size</label>
+                                <select id="cfgPageSize" onchange="markDirty(); updatePreview();">
+                                    <option value="A4">A4</option>
+                                    <option value="Letter">Letter</option>
+                                    <option value="Legal">Legal</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label>Orientation</label>
+                                <select id="cfgOrientation" onchange="markDirty(); updatePreview();">
+                                    <option value="portrait">Portrait</option>
+                                    <option value="landscape">Landscape</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label>Columns</label>
+                                <select id="cfgColumns" onchange="markDirty(); updatePreview();">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label>Margin Top (mm)</label>
+                                <input type="number" id="cfgMarginTop" step="1" min="0" max="80" value="25"
+                                    onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Margin Bottom (mm)</label>
+                                <input type="number" id="cfgMarginBottom" step="1" min="0" max="80" value="25"
+                                    onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Margin Left (mm)</label>
+                                <input type="number" id="cfgMarginLeft" step="1" min="0" max="80" value="19"
+                                    onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Margin Right (mm)</label>
+                                <input type="number" id="cfgMarginRight" step="1" min="0" max="80" value="19"
+                                    onchange="markDirty(); updatePreview();">
+                            </div>
+                        </div>
+
+                        <!-- Spacing -->
+                        <div class="settings-group">
+                            <h4><i class="ph ph-text-align-justify"></i> Spacing</h4>
+                            <div class="setting-row">
+                                <label>Line Spacing</label>
+                                <input type="number" id="cfgLineSpacing" step="0.05" min="1" max="3" value="1.15"
+                                    onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Paragraph Spacing (pt)</label>
+                                <input type="number" id="cfgParagraphSpacing" step="1" min="0" max="30" value="8"
+                                    onchange="markDirty(); updatePreview();">
+                            </div>
+                        </div>
+
+                        <!-- Element Styles -->
+                        <div class="settings-group">
+                            <h4><i class="ph ph-text-t"></i> Element Styles</h4>
+                            <div id="elementStylesContainer">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Cover Page -->
+                        <div class="settings-group">
+                            <h4><i class="ph ph-book-open"></i> Cover Page</h4>
+                            <div class="setting-row">
+                                <label>Enabled</label>
+                                <div class="mini-toggle active" id="cfgCoverEnabled"
+                                    onclick="this.classList.toggle('active'); markDirty(); updatePreview();"></div>
+                            </div>
+                            <div class="setting-row">
+                                <label>Title Size (pt)</label>
+                                <input type="number" id="cfgCoverTitleSize" min="20" max="60" value="36"
+                                    onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Title Color</label>
+                                <input type="color" id="cfgCoverTitleColor" value="#1A1A2E"
+                                    onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Show Date</label>
+                                <div class="mini-toggle active" id="cfgCoverShowDate"
+                                    onclick="this.classList.toggle('active'); markDirty(); updatePreview();"></div>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="settings-group">
+                            <h4><i class="ph ph-text-align-center"></i> Footer</h4>
+                            <div class="setting-row">
+                                <label>Page Numbers</label>
+                                <div class="mini-toggle active" id="cfgFooterPageNumber"
+                                    onclick="this.classList.toggle('active'); markDirty(); updatePreview();"></div>
+                            </div>
+                            <div class="setting-row">
+                                <label>Custom Text</label>
+                                <input type="text" id="cfgFooterText" placeholder="Optional footer text"
+                                    style="width: 140px;" oninput="markDirty(); updatePreview();">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Preview -->
+                    <div class="preview-panel">
+                        <h4><i class="ph ph-eye"></i> Live Preview</h4>
+                        <div class="preview-page" id="previewPage">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '';
+        const token = localStorage.getItem('token');
+        let templates = [];
+        let selectedTemplateId = null;
+        let isDirty = false;
+
+        const ELEMENTS = ['h1', 'h2', 'h3', 'h4', 'h5', 'paragraph', 'list'];
+        const ELEMENT_LABELS = {
+            h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3',
+            h4: 'Heading 4', h5: 'Heading 5',
+            paragraph: 'Paragraph', list: 'List',
+        };
+
+        window.addEventListener('load', () => {
+            if (!token) window.location.href = 'login.html';
+            loadTemplates();
+        });
+
+        // ─── API ─────────────────────────────────────────────────
+
+        async function loadTemplates() {
+            try {
+                const res = await fetch('/templates', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    templates = await res.json();
+                    renderTemplateList();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveTemplate() {
+            if (!selectedTemplateId) return;
+            const tmpl = templates.find(t => t.id === selectedTemplateId);
+            if (!tmpl || tmpl.is_system) return;
+
+            const config = gatherConfig();
+            const name = document.getElementById('templateName').value.trim();
+            if (!name) { alert('Template name is required'); return; }
+
+            try {
+                const res = await fetch(`/templates/${selectedTemplateId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, config })
+                });
+                if (res.ok) {
+                    isDirty = false;
+                    await loadTemplates();
+                    selectTemplate(selectedTemplateId);
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Failed to save');
+                }
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function createNewTemplate() {
+            const name = prompt('Template name:');
+            if (!name) return;
+            try {
+                const res = await fetch('/templates', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    const newTmpl = await res.json();
+                    await loadTemplates();
+                    selectTemplate(newTmpl.id);
+                }
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function duplicateSelectedTemplate() {
+            if (!selectedTemplateId) return;
+            try {
+                const res = await fetch(`/templates/${selectedTemplateId}/duplicate`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const newTmpl = await res.json();
+                    await loadTemplates();
+                    selectTemplate(newTmpl.id);
+                }
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        async function deleteSelectedTemplate() {
+            if (!selectedTemplateId) return;
+            const tmpl = templates.find(t => t.id === selectedTemplateId);
+            if (!tmpl || tmpl.is_system) return;
+            if (!confirm(`Delete "${tmpl.name}"? This cannot be undone.`)) return;
+
+            try {
+                await fetch(`/templates/${selectedTemplateId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                selectedTemplateId = null;
+                await loadTemplates();
+                showEmptyState();
+            } catch (e) { alert('Error: ' + e.message); }
+        }
+
+        // ─── Render ──────────────────────────────────────────────
+
+        function renderTemplateList() {
+            const list = document.getElementById('templateList');
+            list.innerHTML = templates.map(t => `
+                <div class="template-item ${t.id === selectedTemplateId ? 'active' : ''}"
+                     onclick="selectTemplate(${t.id})">
+                    <div class="item-info">
+                        <div class="item-name">${t.name}</div>
+                    </div>
+                    <span class="item-badge ${t.is_system ? '' : 'user'}">${t.is_system ? 'Default' : 'Custom'}</span>
+                </div>
+            `).join('');
+        }
+
+        function selectTemplate(id) {
+            if (isDirty && !confirm('You have unsaved changes. Discard?')) return;
+            selectedTemplateId = id;
+            isDirty = false;
+            const tmpl = templates.find(t => t.id === id);
+            if (!tmpl) return;
+
+            // Show editor
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('editorHeader').style.display = 'flex';
+            document.getElementById('editorBody').style.display = 'grid';
+
+            // Set name
+            document.getElementById('templateName').value = tmpl.name;
+
+            // Disable editing for system templates
+            const isSystem = tmpl.is_system;
+            document.getElementById('templateName').readOnly = isSystem;
+            document.getElementById('saveBtn').style.display = isSystem ? 'none' : '';
+            document.getElementById('deleteBtn').style.display = isSystem ? 'none' : '';
+
+            // Load config
+            loadConfig(tmpl.config);
+            buildElementStyles(tmpl.config);
+            updatePreview();
+            renderTemplateList();
+        }
+
+        function showEmptyState() {
+            document.getElementById('emptyState').style.display = 'block';
+            document.getElementById('editorHeader').style.display = 'none';
+            document.getElementById('editorBody').style.display = 'none';
+        }
+
+        function markDirty() {
+            isDirty = true;
+        }
+
+        // ─── Config I/O ──────────────────────────────────────────
+
+        function loadConfig(cfg) {
+            // Page
+            document.getElementById('cfgPageSize').value = cfg.page?.size || 'A4';
+            document.getElementById('cfgOrientation').value = cfg.page?.orientation || 'portrait';
+            document.getElementById('cfgColumns').value = cfg.page?.columns || 1;
+            document.getElementById('cfgMarginTop').value = cfg.page?.margins?.top ?? 25;
+            document.getElementById('cfgMarginBottom').value = cfg.page?.margins?.bottom ?? 25;
+            document.getElementById('cfgMarginLeft').value = cfg.page?.margins?.left ?? 19;
+            document.getElementById('cfgMarginRight').value = cfg.page?.margins?.right ?? 19;
+
+            // Spacing
+            document.getElementById('cfgLineSpacing').value = cfg.spacing?.line_spacing ?? 1.15;
+            document.getElementById('cfgParagraphSpacing').value = cfg.spacing?.paragraph_spacing ?? 8;
+
+            // Cover
+            toggleSet('cfgCoverEnabled', cfg.cover_page?.enabled ?? true);
+            document.getElementById('cfgCoverTitleSize').value = cfg.cover_page?.title_size ?? 36;
+            document.getElementById('cfgCoverTitleColor').value = cfg.cover_page?.title_color || '#1A1A2E';
+            toggleSet('cfgCoverShowDate', cfg.cover_page?.show_date ?? true);
+
+            // Footer
+            toggleSet('cfgFooterPageNumber', cfg.footer?.show_page_number ?? true);
+            document.getElementById('cfgFooterText').value = cfg.footer?.custom_text || '';
+        }
+
+        function gatherConfig() {
+            const elements = {};
+            ELEMENTS.forEach(el => {
+                elements[el] = {
+                    alignment: document.getElementById(`el_${el}_align`)?.value || 'left',
+                    text_color: document.getElementById(`el_${el}_color`)?.value || '#2C3E50',
+                    background_color: null,
+                    font_weight: document.getElementById(`el_${el}_weight`)?.value || 'normal',
+                    font_size: parseInt(document.getElementById(`el_${el}_size`)?.value || 11),
+                };
+                if (el === 'list') {
+                    elements[el].number_format = document.getElementById(`el_${el}_numfmt`)?.value || 'bullet';
+                }
+            });
+
+            return {
+                page: {
+                    size: document.getElementById('cfgPageSize').value,
+                    orientation: document.getElementById('cfgOrientation').value,
+                    columns: parseInt(document.getElementById('cfgColumns').value),
+                    margins: {
+                        top: parseFloat(document.getElementById('cfgMarginTop').value),
+                        bottom: parseFloat(document.getElementById('cfgMarginBottom').value),
+                        left: parseFloat(document.getElementById('cfgMarginLeft').value),
+                        right: parseFloat(document.getElementById('cfgMarginRight').value),
+                    }
+                },
+                font_family: 'Instrument Sans',
+                spacing: {
+                    line_spacing: parseFloat(document.getElementById('cfgLineSpacing').value),
+                    paragraph_spacing: parseInt(document.getElementById('cfgParagraphSpacing').value),
+                },
+                elements,
+                cover_page: {
+                    enabled: document.getElementById('cfgCoverEnabled').classList.contains('active'),
+                    title_size: parseInt(document.getElementById('cfgCoverTitleSize').value),
+                    title_color: document.getElementById('cfgCoverTitleColor').value,
+                    show_date: document.getElementById('cfgCoverShowDate').classList.contains('active'),
+                    show_author: false,
+                },
+                header: { enabled: false, text: '' },
+                footer: {
+                    enabled: true,
+                    show_page_number: document.getElementById('cfgFooterPageNumber').classList.contains('active'),
+                    custom_text: document.getElementById('cfgFooterText').value,
+                },
+                image_defaults: { alignment: 'center', max_width_percent: 80 },
+            };
+        }
+
+        function toggleSet(id, value) {
+            const el = document.getElementById(id);
+            if (value) el.classList.add('active');
+            else el.classList.remove('active');
+        }
+
+        // ─── Element Styles Builder ──────────────────────────────
+
+        function buildElementStyles(cfg) {
+            const container = document.getElementById('elementStylesContainer');
+            container.innerHTML = ELEMENTS.map(el => {
+                const style = cfg.elements?.[el] || {};
+                const label = ELEMENT_LABELS[el];
+                const isListEl = el === 'list';
+                return `
+                    <div class="element-style-card">
+                        <div class="element-name">${label}</div>
+                        <div class="element-style-grid">
+                            <div class="setting-row">
+                                <label>Align</label>
+                                <select id="el_${el}_align" onchange="markDirty(); updatePreview();">
+                                    <option value="left" ${style.alignment === 'left' ? 'selected' : ''}>Left</option>
+                                    <option value="center" ${style.alignment === 'center' ? 'selected' : ''}>Center</option>
+                                    <option value="right" ${style.alignment === 'right' ? 'selected' : ''}>Right</option>
+                                    <option value="justify" ${style.alignment === 'justify' ? 'selected' : ''}>Justify</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label>Color</label>
+                                <input type="color" id="el_${el}_color" value="${style.text_color || '#2C3E50'}" onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Weight</label>
+                                <select id="el_${el}_weight" onchange="markDirty(); updatePreview();">
+                                    <option value="normal" ${style.font_weight === 'normal' ? 'selected' : ''}>Normal</option>
+                                    <option value="bold" ${style.font_weight === 'bold' ? 'selected' : ''}>Bold</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label>Size (pt)</label>
+                                <input type="number" id="el_${el}_size" value="${style.font_size || 11}" min="8" max="60" onchange="markDirty(); updatePreview();">
+                            </div>
+                            ${isListEl ? `
+                            <div class="setting-row">
+                                <label>Format</label>
+                                <select id="el_${el}_numfmt" onchange="markDirty(); updatePreview();">
+                                    <option value="bullet" ${style.number_format === 'bullet' ? 'selected' : ''}>Bullet</option>
+                                    <option value="numbered" ${style.number_format === 'numbered' ? 'selected' : ''}>Numbered</option>
+                                </select>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ─── Live Preview ────────────────────────────────────────
+
+        function updatePreview() {
+            const cfg = gatherConfig();
+            const page = document.getElementById('previewPage');
+            // mm → preview px (scale factor ~0.8px per mm)
+            const pxPerMm = 0.8;
+            const paddingV = (cfg.page.margins.top * pxPerMm) + 'px';
+            const paddingH = (cfg.page.margins.left * pxPerMm) + 'px';
+            page.style.padding = `${paddingV} ${paddingH}`;
+
+            // Apply orientation to preview page
+            const isLandscape = cfg.page.orientation === 'landscape';
+            if (isLandscape) {
+                page.style.transform = 'scale(0.75)';
+                page.style.transformOrigin = 'top center';
+                page.style.width = '1122px';  // 297mm (A4 landscape) in pixels
+                page.style.minHeight = '793px';  // 210mm (A4 landscape) in pixels
+            } else {
+                page.style.transform = 'scale(0.75)';
+                page.style.transformOrigin = 'top center';
+                page.style.width = '793px';  // 210mm (A4 portrait) in pixels
+                page.style.minHeight = '1122px';  // 297mm (A4 portrait) in pixels
+            }
+
+            // Build cover (outside columns)
+            let coverHtml = '';
+            if (cfg.cover_page.enabled) {
+                coverHtml = `
+                    <div class="preview-cover">
+                        <div style="font-size: ${cfg.cover_page.title_size * 0.5}px; font-weight: bold; color: ${cfg.cover_page.title_color}; margin-bottom: 8px;">
+                            Sample Document Title
+                        </div>
+                        <div style="font-size: 10px; color: #7f8c8d;">Extracted and Processed Content</div>
+                        ${cfg.cover_page.show_date ? `<div style="font-size: 9px; color: #95a5a6; margin-top: 8px;">Generated: March 9, 2026</div>` : ''}
+                    </div>
+                `;
+            }
+
+            // Sample content using element styles
+            const elStyle = (key) => {
+                const s = cfg.elements[key] || {};
+                return `text-align: ${s.alignment || 'left'}; color: ${s.text_color || '#2C3E50'}; font-weight: ${s.font_weight || 'normal'}; font-size: ${(s.font_size || 11) * 0.75}px; margin-bottom: ${cfg.spacing.paragraph_spacing * 0.5}px; line-height: ${cfg.spacing.line_spacing};`;
+            };
+
+            let contentHtml = `
+                <div style="${elStyle('h1')}">1. Introduction</div>
+                <div style="${elStyle('paragraph')}">This is a sample paragraph demonstrating the body text style. It shows how your exported document will look with the current template settings applied.</div>
+                <div style="${elStyle('h2')}">1.1 Key Concepts</div>
+                <div style="${elStyle('paragraph')}">Another paragraph with justified or left-aligned text depending on your configuration. The content fills each column from top to bottom before moving to the next.</div>
+                <div style="${elStyle('h3')}">1.1.1 Details</div>
+                <div style="${elStyle('list')}">
+                    ${cfg.elements.list?.number_format === 'numbered' ? '1.' : '•'} First item in the list<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '2.' : '•'} Second item with more detail<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '3.' : '•'} Third item
+                </div>
+                <div style="${elStyle('h4')}">Additional Notes</div>
+                <div style="${elStyle('paragraph')}">Final section with supporting text content.</div>
+            `;
+
+            // Footer (always anchored at bottom, spans all columns)
+            let footerHtml = `
+                <div class="preview-footer">
+                    ${cfg.footer.show_page_number ? 'Page 1 | ' : ''}Generated by mysmartnotes.vercel.app | Create notes and study smart!${cfg.footer.custom_text ? ' | ' + cfg.footer.custom_text : ''}
+                </div>
+            `;
+
+            // Apply columns to the content wrapper only (footer stays outside)
+            let colStyle = '';
+            if (cfg.page.columns > 1) {
+                colStyle = `column-count: ${cfg.page.columns}; column-gap: 20px; column-fill: auto;`;
+            }
+
+            // Reset page-level column styles
+            page.style.columnCount = '';
+            page.style.columnGap = '';
+
+            page.innerHTML = `
+                ${coverHtml}
+                <div class="preview-content" style="${colStyle}">
+                    ${contentHtml}
+                </div>
+                ${footerHtml}
+            `;
+        }
+    </script>
+</body>
+
+</html>

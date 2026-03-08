@@ -17,9 +17,13 @@ class ContentType(str, Enum):
     H1 = "h1"  # Section header
     H2 = "h2"  # Topic header
     H3 = "h3"  # Subtopic header
+    H4 = "h4"  # Subheading level 4
+    H5 = "h5"  # Subheading level 5
     BODY = "body"  # Regular text
     CODE = "code"  # Code block
-    LIST = "list"  # List item
+    LIST = "list"  # List item (bullet)
+    ORDERED_LIST = "ordered_list"  # Numbered list
+    TABLE_ROW = "table_row"  # Table row
 
 
 @dataclass
