@@ -81,29 +81,35 @@
             flex-direction: row-reverse;
         }
 
+        .message-side {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            min-width: 60px;
+            padding-bottom: var(--spacing-sm);
+        }
+
         .message-actions {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            display: none;
+            opacity: 0;
+            display: flex;
             align-items: center;
             gap: 6px;
             background: transparent;
             border: none;
             border-radius: 0;
             padding: 0;
+            margin-bottom: 4px;
             z-index: 10;
             box-shadow: none;
+            transition: opacity 0.2s;
         }
 
         .message:hover .message-actions {
-            display: flex;
+            opacity: 1;
         }
 
-        .message.user .message-actions {
-            right: 8px;
-            left: auto;
-        }
+        /* Removed absolutely positioned left/right overrides as it uses flex order now */
 
         .action-btn {
             background: none;
@@ -129,13 +135,13 @@
 
         .reply-indicator {
             background: var(--color-background);
-            border-left: 4px solid var(--color-primary);
-            padding: var(--spacing-md) var(--spacing-lg);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--spacing-md);
+            border-top: 1px solid var(--color-primary);
+            border-bottom: 1px solid var(--color-light-gray);
+            padding: var(--spacing-sm) var(--spacing-lg);
             font-size: var(--font-size-sm);
             animation: slideUp 0.2s ease-out;
-            box-shadow: 0 2px 6px rgba(78, 205, 196, 0.15);
+            position: relative;
+            z-index: 10;
         }
 
         @keyframes slideUp {
@@ -143,6 +149,7 @@
                 opacity: 0;
                 transform: translateY(8px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -152,7 +159,7 @@
         .reply-indicator-header {
             font-weight: 600;
             color: var(--color-primary);
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -164,13 +171,9 @@
             overflow: hidden;
             text-overflow: ellipsis;
             display: -webkit-box;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 1;
             -webkit-box-orient: vertical;
-            padding: 4px 0;
             font-style: italic;
-            background: rgba(0,0,0,0.02);
-            padding: 6px 8px;
-            border-radius: 4px;
         }
 
         .close-reply-btn {
@@ -193,11 +196,11 @@
 
         /* WhatsApp-style reply in message bubble */
         .message-reply-quote {
-            background: rgba(78, 205, 196, 0.08);
+            background: var(--color-white);
             border-left: 3px solid var(--color-primary);
             padding: 8px 10px;
             margin-bottom: 10px;
-            border-radius: 4px;
+            border-radius: var(--radius-sm);
             font-size: var(--font-size-xs);
         }
 
@@ -230,6 +233,7 @@
             from {
                 background: rgba(78, 205, 196, 0.3);
             }
+
             to {
                 background: rgba(78, 205, 196, 0.1);
             }
@@ -257,10 +261,9 @@
         .message-time {
             font-size: var(--font-size-xs);
             color: var(--color-gray);
-            padding: 0 var(--spacing-sm);
             display: flex;
-            align-items: flex-end;
-            min-width: 60px;
+            align-items: center;
+            justify-content: center;
         }
 
         /* Spinner Animation */
@@ -491,6 +494,7 @@
                 background-color: #ffeb3b;
                 color: #333;
             }
+
             100% {
                 background-color: #1976d2;
                 color: #fff;
@@ -530,7 +534,7 @@
             color: white;
         }
 
-        .source-item.highlighted-source > div {
+        .source-item.highlighted-source>div {
             color: white;
         }
 
@@ -1559,19 +1563,20 @@
             } : null;
 
             // Add user message to local state
-            const userMsg = { 
-                role: 'user', 
-                content: message, 
-                time: new Date(), 
+            const userMsg = {
+                id: undefined, // Will be set on history fetch or if backend returns it
+                role: 'user',
+                content: message,
+                time: new Date(),
                 ai_mode: currentAiMode,
                 replyTo: replyInfo  // Include reply information
             };
             conversationMessages.push(userMsg);
             input.value = '';
-            
+
             // Clear reply indicator after sending
             clearReply();
-            
+
             displayMessages();
 
             // Loading bubble
@@ -1588,6 +1593,7 @@
                 output_format: currentOutputFormat,
                 conversation_id: currentConversationId,
                 auto_detect_conversation: true,  // Enable auto-detection
+                reply_to_message_id: replyInfo ? replyInfo.id : null  // Send ID to backend
             };
             if (currentScope.type === 'note') payload.lecture_id = parseInt(currentScope.id);
             else if (currentScope.type === 'subject') payload.subject_id = parseInt(currentScope.id);
@@ -1671,13 +1677,18 @@
                 return;
             }
 
-            // Build reply indicator if replying to a specific message
-            let replyIndicatorHTML = '';
+            // Inject reply indicator ABOVE the input box area (in .chat-main)
+            const chatMain = document.querySelector('.chat-main');
+            const existingIndicator = document.getElementById('chat-form-reply-indicator');
+            if (existingIndicator) existingIndicator.remove();
+
             if (window.replyingToMessageId !== null && window.replyingToMessageId !== undefined) {
                 const replyMsg = conversationMessages[window.replyingToMessageId];
                 if (replyMsg) {
-                    const replyPreview = replyMsg.content.substring(0, 50).replace(/<[^>]*>/g, '') + (replyMsg.content.length > 50 ? '...' : '');
-                    replyIndicatorHTML = `
+                    const replyPreview = replyMsg.content.replace(/<[^>]*>/g, '').replace(/\[\d+\]/g, '');
+                    const indicatorDiv = document.createElement('div');
+                    indicatorDiv.id = 'chat-form-reply-indicator';
+                    indicatorDiv.innerHTML = `
                         <div class="reply-indicator">
                             <div class="reply-indicator-header">
                                 <i class="ph ph-arrow-bend-up-right"></i>
@@ -1688,6 +1699,9 @@
                             </div>
                             <div class="reply-indicator-content">"${replyPreview}"</div>
                         </div>`;
+
+                    const inputArea = document.querySelector('.chat-input-area');
+                    chatMain.insertBefore(indicatorDiv, inputArea);
                 }
             }
 
@@ -1819,16 +1833,16 @@
                 let replyQuoteHTML = '';
                 if (msg.replyTo && msg.role === 'user') {
                     const replyAuthor = msg.replyTo.id !== undefined ? (conversationMessages[msg.replyTo.id]?.role === 'user' ? 'You' : 'AI') : 'Unknown';
-                    const replyText = msg.replyTo.content?.substring(0, 60).replace(/<[^>]*>/g, '') || 'Replied message';
+                    const replyText = msg.replyTo.content?.replace(/<[^>]*>/g, '').replace(/\[\d+\]/g, '') || 'Replied message';
                     replyQuoteHTML = `
                         <div class="message-reply-quote">
                             <span class="message-reply-quote-author">↳ ${replyAuthor}</span>
-                            <span class="message-reply-quote-text">"${replyText}${(msg.replyTo.content?.length || 0) > 60 ? '...' : ''}"</span>
+                            <span class="message-reply-quote-text">"${replyText}"</span>
                         </div>`;
                 }
 
-                // Check if this message is the one being replied to
-                const isHighlightedForReply = (window.replyingToMessageId === idx) ? ' highlighted-for-reply' : '';
+                // Check if this message is the one being replied to (only highlight for user messages, as requested)
+                const isHighlightedForReply = (window.replyingToMessageId === idx && msg.role === 'user') ? ' highlighted-for-reply' : '';
 
                 // Reply button only for non-loading messages
                 let actionsHTML = '';
@@ -1842,18 +1856,20 @@
                 return `
                 <div class="message ${msg.role}${isHighlightedForReply}">
                     <div class="message-content">
-                        ${actionsHTML ? `<div class="message-actions">${actionsHTML}</div>` : ''}
                         ${replyQuoteHTML}
                         ${thinkingHTML}
                         ${contentHTML}
                         ${metadataHTML}
                     </div>
-                    <div class="message-time">${timeStr}</div>
+                    <div class="message-side">
+                        ${actionsHTML ? `<div class="message-actions">${actionsHTML}</div>` : ''}
+                        <div class="message-time">${timeStr}</div>
+                    </div>
                 </div>`;
             }).join('');
 
-            // Combine reply indicator and messages
-            container.innerHTML = replyIndicatorHTML + messagesHTML;
+            // Set messages only
+            container.innerHTML = messagesHTML;
             container.scrollTop = container.scrollHeight;
         }
 
@@ -2005,27 +2021,45 @@
                 currentConversationId = convId;
                 isViewingHistory = true;
 
-                // Flatten Q&A pairs into the messages array
-                conversationMessages = [];
-                msgs.forEach(m => {
-                    conversationMessages.push({
+                // Build message list locally from history array
+                const historyMessages = [];
+                // First pass: add messages 
+                msgs.forEach((msg, idx) => {
+                    historyMessages.push({
+                        id: msg.id, // Store database ID for reply references
                         role: 'user',
-                        content: m.message,
-                        time: parseUTCDate(m.created_at),
-                        ai_mode: m.ai_mode,
+                        content: msg.message,
+                        time: new Date(msg.created_at),
+                        ai_mode: msg.ai_mode,
+                        reply_to_message_id: msg.reply_to_message_id // Temporary stored ID
                     });
-                    conversationMessages.push({
+                    historyMessages.push({
+                        id: msg.id + '_ai', // Pseudo ID for AI messages if needed
                         role: 'ai',
-                        content: m.response,
-                        time: parseUTCDate(m.created_at),
-                        ai_mode: m.ai_mode,
-                        ai_model: m.ai_model || null,
-                        sources: m.sources || [],
-                        detailed_sources: m.detailed_sources || [],
+                        content: msg.response,
+                        time: new Date(msg.created_at),
+                        sources: msg.sources || [],
+                        ai_model: msg.ai_model,
+                        ai_mode: msg.ai_mode,
+                        detailed_sources: msg.detailed_sources || [],
+                        timings: msg.timings,
                     });
                 });
 
-                // Restore scope from first message
+                // Second pass: wire up replyTo references using array index
+                historyMessages.forEach((msg, idx) => {
+                    if (msg.role === 'user' && msg.reply_to_message_id !== null && msg.reply_to_message_id !== undefined) {
+                        const targetIdx = parseInt(msg.reply_to_message_id);
+                        if (!isNaN(targetIdx) && targetIdx >= 0 && targetIdx < historyMessages.length) {
+                            msg.replyTo = {
+                                id: targetIdx,
+                                content: historyMessages[targetIdx].content
+                            };
+                        }
+                    }
+                });
+
+                conversationMessages = historyMessages; // Restore scope from first message
                 const first = msgs[0];
                 let scopeType = null, scopeId = null, scopeTitle = 'Past Conversation';
                 if (first.lecture_id) {
@@ -2083,7 +2117,7 @@
             const bracketPattern = /\[([^\]]*)\]/g;
             const references = [];
             const matches = [];
-            
+
             // Find all bracketed content
             let match;
             while ((match = bracketPattern.exec(content)) !== null) {
@@ -2093,7 +2127,7 @@
                     matches.push({ full: match[0], text: bracketedText, index: match.index });
                 }
             }
-            
+
             // Replace all bracketed snippets with superscript numbers
             let convertedContent = content;
             let offset = 0;
@@ -2104,13 +2138,13 @@
                 const endPos = startPos + match.full.length;
                 convertedContent = convertedContent.substring(0, startPos) + replacement + convertedContent.substring(endPos);
                 offset += replacement.length - match.full.length;
-                
+
                 // Clean up the text for display
                 let refText = match.text.replace(/^"|"$/g, '').replace(/\.\.\.$/, '').trim();
                 if (refText.length > 80) refText = refText.substring(0, 80) + '...';
                 references.push({ num: refNum, text: refText });
             });
-            
+
             // Build references section if any found
             let referencesHTML = '';
             if (references.length > 0) {
@@ -2125,7 +2159,7 @@
                         `).join('')}
                     </div>`;
             }
-            
+
             return { content: convertedContent, referencesHTML };
         }
 
@@ -2133,13 +2167,13 @@
             if (!(date instanceof Date)) {
                 date = new Date(date);
             }
-            
+
             // Use device's native local timezone (don't specify timeZone)
             const timeStr = date.toLocaleString([], {
                 hour: '2-digit',
                 minute: '2-digit'
             });
-            
+
             return timeStr;
         }
 
@@ -2147,15 +2181,15 @@
             if (!(date instanceof Date)) {
                 date = new Date(date);
             }
-            
+
             const defaultOptions = {
                 month: 'short',
                 day: 'numeric'
             };
-            
+
             const finalOptions = { ...defaultOptions, ...options };
             const dateStr = date.toLocaleDateString([], finalOptions);
-            
+
             return dateStr;
         }
 
@@ -2163,7 +2197,7 @@
             if (!(date instanceof Date)) {
                 date = new Date(date);
             }
-            
+
             // Use device's native local timezone
             const dateStr = date.toLocaleString([], {
                 month: 'short',
@@ -2171,7 +2205,7 @@
                 hour: '2-digit',
                 minute: '2-digit'
             });
-            
+
             return dateStr;
         }
 
@@ -2274,13 +2308,13 @@
             window._deleteConfirmCallback = onConfirm;
         }
 
-        window.confirmDeleteConv = function() {
+        window.confirmDeleteConv = function () {
             const modal = document.getElementById('deleteConfirmModal');
             if (modal) modal.classList.remove('active');
             if (window._deleteConfirmCallback) window._deleteConfirmCallback();
         };
 
-        window.cancelDeleteConv = function() {
+        window.cancelDeleteConv = function () {
             const modal = document.getElementById('deleteConfirmModal');
             if (modal) modal.classList.remove('active');
         };
@@ -2318,30 +2352,30 @@
             // Pattern to match [1], [2], etc.
             const citationPattern = /\[(\d+)\]/g;
             let converted = text;
-            
+
             converted = converted.replace(citationPattern, (match, num) => {
                 return `<span class="citation-link" data-citation-num="${num}" onclick="handleCitationClick(event, ${num})">[${num}]</span>`;
             });
-            
+
             return converted;
         }
 
         function handleCitationClick(event, citationNum) {
             event.preventDefault();
             event.stopPropagation();
-            
+
             // Find the corresponding source item in the same message
             const messageContent = event.target.closest('.message-content');
             if (!messageContent) return;
-            
+
             const message = messageContent.closest('.message');
             if (!message) return;
-            
+
             // Find all source items in this message's metadata
             const sourceItems = message.querySelectorAll('.source-item');
             if (citationNum > 0 && citationNum <= sourceItems.length) {
                 const targetSource = sourceItems[citationNum - 1];
-                
+
                 // Trigger the source item's onclick behavior
                 // Check if it's a web source or note source by examining the onclick or data attributes
                 const onclickAttr = targetSource.getAttribute('onclick');
@@ -2358,24 +2392,24 @@
         function highlightCitation(event, citationNum) {
             event.preventDefault();
             event.stopPropagation();
-            
+
             // Remove previous highlights
             document.querySelectorAll('.citation-link.highlighted, .source-item.highlighted-source').forEach(el => {
                 el.classList.remove('highlighted', 'highlighted-source');
             });
-            
+
             // Highlight the clicked citation
             const clickedCitation = event.target;
             if (clickedCitation.classList.contains('citation-link')) {
                 clickedCitation.classList.add('highlighted');
             }
-            
+
             // Find and highlight the corresponding source (nth-child starts at 1)
             const sourceItems = document.querySelectorAll('.source-item');
             if (citationNum > 0 && citationNum <= sourceItems.length) {
                 const targetSource = sourceItems[citationNum - 1];
                 targetSource.classList.add('highlighted-source');
-                
+
                 // Scroll the source into view
                 targetSource.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }

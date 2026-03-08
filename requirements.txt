@@ -29,3 +29,7 @@ python-pptx>=0.6.21
 aiohttp>=3.9.0
 pdfplumber>=0.10.0
 ddgs>=3.9.0
+email-validator>=2.1.0.post1
+opencv-python-headless>=4.8.0
+reportlab>=4.0.0
+

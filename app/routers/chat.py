@@ -49,7 +49,7 @@ class ChatMessageResponse(BaseModel):
     ai_model: Optional[str] = None
     conversation_id: Optional[str] = None
     conversation_title: Optional[str] = None
-    timings: Optional[dict] = None
+    reply_to_message_id: Optional[int] = None
     timings: Optional[dict] = None
 
 
@@ -77,6 +77,7 @@ class ChatResponse(BaseModel):
     detailed_sources: Optional[list] = []
     conversation_id: Optional[str] = None
     conversation_title: Optional[str] = None
+    reply_to_message_id: Optional[int] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -99,7 +100,7 @@ OUTPUT_FORMATS = {
 
 _BASE_GUARD = (
     "CRITICAL: Answer ONLY using the provided context. "
-    "If the answer is NOT found in the context, respond with EXACTLY: \"I don't know.\" "
+    "If the answer is NOT found in the context, respond with EXACTLY AND ONLY: \"I am unable to find any information based on your question.\" "
     "Do NOT make up facts, hallucinate information, or guess. "
     "Never provide information outside the provided context."
 )
@@ -112,8 +113,8 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
 
     # Base mode instructions with STRICTER constraints
     mode_instructions = {
-        "quick": "You are a concise assistant. Extract the most important facts from the context. Be specific and factual. If context lacks details, say 'I don't know.'",
-        "simple": "Explain using ONLY the provided context. Use plain, everyday language. Avoid jargon. If unclear in context, say 'I don't know.'",
+        "quick": "You are a concise assistant. Extract the most important facts from the context. Be specific and factual. If context lacks details, say 'I am unable to find any information based on your question.'",
+        "simple": "Explain using ONLY the provided context. Use plain, everyday language. Avoid jargon. If unclear in context, say 'I am unable to find any information based on your question.'",
         "elaborate": "Provide thorough, well-structured explanations grounded in the context. Be detailed but accurate. Never assume facts not in context.",
         "eli5": "Explain like to a 5-year-old using ONLY context material. Use short sentences and relatable analogies from the context only.",
     }
@@ -123,7 +124,7 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
         "sentence": "Respond as 1-3 clear sentences.",
         "pointform": "Use bullet points (- or •). 3-5 points. Keep each point short and factual.",
         "numbered_list": "Use numbered format (1. 2. 3.). 3-7 items. Be concise and specific.",
-        "table": "Create markdown table with 2-3 relevant columns based on the context content.",
+        "table": "Create ONLY a markdown table with 2-3 relevant columns based on the context content. Do NOT add any text outside the table.",
     }
 
     mode_inst = mode_instructions.get(mode, mode_instructions["elaborate"])
@@ -134,7 +135,7 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
         guard = (
             "CRITICAL: Answer using ONLY the web search snippets provided. "
             "Do NOT add external knowledge. "
-            "If the answer is NOT found in snippets, respond with EXACTLY: \"I don't know.\" "
+            "If the answer is NOT found in snippets, respond with EXACTLY AND ONLY: \"I am unable to find any information based on your question.\" "
             "Never hallucinate or guess."
         )
 
@@ -151,7 +152,7 @@ RULES:
 - Do NOT include quotes or brackets 
 - Do NOT include author names or dates in the answer
 - Simply answer naturally; numerical citations [1], [2], etc. will be added automatically
-- If uncertain, say "I don't know"
+- If you found the answer, provide IT and NOTHING ELSE. Do NOT append "I am unable to find any information..." to a valid answer.
 - Never add information outside the provided context
 - Check facts twice before responding
 """
@@ -707,8 +708,13 @@ async def ask_question(
         )
         
         # Checking if local context didn't have the answer
-        if response.strip().lower() in ["i don't know", "i don't know.", '"i don\'t know."']:
-            print(f"[chat] LLM responded 'I don't know' using local context. Trying web search...")
+        fallback_phrases = [
+            "i am unable to find any information based on your question",
+            "i am unable to find any information based on your question.",
+            '"i am unable to find any information based on your question."'
+        ]
+        if response.strip().lower() in fallback_phrases:
+            print(f"[chat] LLM responded with fallback phrase using local context. Trying web search...")
             web_snippet, web_sources, web_error = await web_search(request.message, timeout=10.0)
             print(f"[chat] web_snippet fetched length: {len(web_snippet)}, error: {web_error}")
             if web_error == "timeout":
@@ -797,6 +803,7 @@ async def ask_question(
             ai_mode=request.ai_mode,
             output_format=request.output_format,
             ai_model=ai_model_info,
+            reply_to_message_id=request.reply_to_message_id,
             detailed_sources_json=json.dumps(detailed_sources) if detailed_sources else None,
             timings_json=json.dumps(timings_dict),
         )
@@ -819,6 +826,7 @@ async def ask_question(
         detailed_sources=detailed_sources,
         conversation_id=conv_id,
         conversation_title=conv_title,
+        reply_to_message_id=request.reply_to_message_id,
         timings={
             "retrieval_ms": round(retrieval_ms, 2),
             "model_ms": round(model_ms, 2),
@@ -911,6 +919,7 @@ async def get_conversation_messages(
             ai_model=m.ai_model,
             conversation_id=m.conversation_id,
             conversation_title=m.conversation_title,
+            reply_to_message_id=m.reply_to_message_id,
             output_format=m.output_format,
             timings=json.loads(m.timings_json) if m.timings_json else None,
         )
@@ -943,6 +952,7 @@ async def get_all_chat_history(
             ai_model=m.ai_model,
             conversation_id=m.conversation_id,
             conversation_title=m.conversation_title,
+            reply_to_message_id=m.reply_to_message_id,
             output_format=m.output_format,
             timings=json.loads(m.timings_json) if m.timings_json else None,
         )
@@ -982,9 +992,7 @@ async def get_lecture_chat_history(
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,
-            ai_model=m.ai_model,
-            conversation_id=m.conversation_id,
-            conversation_title=m.conversation_title,
+            reply_to_message_id=m.reply_to_message_id,
             output_format=m.output_format,
             timings=json.loads(m.timings_json) if m.timings_json else None,
         )
