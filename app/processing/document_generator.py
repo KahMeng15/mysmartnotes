@@ -189,6 +189,7 @@ class DocumentGenerator:
         self.base_output_dir = base_output_dir
         self.output_dir = os.path.join(base_output_dir, str(lecture_id))
         self.page_size = page_size
+        self._template_config = None
         
         # Create output directory
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -211,12 +212,39 @@ class DocumentGenerator:
         """
         try:
             extracted_images = extracted_images or []
-            self._template_config = template_config
+            self._template_config = template_config or {}
             
             if progress_callback:
                 progress_callback("Preparing document", 10)
             
-            # Apply template margins if provided (margins are in mm, convert to inches)
+            # Apply template page configuration
+            from reportlab.lib.pagesizes import A4, letter, A3, legal
+            page_size = letter
+            orientation = "portrait"
+            page_size_name = "Letter"
+            
+            if template_config and "page" in template_config:
+                page_cfg = template_config["page"]
+                
+                # Page size
+                size_name = page_cfg.get("size", "A4").upper()
+                if size_name == "A4":
+                    page_size = A4
+                elif size_name == "LETTER":
+                    page_size = letter
+                elif size_name == "LEGAL":
+                    page_size = legal
+                elif size_name == "A3":
+                    page_size = A3
+                
+                # Orientation - swap dimensions for landscape
+                orientation = page_cfg.get("orientation", "portrait").lower()
+                if orientation == "landscape":
+                    page_size = (page_size[1], page_size[0])  # Swap width/height
+            
+            self.page_size = page_size
+            
+            # Get margins (in mm, convert to inches)
             margins_mm = {"top": 25, "bottom": 25, "left": 19, "right": 19}
             if template_config and "page" in template_config:
                 page_cfg = template_config["page"]
@@ -369,51 +397,144 @@ class DocumentGenerator:
                 images_by_page[img.page_number] = []
             images_by_page[img.page_number].append(img)
         
-        for segment in content_segments:
-            # Add content based on type
-            if segment.content_type == ContentType.H1:
-                story.append(Paragraph(segment.content, self.styles["H1"]))
-                story.append(Spacer(1, 0.15 * inch))
-                
-            elif segment.content_type == ContentType.H2:
-                story.append(Paragraph(segment.content, self.styles["H2"]))
-                story.append(Spacer(1, 0.1 * inch))
-                
-            elif segment.content_type == ContentType.H3:
-                story.append(Paragraph(segment.content, self.styles["H3"]))
-                story.append(Spacer(1, 0.08 * inch))
-                
-            elif segment.content_type == ContentType.H4:
-                story.append(Paragraph(segment.content, self.styles["H4"]))
-                story.append(Spacer(1, 0.06 * inch))
-                
-            elif segment.content_type == ContentType.H5:
-                story.append(Paragraph(segment.content, self.styles["H5"]))
-                story.append(Spacer(1, 0.05 * inch))
-                
-            elif segment.content_type == ContentType.LIST:
-                story.append(Paragraph(f"• {segment.content}", self.styles["List"]))
-                
-            elif segment.content_type == ContentType.ORDERED_LIST:
-                story.append(Paragraph(segment.content, self.styles["OrderedList"]))
-                
-            elif segment.content_type == ContentType.TABLE_ROW:
-                story.append(Paragraph(segment.content, self.styles["TableRow"]))
-                
-            elif segment.content_type == ContentType.CODE:
-                story.append(Paragraph(segment.content, self.styles["Code"]))
-                
-            else:  # BODY
-                story.append(Paragraph(segment.content, self.styles["Body"]))
+        # Process segments, collecting consecutive table rows
+        i = 0
+        while i < len(content_segments):
+            segment = content_segments[i]
             
+            # Check if this is a table row - collect all consecutive table rows
+            if segment.content_type == ContentType.TABLE_ROW:
+                table_segments = []
+                while i < len(content_segments) and content_segments[i].content_type == ContentType.TABLE_ROW:
+                    table_segments.append(content_segments[i])
+                    i += 1
+                
+                # Render the table
+                table_flowable = self._render_table(table_segments)
+                if table_flowable:
+                    story.append(table_flowable)
+                    story.append(Spacer(1, 0.2 * inch))
+                continue
+            
+            # Regular paragraph rendering with template styles
+            style_name = self._get_style_name_for_segment(segment)
+            style = self.styles.get(style_name, self.styles["Body"])
+            
+            # Apply template element style if available
+            if self._template_config and "elements" in self._template_config:
+                style = self._apply_template_style(style, style_name)
+            
+            story.append(Paragraph(segment.content, style))
             story.append(Spacer(1, 0.08 * inch))
             
             # Add images for this page
             if segment.page_number in images_by_page:
                 for img in images_by_page[segment.page_number]:
                     story.extend(self._add_image(img))
+            
+            i += 1
         
         return story
+    
+    def _get_style_name_for_segment(self, segment: ContentSegment) -> str:
+        """Map content type to style name"""
+        type_to_style = {
+            ContentType.H1: "H1",
+            ContentType.H2: "H2",
+            ContentType.H3: "H3",
+            ContentType.H4: "H4",
+            ContentType.H5: "H5",
+            ContentType.LIST: "List",
+            ContentType.ORDERED_LIST: "OrderedList",
+            ContentType.CODE: "Code",
+            ContentType.BODY: "Body",
+        }
+        return type_to_style.get(segment.content_type, "Body")
+    
+    def _apply_template_style(self, base_style: ParagraphStyle, style_name: str) -> ParagraphStyle:
+        """Apply template element styles to paragraph style"""
+        elements_config = self._template_config.get("elements", {})
+        
+        # Map style names to element keys
+        style_map = {
+            "H1": "h1", "H2": "h2", "H3": "h3", "H4": "h4", "H5": "h5",
+            "Body": "paragraph", "List": "list", "OrderedList": "list", "Code": "code"
+        }
+        
+        element_key = style_map.get(style_name)
+        if not element_key or element_key not in elements_config:
+            return base_style
+        
+        elem_config = elements_config[element_key]
+        
+        # Create modified style
+        return ParagraphStyle(
+            name=f"{base_style.name}_templated",
+            parent=base_style,
+            fontSize=elem_config.get("font_size", base_style.fontSize),
+            textColor=colors.HexColor(elem_config.get("text_color", "#2C3E50")),
+            fontName="Helvetica-Bold" if elem_config.get("font_weight") == "bold" else "Helvetica",
+            alignment=self._get_alignment(elem_config.get("alignment", "left")),
+        )
+    
+    def _get_alignment(self, alignment_str: str):
+        """Convert alignment string to reportlab enum"""
+        alignment_map = {
+            "left": TA_LEFT,
+            "center": TA_CENTER,
+            "right": TA_CENTER,  # TA_RIGHT not available; use center
+            "justify": TA_JUSTIFY,
+        }
+        return alignment_map.get(alignment_str, TA_LEFT)
+    
+    def _render_table(self, table_segments: List[ContentSegment]) -> Optional[Flowable]:
+        """
+        Render markdown table rows as a ReportLab Table
+        Expects table segments with content like: | Header1 | Header2 |
+        """
+        if not table_segments:
+            return None
+        
+        # Parse markdown table format
+        rows = []
+        for segment in table_segments:
+            # Split by | and clean up
+            cells = [cell.strip() for cell in segment.content.split("|")]
+            # Filter out empty cells at start/end
+            cells = [c for c in cells if c and not c.startswith("---")]
+            if cells:
+                rows.append(cells)
+        
+        if not rows:
+            return None
+        
+        # Create table with better column width calculation
+        try:
+            # Account for margins and padding
+            margins_in = 0.75  # Default document margins in inches
+            available_width = self.page_size[0] - (2 * margins_in * inch)
+            num_cols = len(rows[0]) if rows else 1
+            col_width = available_width / num_cols
+            
+            table = Table(rows, colWidths=[col_width] * num_cols)
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#593f8f")),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('TOPPADDING', (0, 0), (-1, 0), 8),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ]))
+            return table
+        except Exception as e:
+            logger.warning(f"Failed to render table: {e}")
+            return None
 
     def _add_image(self, image_obj: ExtractedImage) -> List[Flowable]:
         """Add image to story"""

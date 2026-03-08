@@ -257,15 +257,22 @@
             border-radius: 4px;
             padding: 40px 30px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            min-height: 560px;
             font-family: 'Instrument Sans', sans-serif;
             position: relative;
             display: flex;
             flex-direction: column;
+            width: 793px;
+            height: 1122px;
+            margin-bottom: 20px;
+            page-break-after: always;
+            overflow: hidden;
         }
 
         .preview-content {
             flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         .preview-cover {
@@ -273,16 +280,17 @@
             padding: 60px 20px;
             border-bottom: 1px dashed #ddd;
             margin-bottom: 20px;
+            flex-shrink: 0;
         }
 
         .preview-footer {
-            margin-top: auto;
             padding-top: 8px;
             border-top: 1px solid #eee;
             font-size: 7pt;
             color: #95a5a6;
             text-align: center;
-            column-span: all;
+            flex-shrink: 0;
+            margin-top: auto;
         }
 
         /* ─── Buttons ─── */
@@ -847,18 +855,18 @@
             const paddingH = (cfg.page.margins.left * pxPerMm) + 'px';
             page.style.padding = `${paddingV} ${paddingH}`;
 
-            // Apply orientation to preview page
+            // Apply orientation to preview page with fixed dimensions
             const isLandscape = cfg.page.orientation === 'landscape';
             if (isLandscape) {
                 page.style.transform = 'scale(0.75)';
                 page.style.transformOrigin = 'top center';
                 page.style.width = '1122px';  // 297mm (A4 landscape) in pixels
-                page.style.minHeight = '793px';  // 210mm (A4 landscape) in pixels
+                page.style.height = '793px';  // 210mm (A4 landscape) in pixels
             } else {
                 page.style.transform = 'scale(0.75)';
                 page.style.transformOrigin = 'top center';
                 page.style.width = '793px';  // 210mm (A4 portrait) in pixels
-                page.style.minHeight = '1122px';  // 297mm (A4 portrait) in pixels
+                page.style.height = '1122px';  // 297mm (A4 portrait) in pixels
             }
 
             // Build cover (outside columns)
@@ -882,18 +890,131 @@
             };
 
             let contentHtml = `
-                <div style="${elStyle('h1')}">1. Introduction</div>
-                <div style="${elStyle('paragraph')}">This is a sample paragraph demonstrating the body text style. It shows how your exported document will look with the current template settings applied.</div>
-                <div style="${elStyle('h2')}">1.1 Key Concepts</div>
-                <div style="${elStyle('paragraph')}">Another paragraph with justified or left-aligned text depending on your configuration. The content fills each column from top to bottom before moving to the next.</div>
-                <div style="${elStyle('h3')}">1.1.1 Details</div>
+                <div style="${elStyle('h1')}">1. Introduction to Documentation</div>
+                <div style="${elStyle('paragraph')}">This is a comprehensive sample paragraph demonstrating the body text style in a professional document. It shows exactly how your exported content will appear with the current template settings applied. The layout system intelligently distributes text across multiple columns when enabled.</div>
+                
+                <div style="${elStyle('h2')}">1.1 Key Concepts and Fundamentals</div>
+                <div style="${elStyle('paragraph')}">Understanding the foundational concepts is crucial for effective implementation. This paragraph provides essential background information that sets the context for the more detailed sections that follow. The text demonstrates proper alignment and spacing according to your template configuration.</div>
+                
+                <div style="${elStyle('paragraph')}">Additional context and supporting information helps reinforce the key concepts introduced. When working with templates, multiple paragraphs allow for thorough explanation of complex topics. The column layout automatically flows content for optimal distribution.</div>
+                
+                <div style="${elStyle('h3')}">1.1.1 Detailed Technical Information</div>
+                <div style="${elStyle('paragraph')}">This subsection contains more granular details about specific implementation aspects. Technical documentation requires precise explanations and comprehensive coverage of edge cases and special scenarios that might arise during usage.</div>
+                
                 <div style="${elStyle('list')}">
-                    ${cfg.elements.list?.number_format === 'numbered' ? '1.' : '•'} First item in the list<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '2.' : '•'} Second item with more detail<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '3.' : '•'} Third item
+                    ${cfg.elements.list?.number_format === 'numbered' ? '1.' : '•'} First foundational concept<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '2.' : '•'} Second principle with supporting rationale<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '3.' : '•'} Third methodology for understanding<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '4.' : '•'} Fourth approach with practical examples<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '5.' : '•'} Fifth consideration for implementation<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '6.' : '•'} Sixth element completing the framework<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '7.' : '•'} Seventh point extending the discussion
                 </div>
-                <div style="${elStyle('h4')}">Additional Notes</div>
-                <div style="${elStyle('paragraph')}">Final section with supporting text content.</div>
+                
+                <div style="${elStyle('h3')}">1.1.2 Practical Implementation Details</div>
+                <div style="${elStyle('paragraph')}">Moving from theory to practice requires careful planning and execution. Implementation details must account for various scenarios, edge cases, and potential challenges that arise in real-world applications.</div>
+                
+                <div style="${elStyle('h2')}">2. Main Content and Core Topics</div>
+                <div style="${elStyle('paragraph')}">This section represents the heart of the documentation system. It demonstrates comprehensive coverage of primary topics with sufficient depth and breadth to provide users with actionable information and clear guidance.</div>
+                
+                <div style="${elStyle('paragraph')}">The multi-column layout excels at presenting substantial amounts of information in an organized, readable format. Content naturally flows across columns, maximizing page usage while maintaining readability and visual appeal.</div>
+                
+                <div style="${elStyle('h3')}">2.1 Subsection: Advanced Concepts</div>
+                <div style="${elStyle('paragraph')}">Advanced topics build upon foundational knowledge and explore more sophisticated implementations. This subsection provides insights for users seeking deeper understanding and more advanced techniques for complex scenarios.</div>
+                
+                <div style="${elStyle('h4')}">2.1.1 Technical Deep Dive</div>
+                <div style="${elStyle('paragraph')}">Technical deep dives provide comprehensive exploration of system internals and implementation mechanisms. Understanding these mechanisms enables better decision-making and optimization of templates for specific use cases.</div>
+                
+                <div style="${elStyle('code')}">const advConfig = {<br>&nbsp;&nbsp;columns: 3,<br>&nbsp;&nbsp;orientation: 'landscape',<br>&nbsp;&nbsp;pageSize: 'A4'<br>};</div>
+                
+                <div style="${elStyle('paragraph')}">Code examples demonstrate practical implementation patterns and best practices for configuration and usage.</div>
+                
+                <div style="${elStyle('h3')}">2.2 Extended Topics and Additional Coverage</div>
+                <div style="${elStyle('paragraph')}">Extended topic coverage ensures comprehensive treatment of all aspects relevant to users. This prevents gaps in knowledge and provides reference material for various use cases and scenarios.</div>
+                
+                <div style="${elStyle('list')}">
+                    ${cfg.elements.list?.number_format === 'numbered' ? '1.' : '•'} Extended topic point number one<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '2.' : '•'} Comprehensive coverage element two<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '3.' : '•'} Detailed coverage section three<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '4.' : '•'} Additional context element four<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '5.' : '•'} Supplementary information five<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '6.' : '•'} Extended coverage six<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '7.' : '•'} Comprehensive point seven<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '8.' : '•'} Final extended topic eight
+                </div>
+                
+                <div style="${elStyle('h2')}">3. Advanced Features and Capabilities</div>
+                <div style="${elStyle('paragraph')}">Advanced features extend the core functionality with powerful capabilities for specialized use cases. Understanding these advanced features enables users to leverage the full potential of the system and create sophisticated, professional documents.</div>
+                
+                <div style="${elStyle('h3')}">3.1 Template-Based Customization</div>
+                <div style="${elStyle('paragraph')}">Template systems provide flexible customization options while maintaining consistent, professional appearance. Users can adjust styling, layout, colors, and typography to match specific requirements and branding guidelines without touching underlying content.</div>
+                
+                <div style="${elStyle('paragraph')}">The template engine processes configuration settings and applies them systematically across all document elements, ensuring consistency and reducing manual formatting effort significantly.</div>
+                
+                <div style="${elStyle('h3')}">3.2 Multi-Column Layout System</div>
+                <div style="${elStyle('paragraph')}">Multi-column layouts optimize space usage and improve readability for documents with substantial content. The system automatically balances content across columns, ensuring even distribution and professional appearance regardless of content volume.</div>
+                
+                <div style="${elStyle('h4')}">Three-Column Configuration</div>
+                <div style="${elStyle('paragraph')}">Three-column layout works exceptionally well for documents with significant content, allowing newspapers-style presentation of information. This configuration is ideal for whitepapers, technical documentation, and comprehensive guides.</div>
+                
+                <div style="${elStyle('h2')}">4. Practical Examples and Use Cases</div>
+                <div style="${elStyle('paragraph')}">Real-world examples demonstrate how templates function in actual scenarios. Practical applications help users understand template benefits and learn how to implement similar solutions for their specific needs and requirements.</div>
+                
+                <div style="${elStyle('h3')}">4.1 Educational Materials</div>
+                <div style="${elStyle('paragraph')}">Educational content benefits significantly from structured templates and multi-column layouts. Textbooks, course materials, and academic papers all leverage these features to present information clearly and attractively.</div>
+                
+                <div style="${elStyle('h3')}">4.2 Business Documentation</div>
+                <div style="${elStyle('paragraph')}">Business documents require professional appearance and consistent branding. Templates ensure compliance with style guidelines while allowing content creators to focus on substance rather than formatting.</div>
+                
+                <div style="${elStyle('h3')}">4.3 Technical Specification</div>
+                <div style="${elStyle('paragraph')}">Technical specifications demand precise organization and clear presentation of complex information. Multi-column layouts support this by efficiently using available space while maintaining readability.</div>
+                
+                <div style="${elStyle('h2')}">5. Optimization and Best Practices</div>
+                <div style="${elStyle('paragraph')}">Optimizing templates and configurations requires understanding of both aesthetic and functional principles. Following established best practices ensures documents are both beautiful and functional.</div>
+                
+                <div style="${elStyle('h3')}">5.1 Performance Optimization</div>
+                <div style="${elStyle('paragraph')}">Performance considerations ensure documents generate quickly and render smoothly. Proper configuration of templates and content structure minimizes processing overhead.</div>
+                
+                <div style="${elStyle('h3')}">5.2 Design Best Practices</div>
+                <div style="${elStyle('paragraph')}">Effective design balances aesthetic appeal with functional clarity. Consistent use of fonts, colors, spacing, and hierarchy creates professional documents that are easy to navigate and understand.</div>
+                
+                <div style="${elStyle('list')}">
+                    ${cfg.elements.list?.number_format === 'numbered' ? '1.' : '•'} Maintain visual hierarchy through consistent heading styles<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '2.' : '•'} Use appropriate colors that convey meaning and maintain readability<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '3.' : '•'} Ensure adequate white space between sections and elements<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '4.' : '•'} Choose typography that balances professionalism with character<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '5.' : '•'} Test layouts with varying content lengths and volume<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '6.' : '•'} Verify page breaks occur at appropriate locations<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '7.' : '•'} Ensure footer and header information is consistent<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '8.' : '•'} Implement responsive design principles where applicable<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '9.' : '•'} Document template specifications for future maintenance<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '10.' : '•'} Test across different devices and output formats
+                </div>
+                
+                <div style="${elStyle('h2')}">6. Troubleshooting and FAQ</div>
+                <div style="${elStyle('paragraph')}">Common issues and frequently asked questions are addressed in this section. Understanding solutions to typical problems helps users resolve issues quickly and effectively without requiring external support.</div>
+                
+                <div style="${elStyle('h3')}">6.1 Common Questions</div>
+                <div style="${elStyle('paragraph')}">Users frequently ask about template modification, column configuration, and export options. This section provides clear answers and guidance for the most commonly encountered questions and scenarios.</div>
+                
+                <div style="${elStyle('h3')}">6.2 Troubleshooting Guide</div>
+                <div style="${elStyle('paragraph')}">Systematic troubleshooting approaches help identify and resolve issues systematically. Following a structured methodology ensures problems are identified quickly and solutions are implemented effectively.</div>
+                
+                <div style="${elStyle('h2')}">7. Conclusion and Summary</div>
+                <div style="${elStyle('paragraph')}">This comprehensive guide has covered extensive ground, from foundational concepts through advanced features and practical applications. Templates provide powerful capabilities for creating professional, consistent documents with minimal effort.</div>
+                
+                <div style="${elStyle('paragraph')}">By leveraging template-based customization and multi-column layouts effectively, users can create sophisticated documents that meet professional standards while maintaining content focus. The system is designed to be intuitive yet powerful, accessible to new users while offering advanced capabilities for experienced practitioners.</div>
+                
+                <div style="${elStyle('h3')}">Final Recommendations</div>
+                <div style="${elStyle('list')}">
+                    ${cfg.elements.list?.number_format === 'numbered' ? '1.' : '•'} Explore different template configurations to find your optimal setup<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '2.' : '•'} Experiment with column counts for your specific content types<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '3.' : '•'} Test page orientations to maximize content utilization<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '4.' : '•'} Customize colors and fonts to match your personal or corporate branding<br>
+                    ${cfg.elements.list?.number_format === 'numbered' ? '5.' : '•'} Share successful templates with your team for consistency
+                </div>
+                
+                <div style="${elStyle('paragraph')}">Thank you for exploring the comprehensive template system. We hope this guide has provided valuable insights and guidance for creating professional, beautiful documents effortlessly.</div>
             `;
 
             // Footer (always anchored at bottom, spans all columns)
@@ -906,7 +1027,9 @@
             // Apply columns to the content wrapper only (footer stays outside)
             let colStyle = '';
             if (cfg.page.columns > 1) {
-                colStyle = `column-count: ${cfg.page.columns}; column-gap: 20px; column-fill: auto;`;
+                colStyle = `display: block; column-count: ${cfg.page.columns}; column-gap: 20px; column-fill: auto;`;
+            } else {
+                colStyle = `display: flex; flex-direction: column;`;
             }
 
             // Reset page-level column styles
