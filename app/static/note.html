@@ -48,6 +48,8 @@
             }
         }
     </style>
+    <!-- Centralized Chat Styles -->
+    <link rel="stylesheet" href="/chat.css">
 </head>
 
 <body class="note-page">
@@ -67,8 +69,7 @@
                 <div style="display:none;"><a href="#" id="metaSubjectHidden"><span>Subject</span></a></div>
             </div>
             <div id="loadingContainer" class="loading">
-                <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i>
-                </div>
+                <div class="spinner" style="margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i></div>
                 <p>Loading note...</p>
             </div>
 
@@ -230,34 +231,99 @@
         <!-- CHAT CARD (white card) — hidden by default -->
         <div class="note-chat-card page-card" id="noteChatPanel" style="display: none;">
             <div class="note-chat-header">
-                <h4><i class="ph ph-chat-circle-dots"></i> Chat</h4>
+                <h4 id="noteChatTitle"
+                    style="cursor: pointer; display: flex; align-items: center; gap: var(--spacing-sm);"
+                    onclick="goToChat()" title="Open full chat history">
+                    <i class="ph ph-chat-circle-dots"></i> Chat <i class="ph ph-arrow-square-out"
+                        style="font-size: 0.8em; color: var(--color-gray);"></i>
+                </h4>
                 <button class="note-chat-close" onclick="toggleChat()" title="Close chat"><i
                         class="ph ph-x"></i></button>
                 <p class="note-chat-subtitle" id="noteChatSubtitle">Ask questions about this note</p>
+                <p class="note-chat-subtitle" id="chatMeta" style="display: none; font-size: 11px; margin-top: 2px;">
+                </p>
             </div>
-            <div class="note-chat-messages" id="noteChatMessages">
-                <div class="note-chat-empty">
+            <div class="chat-messages" id="noteChatMessages">
+                <div class="empty-state">
                     <i class="ph ph-chat-circle-dots" style="font-size: 2rem;"></i>
                     <p>Ask a question about this note</p>
                 </div>
             </div>
             <div class="note-chat-input-area">
-                <!-- AI Mode Selector -->
-                <div class="ai-mode-bar">
-                    <span class="mode-label-text">Mode:</span>
-                    <button class="mode-pill" data-mode="quick" onclick="setChatMode('quick')" title="Quick answer"><i
-                            class="ph ph-lightning"></i> Quick</button>
-                    <button class="mode-pill active" data-mode="elaboration" onclick="setChatMode('elaboration')"
-                        title="Elaborate"><i class="ph ph-lightbulb"></i> Elaborate</button>
-                    <button class="mode-pill" data-mode="eli5" onclick="setChatMode('eli5')" title="ELI5"><i
-                            class="ph ph-smiley"></i> ELI5</button>
+                <!-- AI Controls: Compact Display -->
+                <div class="ai-controls-compact" id="noteChatControlsCompact">
+                    <span style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Mode</span>
+                    <button class="control-badge" onclick="toggleNoteChatMode()" title="Click to change mode">
+                        <i class="ph" id="noteModeIcon"></i>
+                        <span id="noteModeLabel"></span>
+                    </button>
+                    <span style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Output</span>
+                    <button class="control-badge" onclick="toggleNoteChatOutput()" title="Click to change output format">
+                        <i class="ph" id="noteOutputIcon"></i>
+                        <span id="noteOutputLabel"></span>
+                    </button>
                 </div>
+
+                <!-- AI Controls: Expanded Selection -->
+                <div class="ai-controls-expanded" id="noteChatControlsExpanded" style="display: none;">
+                    <!-- Mode Selection -->
+                    <div id="noteModeSelection" style="display: none;">
+                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">Select Mode</div>
+                        <div class="ai-mode-bar" style="flex-direction: row; gap: 6px;">
+                            <button class="mode-pill" data-mode="quick" onclick="setNoteChatMode('quick')"
+                                title="Use less processing to get answer">
+                                <i class="ph ph-lightning"></i> Quick
+                            </button>
+                            <button class="mode-pill" data-mode="simple" onclick="setNoteChatMode('simple')"
+                                title="Answer in simple terms">
+                                <i class="ph ph-text-a-underline"></i> Simple
+                            </button>
+                            <button class="mode-pill active" data-mode="elaborate" onclick="setNoteChatMode('elaborate')"
+                                title="Provide thorough explanation">
+                                <i class="ph ph-lightbulb"></i> Elaborate
+                            </button>
+                            <button class="mode-pill" data-mode="eli5" onclick="setNoteChatMode('eli5')"
+                                title="Explain like I'm 5">
+                                <i class="ph ph-smiley"></i> ELI5
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Output Selection -->
+                    <div id="noteOutputSelection" style="display: none;">
+                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">Select Output</div>
+                        <div class="output-format-bar" style="flex-direction: row; gap: 6px;">
+                            <button class="mode-pill active" data-format="sentence"
+                                onclick="setNoteChatOutputFormat('sentence')" title="Single paragraph response">
+                                <i class="ph ph-text-t"></i> Sentence
+                            </button>
+                            <button class="mode-pill" data-format="pointform" onclick="setNoteChatOutputFormat('pointform')"
+                                title="Bullet point format">
+                                <i class="ph ph-list-bullets"></i> Pointform
+                            </button>
+                            <button class="mode-pill" data-format="numbered_list"
+                                onclick="setNoteChatOutputFormat('numbered_list')" title="Numbered list format">
+                                <i class="ph ph-list-numbers"></i> Numbered List
+                            </button>
+                            <button class="mode-pill" data-format="table" onclick="setNoteChatOutputFormat('table')"
+                                title="Table format">
+                                <i class="ph ph-table"></i> Table
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="inlineReplyIndicatorContainer"></div>
+
                 <div class="note-chat-input-row">
                     <input type="text" id="noteChatInput" placeholder="Ask about this note..." disabled>
                     <button type="button" id="noteChatSendBtn" class="btn btn-primary" disabled
                         onclick="sendNoteChat()">
                         <i class="ph ph-paper-plane-right"></i>
                     </button>
+                </div>
+                <div style="text-align: center; font-size: 10px; color: var(--color-gray); margin-top: 6px;">
+                    AI can make mistakes. Always double check.
                 </div>
             </div>
         </div> <!-- /note-chat-card -->
@@ -389,12 +455,23 @@
         // ===== INLINE CHAT STATE =====
         let chatMessages = [];
         let chatConversationId = null;
-        let chatAiMode = localStorage.getItem('noteChatAiMode') || 'elaboration';
+        let chatAiMode = localStorage.getItem('noteChatAiMode') || 'elaborate';
+        let chatOutputFormat = localStorage.getItem('noteChatOutputFormat') || 'sentence';
+        window.replyingToMessageId = null;
+        window.replyingToMessageContent = null;
 
         const MODE_META = {
-            quick: { label: 'Quick Answer', icon: 'ph-lightning' },
-            elaboration: { label: 'Elaborate', icon: 'ph-lightbulb' },
+            quick: { label: 'Quick', icon: 'ph-lightning' },
+            simple: { label: 'Simple', icon: 'ph-text-a-underline' },
+            elaborate: { label: 'Elaborate', icon: 'ph-lightbulb' },
             eli5: { label: 'ELI5', icon: 'ph-smiley' },
+        };
+
+        const OUTPUT_FORMAT_META = {
+            sentence: { label: 'Sentence', icon: 'ph-text-t' },
+            pointform: { label: 'Pointform', icon: 'ph-list-bullets' },
+            numbered_list: { label: 'Numbered List', icon: 'ph-list-numbers' },
+            table: { label: 'Table', icon: 'ph-table' },
         };
 
         function generateUUID() {
@@ -1967,16 +2044,103 @@
             input.disabled = false;
             sendBtn.disabled = false;
             input.addEventListener('keypress', e => { if (e.key === 'Enter') sendNoteChat(); });
-            setChatMode(chatAiMode);
+            updateNoteChatModeButtons();
+            updateNoteChatOutputButtons();
+            updateNoteChatCompactDisplay();
             loadNoteChatHistory();
         }
 
-        function setChatMode(mode) {
+        function setNoteChatMode(mode) {
             chatAiMode = mode;
             localStorage.setItem('noteChatAiMode', mode);
-            document.querySelectorAll('.note-chat-card .mode-pill').forEach(p => {
-                p.classList.toggle('active', p.dataset.mode === mode);
+            updateNoteChatModeButtons();
+            updateNoteChatCompactDisplay();
+            // Close expanded view after selection
+            document.getElementById('noteChatControlsCompact').style.display = 'flex';
+            document.getElementById('noteChatControlsExpanded').style.display = 'none';
+            document.getElementById('noteModeSelection').style.display = 'none';
+            document.getElementById('noteOutputSelection').style.display = 'none';
+        }
+
+        function setNoteChatOutputFormat(format) {
+            chatOutputFormat = format;
+            localStorage.setItem('noteChatOutputFormat', format);
+            updateNoteChatOutputButtons();
+            updateNoteChatCompactDisplay();
+            // Close expanded view after selection
+            document.getElementById('noteChatControlsCompact').style.display = 'flex';
+            document.getElementById('noteChatControlsExpanded').style.display = 'none';
+            document.getElementById('noteModeSelection').style.display = 'none';
+            document.getElementById('noteOutputSelection').style.display = 'none';
+        }
+
+        function toggleNoteChatMode() {
+            const compact = document.getElementById('noteChatControlsCompact');
+            const expanded = document.getElementById('noteChatControlsExpanded');
+            const modeSelection = document.getElementById('noteModeSelection');
+            const outputSelection = document.getElementById('noteOutputSelection');
+            
+            if (modeSelection.style.display === 'none') {
+                compact.style.display = 'none';
+                expanded.style.display = 'block';
+                modeSelection.style.display = 'block';
+                outputSelection.style.display = 'none';
+            } else {
+                expanded.style.display = 'none';
+                modeSelection.style.display = 'none';
+                compact.style.display = 'flex';
+            }
+        }
+
+        function toggleNoteChatOutput() {
+            const compact = document.getElementById('noteChatControlsCompact');
+            const expanded = document.getElementById('noteChatControlsExpanded');
+            const modeSelection = document.getElementById('noteModeSelection');
+            const outputSelection = document.getElementById('noteOutputSelection');
+            
+            if (outputSelection.style.display === 'none') {
+                compact.style.display = 'none';
+                expanded.style.display = 'block';
+                outputSelection.style.display = 'block';
+                modeSelection.style.display = 'none';
+            } else {
+                expanded.style.display = 'none';
+                outputSelection.style.display = 'none';
+                compact.style.display = 'flex';
+            }
+        }
+
+        function updateNoteChatModeButtons() {
+            document.querySelectorAll('#noteModeSelection .mode-pill').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.mode === chatAiMode) {
+                    btn.classList.add('active');
+                }
             });
+        }
+
+        function updateNoteChatOutputButtons() {
+            document.querySelectorAll('#noteOutputSelection .mode-pill').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.format === chatOutputFormat) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        function updateNoteChatCompactDisplay() {
+            const modeMeta = MODE_META[chatAiMode];
+            const outputMeta = OUTPUT_FORMAT_META[chatOutputFormat];
+            
+            if (modeMeta) {
+                document.getElementById('noteModeIcon').className = 'ph ' + modeMeta.icon;
+                document.getElementById('noteModeLabel').textContent = modeMeta.label;
+            }
+            
+            if (outputMeta) {
+                document.getElementById('noteOutputIcon').className = 'ph ' + outputMeta.icon;
+                document.getElementById('noteOutputLabel').textContent = outputMeta.label;
+            }
         }
 
         async function loadNoteChatHistory() {
@@ -2014,17 +2178,45 @@
 
             if (!chatConversationId) chatConversationId = generateUUID();
 
-            chatMessages.push({ role: 'user', content: message, time: new Date(), ai_mode: chatAiMode });
+            const replyInfo = window.replyingToMessageId !== null && window.replyingToMessageId !== undefined ? {
+                id: window.replyingToMessageId,
+                content: window.replyingToMessageContent
+            } : null;
+
+            chatMessages.push({
+                role: 'user',
+                content: message,
+                time: new Date(),
+                ai_mode: chatAiMode,
+                replyTo: replyInfo
+            });
             input.value = '';
+
+            clearReply();
             displayChatMessages();
 
-            // Loading bubble
+            // Loading bubble with dynamic text
             chatMessages.push({
                 role: 'ai', loading: true,
-                content: '<div style="display:flex;align-items:center;gap:8px;"><i class="ph ph-spinner ph-spin"></i> Thinking…</div>',
+                content: '<div class="loading-message"><span class="spinner" style="display: inline-flex; animation: spin 1s linear infinite;"><i class="ph-spinner" style="font-size: 16px;"></i></span> <span id="note-loading-text">Processing...</span></div>',
                 time: new Date()
             });
             displayChatMessages();
+
+            let currentLoadingTextIdx = 0;
+            const loadingTexts = [
+                "Processing...",
+                "Retrieving...",
+                "Searching Web...",
+                "Building Answer..."
+            ];
+            const loadingInterval = setInterval(() => {
+                const el = document.getElementById('note-loading-text');
+                if (el) {
+                    currentLoadingTextIdx = Math.min(currentLoadingTextIdx + 1, loadingTexts.length - 1);
+                    el.innerText = loadingTexts[currentLoadingTextIdx];
+                }
+            }, 1000);
 
             try {
                 const resp = await fetch('/chat/ask', {
@@ -2033,11 +2225,15 @@
                     body: JSON.stringify({
                         message,
                         ai_mode: chatAiMode,
+                        output_format: chatOutputFormat,
                         conversation_id: chatConversationId,
-                        lecture_id: parseInt(lectureId)
+                        lecture_id: parseInt(lectureId),
+                        auto_detect_conversation: true,
+                        reply_to_message_id: replyInfo ? replyInfo.id : null
                     })
                 });
 
+                clearInterval(loadingInterval);
                 chatMessages.pop(); // remove loading
 
                 if (resp.ok) {
@@ -2047,49 +2243,340 @@
                         content: data.response,
                         time: new Date(),
                         ai_mode: data.ai_mode || chatAiMode,
-                        ai_model: data.ai_model
+                        ai_model: data.ai_model,
+                        sources: data.sources,
+                        detailed_sources: data.detailed_sources || [],
+                        thinking: data.thinking || null,
+                        timings: data.timings
                     });
                     if (data.conversation_id) chatConversationId = data.conversation_id;
                     if (data.conversation_title) {
                         document.getElementById('noteChatSubtitle').textContent = data.conversation_title;
                     }
+
+                    const questionCount = chatMessages.filter(m => m.role === 'user').length;
+                    const metaEl = document.getElementById('chatMeta');
+                    if (metaEl) {
+                        metaEl.textContent = `${questionCount} question(s)`;
+                        metaEl.style.display = 'block';
+                    }
                 } else {
                     chatMessages.push({ role: 'ai', content: `Error (${resp.status}). Please try again.`, time: new Date() });
                 }
             } catch (err) {
+                clearInterval(loadingInterval);
                 chatMessages.pop();
                 chatMessages.push({ role: 'ai', content: 'Network error: ' + err.message, time: new Date() });
             }
             displayChatMessages();
         }
 
+        // ── Reply Functions ──
+        function setReply(messageIndex) {
+            const msg = chatMessages[messageIndex];
+            window.replyingToMessageId = messageIndex;
+            window.replyingToMessageContent = msg.content.replace(/<[^>]*>/g, '').substring(0, 100);
+            displayChatMessages();
+            document.getElementById('noteChatInput').focus();
+        }
+
+        function clearReply() {
+            window.replyingToMessageId = null;
+            window.replyingToMessageContent = null;
+            displayChatMessages();
+        }
+
         function displayChatMessages() {
             const container = document.getElementById('noteChatMessages');
             if (chatMessages.length === 0) {
-                container.innerHTML = `<div class="note-chat-empty">
+                container.innerHTML = `<div class="empty-state">
                     <i class="ph ph-chat-circle-dots" style="font-size:2rem;"></i>
                     <p>Ask a question about this note</p></div>`;
                 return;
             }
 
-            container.innerHTML = chatMessages.map(msg => {
-                let html = msg.content;
+            // Inject reply indicator ABOVE the input box
+            const inputArea = document.querySelector('.note-chat-input-area');
+            let indicatorContainer = document.getElementById('inlineReplyIndicatorContainer');
+            if (!indicatorContainer) {
+                indicatorContainer = document.createElement('div');
+                indicatorContainer.id = 'inlineReplyIndicatorContainer';
+                inputArea.insertBefore(indicatorContainer, document.querySelector('.note-chat-input-row'));
+            }
+
+            if (window.replyingToMessageId !== null && window.replyingToMessageId !== undefined) {
+                const replyMsg = chatMessages[window.replyingToMessageId];
+                if (replyMsg) {
+                    const replyPreview = replyMsg.content.replace(/<[^>]*>/g, '').replace(/\[\d+\]/g, '');
+                    indicatorContainer.innerHTML = `
+                        <div class="reply-indicator">
+                            <div class="reply-indicator-header">
+                                <i class="ph ph-arrow-bend-up-right"></i>
+                                Replying to ${replyMsg.role === 'user' ? 'your message' : 'AI'}
+                                <button class="close-reply-btn" onclick="clearReply()">
+                                    <i class="ph ph-x"></i>
+                                </button>
+                            </div>
+                            <div class="reply-indicator-content">"${replyPreview}"</div>
+                        </div>`;
+                }
+            } else {
+                indicatorContainer.innerHTML = '';
+            }
+
+            container.innerHTML = chatMessages.map((msg, idx) => {
+                let contentHTML = msg.content;
+                let referencesHTML = '';
                 if (msg.role === 'ai' && !msg.loading && typeof marked !== 'undefined') {
-                    try { html = marked.parse(html); } catch (e) { }
+                    try { contentHTML = marked.parse(contentHTML); } catch (e) { }
+                    // Parse citations in the response if there are sources
+                    if (msg.detailed_sources && msg.detailed_sources.length > 0) {
+                        contentHTML = parseCitations(contentHTML);
+                    }
                 }
-                let modeBadge = '';
+
+                // AI mode badge
+                let modeMeta = null;
                 if (msg.role === 'ai' && !msg.loading && msg.ai_mode) {
-                    const m = MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
-                    modeBadge = `<div class="ai-mode-badge"><i class="ph ${m.icon}"></i> ${m.label}</div>`;
+                    modeMeta = MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
                 }
-                const t = (msg.time instanceof Date ? msg.time : new Date(msg.time))
-                    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                return `<div class="note-chat-msg ${msg.role}">
-                    <div class="note-chat-msg-content">${modeBadge}${html}</div>
-                    <div class="note-chat-msg-time">${t}</div>
+
+                // Thinking section
+                let thinkingHTML = '';
+                if (msg.thinking) {
+                    thinkingHTML = `
+                        <div class="thinking-section">
+                            <div class="thinking-header" onclick="toggleThinking(this)">
+                                <span class="thinking-icon"><i class="ph ph-caret-right"></i></span>
+                                <span>🧠 AI Thinking Process</span>
+                            </div>
+                            <div class="thinking-content">
+                                ${msg.thinking.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                            </div>
+                        </div>`;
+                }
+
+                // Sources & metadata
+                let sourcesHTML = '';
+                let metadataHTML = '';
+                const hasSources = msg.detailed_sources && msg.detailed_sources.length > 0;
+
+                if (hasSources || msg.ai_model || msg.timings || modeMeta) {
+                    const msgId = 'note-msg-' + idx;
+                    let highestMatch = 0;
+                    if (hasSources) {
+                        highestMatch = Math.max(...msg.detailed_sources.map(s => s.score || 0));
+                        const isWebSearch = msg.detailed_sources.some(s => s.is_web);
+
+                        if (isWebSearch && msg.role === 'ai') {
+                            contentHTML = `<div style="margin-bottom:12px;display:inline-flex;align-items:center;gap:6px;background:#eef2ff;color:#4f46e5;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;"><i class="ph ph-globe"></i> Searched the Web</div>\n` + contentHTML;
+                        }
+
+                        const sourceLinks = msg.detailed_sources.map((src, si) => {
+                            const citationNum = si + 1;
+                            const score = src.score ? ` (${src.score}% match)` : '';
+                            if (src.is_web) {
+                                return `
+                                    <div class="source-item" onclick="window.open('${src.url}', '_blank')">
+                                        <div style="font-weight:600;color:#1976d2;margin-bottom:2px;">
+                                            <i class="ph ph-globe"></i> [${citationNum}] Web Reference${score}
+                                        </div>
+                                        <div style="color:#666;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                            ${src.url}
+                                        </div>
+                                        <div style="color:#999;font-size:9px;margin-top:2px;">${src.title || ''}</div>
+                                    </div>`;
+                            }
+
+                            const refLectureId = src.lecture_id || lectureId;
+                            // Truncate to ~10 words to prevent width expansion
+                            let previewStr = src.text_preview || 'View reference';
+                            const words = previewStr.split(' ');
+                            if (words.length > 15) {
+                                previewStr = words.slice(0, 15).join(' ') + '...';
+                            }
+                            return `
+                                <div class="source-item" onclick="openSourceReference(${refLectureId}, ${src.position || 0})">
+                                    <div style="font-weight:600;color:#1976d2;margin-bottom:2px;">
+                                        <i class="ph ph-file-text"></i> [${citationNum}] Reference${score}
+                                    </div>
+                                    <div style="color:#666;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                        "${previewStr}"
+                                    </div>
+                                </div>`;
+                        }).join('');
+                        sourcesHTML = `<div class="sources-section">${sourceLinks}</div>`;
+                    }
+
+                    const aiModel = msg.ai_model || null;
+                    const t = msg.timings || null;
+                    let infoContent = `
+                        <div style="padding:10px;background:#f9f9f9;border-radius:6px;">
+                            <div style="margin-bottom:${t ? '8px' : '0'}">
+                                <div style="font-weight:600;color:#333;margin-bottom:6px;"><i class="ph ph-robot"></i> Model: ${aiModel || '<span style="color:#aaa">Unknown</span>'}</div>
+                            </div>
+                            ${t && t.step_times ? `
+                            <div style="border-top:1px solid #e0e0e0;padding-top:8px;">
+                                <div style="font-weight:600;color:#333;margin-bottom:6px;"><i class="ph ph-list-numbers"></i> Process Timing (ms)</div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>1. Scope:</span><span>${t.step_times.step1.toFixed(2)}ms</span></div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>2. Convo:</span><span>${t.step_times.step2.toFixed(2)}ms</span></div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>3. Intent:</span><span>${t.step_times.step3.toFixed(2)}ms</span></div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>4. Context:</span><span>${t.step_times.step4.toFixed(2)}ms</span></div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>5. Web:</span><span>${t.step_times.step5.toFixed(2)}ms</span></div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>6. Prompt:</span><span>${t.step_times.step6.toFixed(2)}ms</span></div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>7. Gen:</span><span>${t.step_times.step7.toFixed(2)}ms</span></div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>8. Cites:</span><span>${t.step_times.step8.toFixed(2)}ms</span></div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f0f0f0;"><span>9. Save:</span><span>${t.step_times.step9.toFixed(2)}ms</span></div>
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:2px;font-weight:600;color:var(--color-primary);"><span>Total:</span><span>${t.total_ms.toFixed(2)}ms</span></div>
+                            </div>` : ''}
+                        </div>`;
+
+                    const refLabel = hasSources ? `Reference (${highestMatch}%)` : 'Reference';
+                    let toggleContent = '';
+
+                    if (modeMeta) {
+                        toggleContent += `<span style="display:inline-flex;align-items:center;gap:4px;color:var(--color-gray);"><i class="ph ${modeMeta.icon}"></i> ${modeMeta.label}</span><span class="reference-divider">|</span>`;
+                    }
+
+                    toggleContent += `<span onclick="toggleMetadata('${msgId}-ref','${msgId}')" style="cursor:pointer;">${refLabel}</span><span class="reference-divider">|</span><button class="info-btn" onclick="toggleMetadata('${msgId}-info','${msgId}',event)">Info</button>`;
+
+                    metadataHTML = `
+                        <div class="message-metadata">
+                            <div class="metadata-toggle">
+                                ${toggleContent}
+                            </div>
+                            <div class="metadata-content" id="${msgId}-ref-content">${sourcesHTML}</div>
+                            <div class="metadata-content" id="${msgId}-info-content">${infoContent}</div>
+                        </div>`;
+                }
+
+                let timeStr = formatMessageTime(msg.time);
+
+                // WhatsApp-style reply quote
+                let replyQuoteHTML = '';
+                if (msg.replyTo && msg.role === 'user') {
+                    const replyAuthor = msg.replyTo.id !== undefined ? (chatMessages[msg.replyTo.id]?.role === 'user' ? 'You' : 'AI') : 'Unknown';
+                    const replyText = msg.replyTo.content?.replace(/<[^>]*>/g, '').replace(/\[\d+\]/g, '') || 'Replied message';
+                    replyQuoteHTML = `
+                        <div class="message-reply-quote">
+                            <span class="message-reply-quote-author">↳ ${replyAuthor}</span>
+                            <span class="message-reply-quote-text">"${replyText}"</span>
+                        </div>`;
+                }
+
+                // Check if this message is being replied to
+                const isHighlightedForReply = (window.replyingToMessageId === idx && msg.role === 'user') ? ' highlighted-for-reply' : '';
+
+                // Reply button only for non-loading
+                let actionsHTML = '';
+                if (!msg.loading) {
+                    actionsHTML = `
+                        <button class="action-btn" title="Reply to this message" onclick="setReply(${idx})">
+                            <i class="ph ph-arrow-bend-up-right"></i>
+                        </button>`;
+                }
+
+                return `<div class="message ${msg.role}${isHighlightedForReply}">
+                    ${msg.role === 'ai' ? `<div class="message-side"></div>` : ''}
+                    <div class="message-content">
+                        ${replyQuoteHTML}
+                        ${thinkingHTML}
+                        ${contentHTML}
+                        ${metadataHTML}
+                    </div>
+                    <div class="message-side">
+                        ${actionsHTML ? `<div class="message-actions">${actionsHTML}</div>` : ''}
+                        <div class="message-time">${timeStr}</div>
+                    </div>
                 </div>`;
             }).join('');
             container.scrollTop = container.scrollHeight;
+        }
+
+        function formatMessageTime(date) {
+            if (!(date instanceof Date)) date = new Date(date);
+            return date.toLocaleString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function toggleThinking(header) {
+            header.querySelector('.note-thinking-icon').classList.toggle('expanded');
+            header.nextElementSibling.classList.toggle('expanded');
+        }
+
+        function toggleMetadata(sectionId, msgId, event) {
+            if (event) event.stopPropagation();
+            const content = document.getElementById(sectionId + '-content');
+            if (!content) return;
+            const isExpanded = content.classList.contains('expanded');
+            if (!isExpanded) {
+                const other = sectionId.includes('-ref') ? msgId + '-info' : msgId + '-ref';
+                const otherEl = document.getElementById(other + '-content');
+                if (otherEl) otherEl.classList.remove('expanded');
+            }
+            content.classList.toggle('expanded');
+        }
+
+        function openSourceReference(lectureId, position) {
+            if (!lectureId) return;
+            const currentLectureId = window.location.pathname.split('/').pop();
+            // If it's the current lecture, just navigate to position on same page
+            if (lectureId == currentLectureId) {
+                navigateToReferencePosition(position);
+            } else {
+                // Otherwise navigate to the other lecture and scroll to position
+                window.location.href = `/note/${lectureId}#pos-${position}`;
+            }
+        }
+
+        // ── Citation Parsing ──
+        function parseCitations(text) {
+            const citationPattern = /\[(\d+)\]/g;
+            return text.replace(citationPattern, (match, num) => {
+                return `<span class="note-citation-link" data-citation-num="${num}" onclick="handleCitationClick(event, ${num})">[${num}]</span>`;
+            });
+        }
+
+        function handleCitationClick(event, citationNum) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const messageContent = event.target.closest('.message-content');
+            if (!messageContent) return;
+
+            const message = messageContent.closest('.message');
+            if (!message) return;
+
+            const sourceItems = message.querySelectorAll('.source-item');
+            if (citationNum > 0 && citationNum <= sourceItems.length) {
+                const targetSource = sourceItems[citationNum - 1];
+                const onclickAttr = targetSource.getAttribute('onclick');
+                if (onclickAttr) {
+                    eval(onclickAttr);
+                } else {
+                    highlightCitation(event, citationNum);
+                }
+            }
+        }
+
+        function highlightCitation(event, citationNum) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            document.querySelectorAll('.note-citation-link.highlighted, .source-item.highlighted-source').forEach(el => {
+                el.classList.remove('highlighted', 'highlighted-source');
+            });
+
+            const clickedCitation = event.target;
+            if (clickedCitation.classList.contains('note-citation-link')) {
+                clickedCitation.classList.add('highlighted');
+            }
+
+            const sourceItems = document.querySelectorAll('.source-item');
+            if (citationNum > 0 && citationNum <= sourceItems.length) {
+                const targetSource = sourceItems[citationNum - 1];
+                targetSource.classList.add('highlighted-source');
+                targetSource.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         }
 
         function goToChat() {

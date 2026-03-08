@@ -778,45 +778,51 @@ a:hover {
 }
 
 .note-chat-input-area {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--color-light-gray);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
   flex-shrink: 0;
+  margin-top: auto;
 }
 
-.note-chat-input-area .ai-mode-bar {
+/* Override ai-controls for note context */
+.note-chat-input-area .ai-controls {
   display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+  flex-wrap: nowrap;
 }
 
-.note-chat-input-area .mode-label-text {
-  font-size: 10px;
-  color: var(--color-gray);
-  font-weight: 500;
-  margin-right: 2px;
+.note-chat-input-area .ai-controls > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
 }
 
+/* Override mode-pill sizing for compact note view */
 .note-chat-input-area .mode-pill {
-  padding: 2px 7px;
-  border-radius: 16px;
-  font-size: 10px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
   border: 1px solid var(--color-light-gray);
-  background: var(--color-background);
-  color: var(--color-gray);
+  background: var(--color-white);
+  color: var(--color-dark);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .note-chat-input-area .mode-pill:hover {
   border-color: var(--color-primary);
+  background: rgba(78, 205, 196, 0.08);
   color: var(--color-primary);
 }
 
@@ -826,15 +832,37 @@ a:hover {
   color: white;
 }
 
+/* Control labels */
+.note-chat-input-area .control-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-gray);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+/* Mode and output bars */
+.note-chat-input-area .ai-mode-bar,
+.note-chat-input-area .output-format-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .note-chat-input-row {
   display: flex;
   gap: var(--spacing-sm);
+  margin-top: 0;
 }
 
 .note-chat-input-row input {
   flex: 1;
-  border-radius: var(--radius-full);
   padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-light-gray);
   font-size: var(--font-size-sm);
 }
 
@@ -862,6 +890,63 @@ a:hover {
   border: 1px solid rgba(78, 205, 196, 0.25);
   margin-bottom: 4px;
   font-weight: 500;
+}
+
+/* Compact controls display */
+.ai-controls-compact {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.control-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(78, 205, 196, 0.1);
+  border: 1px solid rgba(78, 205, 196, 0.3);
+  color: var(--color-primary);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.control-badge:hover {
+  background: rgba(78, 205, 196, 0.15);
+  border-color: var(--color-primary);
+}
+
+.control-badge .ph {
+  font-size: 14px;
+}
+
+/* Expanded controls display */
+.ai-controls-expanded {
+  display: none;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.ai-controls-expanded.active {
+  display: flex;
+}
+
+#noteModeSelection,
+#noteOutputSelection {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#noteModeSelection.active,
+#noteOutputSelection.active {
+  display: flex;
 }
 
 /* ACTION PANEL (no card) */
