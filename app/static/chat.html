@@ -1582,10 +1582,25 @@
             // Loading bubble
             conversationMessages.push({
                 role: 'ai', loading: true,
-                content: '<div class="loading-message"><span class="spinner"><i class="ph-spinner"></i></span> Thinking…</div>',
+                content: '<div class="loading-message"><span class="spinner"><i class="ph-spinner"></i></span> <span id="loading-text">Processing</span></div>',
                 time: new Date()
             });
             displayMessages();
+
+            let currentLoadingTextIdx = 0;
+            const loadingTexts = [
+                "Processing...",
+                "Retrieving from local knowledge...",
+                "Searching the web...",
+                "Building an answer..."
+            ];
+            const loadingInterval = setInterval(() => {
+                const el = document.getElementById('loading-text');
+                if (el) {
+                    currentLoadingTextIdx = Math.min(currentLoadingTextIdx + 1, loadingTexts.length - 1);
+                    el.innerText = loadingTexts[currentLoadingTextIdx];
+                }
+            }, 1000);
 
             const payload = {
                 message,
@@ -1606,6 +1621,7 @@
                     body: JSON.stringify(payload)
                 });
 
+                clearInterval(loadingInterval);
                 conversationMessages.pop(); // remove loading
 
                 if (resp.ok) {
@@ -1640,6 +1656,7 @@
                     });
                 }
             } catch (err) {
+                clearInterval(loadingInterval);
                 conversationMessages.pop();
                 conversationMessages.push({ role: 'ai', content: 'Network error: ' + err.message, time: new Date() });
             }
@@ -1793,7 +1810,40 @@
                             <div style="margin-bottom:${t ? '10px' : '0'}">
                                 <div style="font-weight:600;color:#333;margin-bottom:4px;"><i class="ph ph-robot"></i> Model: ${aiModel || '<span style="color:#aaa">Unknown</span>'}</div>
                             </div>
-                            ${t ? `
+                            ${t && t.step_times ? `
+                            <div style="border-top:1px solid #e0e0e0;padding-top:8px;">
+                                <div style="font-weight:600;color:#333;margin-bottom:6px;"><i class="ph ph-list-numbers"></i> Process Timing (Milliseconds)</div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                                    <span>1. Scope Identification:</span><span style="font-weight:600;">${t.step_times.step1.toFixed(2)}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                                    <span>2. Conversation Detection:</span><span style="font-weight:600;">${t.step_times.step2.toFixed(2)}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                                    <span>3. Intent Classification:</span><span style="font-weight:600;">${t.step_times.step3.toFixed(2)}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                                    <span>4. Local Context Retrieval:</span><span style="font-weight:600;">${t.step_times.step4.toFixed(2)}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                                    <span>5. Web Search Fallback:</span><span style="font-weight:600;">${t.step_times.step5.toFixed(2)}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                                    <span>6. Prompt Building:</span><span style="font-weight:600;">${t.step_times.step6.toFixed(2)}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                                    <span>7. AI Answer Generation:</span><span style="font-weight:600;">${t.step_times.step7.toFixed(2)}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;">
+                                    <span>8. Citation Injection:</span><span style="font-weight:600;">${t.step_times.step8.toFixed(2)}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid #f0f0f0;">
+                                    <span>9. Save & Housekeeping:</span><span style="font-weight:600;">${t.step_times.step9.toFixed(2)}ms</span>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;">
+                                    <span>Total:</span><span style="color:var(--color-primary);font-weight:600;">${t.total_ms.toFixed(2)}ms</span>
+                                </div>
+                            </div>` : t ? `
                             <div style="border-top:1px solid #e0e0e0;padding-top:8px;">
                                 <div style="font-weight:600;color:#333;margin-bottom:6px;"><i class="ph ph-hourglass"></i> Timing</div>
                                 <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;">

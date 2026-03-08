@@ -419,11 +419,13 @@ def inject_citations(response: str, detailed_sources: List[dict]) -> str:
     
     import re
     
-    # Split response into sentences, keeping track of positions
-    # Match sentences ending with . ! or ?
-    sentences = re.split(r'(?<=[.!?])\s+', response.strip())
-    if not sentences:
-        return response
+    # Split response keeping the whitespace separators using a capture group
+    # This preserves newlines and spacing perfectly.
+    parts = re.split(r'((?<=[.!?])\s+)', response.strip())
+    
+    # parts looks like: [sentence1, whitespace1, sentence2, whitespace2, ...]
+    sentences = parts[0::2]
+    separators = parts[1::2]
     
     # Map each source to its best matching sentence
     sentence_citations = {}  # {sentence_index: citation_number}
@@ -461,7 +463,7 @@ def inject_citations(response: str, detailed_sources: List[dict]) -> str:
             # Count how many key terms appear in the sentence
             overlap = sum(1 for term in key_terms if term in sentence_lower)
             
-            # Require at least 40% of key terms to match (improved threshold)
+            # Require at least 40% of key terms to match
             match_percentage = (overlap / len(key_terms)) * 100 if key_terms else 0
             
             if match_percentage >= 40 and overlap > best_overlap:
@@ -480,25 +482,24 @@ def inject_citations(response: str, detailed_sources: List[dict]) -> str:
                 sentence_citations[i] = i + 1
     
     # Rebuild response with citations placed at the end of sentences
-    cited_sentences = []
+    cited_parts = []
     for sent_idx, sentence in enumerate(sentences):
-        sentence = sentence.rstrip()  # Remove trailing whitespace
+        # Don't inject citation if the sentence looks like a markdown table row (starts/ends with |)
+        is_table_row = bool(re.search(r'^\s*\|.*\|\s*$', sentence, re.MULTILINE))
         
-        # Check if this sentence should be cited
-        if sent_idx in sentence_citations:
+        if sent_idx in sentence_citations and not is_table_row:
             citation_num = sentence_citations[sent_idx]
             
-            # Find the period/punctuation at the end
             if sentence and sentence[-1] in '.!?':
-                # Insert citation before the punctuation
                 sentence = sentence[:-1] + f" [{citation_num}]{sentence[-1]}"
             else:
-                # No punctuation, just add at end
                 sentence = sentence + f" [{citation_num}]"
         
-        cited_sentences.append(sentence)
-    
-    return ' '.join(cited_sentences)
+        cited_parts.append(sentence)
+        if sent_idx < len(separators):
+            cited_parts.append(separators[sent_idx])
+            
+    return ''.join(cited_parts)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -520,6 +521,7 @@ async def ask_question(
         )
 
     t_start = time.time()
+    step_times = {f"step{i}": 0.0 for i in range(1, 10)}
     lecture_ids = []
     sources = []
 
@@ -558,8 +560,10 @@ async def ask_question(
             lecture_ids.extend([l.id for l in lectures])
             sources.extend([l.title for l in lectures])
 
+    step_times["step1"] = round((time.time() - t_start) * 1000.0, 2)
     retrieval_ms = (time.time() - t_start) * 1000.0
 
+    t_step2_start = time.time()
     # Initialize AI client early for classification
     ai_client = AIClient(current_user)
     
@@ -608,8 +612,12 @@ async def ask_question(
     if not conv_id:
         conv_id = str(uuid.uuid4())
     
+    step_times["step2"] = round((time.time() - t_step2_start) * 1000.0, 2)
+    t_step3_start = time.time()
+    
     # STEP 2: Classify Query Intent
     intent = await classify_query(ai_client, request.message)
+    step_times["step3"] = round((time.time() - t_step3_start) * 1000.0, 2)
 
     context = ""
     snippet_sources = []
@@ -625,6 +633,7 @@ async def ask_question(
         prompt = "You are an AI study assistant. The user's query is off-topic. Politely decline to answer, stating that you can only answer questions related to their notes or general educational topics, and cannot look up the answer to their off-topic query."
     else:
         # STEP 3: Retrieve relevant chunks from pre-computed embeddings (INFORMATIONAL)
+        t_step4_start = time.time()
         if lecture_ids:
             try:
                 from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
@@ -652,8 +661,11 @@ async def ask_question(
             except Exception as e:
                 print(f"[chat] Vector retrieval failed: {e}")
                 retrieval_ms = (time.time() - t_start) * 1000.0
+        
+        step_times["step4"] = round((time.time() - t_step4_start) * 1000.0, 2)
 
         # STEP 4: Web search fallback if no local context
+        t_step5_start = time.time()
         if not context or len(context) < 100:
             print(f"[chat] No sufficient local context ({len(context)} chars), trying web search...")
             web_snippet, web_sources, web_error = await web_search(request.message, timeout=10.0)
@@ -679,7 +691,10 @@ async def ask_question(
                     for s in web_sources
                 ]
                 
+        step_times["step5"] = round((time.time() - t_step5_start) * 1000.0, 2)
+
         # STEP 5: Build mode-specific prompt for informational queries
+        t_step6_start = time.time()
         if not context:
             context = "No information available."
         prompt = build_mode_prompt(
@@ -689,9 +704,11 @@ async def ask_question(
             request.output_format,
             conversation_context=conversation_context  # Include context from earlier messages
         )
+        step_times["step6"] = round((time.time() - t_step6_start) * 1000.0, 2)
     
     # STEP 6: Call LLM
     t_model_start = time.time()
+    t_step7_start = time.time()
 
     ai_model_info = f"{ai_client.provider.upper()}"
     if ai_client.ai_model_name:
@@ -707,6 +724,7 @@ async def ask_question(
             timeout=4.5
         )
         
+        fallback_duration_ms = 0.0
         # Checking if local context didn't have the answer
         fallback_phrases = [
             "i am unable to find any information based on your question",
@@ -715,7 +733,12 @@ async def ask_question(
         ]
         if response.strip().lower() in fallback_phrases:
             print(f"[chat] LLM responded with fallback phrase using local context. Trying web search...")
+            
+            t_fallback_start = time.time()
             web_snippet, web_sources, web_error = await web_search(request.message, timeout=10.0)
+            fallback_duration_ms = (time.time() - t_fallback_start) * 1000.0
+            step_times["step5"] += fallback_duration_ms
+            
             print(f"[chat] web_snippet fetched length: {len(web_snippet)}, error: {web_error}")
             if web_error == "timeout":
                 response = "DuckDuckGo is taking a while to search... Could you try rephrasing your question or check your internet connection?"
@@ -754,18 +777,25 @@ async def ask_question(
 
     except asyncio.TimeoutError:
         response = "I'm thinking… this is taking longer than expected. Could you try rephrasing your question?"
+        fallback_duration_ms = 0.0
     except Exception as e:
         print(f"[chat] LLM call failed: {e}")
         response = f"I encountered an error: {str(e)[:100]}"
+        fallback_duration_ms = 0.0
 
     model_ms = (time.time() - t_model_start) * 1000.0
-    total_ms = (time.time() - t_start) * 1000.0
+    
+    # Subtract the web search time, so step7 only measures the LLM's own generation time
+    step_times["step7"] = round(((time.time() - t_step7_start) * 1000.0) - fallback_duration_ms, 2)
 
     # STEP 7: Inject citations into response
+    t_step8_start = time.time()
     if detailed_sources:
         response = inject_citations(response, detailed_sources)
+    step_times["step8"] = round((time.time() - t_step8_start) * 1000.0, 2)
 
     # STEP 8: Resolve conversation title
+    t_step9_start = time.time()
     existing_count = db.query(func.count(ChatMessage.id)).filter(
         ChatMessage.conversation_id == conv_id,
         ChatMessage.user_id == current_user.id
@@ -781,6 +811,9 @@ async def ask_question(
         ).first()
         conv_title = existing_title[0] if existing_title else generate_conversation_title(request.message)
 
+    step_times["step9"] = round((time.time() - t_step9_start) * 1000.0, 2)
+    total_ms = (time.time() - t_start) * 1000.0
+
     # STEP 9: Save to chat history
     try:
         # Prepare timings dict for storage
@@ -788,6 +821,7 @@ async def ask_question(
             "retrieval_ms": round(retrieval_ms, 2),
             "model_ms": round(model_ms, 2),
             "total_ms": round(total_ms, 2),
+            "step_times": step_times,
         }
         
         chat_msg = ChatMessage(
@@ -830,7 +864,8 @@ async def ask_question(
         timings={
             "retrieval_ms": round(retrieval_ms, 2),
             "model_ms": round(model_ms, 2),
-            "total_ms": round(total_ms, 2)
+            "total_ms": round(total_ms, 2),
+            "step_times": step_times,
         }
     )
 
