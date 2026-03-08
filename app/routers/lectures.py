@@ -590,7 +590,13 @@ async def export_lecture(
         ).first()
         if tmpl:
             template_config = tmpl.config
-    
+            logger.info(f"[Export] Loaded template '{tmpl.name}' (ID: {template_id})")
+            logger.info(f"[Export] Template config: {template_config}")
+        else:
+            logger.warning(f"[Export] Template ID {template_id} not found")
+    else:
+        logger.info(f"[Export] No template ID provided, using defaults")
+
     # Get lecture
     lecture = db.query(Lecture).filter(
         Lecture.id == lecture_id,

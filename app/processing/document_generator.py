@@ -16,7 +16,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Image as RLImage,
     PageBreak, Table, TableStyle, KeepTogether, PageTemplate,
-    Frame, Flowable
+    Frame, Flowable, BaseDocTemplate, FrameBreak
 )
 from reportlab.pdfgen import canvas
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
@@ -72,10 +72,7 @@ class StyleSheet:
                 spaceAfter=12,
                 spaceBefore=12,
                 fontName="Helvetica-Bold",
-                borderColor=colors.HexColor("#3498db"),
-                borderWidth=2,
-                borderPadding=8,
-                borderRadius=4,
+                leading=20,
             ),
             "H2": ParagraphStyle(
                 name="H2_custom",
@@ -85,6 +82,7 @@ class StyleSheet:
                 spaceAfter=10,
                 spaceBefore=10,
                 fontName="Helvetica-Bold",
+                leading=16,
             ),
             "H3": ParagraphStyle(
                 name="H3_custom",
@@ -94,6 +92,7 @@ class StyleSheet:
                 spaceAfter=8,
                 spaceBefore=8,
                 fontName="Helvetica-Bold",
+                leading=14,
             ),
             "H4": ParagraphStyle(
                 name="H4_custom",
@@ -103,6 +102,7 @@ class StyleSheet:
                 spaceAfter=6,
                 spaceBefore=6,
                 fontName="Helvetica-Bold",
+                leading=13,
             ),
             "H5": ParagraphStyle(
                 name="H5_custom",
@@ -112,21 +112,23 @@ class StyleSheet:
                 spaceAfter=4,
                 spaceBefore=4,
                 fontName="Helvetica-Bold",
+                leading=12,
             ),
             "Body": ParagraphStyle(
                 name="Body_custom",
                 parent=styles["BodyText"],
                 fontSize=11,
-                leading=14,
+                leading=13,
                 alignment=TA_JUSTIFY,
                 textColor=colors.HexColor("#2c3e50"),
-                spaceAfter=6,
+                spaceAfter=8,
+                spaceBefore=0,
             ),
             "List": ParagraphStyle(
                 name="List_custom",
                 parent=styles["BodyText"],
                 fontSize=11,
-                leading=14,
+                leading=13,
                 leftIndent=20,
                 textColor=colors.HexColor("#2c3e50"),
                 spaceAfter=4,
@@ -135,7 +137,7 @@ class StyleSheet:
                 name="OrderedList_custom",
                 parent=styles["BodyText"],
                 fontSize=11,
-                leading=14,
+                leading=13,
                 leftIndent=20,
                 textColor=colors.HexColor("#2c3e50"),
                 spaceAfter=4,
@@ -165,9 +167,7 @@ class StyleSheet:
                 backColor=colors.HexColor("#ecf0f1"),
                 leftIndent=15,
                 spaceAfter=6,
-                borderColor=colors.HexColor("#bdc3c7"),
-                borderWidth=1,
-                borderPadding=8,
+                leading=11,
             ),
         }
         
@@ -214,6 +214,20 @@ class DocumentGenerator:
             extracted_images = extracted_images or []
             self._template_config = template_config or {}
             
+            # Debug logging
+            logger.info(f"[PDF Export] Template config type: {type(template_config)}")
+            logger.info(f"[PDF Export] Template config value: {template_config}")
+            
+            if template_config and isinstance(template_config, str):
+                # If it's a string, parse it as JSON
+                import json
+                try:
+                    template_config = json.loads(template_config)
+                    self._template_config = template_config
+                    logger.info(f"[PDF Export] Parsed JSON template config: {template_config}")
+                except:
+                    logger.warning(f"[PDF Export] Failed to parse template config as JSON")
+            
             if progress_callback:
                 progress_callback("Preparing document", 10)
             
@@ -225,6 +239,7 @@ class DocumentGenerator:
             
             if template_config and "page" in template_config:
                 page_cfg = template_config["page"]
+                logger.info(f"[PDF Export] Page config: {page_cfg}")
                 
                 # Page size
                 size_name = page_cfg.get("size", "A4").upper()
@@ -239,6 +254,7 @@ class DocumentGenerator:
                 
                 # Orientation - swap dimensions for landscape
                 orientation = page_cfg.get("orientation", "portrait").lower()
+                logger.info(f"[PDF Export] Orientation: {orientation}")
                 if orientation == "landscape":
                     page_size = (page_size[1], page_size[0])  # Swap width/height
             
@@ -254,27 +270,45 @@ class DocumentGenerator:
             # Convert mm to inches (1 inch = 25.4 mm)
             margins_in = {k: v / 25.4 for k, v in margins_mm.items()}
             
-            # Create document
-            doc = SimpleDocTemplate(
-                self.output_pdf,
-                pagesize=self.page_size,
-                rightMargin=margins_in["right"] * inch,
-                leftMargin=margins_in["left"] * inch,
-                topMargin=margins_in["top"] * inch,
-                bottomMargin=margins_in["bottom"] * inch,
-            )
+            # Get column count
+            num_columns = 1
+            if template_config and "page" in template_config:
+                num_columns = template_config["page"].get("columns", 1)
+                logger.info(f"[PDF Export] Columns: {num_columns}")
+            
+            # Create document with appropriate template
+            if num_columns > 1:
+                doc = self._create_multicolumn_document(
+                    self.output_pdf,
+                    self.page_size,
+                    margins_in,
+                    num_columns
+                )
+                use_multicolumn = True
+                logger.info(f"[PDF Export] Using multicolumn layout with {num_columns} columns")
+            else:
+                doc = SimpleDocTemplate(
+                    self.output_pdf,
+                    pagesize=self.page_size,
+                    rightMargin=margins_in["right"] * inch,
+                    leftMargin=margins_in["left"] * inch,
+                    topMargin=margins_in["top"] * inch,
+                    bottomMargin=margins_in["bottom"] * inch,
+                )
+                use_multicolumn = False
+                logger.info(f"[PDF Export] Using single column layout")
             
             # Build story
             story = []
             
-            # Add title page
+            # Add title page (not affected by columns)
             if include_cover:
                 if progress_callback:
                     progress_callback("Creating cover page", 20)
                 story.extend(self._create_title_page())
                 story.append(PageBreak())
             
-            # Add table of contents
+            # Add table of contents (not affected by columns)
             if include_toc:
                 if progress_callback:
                     progress_callback("Building table of contents", 35)
@@ -289,7 +323,12 @@ class DocumentGenerator:
             # Build PDF
             if progress_callback:
                 progress_callback("Building PDF", 80)
-            doc.build(story, onFirstPage=self._on_page, onLaterPages=self._on_page)
+            
+            # BaseDocTemplate doesn't support onFirstPage/onLaterPages callbacks
+            if use_multicolumn:
+                doc.build(story)
+            else:
+                doc.build(story, onFirstPage=self._on_page, onLaterPages=self._on_page)
             
             if progress_callback:
                 progress_callback("Complete", 100)
@@ -300,6 +339,55 @@ class DocumentGenerator:
         except Exception as e:
             logger.error(f"Error generating PDF: {e}")
             raise
+
+    def _create_multicolumn_document(
+        self,
+        filename: str,
+        page_size: tuple,
+        margins_in: dict,
+        num_columns: int
+    ) -> BaseDocTemplate:
+        """Create a BaseDocTemplate with multiple column frames"""
+        doc = BaseDocTemplate(
+            filename,
+            pagesize=page_size,
+            rightMargin=margins_in["right"] * inch,
+            leftMargin=margins_in["left"] * inch,
+            topMargin=margins_in["top"] * inch,
+            bottomMargin=margins_in["bottom"] * inch,
+        )
+        
+        # Calculate frame dimensions
+        page_width = page_size[0]
+        page_height = page_size[1]
+        available_width = page_width - (margins_in["left"] + margins_in["right"]) * inch
+        available_height = page_height - (margins_in["top"] + margins_in["bottom"]) * inch
+        
+        # Column gap
+        column_gap = 0.3 * inch
+        column_width = (available_width - (num_columns - 1) * column_gap) / num_columns
+        
+        # Create frames for each column
+        frames = []
+        for col in range(num_columns):
+            x = margins_in["left"] * inch + col * (column_width + column_gap)
+            frame = Frame(
+                x,
+                margins_in["bottom"] * inch,
+                column_width,
+                available_height,
+                leftPadding=0,
+                rightPadding=0,
+                topPadding=0,
+                bottomPadding=0,
+            )
+            frames.append(frame)
+        
+        # Create page template with multiple frames
+        template = PageTemplate(id="default", frames=frames)
+        doc.addPageTemplates([template])
+        
+        return doc
 
     def _create_title_page(self) -> List[Flowable]:
         """Create title page"""
@@ -413,7 +501,9 @@ class DocumentGenerator:
                 table_flowable = self._render_table(table_segments)
                 if table_flowable:
                     story.append(table_flowable)
-                    story.append(Spacer(1, 0.2 * inch))
+                    # Add spacing after table only if not using template
+                    if not self._template_config or "elements" not in self._template_config:
+                        story.append(Spacer(1, 0.2 * inch))
                 continue
             
             # Regular paragraph rendering with template styles
@@ -425,7 +515,10 @@ class DocumentGenerator:
                 style = self._apply_template_style(style, style_name)
             
             story.append(Paragraph(segment.content, style))
-            story.append(Spacer(1, 0.08 * inch))
+            
+            # Only add extra spacing if not using template (template spacing is in ParagraphStyle)
+            if not self._template_config or "elements" not in self._template_config:
+                story.append(Spacer(1, 0.08 * inch))
             
             # Add images for this page
             if segment.page_number in images_by_page:
@@ -454,6 +547,7 @@ class DocumentGenerator:
     def _apply_template_style(self, base_style: ParagraphStyle, style_name: str) -> ParagraphStyle:
         """Apply template element styles to paragraph style"""
         elements_config = self._template_config.get("elements", {})
+        spacing_config = self._template_config.get("spacing", {})
         
         # Map style names to element keys
         style_map = {
@@ -462,19 +556,37 @@ class DocumentGenerator:
         }
         
         element_key = style_map.get(style_name)
-        if not element_key or element_key not in elements_config:
+        if not element_key:
             return base_style
         
-        elem_config = elements_config[element_key]
+        elem_config = elements_config.get(element_key, {})
         
-        # Create modified style
+        # Get spacing settings
+        line_spacing = spacing_config.get("line_spacing", 1.15)
+        paragraph_spacing = spacing_config.get("paragraph_spacing", 8)
+        
+        # Calculate leading from line_spacing
+        base_font_size = elem_config.get("font_size", base_style.fontSize)
+        leading = base_font_size * line_spacing
+        
+        # Get alignment
+        alignment = self._get_alignment(elem_config.get("alignment", "left"))
+        
+        # Get colors and font info
+        text_color = elem_config.get("text_color", "#2C3E50")
+        font_weight = elem_config.get("font_weight", "normal")
+        
+        # Create modified style with all template settings
         return ParagraphStyle(
             name=f"{base_style.name}_templated",
             parent=base_style,
-            fontSize=elem_config.get("font_size", base_style.fontSize),
-            textColor=colors.HexColor(elem_config.get("text_color", "#2C3E50")),
-            fontName="Helvetica-Bold" if elem_config.get("font_weight") == "bold" else "Helvetica",
-            alignment=self._get_alignment(elem_config.get("alignment", "left")),
+            fontSize=base_font_size,
+            textColor=colors.HexColor(text_color),
+            fontName="Helvetica-Bold" if font_weight == "bold" else "Helvetica",
+            alignment=alignment,
+            leading=leading,
+            spaceAfter=paragraph_spacing,
+            spaceBefore=paragraph_spacing,
         )
     
     def _get_alignment(self, alignment_str: str):
