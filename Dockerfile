@@ -40,7 +40,6 @@ ENV DATABASE_URL=sqlite:///./data/app.db \
     DEBUG=False \
     LOG_LEVEL=INFO \
     HOST=0.0.0.0 \
-    PORT=8000 \
     MAX_UPLOAD_SIZE_MB=50 \
     ALLOWED_EXTENSIONS=pdf,pptx,png,jpg,jpeg \
     OCR_ENABLED=True \
