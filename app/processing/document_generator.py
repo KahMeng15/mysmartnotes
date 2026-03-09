@@ -19,7 +19,7 @@ from reportlab.platypus import (
     Frame, Flowable, BaseDocTemplate, FrameBreak
 )
 from reportlab.pdfgen import canvas
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
@@ -60,59 +60,59 @@ class StyleSheet:
 
     @staticmethod
     def get_styles() -> Dict[str, ParagraphStyle]:
-        """Get custom styles for document"""
+        """Get custom styles for document — sizes/colors match template defaults"""
         styles = getSampleStyleSheet()
         
         custom_styles = {
             "H1": ParagraphStyle(
                 name="H1_custom",
                 parent=styles["Heading1"],
-                fontSize=18,
-                textColor=colors.HexColor("#1a1a1a"),
-                spaceAfter=12,
-                spaceBefore=12,
+                fontSize=28,
+                textColor=colors.HexColor("#1A1A2E"),
+                spaceAfter=8,
+                spaceBefore=8,
                 fontName="Helvetica-Bold",
-                leading=20,
+                leading=34,
             ),
             "H2": ParagraphStyle(
                 name="H2_custom",
                 parent=styles["Heading2"],
-                fontSize=14,
-                textColor=colors.HexColor("#2c3e50"),
-                spaceAfter=10,
-                spaceBefore=10,
+                fontSize=24,
+                textColor=colors.HexColor("#2C3E50"),
+                spaceAfter=8,
+                spaceBefore=8,
                 fontName="Helvetica-Bold",
-                leading=16,
+                leading=29,
             ),
             "H3": ParagraphStyle(
                 name="H3_custom",
                 parent=styles["Heading3"],
-                fontSize=12,
-                textColor=colors.HexColor("#34495e"),
+                fontSize=20,
+                textColor=colors.HexColor("#34495E"),
                 spaceAfter=8,
                 spaceBefore=8,
                 fontName="Helvetica-Bold",
-                leading=14,
+                leading=24,
             ),
             "H4": ParagraphStyle(
                 name="H4_custom",
                 parent=styles["Heading3"],
-                fontSize=11,
-                textColor=colors.HexColor("#476978"),
+                fontSize=16,
+                textColor=colors.HexColor("#333333"),
                 spaceAfter=6,
                 spaceBefore=6,
                 fontName="Helvetica-Bold",
-                leading=13,
+                leading=20,
             ),
             "H5": ParagraphStyle(
                 name="H5_custom",
                 parent=styles["Heading3"],
-                fontSize=10,
-                textColor=colors.HexColor("#566b7f"),
+                fontSize=14,
+                textColor=colors.HexColor("#555555"),
                 spaceAfter=4,
                 spaceBefore=4,
                 fontName="Helvetica-Bold",
-                leading=12,
+                leading=17,
             ),
             "Body": ParagraphStyle(
                 name="Body_custom",
@@ -190,6 +190,9 @@ class DocumentGenerator:
         self.output_dir = os.path.join(base_output_dir, str(lecture_id))
         self.page_size = page_size
         self._template_config = None
+        # Resolved footer settings (set during generate_pdf, used in _on_page callback)
+        self._footer_show_page_number = True
+        self._footer_custom_text = ""
         
         # Create output directory
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -259,6 +262,15 @@ class DocumentGenerator:
                     page_size = (page_size[1], page_size[0])  # Swap width/height
             
             self.page_size = page_size
+            
+            # Resolve footer settings for use in _on_page callback
+            if template_config and "footer" in template_config:
+                fc = template_config["footer"]
+                self._footer_show_page_number = fc.get("show_page_number", True)
+                self._footer_custom_text = fc.get("custom_text", "")
+            else:
+                self._footer_show_page_number = True
+                self._footer_custom_text = ""
             
             # Get margins (in mm, convert to inches)
             margins_mm = {"top": 25, "bottom": 25, "left": 19, "right": 19}
@@ -390,19 +402,29 @@ class DocumentGenerator:
         return doc
 
     def _create_title_page(self) -> List[Flowable]:
-        """Create title page"""
+        """Create title page using cover_page config if available"""
         story = []
         
         story.append(Spacer(1, 1.5 * inch))
         
+        # Read cover page config
+        cover_cfg = {}
+        if self._template_config and "cover_page" in self._template_config:
+            cover_cfg = self._template_config["cover_page"]
+        
+        title_font_size = cover_cfg.get("title_size", 36)
+        title_color = cover_cfg.get("title_color", "#1A1A2E")
+        show_date = cover_cfg.get("show_date", True)
+        
         # Title
         title_style = ParagraphStyle(
-            "Title",
-            fontSize=24,
-            textColor=colors.HexColor("#1a1a1a"),
+            "CoverTitle",
+            fontSize=title_font_size,
+            textColor=colors.HexColor(title_color),
             alignment=TA_CENTER,
             fontName="Helvetica-Bold",
             spaceAfter=12,
+            leading=title_font_size * 1.2,
         )
         story.append(Paragraph(self.lecture_title, title_style))
         
@@ -410,7 +432,7 @@ class DocumentGenerator:
         
         # Subtitle
         subtitle_style = ParagraphStyle(
-            "Subtitle",
+            "CoverSubtitle",
             fontSize=14,
             textColor=colors.HexColor("#7f8c8d"),
             alignment=TA_CENTER,
@@ -418,18 +440,17 @@ class DocumentGenerator:
         )
         story.append(Paragraph("Extracted and Processed Content", subtitle_style))
         
-        story.append(Spacer(1, 0.5 * inch))
-        
-        # Metadata
-        meta_style = ParagraphStyle(
-            "Meta",
-            fontSize=10,
-            textColor=colors.HexColor("#95a5a6"),
-            alignment=TA_CENTER,
-            spaceAfter=6,
-        )
-        story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y')}", meta_style))
-        story.append(Paragraph(f"Lecture ID: {self.lecture_id}", meta_style))
+        # Date (only if show_date is True)
+        if show_date:
+            story.append(Spacer(1, 0.5 * inch))
+            meta_style = ParagraphStyle(
+                "CoverMeta",
+                fontSize=10,
+                textColor=colors.HexColor("#95a5a6"),
+                alignment=TA_CENTER,
+                spaceAfter=6,
+            )
+            story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y')}", meta_style))
         
         return story
 
@@ -594,15 +615,15 @@ class DocumentGenerator:
         alignment_map = {
             "left": TA_LEFT,
             "center": TA_CENTER,
-            "right": TA_CENTER,  # TA_RIGHT not available; use center
+            "right": TA_RIGHT,
             "justify": TA_JUSTIFY,
         }
         return alignment_map.get(alignment_str, TA_LEFT)
     
     def _render_table(self, table_segments: List[ContentSegment]) -> Optional[Flowable]:
         """
-        Render markdown table rows as a ReportLab Table
-        Expects table segments with content like: | Header1 | Header2 |
+        Render markdown table rows as a ReportLab Table, applying all table
+        styles from template_config["table"] if available.
         """
         if not table_segments:
             return None
@@ -610,9 +631,7 @@ class DocumentGenerator:
         # Parse markdown table format
         rows = []
         for segment in table_segments:
-            # Split by | and clean up
             cells = [cell.strip() for cell in segment.content.split("|")]
-            # Filter out empty cells at start/end
             cells = [c for c in cells if c and not c.startswith("---")]
             if cells:
                 rows.append(cells)
@@ -620,29 +639,65 @@ class DocumentGenerator:
         if not rows:
             return None
         
-        # Create table with better column width calculation
+        # Read table config from template
+        tbl_cfg = {}
+        if self._template_config and "table" in self._template_config:
+            tbl_cfg = self._template_config["table"]
+        
+        header_bg      = tbl_cfg.get("header_bg_color", "#593f8f")
+        header_fg      = tbl_cfg.get("header_text_color", "#ffffff")
+        odd_row_color  = tbl_cfg.get("odd_row_color", "#ffffff")
+        even_row_color = tbl_cfg.get("even_row_color", "#f5f4fb")
+        border_color   = tbl_cfg.get("border_color", "#cccccc")
+        border_width   = float(tbl_cfg.get("border_width", 0.5))
+        repeat_header  = tbl_cfg.get("repeat_header", True)
+        cell_padding   = int(tbl_cfg.get("cell_padding", 6))
+        header_fs      = int(tbl_cfg.get("header_font_size", 10))
+        body_fs        = int(tbl_cfg.get("body_font_size", 9))
+        alignment      = tbl_cfg.get("alignment", "center").upper()
+        
         try:
-            # Account for margins and padding
-            margins_in = 0.75  # Default document margins in inches
-            available_width = self.page_size[0] - (2 * margins_in * inch)
+            # Calculate column widths from available page space
+            margins_cfg = {}
+            if self._template_config and "page" in self._template_config:
+                margins_cfg = self._template_config["page"].get("margins", {})
+            left_m  = float(margins_cfg.get("left",  19)) / 25.4 * inch
+            right_m = float(margins_cfg.get("right", 19)) / 25.4 * inch
+            available_width = self.page_size[0] - left_m - right_m
             num_cols = len(rows[0]) if rows else 1
             col_width = available_width / num_cols
             
-            table = Table(rows, colWidths=[col_width] * num_cols)
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#593f8f")),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('TOPPADDING', (0, 0), (-1, 0), 8),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
-            ]))
+            # Build alternating row background commands
+            row_bg_cmds = []
+            for r_idx in range(1, len(rows)):
+                color_hex = odd_row_color if r_idx % 2 == 1 else even_row_color
+                row_bg_cmds.append(('BACKGROUND', (0, r_idx), (-1, r_idx), colors.HexColor(color_hex)))
+            
+            table_style_cmds = [
+                # Header row
+                ('BACKGROUND',   (0, 0), (-1, 0), colors.HexColor(header_bg)),
+                ('TEXTCOLOR',    (0, 0), (-1, 0), colors.HexColor(header_fg)),
+                ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE',     (0, 0), (-1, 0), header_fs),
+                # Body rows
+                ('FONTNAME',     (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE',     (0, 1), (-1, -1), body_fs),
+                ('TEXTCOLOR',    (0, 1), (-1, -1), colors.HexColor("#2C3E50")),
+                # Alignment
+                ('ALIGN',        (0, 0), (-1, -1), alignment),
+                ('VALIGN',       (0, 0), (-1, -1), 'MIDDLE'),
+                # Padding
+                ('TOPPADDING',   (0, 0), (-1, -1), cell_padding),
+                ('BOTTOMPADDING',(0, 0), (-1, -1), cell_padding),
+                ('LEFTPADDING',  (0, 0), (-1, -1), cell_padding),
+                ('RIGHTPADDING', (0, 0), (-1, -1), cell_padding),
+                # Border
+                ('GRID',         (0, 0), (-1, -1), border_width, colors.HexColor(border_color)),
+            ] + row_bg_cmds
+            
+            repeat_rows = 1 if repeat_header else 0
+            table = Table(rows, colWidths=[col_width] * num_cols, repeatRows=repeat_rows)
+            table.setStyle(TableStyle(table_style_cmds))
             return table
         except Exception as e:
             logger.warning(f"Failed to render table: {e}")
@@ -679,24 +734,28 @@ class DocumentGenerator:
         return story
 
     def _on_page(self, canvas_obj, doc):
-        """Callback for page drawing"""
+        """Callback for page drawing — respects footer config from template"""
         canvas_obj.saveState()
         
         page_width = self.page_size[0]
         
-        # Draw branded footer (left side)
+        # Build footer text
+        parts = ["Generated by mysmartnotes.vercel.app | Create notes and study smart!"]
+        if self._footer_custom_text:
+            parts.append(self._footer_custom_text)
+        footer_text = " | ".join(parts)
+        
         canvas_obj.setFont("Helvetica", 7)
-        generated_date = datetime.now().strftime("%B %d, %Y %I:%M %p")
-        footer_text = f"Generated by mysmartnotes.vercel.app | Create notes and study smart! | {generated_date}"
         canvas_obj.drawString(0.5 * inch, 0.35 * inch, footer_text)
         
-        # Draw page number (right side)
-        canvas_obj.setFont("Helvetica", 8)
-        canvas_obj.drawRightString(
-            page_width - 0.5 * inch,
-            0.35 * inch,
-            f"Page {doc.page}"
-        )
+        # Page number on right (only if configured)
+        if self._footer_show_page_number:
+            canvas_obj.setFont("Helvetica", 8)
+            canvas_obj.drawRightString(
+                page_width - 0.5 * inch,
+                0.35 * inch,
+                f"Page {doc.page}"
+            )
         
         canvas_obj.restoreState()
 

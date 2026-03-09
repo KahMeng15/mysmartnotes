@@ -7,7 +7,9 @@
     <title>Export Templates - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/styles/master.css">
     <link rel="stylesheet" href="/styles/templates.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -18,7 +20,8 @@
 <body>
     <div class="page-card">
         <div class="page-card-content">
-            <h1 style="margin-bottom: var(--spacing-xl);"><i class="ph ph-palette" style="margin-right: 8px;"></i> Export
+            <h1 style="margin-bottom: var(--spacing-xl);"><i class="ph ph-palette" style="margin-right: 8px;"></i>
+                Export
                 Templates</h1>
 
             <div class="templates-layout">
@@ -51,7 +54,8 @@
                             <button class="btn-icon danger" onclick="deleteSelectedTemplate()" title="Delete"
                                 id="deleteBtn"><i class="ph ph-trash"></i></button>
                             <button class="btn btn-primary" onclick="saveTemplate()" id="saveBtn"
-                                style="padding: 6px 16px; font-size: var(--font-size-sm);"><i class="ph ph-floppy-disk"></i>
+                                style="padding: 6px 16px; font-size: var(--font-size-sm);"><i
+                                    class="ph ph-floppy-disk"></i>
                                 Save</button>
                         </div>
                     </div>
@@ -128,6 +132,69 @@
                                 <h4><i class="ph ph-text-t"></i> Element Styles</h4>
                                 <div id="elementStylesContainer">
                                     <!-- Populated by JS -->
+                                </div>
+                            </div>
+
+                            <!-- Table Styles -->
+                            <div class="settings-group">
+                                <h4><i class="ph ph-table"></i> Table Styles</h4>
+                                <div class="setting-row">
+                                    <label>Header BG</label>
+                                    <input type="color" id="tbl_header_bg" value="#593f8f"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Header Text</label>
+                                    <input type="color" id="tbl_header_fg" value="#ffffff"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Odd Row</label>
+                                    <input type="color" id="tbl_odd_row" value="#ffffff"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Even Row</label>
+                                    <input type="color" id="tbl_even_row" value="#f5f4fb"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Border Color</label>
+                                    <input type="color" id="tbl_border_color" value="#cccccc"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Border Width (pt)</label>
+                                    <input type="number" id="tbl_border_width" step="0.5" min="0" max="5" value="0.5"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Repeat Header</label>
+                                    <div class="mini-toggle active" id="tbl_repeat_header"
+                                        onclick="this.classList.toggle('active'); markDirty(); updatePreview();"></div>
+                                </div>
+                                <div class="setting-row">
+                                    <label>Cell Padding (pt)</label>
+                                    <input type="number" id="tbl_cell_padding" step="1" min="0" max="20" value="6"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Header Font (pt)</label>
+                                    <input type="number" id="tbl_header_fs" step="1" min="6" max="20" value="10"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Body Font (pt)</label>
+                                    <input type="number" id="tbl_body_fs" step="1" min="6" max="20" value="9"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Alignment</label>
+                                    <select id="tbl_alignment" onchange="markDirty(); updatePreview();">
+                                        <option value="left">Left</option>
+                                        <option value="center">Center</option>
+                                        <option value="right">Right</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -368,6 +435,20 @@
             document.getElementById('cfgLineSpacing').value = cfg.spacing?.line_spacing ?? 1.15;
             document.getElementById('cfgParagraphSpacing').value = cfg.spacing?.paragraph_spacing ?? 8;
 
+            // Table
+            const tbl = cfg.table || {};
+            document.getElementById('tbl_header_bg').value = tbl.header_bg_color || '#593f8f';
+            document.getElementById('tbl_header_fg').value = tbl.header_text_color || '#ffffff';
+            document.getElementById('tbl_odd_row').value = tbl.odd_row_color || '#ffffff';
+            document.getElementById('tbl_even_row').value = tbl.even_row_color || '#f5f4fb';
+            document.getElementById('tbl_border_color').value = tbl.border_color || '#cccccc';
+            document.getElementById('tbl_border_width').value = tbl.border_width ?? 0.5;
+            toggleSet('tbl_repeat_header', tbl.repeat_header ?? true);
+            document.getElementById('tbl_cell_padding').value = tbl.cell_padding ?? 6;
+            document.getElementById('tbl_header_fs').value = tbl.header_font_size ?? 10;
+            document.getElementById('tbl_body_fs').value = tbl.body_font_size ?? 9;
+            document.getElementById('tbl_alignment').value = tbl.alignment || 'left';
+
             // Cover
             toggleSet('cfgCoverEnabled', cfg.cover_page?.enabled ?? true);
             document.getElementById('cfgCoverTitleSize').value = cfg.cover_page?.title_size ?? 36;
@@ -412,6 +493,19 @@
                     paragraph_spacing: parseInt(document.getElementById('cfgParagraphSpacing').value),
                 },
                 elements,
+                table: {
+                    header_bg_color: document.getElementById('tbl_header_bg').value,
+                    header_text_color: document.getElementById('tbl_header_fg').value,
+                    odd_row_color: document.getElementById('tbl_odd_row').value,
+                    even_row_color: document.getElementById('tbl_even_row').value,
+                    border_color: document.getElementById('tbl_border_color').value,
+                    border_width: parseFloat(document.getElementById('tbl_border_width').value),
+                    repeat_header: document.getElementById('tbl_repeat_header').classList.contains('active'),
+                    cell_padding: parseInt(document.getElementById('tbl_cell_padding').value),
+                    header_font_size: parseInt(document.getElementById('tbl_header_fs').value),
+                    body_font_size: parseInt(document.getElementById('tbl_body_fs').value),
+                    alignment: document.getElementById('tbl_alignment').value,
+                },
                 cover_page: {
                     enabled: document.getElementById('cfgCoverEnabled').classList.contains('active'),
                     title_size: parseInt(document.getElementById('cfgCoverTitleSize').value),
@@ -515,19 +609,23 @@
             if (cfg.cover_page.enabled) {
                 coverHtml = `
                     <div class="preview-cover">
-                        <div style="font-size: ${cfg.cover_page.title_size * 0.5}px; font-weight: bold; color: ${cfg.cover_page.title_color}; margin-bottom: 8px;">
+                        <div style="font-size: ${cfg.cover_page.title_size * PX_PER_PT}px; font-weight: bold; color: ${cfg.cover_page.title_color}; margin-bottom: 8px;">
                             Sample Document Title
                         </div>
-                        <div style="font-size: 10px; color: #7f8c8d;">Extracted and Processed Content</div>
-                        ${cfg.cover_page.show_date ? `<div style="font-size: 9px; color: #95a5a6; margin-top: 8px;">Generated: March 9, 2026</div>` : ''}
+                        <div style="font-size: ${14 * PX_PER_PT}px; color: #7f8c8d;">Extracted and Processed Content</div>
+                        ${cfg.cover_page.show_date ? `<div style="font-size: ${10 * PX_PER_PT}px; color: #95a5a6; margin-top: 8px;">Generated: March 9, 2026</div>` : ''}
                     </div>
                 `;
             }
 
             // Sample content using element styles
+            // The preview div is 793px wide but CSS-scaled to 0.75 (595px visual).
+            // To match PDF proportions (595pt wide), font sizes need ×(793/595)=×1.333
+            // so that after scale(0.75) they appear at the correct pt proportion.
+            const PX_PER_PT = 793 / 595; // ≈ 1.333
             const elStyle = (key) => {
                 const s = cfg.elements[key] || {};
-                return `text-align: ${s.alignment || 'left'}; color: ${s.text_color || '#2C3E50'}; font-weight: ${s.font_weight || 'normal'}; font-size: ${(s.font_size || 11) * 0.75}px; margin-bottom: ${cfg.spacing.paragraph_spacing * 0.5}px; line-height: ${cfg.spacing.line_spacing};`;
+                return `text-align: ${s.alignment || 'left'}; color: ${s.text_color || '#2C3E50'}; font-weight: ${s.font_weight || 'normal'}; font-size: ${(s.font_size || 11) * PX_PER_PT}px; margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px; line-height: ${cfg.spacing.line_spacing};`;
             };
 
             let contentHtml = `
@@ -665,6 +763,51 @@
                 </div>
             `;
 
+            // Build live preview table reflecting table config
+            const tbl = cfg.table || {};
+            const hdrBg = tbl.header_bg_color || '#593f8f';
+            const hdrFg = tbl.header_text_color || '#ffffff';
+            const oddBg = tbl.odd_row_color || '#ffffff';
+            const evenBg = tbl.even_row_color || '#f5f4fb';
+            const bdrClr = tbl.border_color || '#cccccc';
+            const bdrW = (tbl.border_width ?? 0.5) + 'px';
+            const pad = (tbl.cell_padding ?? 6) * PX_PER_PT + 'px';
+            const hFs = (tbl.header_font_size ?? 10) * PX_PER_PT + 'px';
+            const bFs = (tbl.body_font_size ?? 9) * PX_PER_PT + 'px';
+            const align = tbl.alignment || 'left';
+            const cellStyle = `border: ${bdrW} solid ${bdrClr}; padding: ${pad}; text-align: ${align};`;
+            const tableHtml = `
+                <div style="margin-top: 8px;">
+                    <div style="font-size: 7px; color: #888; margin-bottom: 3px;">↓ Table Preview</div>
+                    <table style="width: 100%; border-collapse: collapse; font-family: inherit;">
+                        <thead>
+                            <tr>
+                                <th style="${cellStyle} background: ${hdrBg}; color: ${hdrFg}; font-size: ${hFs}; font-weight: bold;">Column A</th>
+                                <th style="${cellStyle} background: ${hdrBg}; color: ${hdrFg}; font-size: ${hFs}; font-weight: bold;">Column B</th>
+                                <th style="${cellStyle} background: ${hdrBg}; color: ${hdrFg}; font-size: ${hFs}; font-weight: bold;">Column C</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 1 Alpha</td>
+                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 1 Beta</td>
+                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 1 Gamma</td>
+                            </tr>
+                            <tr>
+                                <td style="${cellStyle} background: ${evenBg}; font-size: ${bFs};">Row 2 Alpha</td>
+                                <td style="${cellStyle} background: ${evenBg}; font-size: ${bFs};">Row 2 Beta</td>
+                                <td style="${cellStyle} background: ${evenBg}; font-size: ${bFs};">Row 2 Gamma</td>
+                            </tr>
+                            <tr>
+                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 3 Alpha</td>
+                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 3 Beta</td>
+                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 3 Gamma</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
             // Apply columns to the content wrapper only (footer stays outside)
             let colStyle = '';
             if (cfg.page.columns > 1) {
@@ -681,6 +824,7 @@
                 ${coverHtml}
                 <div class="preview-content" style="${colStyle}">
                     ${contentHtml}
+                    ${tableHtml}
                 </div>
                 ${footerHtml}
             `;
