@@ -13,6 +13,7 @@ from docx import Document
 from docx.shared import Pt, Inches, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.section import WD_ORIENT
+import re
 
 from app.processing.text_processor import ContentSegment, ContentType
 from app.processing.image_extractor import ExtractedImage
@@ -75,6 +76,23 @@ class DocxGenerator:
                     progress_callback("Building table of contents", 35)
                 self._create_toc_placeholder(doc, content_segments)
 
+            # Margins setup from template
+            if template_config and "page" in template_config:
+                page_cfg = template_config["page"]
+                margins = page_cfg.get("margins", {})
+                if margins:
+                    for section in doc.sections:
+                        if "top" in margins: section.top_margin = Cm(margins["top"] / 10.0)
+                        if "bottom" in margins: section.bottom_margin = Cm(margins["bottom"] / 10.0)
+                        if "left" in margins: section.left_margin = Cm(margins["left"] / 10.0)
+                        if "right" in margins: section.right_margin = Cm(margins["right"] / 10.0)
+                        
+                orientation = page_cfg.get("orientation", "portrait").lower()
+                if orientation == "landscape":
+                    for section in doc.sections:
+                        section.orientation = WD_ORIENT.LANDSCAPE
+                        section.page_width, section.page_height = section.page_height, section.page_width
+
             # Main content
             if progress_callback:
                 progress_callback("Rendering content", 50)
@@ -132,6 +150,19 @@ class DocxGenerator:
             "Heading 4": {"key": "h4", "size": 16, "color": "#333333", "bold": True, "space_before": 10, "space_after": 6},
         }
 
+        # Setup Alignment mapping helper function
+        def _get_docx_alignment(align_str):
+            if align_str == 'center': return WD_ALIGN_PARAGRAPH.CENTER
+            if align_str == 'right': return WD_ALIGN_PARAGRAPH.RIGHT
+            if align_str == 'justify': return WD_ALIGN_PARAGRAPH.JUSTIFY
+            return WD_ALIGN_PARAGRAPH.LEFT
+            
+        p_align = _get_docx_alignment(p_cfg.get("alignment", "left"))
+        try:
+            doc.styles["Normal"].paragraph_format.alignment = p_align
+        except:
+            pass
+
         for style_name, defaults in heading_defaults.items():
             try:
                 h_style = doc.styles[style_name]
@@ -143,6 +174,7 @@ class DocxGenerator:
                 h_style.font.bold = h_el.get("font_weight", "bold") == "bold"
                 h_style.paragraph_format.space_before = Pt(defaults["space_before"])
                 h_style.paragraph_format.space_after = Pt(defaults["space_after"])
+                h_style.paragraph_format.alignment = _get_docx_alignment(h_el.get("alignment", "left"))
             except KeyError:
                 pass
 
@@ -234,13 +266,10 @@ class DocxGenerator:
             elif segment.content_type == ContentType.LIST:
                 # Handle bullet points
                 content = segment.content
-                if content.startswith("- "):
-                    content = content[2:]
-                elif content.startswith("• "):
-                    content = content[2:]
+                content = re.sub(r'^\s*[-*+•]\s+', '', content)
                 para = doc.add_paragraph(content, style="List Bullet")
                 for run in para.runs:
-                    run.font.name = "Instrument Sans"
+                    run.font.name = tc.get("font_family", "Instrument Sans")
                     run.font.size = Pt(11)
             elif segment.content_type == ContentType.CODE:
                 para = doc.add_paragraph()
@@ -252,9 +281,8 @@ class DocxGenerator:
             else:
                 # Body text
                 para = doc.add_paragraph(segment.content)
-                para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                 for run in para.runs:
-                    run.font.name = "Instrument Sans"
+                    run.font.name = tc.get("font_family", "Instrument Sans")
                     run.font.size = Pt(11)
                     run.font.color.rgb = RGBColor(0x2C, 0x3E, 0x50)
 

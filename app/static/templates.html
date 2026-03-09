@@ -584,14 +584,16 @@
         function updatePreview() {
             const cfg = gatherConfig();
             const page = document.getElementById('previewPage');
-            // mm → preview px (scale factor ~0.8px per mm)
-            const pxPerMm = 0.8;
+            // mm → preview px
+            // The preview div is 793px wide (A4 portrait) or 1122px (A4 landscape)
+            // A4 portrait is 210mm wide. So scale factor is 793/210 = ~3.77 px per mm
+            const isLandscape = cfg.page.orientation === 'landscape';
+            const pxPerMm = isLandscape ? (1122 / 297) : (793 / 210);
             const paddingV = (cfg.page.margins.top * pxPerMm) + 'px';
             const paddingH = (cfg.page.margins.left * pxPerMm) + 'px';
             page.style.padding = `${paddingV} ${paddingH}`;
 
             // Apply orientation to preview page with fixed dimensions
-            const isLandscape = cfg.page.orientation === 'landscape';
             if (isLandscape) {
                 page.style.transform = 'scale(0.75)';
                 page.style.transformOrigin = 'top center';

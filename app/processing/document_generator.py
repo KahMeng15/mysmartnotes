@@ -22,6 +22,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
 
 from app.processing.text_processor import ContentSegment, ContentType
 from app.processing.image_extractor import ExtractedImage
@@ -176,6 +177,7 @@ class StyleSheet:
 
 class DocumentGenerator:
     """Generates styled PDF from structured content"""
+    _fonts_registered = False
 
     def __init__(
         self,
@@ -199,6 +201,27 @@ class DocumentGenerator:
         
         self.output_pdf = os.path.join(self.output_dir, "OUTPUT.pdf")
         self.styles = StyleSheet.get_styles()
+        self._register_fonts()
+
+    @classmethod
+    def _register_fonts(cls):
+        """Register custom TrueType fonts if not already registered"""
+        if cls._fonts_registered:
+            return
+            
+        try:
+            fonts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "fonts", "Instrument_Sans")
+            if os.path.exists(fonts_dir):
+                pdfmetrics.registerFont(TTFont('Instrument Sans', os.path.join(fonts_dir, 'InstrumentSans-Regular.ttf')))
+                pdfmetrics.registerFont(TTFont('Instrument Sans-Bold', os.path.join(fonts_dir, 'InstrumentSans-Bold.ttf')))
+                pdfmetrics.registerFont(TTFont('Instrument Sans-Italic', os.path.join(fonts_dir, 'InstrumentSans-Italic.ttf')))
+                pdfmetrics.registerFont(TTFont('Instrument Sans-BoldItalic', os.path.join(fonts_dir, 'InstrumentSans-BoldItalic.ttf')))
+                pdfmetrics.registerFontFamily('Instrument Sans', normal='Instrument Sans', bold='Instrument Sans-Bold', italic='Instrument Sans-Italic', boldItalic='Instrument Sans-BoldItalic')
+                logger.info("[PDF Export] Custom fonts loaded successfully.")
+        except Exception as e:
+            logger.warning(f"[PDF Export] Failed to register custom fonts: {e}")
+            
+        cls._fonts_registered = True
 
     def generate_pdf(
         self,
@@ -535,7 +558,7 @@ class DocumentGenerator:
             if self._template_config and "elements" in self._template_config:
                 style = self._apply_template_style(style, style_name)
             
-            story.append(Paragraph(segment.content, style))
+            story.append(Paragraph(self._prepare_content(segment, style_name), style))
             
             # Only add extra spacing if not using template (template spacing is in ParagraphStyle)
             if not self._template_config or "elements" not in self._template_config:
@@ -603,13 +626,69 @@ class DocumentGenerator:
             parent=base_style,
             fontSize=base_font_size,
             textColor=colors.HexColor(text_color),
-            fontName="Helvetica-Bold" if font_weight == "bold" else "Helvetica",
+            fontName="Instrument Sans-Bold" if font_weight == "bold" else "Instrument Sans",
             alignment=alignment,
             leading=leading,
             spaceAfter=paragraph_spacing,
             spaceBefore=paragraph_spacing,
         )
     
+    def _parse_inline_markdown(self, text: str) -> str:
+        """
+        Convert inline markdown syntax to ReportLab paragraph XML.
+        ReportLab Paragraph supports a subset of HTML-like tags:
+          <b>, <i>, <u>, <strike>, <font color="...">.
+        Order matters: process bold+italic first, then bold, then italic.
+        """
+        import re
+        import html
+
+        # Escape HTML special chars first so we don't double-escape our own tags
+        text = html.escape(text, quote=False)
+
+        # Bold + italic: ***text*** or ___text___
+        text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<b><i>\1</i></b>', text)
+        text = re.sub(r'___(.+?)___', r'<b><i>\1</i></b>', text)
+
+        # Bold: **text** or __text__
+        text = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+        text = re.sub(r'__(.+?)__', r'<b>\1</b>', text)
+
+        # Italic: *text* or _text_ (not inside a word)
+        text = re.sub(r'(?<!\w)\*(.+?)\*(?!\w)', r'<i>\1</i>', text)
+        text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'<i>\1</i>', text)
+
+        # Strikethrough: ~~text~~
+        text = re.sub(r'~~(.+?)~~', r'<strike>\1</strike>', text)
+
+        # Inline code: `code`
+        text = re.sub(r'`([^`]+)`', r'<font face="Courier">\1</font>', text)
+
+        return text
+
+    def _prepare_content(self, segment: ContentSegment, style_name: str) -> str:
+        """
+        Prepare segment content for Paragraph:
+        - Strip and replace list prefix chars with proper bullet / number
+        - Apply inline markdown → ReportLab XML conversion
+        """
+        import re
+        content = segment.content
+
+        if style_name == "List":
+            # Strip leading markdown list markers (-, *, +, •) and replace with •
+            content = re.sub(r'^\s*[-*+•]\s+', '', content)
+            content = f'\u2022\u00a0\u00a0{content}'
+        elif style_name == "OrderedList":
+            # Strip leading "1." / "2." etc. and replace with the raw number
+            m = re.match(r'^\s*(\d+)\.\s+', content)
+            if m:
+                num = m.group(1)
+                content = re.sub(r'^\s*\d+\.\s+', '', content)
+                content = f'{num}.\u00a0\u00a0{content}'
+
+        return self._parse_inline_markdown(content)
+
     def _get_alignment(self, alignment_str: str):
         """Convert alignment string to reportlab enum"""
         alignment_map = {
