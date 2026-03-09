@@ -657,34 +657,68 @@ class DocumentGenerator:
         alignment      = tbl_cfg.get("alignment", "center").upper()
         
         try:
-            # Calculate column widths from available page space
+            # Calculate available width for the table, accounting for:
+            # 1. Page margins
+            # 2. Number of layout columns (tables flow inside a single column frame)
+            # 3. Column gap between frames
             margins_cfg = {}
             if self._template_config and "page" in self._template_config:
                 margins_cfg = self._template_config["page"].get("margins", {})
             left_m  = float(margins_cfg.get("left",  19)) / 25.4 * inch
             right_m = float(margins_cfg.get("right", 19)) / 25.4 * inch
-            available_width = self.page_size[0] - left_m - right_m
-            num_cols = len(rows[0]) if rows else 1
-            col_width = available_width / num_cols
+            full_content_width = self.page_size[0] - left_m - right_m
+
+            # Determine number of layout columns from template config
+            layout_cols = 1
+            if self._template_config and "page" in self._template_config:
+                layout_cols = int(self._template_config["page"].get("columns", 1))
+
+            # Each frame (column) is: (full_content_width - gaps) / num_columns
+            column_gap = 0.3 * inch  # must match _create_multicolumn_document
+            if layout_cols > 1:
+                frame_width = (full_content_width - (layout_cols - 1) * column_gap) / layout_cols
+            else:
+                frame_width = full_content_width
+
+            # Number of data columns in this specific table
+            num_table_cols = len(rows[0]) if rows else 1
+            col_width = frame_width / num_table_cols
             
+            # Convert raw cell strings → Paragraph objects so text wraps inside cells.
+            # In ReportLab, plain strings NEVER word-wrap; Paragraphs always do.
+            rl_alignment = self._get_alignment(tbl_cfg.get("alignment", "center"))
+            header_cell_style = ParagraphStyle(
+                "TblHeader",
+                fontName="Helvetica-Bold",
+                fontSize=header_fs,
+                textColor=colors.HexColor(header_fg),
+                alignment=rl_alignment,
+                leading=header_fs * 1.3,
+            )
+            body_cell_style = ParagraphStyle(
+                "TblBody",
+                fontName="Helvetica",
+                fontSize=body_fs,
+                textColor=colors.HexColor("#2C3E50"),
+                alignment=rl_alignment,
+                leading=body_fs * 1.3,
+            )
+
+            para_rows = []
+            for r_idx, row in enumerate(rows):
+                cell_style = header_cell_style if r_idx == 0 else body_cell_style
+                para_rows.append([Paragraph(str(cell), cell_style) for cell in row])
+
             # Build alternating row background commands
             row_bg_cmds = []
             for r_idx in range(1, len(rows)):
                 color_hex = odd_row_color if r_idx % 2 == 1 else even_row_color
                 row_bg_cmds.append(('BACKGROUND', (0, r_idx), (-1, r_idx), colors.HexColor(color_hex)))
-            
+
             table_style_cmds = [
-                # Header row
+                # Header row background (text styling is inside the Paragraph style)
                 ('BACKGROUND',   (0, 0), (-1, 0), colors.HexColor(header_bg)),
-                ('TEXTCOLOR',    (0, 0), (-1, 0), colors.HexColor(header_fg)),
-                ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE',     (0, 0), (-1, 0), header_fs),
-                # Body rows
-                ('FONTNAME',     (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE',     (0, 1), (-1, -1), body_fs),
-                ('TEXTCOLOR',    (0, 1), (-1, -1), colors.HexColor("#2C3E50")),
-                # Alignment
-                ('ALIGN',        (0, 0), (-1, -1), alignment),
+                # Vertical alignment
                 ('VALIGN',       (0, 0), (-1, -1), 'MIDDLE'),
                 # Padding
                 ('TOPPADDING',   (0, 0), (-1, -1), cell_padding),
@@ -694,9 +728,9 @@ class DocumentGenerator:
                 # Border
                 ('GRID',         (0, 0), (-1, -1), border_width, colors.HexColor(border_color)),
             ] + row_bg_cmds
-            
+
             repeat_rows = 1 if repeat_header else 0
-            table = Table(rows, colWidths=[col_width] * num_cols, repeatRows=repeat_rows)
+            table = Table(para_rows, colWidths=[col_width] * num_table_cols, repeatRows=repeat_rows)
             table.setStyle(TableStyle(table_style_cmds))
             return table
         except Exception as e:
