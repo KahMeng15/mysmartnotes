@@ -100,7 +100,7 @@ class ExportTemplate(Base):
     """User-defined export templates"""
     __tablename__ = "export_templates"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(8), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # NULL = system default
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)

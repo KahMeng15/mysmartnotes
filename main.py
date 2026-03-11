@@ -112,9 +112,13 @@ async def serve_login():
 async def serve_dashboard():
     return FileResponse(os.path.join(static_dir, "dashboard.html"))
 
-@app.get("/templates")
-async def serve_templates():
-    return FileResponse(os.path.join(static_dir, "templates.html"))
+@app.get("/exporttemplates")
+async def serve_export_templates():
+    return FileResponse(os.path.join(static_dir, "exporttemplates.html"))
+
+@app.get("/exporttemplate/{id}")
+async def serve_export_template(id: str):
+    return FileResponse(os.path.join(static_dir, "exporttemplate.html"))
 
 @app.get("/")
 async def root():

@@ -24,7 +24,7 @@ function injectSidebar() {
             <li><a href="/flashcards.html" class="sidebar-nav-link" data-page="flashcards.html"><i class="ph ph-cards"></i><span>Flashcards</span></a></li>
             <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-clock"></i><span>Pomodoro</span></a></li>
             <li><a href="/upload.html" class="sidebar-nav-link" data-page="upload.html"><i class="ph ph-upload-simple"></i><span>Upload</span></a></li>
-            <li><a href="/templates.html" class="sidebar-nav-link" data-page="templates.html"><i class="ph ph-palette"></i><span>Templates</span></a></li>
+            <li><a href="/exporttemplates" class="sidebar-nav-link" data-page="exporttemplates"><i class="ph ph-palette"></i><span>Templates</span></a></li>
             <li class="sidebar-divider"></li>
             <li><a href="/settings.html" class="sidebar-nav-link" data-page="settings.html"><i class="ph ph-gear"></i><span>Settings</span></a></li>
             <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-clock-user"></i><span>Recent</span></a></li>

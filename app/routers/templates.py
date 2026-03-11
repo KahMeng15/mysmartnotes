@@ -10,8 +10,20 @@ from app.utils.auth import get_current_user
 from app.utils.db import get_db
 
 logger = logging.getLogger(__name__)
+import random
+import string
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/templates", tags=["templates"])
+
+def generate_template_id(db: Session, length=8):
+    """Generate a unique alphanumeric ID for templates."""
+    while True:
+        new_id = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+        if not db.query(ExportTemplate).filter(ExportTemplate.id == new_id).first():
+            return new_id
+        length += 1
 
 # ─── Default template configs ──────────────────────────────────
 
@@ -25,6 +37,7 @@ DEFAULT_ELEMENT_STYLE = {
 
 SEEDED_TEMPLATES = [
     {
+        "id": "stdacad1",
         "name": "Standard Academic",
         "description": "Clean, professional layout for academic documents",
         "config": {
@@ -54,6 +67,7 @@ SEEDED_TEMPLATES = [
         }
     },
     {
+        "id": "modminml",
         "name": "Modern Minimal",
         "description": "Clean and minimal with generous whitespace",
         "config": {
@@ -83,6 +97,7 @@ SEEDED_TEMPLATES = [
         }
     },
     {
+        "id": "bolddark",
         "name": "Bold & Dark",
         "description": "High contrast dark theme with bold typography",
         "config": {
@@ -126,8 +141,11 @@ def seed_default_templates(db: Session):
         if existing:
             # Update config to latest (e.g. mm margin conversion)
             existing.config = tmpl_data["config"]
+            existing.name = tmpl_data["name"]
+            existing.description = tmpl_data["description"]
         else:
             tmpl = ExportTemplate(
+                id=tmpl_data["id"],
                 user_id=None,
                 name=tmpl_data["name"],
                 description=tmpl_data["description"],
@@ -169,7 +187,7 @@ async def list_templates(
 
 @router.get("/{template_id}", response_model=dict)
 async def get_template(
-    template_id: int,
+    template_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -208,6 +226,7 @@ async def create_template(
     config = body.get("config", SEEDED_TEMPLATES[0]["config"])  # Default to Standard Academic config
     
     tmpl = ExportTemplate(
+        id=generate_template_id(db),
         user_id=current_user.id,
         name=name,
         description=body.get("description", ""),
@@ -232,7 +251,7 @@ async def create_template(
 
 @router.put("/{template_id}", response_model=dict)
 async def update_template(
-    template_id: int,
+    template_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -271,7 +290,7 @@ async def update_template(
 
 @router.delete("/{template_id}")
 async def delete_template(
-    template_id: int,
+    template_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -292,7 +311,7 @@ async def delete_template(
 
 @router.post("/{template_id}/duplicate", response_model=dict, status_code=201)
 async def duplicate_template(
-    template_id: int,
+    template_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -306,6 +325,7 @@ async def duplicate_template(
         raise HTTPException(status_code=404, detail="Template not found")
     
     new_tmpl = ExportTemplate(
+        id=generate_template_id(db),
         user_id=current_user.id,
         name=f"{source.name} (Copy)",
         description=source.description,

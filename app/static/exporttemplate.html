@@ -11,6 +11,7 @@
         href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/styles/master.css">
+    <link rel="stylesheet" href="/styles/chat.css">
     <link rel="stylesheet" href="/styles/templates.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
@@ -18,52 +19,16 @@
 </head>
 
 <body>
-    <div class="page-card">
-        <div class="page-card-content">
-            <h1 style="margin-bottom: var(--spacing-xl);"><i class="ph ph-palette" style="margin-right: 8px;"></i>
-                Export
-                Templates</h1>
-
-            <div class="templates-layout">
-                <!-- Sidebar: Template list -->
-                <div class="template-sidebar">
-                    <h3><i class="ph ph-list-dashes"></i> Templates</h3>
-                    <div class="template-list" id="templateList">
-                        <!-- Populated by JS -->
-                    </div>
-                    <button class="btn btn-primary btn-block" onclick="createNewTemplate()">
-                        <i class="ph ph-plus"></i> New Template
-                    </button>
-                </div>
-
-                <!-- Editor -->
-                <div class="editor-panel" id="editorPanel">
-                    <div class="empty-state" id="emptyState">
-                        <i class="ph ph-pencil-ruler"></i>
-                        <h3>Select a template to edit</h3>
-                        <p>Choose a template from the sidebar or create a new one.</p>
-                    </div>
-
-                    <!-- Editor Header (hidden until template selected) -->
-                    <div class="editor-header" id="editorHeader" style="display: none;">
-                        <i class="ph ph-text-aa" style="font-size: 20px; color: var(--color-primary);"></i>
-                        <input type="text" id="templateName" placeholder="Template Name" oninput="markDirty()">
-                        <div class="header-actions">
-                            <button class="btn-icon" onclick="duplicateSelectedTemplate()" title="Duplicate"><i
-                                    class="ph ph-copy"></i></button>
-                            <button class="btn-icon danger" onclick="deleteSelectedTemplate()" title="Delete"
-                                id="deleteBtn"><i class="ph ph-trash"></i></button>
-                            <button class="btn btn-primary" onclick="saveTemplate()" id="saveBtn"
-                                style="padding: 6px 16px; font-size: var(--font-size-sm);"><i
-                                    class="ph ph-floppy-disk"></i>
-                                Save</button>
+    <!-- Edit View: Chat-like interface -->
+    <div id="templateEditView" class="template-edit-view chat-container page-card" style="padding: 0; display: flex; height: 100vh; border-radius: 0;">
+                    <!-- Settings Sidebar (replaces conversation list) -->
+                    <div class="chat-sidebar template-settings-sidebar">
+                        <div class="sidebar-header" style="justify-content: flex-start; gap: var(--spacing-md); margin-bottom: var(--spacing-lg);">
+                            <button class="btn-icon" onclick="closeEditor()" title="Back to templates"><i class="ph ph-arrow-left"></i></button>
+                            <h3 style="margin: 0;">Settings</h3>
                         </div>
-                    </div>
-
-                    <!-- Editor Body (hidden until template selected) -->
-                    <div class="editor-body" id="editorBody" style="display: none;">
-                        <!-- Settings -->
-                        <div class="settings-panel">
+                        
+                        <div class="settings-scroll-area">
                             <!-- Page Setup -->
                             <div class="settings-group">
                                 <h4><i class="ph ph-file"></i> Page Setup</h4>
@@ -238,18 +203,28 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Live Preview -->
-                        <div class="preview-panel">
-                            <h4><i class="ph ph-eye"></i> Live Preview</h4>
+                    <!-- Main Preview Area (replaces chat main) -->
+                    <div class="chat-main template-preview-main">
+                        <div class="chat-header">
+                            <div class="chat-header-top align-items-center" style="gap: var(--spacing-md);">
+                                <i class="ph ph-text-aa" style="font-size: 24px; color: var(--color-primary);"></i>
+                                <input type="text" id="templateName" placeholder="Template Name" oninput="markDirty()" class="clean-input" style="flex: 1; font-size: 1.2rem; font-weight: 600;">
+                                <div class="header-actions">
+                                    <button class="btn-icon" onclick="duplicateSelectedTemplate()" title="Duplicate"><i class="ph ph-copy"></i></button>
+                                    <button class="btn-icon danger" onclick="deleteSelectedTemplate()" title="Delete" id="deleteBtn"><i class="ph ph-trash"></i></button>
+                                    <button class="btn btn-primary" onclick="saveTemplate()" id="saveBtn" style="padding: 6px 16px;"><i class="ph ph-floppy-disk"></i> Save</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-messages" style="background: var(--color-bg); justify-content: flex-start; align-items: center; padding-top: var(--spacing-xl);">
                             <div class="preview-page" id="previewPage">
                                 <!-- Populated by JS -->
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -267,20 +242,42 @@
         };
 
         window.addEventListener('load', () => {
-            if (!token) window.location.href = 'login.html';
-            loadTemplates();
+            if (!token) window.location.href = '/login.html';
+            const parts = window.location.pathname.split('/');
+            selectedTemplateId = parts[parts.length - 1]; // e.g. /exporttemplate/{id}
+            if (selectedTemplateId && selectedTemplateId !== 'exporttemplate') {
+                loadTemplate(selectedTemplateId);
+            } else {
+                window.location.href = '/exporttemplates';
+            }
         });
 
         // ─── API ─────────────────────────────────────────────────
 
-        async function loadTemplates() {
+        async function loadTemplate(id) {
             try {
-                const res = await fetch('/templates', {
+                const res = await fetch(`/templates/${id}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (res.ok) {
-                    templates = await res.json();
-                    renderTemplateList();
+                    const tmpl = await res.json();
+                    
+                    // Set name
+                    document.getElementById('templateName').value = tmpl.name;
+
+                    // Disable editing for system templates
+                    const isSystem = tmpl.is_system;
+                    document.getElementById('templateName').readOnly = isSystem;
+                    document.getElementById('saveBtn').style.display = isSystem ? 'none' : '';
+                    document.getElementById('deleteBtn').style.display = isSystem ? 'none' : '';
+
+                    // Load config
+                    loadConfig(tmpl.config);
+                    buildElementStyles(tmpl.config);
+                    updatePreview();
+                } else {
+                    alert('Failed to load template');
+                    window.location.href = '/exporttemplates';
                 }
             } catch (e) { console.error(e); }
         }
@@ -305,8 +302,7 @@
                 });
                 if (res.ok) {
                     isDirty = false;
-                    await loadTemplates();
-                    selectTemplate(selectedTemplateId);
+                    alert('Saved!');
                 } else {
                     const err = await res.json();
                     alert(err.detail || 'Failed to save');
@@ -328,8 +324,7 @@
                 });
                 if (res.ok) {
                     const newTmpl = await res.json();
-                    await loadTemplates();
-                    selectTemplate(newTmpl.id);
+                    window.location.href = `/exporttemplate/${newTmpl.id}`;
                 }
             } catch (e) { alert('Error: ' + e.message); }
         }
@@ -343,8 +338,7 @@
                 });
                 if (res.ok) {
                     const newTmpl = await res.json();
-                    await loadTemplates();
-                    selectTemplate(newTmpl.id);
+                    window.location.href = `/exporttemplate/${newTmpl.id}`;
                 }
             } catch (e) { alert('Error: ' + e.message); }
         }
@@ -360,60 +354,18 @@
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                selectedTemplateId = null;
-                await loadTemplates();
-                showEmptyState();
+                window.location.href = '/exporttemplates';
             } catch (e) { alert('Error: ' + e.message); }
         }
 
-        // ─── Render ──────────────────────────────────────────────
 
-        function renderTemplateList() {
-            const list = document.getElementById('templateList');
-            list.innerHTML = templates.map(t => `
-                <div class="template-item ${t.id === selectedTemplateId ? 'active' : ''}"
-                     onclick="selectTemplate(${t.id})">
-                    <div class="item-info">
-                        <div class="item-name">${t.name}</div>
-                    </div>
-                    <span class="item-badge ${t.is_system ? '' : 'user'}">${t.is_system ? 'Default' : 'Custom'}</span>
-                </div>
-            `).join('');
-        }
 
-        function selectTemplate(id) {
+        function closeEditor() {
             if (isDirty && !confirm('You have unsaved changes. Discard?')) return;
-            selectedTemplateId = id;
-            isDirty = false;
-            const tmpl = templates.find(t => t.id === id);
-            if (!tmpl) return;
-
-            // Show editor
-            document.getElementById('emptyState').style.display = 'none';
-            document.getElementById('editorHeader').style.display = 'flex';
-            document.getElementById('editorBody').style.display = 'grid';
-
-            // Set name
-            document.getElementById('templateName').value = tmpl.name;
-
-            // Disable editing for system templates
-            const isSystem = tmpl.is_system;
-            document.getElementById('templateName').readOnly = isSystem;
-            document.getElementById('saveBtn').style.display = isSystem ? 'none' : '';
-            document.getElementById('deleteBtn').style.display = isSystem ? 'none' : '';
-
-            // Load config
-            loadConfig(tmpl.config);
-            buildElementStyles(tmpl.config);
-            updatePreview();
-            renderTemplateList();
+            window.location.href = '/exporttemplates';
         }
 
-        function showEmptyState() {
-            document.getElementById('emptyState').style.display = 'block';
-            document.getElementById('editorHeader').style.display = 'none';
-            document.getElementById('editorBody').style.display = 'none';
-        }
+
 
         function markDirty() {
             isDirty = true;
