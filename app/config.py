@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
+    # Admin Bootstrap
+    ADMIN_EMAIL: str = ""
+    ADMIN_PASSWORD: str = ""
+    
     # ============================================
     # Global AI Configuration (Administrator-managed)
     # ============================================

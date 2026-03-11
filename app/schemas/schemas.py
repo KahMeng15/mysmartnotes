@@ -37,6 +37,9 @@ class UserUpdate(BaseModel):
 class User(UserBase):
     id: int
     is_active: bool
+    is_admin: bool = False
+    is_approved: bool = True
+    tier: str = "free"
     ai_provider: str = "gemini"
     ai_model: Optional[str] = None
     ai_base_url: Optional[str] = None

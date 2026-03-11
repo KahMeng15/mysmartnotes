@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles/master.css">
-    <link rel="stylesheet" href="/styles/settings.css"
+    <link rel="stylesheet" href="/styles/settings.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/nav.js"></script>
@@ -63,8 +63,36 @@
                         <input type="password" id="confirmPassword">
                     </div>
                 </div>
+                <div style="margin-top: 24px;">
+                    <h4 style="margin-bottom: 12px; font-size: 14px;">Recent Logins</h4>
+                    <ul id="recentLoginsList" style="font-size: 12px; color: var(--color-gray); padding-left: 16px; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+                        <li>Loading...</li>
+                    </ul>
+                </div>
                 <div style="margin-top: auto; padding-top: var(--spacing-lg);">
                     <button onclick="changePassword()" class="btn btn-primary btn-block">Change Password</button>
+                </div>
+            </div>
+
+            <!-- 2.5 Statistics -->
+            <div class="settings-section">
+                <h3><i class="ph ph-chart-bar"></i> Statistics</h3>
+                <div class="settings-grid" style="flex: 1; align-content: start; gap: 12px;" id="userStatsContainer">
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-light-gray); padding-bottom: 8px;">
+                        <span style="color: var(--color-gray);">Notes Uploaded</span> <strong id="statNotes">0</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-light-gray); padding-bottom: 8px;">
+                        <span style="color: var(--color-gray);">Subjects Created</span> <strong id="statSubjects">0</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-light-gray); padding-bottom: 8px;">
+                        <span style="color: var(--color-gray);">Groups Created</span> <strong id="statGroups">0</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-light-gray); padding-bottom: 8px;">
+                        <span style="color: var(--color-gray);">Questions Asked</span> <strong id="statQuestions">0</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--color-light-gray); padding-bottom: 8px;">
+                        <span style="color: var(--color-gray);">Time Spent</span> <strong id="statTime">0 mins</strong>
+                    </div>
                 </div>
             </div>
 
@@ -99,8 +127,7 @@
                         <div style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-sm);">
                             <div>
                                 <div style="font-weight: 600;">Storage Used</div>
-                                <div style="font-size: var(--font-size-sm); color: var(--color-gray);">Your data storage
-                                </div>
+                                <div style="font-size: var(--font-size-sm); color: var(--color-gray);"><span id="statStorage">0 MB</span> / <span id="statQuota">Unlimited</span></div>
                             </div>
                             <div style="font-weight: 600; color: var(--color-success);">Unlimited</div>
                         </div>
@@ -168,7 +195,11 @@
                             <label>AI Provider</label>
                             <select id="aiProvider" onchange="toggleAIFields()">
                                 <option value="gemini">Google Gemini</option>
+                                <option value="chatgpt">ChatGPT (OpenAI)</option>
+                                <option value="claude">Claude (Anthropic)</option>
                                 <option value="huggingface">Hugging Face</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="local_modal">Local Modal</option>
                                 <option value="ollama">Ollama (Local/Self-hosted)</option>
                             </select>
                         </div>
@@ -201,14 +232,19 @@
 
             <!-- 6. About -->
             <div class="settings-section">
-                <h3><i class="ph ph-info"></i> About</h3>
+                <h3><i class="ph ph-info"></i> About & Support</h3>
                 <div style="color: var(--color-gray); font-size: var(--font-size-sm); flex: 1; align-content: start;">
                     <p><strong>MySmartNotes</strong> v1.0.0</p>
                     <p>An AI-powered study companion to help you learn efficiently.</p>
                     <div style="margin-top: var(--spacing-lg);">
-                        <a href="#" style="color: var(--color-primary);">Terms of Service</a><br>
-                        <a href="#" style="color: var(--color-primary);">Privacy Policy</a><br>
-                        <a href="#" style="color: var(--color-primary);">Contact Support</a>
+                        <a href="#" style="color: var(--color-primary); display: block; margin-bottom: 4px;">Terms of Service</a>
+                        <a href="#" style="color: var(--color-primary); display: block; margin-bottom: 4px;">Privacy Policy</a>
+                        <a href="#" style="color: var(--color-primary); display: block; margin-bottom: 4px;">Fair Use Policy</a>
+                        <a href="#" style="color: var(--color-primary); display: block; margin-bottom: 4px;">Licenses</a>
+                    </div>
+                    <div style="margin-top: var(--spacing-md); border-top: 1px solid var(--color-light-gray); padding-top: var(--spacing-md);">
+                        <a href="#" style="color: var(--color-primary); font-weight: bold; display: block; margin-bottom: 6px;"><i class="ph ph-envelope-simple"></i> Contact Support</a>
+                        <a href="#" style="color: var(--color-primary); font-weight: bold; display: block;"><i class="ph ph-chat-centered-text"></i> Submit Feedback</a>
                     </div>
                 </div>
             </div>

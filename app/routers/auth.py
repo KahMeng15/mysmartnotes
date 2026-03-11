@@ -1,5 +1,5 @@
 """Authentication router"""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from pydantic import BaseModel
@@ -13,6 +13,8 @@ from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, Token
 from app.utils.db import get_db
 from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user as get_current_user_from_token
 from app.config import get_settings
+from sqlalchemy import func
+from app.models.db import Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserLog
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -92,7 +94,7 @@ def get_firebase_config():
 
 
 @router.post("/register", response_model=UserSchema)
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+def register(user_data: UserCreate, request: Request, db: Session = Depends(get_db)):
     """Register a new user"""
     # Check if user exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
@@ -109,17 +111,24 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         email=user_data.email,
         full_name=user_data.full_name,
         nickname=user_data.nickname,
-        hashed_password=hash_password(user_data.password)
+        hashed_password=hash_password(user_data.password),
+        is_admin=True if settings.ADMIN_EMAIL and user_data.email.lower() == settings.ADMIN_EMAIL.lower() else False
     )
     db.add(user)
     db.commit()
     db.refresh(user)
     
+    # Log signup
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    db.add(UserLog(user_id=user.id, action="signup", ip_address=ip_address, device_info=user_agent))
+    db.commit()
+    
     return user
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(credentials: UserLogin, db: Session = Depends(get_db)):
+def login(credentials: UserLogin, request: Request, db: Session = Depends(get_db)):
     """Login user and return access token"""
     user = db.query(User).filter(User.email == credentials.email).first()
     
@@ -144,6 +153,11 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is disabled"
         )
+        
+    # Auto-elevate admin matching settings
+    if settings.ADMIN_EMAIL and user.email.lower() == settings.ADMIN_EMAIL.lower() and not user.is_admin:
+        user.is_admin = True
+        db.commit()
     
     # Create token
     access_token = create_access_token(
@@ -151,17 +165,23 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     
+    # Log login
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    db.add(UserLog(user_id=user.id, action="login", ip_address=ip_address, device_info=user_agent))
+    db.commit()
+    
     return {"access_token": access_token, "token_type": "bearer", "user": user}
 
 
 @router.post("/google-login")
-def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db)):
+def google_login(google_request: GoogleLoginRequest, request: Request, db: Session = Depends(get_db)):
     """Verify Google token and check if user exists"""
     try:
         print(f"[DEBUG] Received Google login request")
         
         # Verify the Firebase ID token
-        claims = verify_firebase_token(request.idToken)
+        claims = verify_firebase_token(google_request.idToken)
         
         # Extract user information from token
         email = claims.get('email')
@@ -186,11 +206,22 @@ def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db)):
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User account is disabled"
                 )
+                
+            if settings.ADMIN_EMAIL and user.email.lower() == settings.ADMIN_EMAIL.lower() and not user.is_admin:
+                user.is_admin = True
+                db.commit()
             
             access_token = create_access_token(
                 data={"sub": str(user.id)},
                 expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
             )
+            
+            # Log login
+            ip_address = request.client.host if request.client else None
+            user_agent = request.headers.get("user-agent", "Unknown Device")
+            db.add(UserLog(user_id=user.id, action="login", ip_address=ip_address, device_info=user_agent, details="Google Auth"))
+            db.commit()
+            
             print(f"[DEBUG] Existing user logged in: {email}")
             return {
                 "access_token": access_token,
@@ -226,11 +257,11 @@ def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/google-complete", response_model=TokenResponse)
-def google_complete(request: GoogleCompleteRequest, db: Session = Depends(get_db)):
+def google_complete(google_request: GoogleCompleteRequest, request: Request, db: Session = Depends(get_db)):
     """Complete Google registration for new user with additional info"""
     try:
         # Verify the Firebase ID token
-        claims = verify_firebase_token(request.idToken)
+        claims = verify_firebase_token(google_request.idToken)
         
         # Extract user information from token
         email = claims.get('email')
@@ -252,6 +283,11 @@ def google_complete(request: GoogleCompleteRequest, db: Session = Depends(get_db
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User account is disabled"
                 )
+                
+            if settings.ADMIN_EMAIL and existing_user.email.lower() == settings.ADMIN_EMAIL.lower() and not existing_user.is_admin:
+                existing_user.is_admin = True
+                db.commit()
+                
             access_token = create_access_token(
                 data={"sub": str(existing_user.id)},
                 expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -263,9 +299,10 @@ def google_complete(request: GoogleCompleteRequest, db: Session = Depends(get_db
             username=email,
             email=email,
             full_name=full_name,
-            nickname=request.nickname,
+            nickname=google_request.nickname,
             hashed_password="",  # No local password for Google auth users
-            is_active=True
+            is_active=True,
+            is_admin=True if settings.ADMIN_EMAIL and email.lower() == settings.ADMIN_EMAIL.lower() else False
         )
         db.add(user)
         db.commit()
@@ -276,6 +313,12 @@ def google_complete(request: GoogleCompleteRequest, db: Session = Depends(get_db
             data={"sub": str(user.id)},
             expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         )
+        
+        # Log signup
+        ip_address = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent", "Unknown Device")
+        db.add(UserLog(user_id=user.id, action="signup", ip_address=ip_address, device_info=user_agent, details="Google Auth"))
+        db.commit()
         
         return {"access_token": access_token, "token_type": "bearer", "user": user}
         
@@ -315,3 +358,99 @@ def update_profile(user_update: UserUpdate, current_user: User = Depends(get_cur
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.get("/stats")
+def get_user_stats(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Get personalized statistics and recent logins for the current user"""
+    u_id = current_user.id
+    notes_count = db.query(func.count(Lecture.id)).filter(Lecture.user_id == u_id).scalar() or 0
+    subjects_count = db.query(func.count(Subject.id)).filter(Subject.user_id == u_id).scalar() or 0
+    groups_count = db.query(func.count(SubjectGroup.id)).filter(SubjectGroup.user_id == u_id).scalar() or 0
+    questions_count = db.query(func.count(ChatMessage.id)).filter(ChatMessage.user_id == u_id).scalar() or 0
+    
+    time_spent_mins = db.query(func.sum(StudySession.duration_minutes)).filter(StudySession.user_id == u_id).scalar() or 0
+    
+    storage_bytes = db.query(func.sum(Lecture.file_size)).filter(Lecture.user_id == u_id).scalar() or 0
+    storage_mb = round(storage_bytes / (1024 * 1024), 2)
+    
+    recent_logins_query = db.query(UserLog).filter(UserLog.user_id == u_id, UserLog.action == "login").order_by(UserLog.timestamp.desc()).limit(5).all()
+    
+    recent_logins = [
+        {
+            "ip_address": log.ip_address,
+            "device_info": log.device_info,
+            "timestamp": log.timestamp.isoformat()
+        } for log in recent_logins_query
+    ]
+    
+    return {
+        "notes_uploaded": notes_count,
+        "subjects_created": subjects_count,
+        "groups_created": groups_count,
+        "questions_asked": questions_count,
+        "time_spent_mins": time_spent_mins,
+        "space_used_mb": storage_mb,
+        "quota": "Unlimited for early testers",
+        "recent_logins": recent_logins
+    }
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+@router.put("/change-password")
+def change_password(passwords: PasswordChange, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Change the user's password"""
+    if not current_user.hashed_password:
+        raise HTTPException(status_code=400, detail="Cannot change password for OAuth accounts. Please login via Google.")
+        
+    try:
+        if not verify_password(passwords.current_password, current_user.hashed_password):
+            raise HTTPException(status_code=400, detail="Incorrect current password")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Error verifying current password")
+        
+    current_user.hashed_password = hash_password(passwords.new_password)
+    db.commit()
+    return {"message": "Password changed successfully"}
+
+@router.delete("/profile")
+def delete_account(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Permanently delete user account and data"""
+    db.delete(current_user)
+    db.commit()
+    return {"message": "Account deleted successfully"}
+
+@router.get("/download-data")
+def download_data(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Export all user data as JSON"""
+    uid = current_user.id
+    
+    # This is a simple aggregated export
+    lectures = db.query(Lecture).filter(Lecture.user_id == uid).all()
+    subjects = db.query(Subject).filter(Subject.user_id == uid).all()
+    groups = db.query(SubjectGroup).filter(SubjectGroup.user_id == uid).all()
+    chats = db.query(ChatMessage).filter(ChatMessage.user_id == uid).all()
+    
+    # We serialize the most important details for them
+    data = {
+        "profile": {
+            "email": current_user.email,
+            "full_name": current_user.full_name,
+            "nickname": current_user.nickname,
+            "joined_at": current_user.created_at.isoformat() if current_user.created_at else None
+        },
+        "subjects": [{"id": s.id, "name": s.name} for s in subjects],
+        "notes_uploaded": [{"id": l.id, "title": l.title, "subject_id": l.subject_id} for l in lectures],
+        "chat_history": [{"role": c.role, "content": c.content, "timestamp": c.timestamp.isoformat()} for c in chats]
+    }
+    
+    from fastapi.responses import JSONResponse
+    import json
+    # Use headers to force file download in browser
+    headers = {
+        "Content-Disposition": f"attachment; filename=mysmartnotes_export_{current_user.username}.json"
+    }
+    return JSONResponse(content=data, headers=headers)
+

@@ -11,6 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
 function injectSidebar() {
     const isNotePage = document.body.classList.contains('note-page');
     const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    
+    const userStr = localStorage.getItem('user');
+    let isAdmin = false;
+    if (userStr) {
+        try { isAdmin = JSON.parse(userStr).is_admin; } catch(e) {}
+    }
+    
+    const adminItem = isAdmin ? `<li><a href="/admin" class="sidebar-nav-link" data-page="admin"><i class="ph ph-shield-star"></i><span>Admin</span></a></li>` : '';
 
     const sidebarHtml = `
     <aside class="app-sidebar" id="appSidebar">
@@ -26,6 +34,7 @@ function injectSidebar() {
             <li><a href="/upload.html" class="sidebar-nav-link" data-page="upload.html"><i class="ph ph-upload-simple"></i><span>Upload</span></a></li>
             <li><a href="/exporttemplates" class="sidebar-nav-link" data-page="exporttemplates"><i class="ph ph-palette"></i><span>Templates</span></a></li>
             <li class="sidebar-divider"></li>
+            ${adminItem}
             <li><a href="/settings.html" class="sidebar-nav-link" data-page="settings.html"><i class="ph ph-gear"></i><span>Settings</span></a></li>
             <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-clock-user"></i><span>Recent</span></a></li>
         </ul>

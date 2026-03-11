@@ -18,7 +18,10 @@ class User(Base):
     full_name = Column(String(255))
     nickname = Column(String(100))
     is_active = Column(Boolean, default=True)
-    ai_provider = Column(String(50), default="gemini") # gemini, huggingface, ollama
+    is_admin = Column(Boolean, default=False)
+    is_approved = Column(Boolean, default=True) # Manual approval flow
+    tier = Column(String(50), default="free") # free, pro, etc.
+    ai_provider = Column(String(50), default="gemini") # gemini, chatgpt, claude, huggingface, openrouter, local
     ai_model = Column(String(100), nullable=True)
     ai_base_url = Column(String(255), nullable=True)
     ai_api_key = Column(String(255), nullable=True)
@@ -246,3 +249,75 @@ class NoteSnapshot(Base):
     # Relationships
     user = relationship("User")
     lecture = relationship("Lecture")
+
+
+class SystemSettings(Base):
+    """Global System Configuration"""
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True) # Usually just 1 row
+    lockdown_mode = Column(Boolean, default=False)
+    signup_config = Column(String(50), default="open") # open, approval, invite
+    maintenance_mode = Column(Boolean, default=False)
+    footer_text = Column(String(255), nullable=True)
+    global_ai_provider = Column(String(50), default="gemini")
+    global_ai_model = Column(String(100), nullable=True)
+    global_ai_api_key = Column(String(255), nullable=True)
+    global_ai_base_url = Column(String(255), nullable=True)
+    ai_limit_per_user = Column(String(50), default="unlimited") # sec, min, hour, day, unlimited
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class EmailConfig(Base):
+    """SMTP Email Configuration"""
+    __tablename__ = "email_config"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    smtp_provider = Column(String(100), nullable=True)
+    email_address = Column(String(255), nullable=True)
+    sender_name = Column(String(100), nullable=True)
+    app_password = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserLog(Base):
+    """Audit logs for actions"""
+    __tablename__ = "user_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True) # allow null for failed logins/global actions
+    action = Column(String(100), nullable=False) # login, signup, page_access, upload, processing, chat, etc.
+    ip_address = Column(String(50), nullable=True)
+    device_info = Column(Text, nullable=True)
+    details = Column(Text, nullable=True) # Extra info (JSON or string)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Relationships
+    user = relationship("User")
+
+
+class IPFilter(Base):
+    """IP Whitelist / Blacklist rules"""
+    __tablename__ = "ip_filters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    filter_type = Column(String(20), nullable=False) # whitelist, blacklist
+    rule_type = Column(String(20), nullable=False) # country, specific_ip
+    value = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class RateLimitConfig(Base):
+    """Specific rate limits for different modules"""
+    __tablename__ = "rate_limits"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    per_user_api = Column(Integer, default=0) # 0 means unlimited
+    global_api = Column(Integer, default=0)
+    chat_api = Column(Integer, default=0)
+    processing_api = Column(Integer, default=0)
+    sessions = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

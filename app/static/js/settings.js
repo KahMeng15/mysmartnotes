@@ -5,7 +5,46 @@ const user = JSON.parse(localStorage.getItem('user') || '{}');
 window.addEventListener('load', () => {
     if (!token) window.location.href = 'login.html';
     loadSettings();
+    loadStats();
 });
+
+async function loadStats() {
+    try {
+        const response = await fetch('/auth/stats', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (response.ok) {
+            const stats = await response.json();
+            
+            // Populate stats
+            document.getElementById('statNotes').textContent = stats.notes_uploaded;
+            document.getElementById('statSubjects').textContent = stats.subjects_created;
+            document.getElementById('statGroups').textContent = stats.groups_created;
+            document.getElementById('statQuestions').textContent = stats.questions_asked;
+            document.getElementById('statTime').textContent = `${stats.time_spent_mins} mins`;
+            document.getElementById('statStorage').textContent = `${stats.space_used_mb} MB`;
+            document.getElementById('statQuota').textContent = stats.quota;
+            
+            // Populate recent logins
+            const loginsList = document.getElementById('recentLoginsList');
+            loginsList.innerHTML = '';
+            if (stats.recent_logins && stats.recent_logins.length > 0) {
+                stats.recent_logins.forEach(login => {
+                    const li = document.createElement('li');
+                    const date = new Date(login.timestamp).toLocaleString();
+                    li.textContent = `${date} (IP: ${login.ip_address || 'Unknown'}) - ${login.device_info || 'Unknown Device'}`;
+                    loginsList.appendChild(li);
+                });
+            } else {
+                loginsList.innerHTML = '<li>No recent logins found</li>';
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load stats', e);
+    }
+}
 
 function loadSettings() {
     document.getElementById('fullName').value = user.full_name || '';
@@ -60,12 +99,19 @@ function toggleAIFields() {
     const baseUrlGroup = document.getElementById('aiBaseUrlGroup');
     const apiKeyHelp = document.getElementById('apiKeyHelp');
 
-    if (provider === 'ollama') {
+    const requiresBaseUrl = ['ollama', 'local_modal', 'openrouter'].includes(provider);
+    const requiresApiKey = ['gemini', 'huggingface', 'chatgpt', 'claude', 'openrouter'].includes(provider);
+
+    if (requiresBaseUrl) {
         baseUrlGroup.style.display = 'block';
-        apiKeyHelp.textContent = 'Optional for Ollama (only if your server requires authentication)';
+        if (provider === 'openrouter') {
+            apiKeyHelp.textContent = 'Required for OpenRouter. Base URL is usually left default.';
+        } else {
+            apiKeyHelp.textContent = `Optional for ${provider}`;
+        }
     } else {
         baseUrlGroup.style.display = 'none';
-        apiKeyHelp.textContent = 'Required for Gemini and Hugging Face';
+        apiKeyHelp.textContent = requiresApiKey ? 'Required for this provider' : 'Optional';
     }
 }
 
@@ -88,11 +134,14 @@ async function updateProfile(event) {
             const model = document.getElementById('aiModel').value;
             
             // Validation
-            if (provider === 'ollama' && !baseUrl) {
-                alert('Base URL is required for Ollama provider');
+            const requiresBaseUrl = ['ollama', 'local_modal'].includes(provider);
+            const requiresApiKey = ['gemini', 'huggingface', 'chatgpt', 'claude', 'openrouter'].includes(provider);
+
+            if (requiresBaseUrl && !baseUrl) {
+                alert(`Base URL is required for ${provider}`);
                 return;
             }
-            if ((provider === 'gemini' || provider === 'huggingface') && !apiKey) {
+            if (requiresApiKey && !apiKey) {
                 alert(`API Key is required for ${provider}`);
                 return;
             }
@@ -142,7 +191,7 @@ function clearCache() {
     window.location.href = 'login.html';
 }
 
-function changePassword() {
+async function changePassword() {
     const current = document.getElementById('currentPassword').value;
     const newPass = document.getElementById('newPassword').value;
     const confirm = document.getElementById('confirmPassword').value;
@@ -157,16 +206,73 @@ function changePassword() {
         return;
     }
 
-    alert('Password change feature coming soon');
+    try {
+        const res = await fetch('/auth/change-password', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                current_password: current,
+                new_password: newPass
+            })
+        });
+        
+        if (res.ok) {
+            alert('Password changed successfully');
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        } else {
+            const error = await res.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch(err) {
+        alert('Error: ' + err.message);
+    }
 }
 
-function downloadData() {
-    alert('Download data feature coming soon');
+async function downloadData() {
+    try {
+        const res = await fetch('/auth/download-data', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch data');
+        
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mysmartnotes_export.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    } catch(err) {
+        alert('Error downloading data: ' + err.message);
+    }
 }
 
-function deleteAccount() {
+async function deleteAccount() {
     if (!confirm('Are you sure? This cannot be undone.')) return;
     if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) return;
 
-    alert('Account deletion coming soon');
+    try {
+        const res = await fetch('/auth/profile', {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+            alert('Account deleted successfully.');
+            localStorage.clear();
+            window.location.href = '/login.html';
+        } else {
+            const error = await res.json();
+            alert('Error: ' + error.detail);
+        }
+    } catch(err) {
+        alert('Error: ' + err.message);
+    }
 }

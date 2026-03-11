@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles/master.css">
+    <link rel="stylesheet" href="/styles/settings.css">
+    <style>
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        .admin-table th, .admin-table td { border: 1px solid var(--color-light-gray); padding: 8px; text-align: left; }
+        .admin-table th { background-color: #f9fafb; font-weight: 600; }
+        .tab-btn { margin-right: 10px; padding: 6px 16px; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid transparent; background: transparent; }
+        .tab-btn.active { background: var(--color-primary); color: white; }
+        .admin-section { display: none; }
+        .admin-section.active { display: block; }
+        .action-btn { padding: 4px 8px; font-size: 12px; margin-right: 4px; cursor: pointer; }
+    </style>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/admin.js"></script>
+</head>
+
+<body>
+    <!-- Content -->
+    <div class="page-card" style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+        <h1 style="margin-bottom: var(--spacing-md);"><i class="ph ph-shield-star"></i> Admin Dashboard</h1>
+        
+        <div style="margin-bottom: 20px; border-bottom: 1px solid var(--color-light-gray); padding-bottom: 10px;">
+            <button class="tab-btn active" onclick="switchTab('tab-users')">Users</button>
+            <button class="tab-btn" onclick="switchTab('tab-settings')">System Settings</button>
+            <button class="tab-btn" onclick="switchTab('tab-rate-limits')">Rate Limits</button>
+            <button class="tab-btn" onclick="switchTab('tab-email')">Email Config</button>
+            <button class="tab-btn" onclick="switchTab('tab-ip')">IP Filters</button>
+            <button class="tab-btn" onclick="switchTab('tab-logs')">System Logs</button>
+        </div>
+
+        <!-- USERS TAB -->
+        <div id="tab-users" class="admin-section active">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3>Users Management</h3>
+                <button class="btn btn-primary" onclick="inviteUserModal()"><i class="ph ph-paper-plane-tilt"></i> Invite User</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th><th>Nickname</th><th>Fullname</th><th>Email</th>
+                            <th>Notes/Subj/Grp</th>
+                            <th>Convs/Qstns</th>
+                            <th>Storage</th>
+                            <th>Logins / Time</th>
+                            <th>Tier</th>
+                            <th>Status / Admin</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="11">Loading users...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SYSTEM SETTINGS TAB -->
+        <div id="tab-settings" class="admin-section">
+            <h3>System Settings</h3>
+            <form id="systemSettingsForm" onsubmit="saveSystemSettings(event)" class="settings-grid">
+                <div class="form-group toggle">
+                    <div>
+                        <div style="font-weight: 600;">Lockdown Mode</div>
+                        <div style="font-size: 12px; color: var(--color-gray);">Allow local IP users only</div>
+                    </div>
+                    <div class="toggle-switch" id="lockdownToggle" onclick="this.classList.toggle('active')"></div>
+                </div>
+                
+                <div class="form-group toggle">
+                    <div>
+                        <div style="font-weight: 600;">Maintenance Mode</div>
+                        <div style="font-size: 12px; color: var(--color-gray);">Temporarily disable access for non-admins</div>
+                    </div>
+                    <div class="toggle-switch" id="maintenanceToggle" onclick="this.classList.toggle('active')"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Sign Up Config</label>
+                    <select id="signupConfig">
+                        <option value="open">Open Globally</option>
+                        <option value="approval">Require Approval</option>
+                        <option value="invite">Strictly Invite Only</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Global Footer Text</label>
+                    <input type="text" id="footerText" placeholder="e.g. © 2026 MyCompany All Rights Reserved">
+                </div>
+                
+                <hr style="grid-column: 1/-1; border: 0; border-top: 1px solid var(--color-light-gray); margin: 10px 0;">
+                <h4 style="grid-column: 1/-1; margin: 0;">Global AI Provider</h4>
+
+                <div class="form-group">
+                    <label>Provider</label>
+                    <select id="globalAiProvider">
+                        <option value="gemini">Google Gemini</option>
+                        <option value="chatgpt">ChatGPT</option>
+                        <option value="claude">Claude</option>
+                        <option value="huggingface">Hugging Face</option>
+                        <option value="openrouter">Open Router</option>
+                        <option value="local_modal">Local Modal</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="password" id="globalAiKey" placeholder="Global API Key (if any)">
+                </div>
+
+                <div class="form-group">
+                    <label>Model</label>
+                    <input type="text" id="globalAiModel" placeholder="e.g. gpt-4o">
+                </div>
+
+                <div class="form-group">
+                    <label>Base URL</label>
+                    <input type="text" id="globalAiUrl" placeholder="Optional for custom endpoints">
+                </div>
+
+                <div class="form-group">
+                    <label>AI Limit Per User</label>
+                    <select id="aiLimitPerUser">
+                        <option value="unlimited">Unlimited</option>
+                        <option value="sec">Per Second</option>
+                        <option value="min">Per Minute</option>
+                        <option value="hour">Per Hour</option>
+                        <option value="day">Per Day</option>
+                    </select>
+                </div>
+
+                <div style="grid-column: 1/-1; margin-top: 10px;">
+                    <button type="submit" class="btn btn-primary">Save System Settings</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- RATE LIMITS TAB -->
+        <div id="tab-rate-limits" class="admin-section">
+            <h3>Rate Limits Configuration (0 = Unlimited)</h3>
+            <form id="rateLimitsForm" onsubmit="saveRateLimits(event)" class="settings-grid">
+                <div class="form-group">
+                    <label>Per User API calls/min</label>
+                    <input type="number" id="rlPerUser" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Global API calls/min</label>
+                    <input type="number" id="rlGlobal" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Chat API calls/min</label>
+                    <input type="number" id="rlChat" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Processing API calls/min</label>
+                    <input type="number" id="rlProcessing" value="0">
+                </div>
+                <div class="form-group">
+                    <label>Total Sessions</label>
+                    <input type="number" id="rlSessions" value="0">
+                </div>
+                <div style="grid-column: 1/-1; margin-top: 10px;">
+                    <button type="submit" class="btn btn-primary">Save Rate Limits</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- EMAIL CONFIG TAB -->
+        <div id="tab-email" class="admin-section">
+            <h3>Email Configuration</h3>
+            <form id="emailConfigForm" onsubmit="saveEmailConfig(event)" class="settings-grid">
+                <div class="form-group">
+                    <label>SMTP Provider URL</label>
+                    <input type="text" id="smtpProvider" placeholder="smtp.gmail.com">
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="emailAddress" placeholder="no-reply@mysmartnotes.com">
+                </div>
+                <div class="form-group">
+                    <label>Sender Name</label>
+                    <input type="text" id="senderName" placeholder="MySmartNotes">
+                </div>
+                <div class="form-group">
+                    <label>App Password</label>
+                    <input type="password" id="appPassword" placeholder="Your App Password">
+                </div>
+                <div style="grid-column: 1/-1; margin-top: 10px;">
+                    <button type="submit" class="btn btn-primary">Save Email Config</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- IP FILTERS TAB -->
+        <div id="tab-ip" class="admin-section">
+            <h3>IP Filters (Whitelist / Blacklist)</h3>
+            <form id="addIpFilterForm" onsubmit="addIpFilter(event)" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <select id="ipFilterType"><option value="blacklist">Blacklist</option><option value="whitelist">Whitelist</option></select>
+                <select id="ipRuleType"><option value="country">Country</option><option value="specific_ip">Specific IP</option></select>
+                <input type="text" id="ipValue" placeholder="e.g. 'US' or '192.168.1.1'" required style="flex: 1;">
+                <button type="submit" class="btn btn-primary">Add Rule</button>
+            </form>
+            <table class="admin-table" id="ipFiltersTable">
+                <thead><tr><th>ID</th><th>Type</th><th>Rule</th><th>Value</th><th>Actions</th></tr></thead>
+                <tbody><tr><td colspan="5">Loading...</td></tr></tbody>
+            </table>
+        </div>
+
+        <!-- SYSTEM LOGS TAB -->
+        <div id="tab-logs" class="admin-section">
+            <h3>System Logs</h3>
+            <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                <select id="logActionFilter" onchange="loadLogs()">
+                    <option value="">All Actions</option>
+                    <option value="login">Logins</option>
+                    <option value="signup">Signups</option>
+                    <option value="page_access">Page Access</option>
+                    <option value="upload">Uploads</option>
+                    <option value="processing_backend">Processing</option>
+                    <option value="editing">Editing</option>
+                    <option value="chat">Chat</option>
+                </select>
+                <input type="number" id="logUserIdFilter" placeholder="Filter by User ID" onchange="loadLogs()">
+                <button class="btn btn-outline" onclick="loadLogs()"><i class="ph ph-arrows-clockwise"></i> Refresh</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table" id="logsTable">
+                    <thead><tr><th>Time</th><th>User ID</th><th>Action</th><th>IP Address</th><th>Device Info</th><th>Details</th></tr></thead>
+                    <tbody><tr><td colspan="6">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>
