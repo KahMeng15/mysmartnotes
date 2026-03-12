@@ -1,4 +1,12 @@
 """Main application entry point"""
+import sys
+import os
+
+# Ensure the current directory is in the path for module resolution
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -6,7 +14,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-import os
 
 from app.config import get_settings
 from app.utils.db import init_db

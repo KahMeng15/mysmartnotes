@@ -24,7 +24,8 @@ COPY . .
 RUN mkdir -p /app/data /app/generated /app/output
 
 # Set Default Environment Variables (these can be overridden by docker-compose or run command)
-ENV PYTHONPATH=/app \
+ENV PYTHONPATH=. \
+    PORT=8000 \
     DATABASE_URL=sqlite:///./data/app.db \
     SECRET_KEY=dev-secret-key-change-in-production \
     ALGORITHM=HS256 \
@@ -58,7 +59,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests, os; requests.get(f'http://localhost:{os.environ.get(\"PORT\", 8000)}/health')"
+    CMD python -c "import requests, os; p = os.environ.get('PORT', '8000'); requests.get(f'http://localhost:{p}/health')"
 
 # Run application
 CMD ["python", "main.py"]

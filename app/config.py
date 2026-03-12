@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     
     # Server
     HOST: str = "0.0.0.0"
-    PORT: int
+    PORT: int = 8000
     
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 50
