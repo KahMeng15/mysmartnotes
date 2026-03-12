@@ -5,9 +5,10 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime, timedelta
 
-from app.models.db import User, Lecture, Flashcard, StudySession
+from app.models.db import User, Lecture, Flashcard, StudySession, Subject, ChatMessage
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
+from app.schemas.analytics import DashboardSummary
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -223,4 +224,39 @@ async def get_completion_rates(
         in_progress_count=in_progress_count,
         not_started_count=not_started_count,
         completion_rates=completion_rates
+    )
+
+
+@router.get("/dashboard-summary", response_model=DashboardSummary)
+async def get_dashboard_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get summarized dashboard statistics (last 7 days)"""
+    from sqlalchemy import func
+    
+    # 1. Totals
+    total_subjects = db.query(func.count(Subject.id)).filter(Subject.user_id == current_user.id).scalar() or 0
+    total_notes = db.query(func.count(Lecture.id)).filter(Lecture.user_id == current_user.id).scalar() or 0
+    
+    # 2. Last 7 Days Range
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    
+    # 3. Questions Asked (ChatMessage records)
+    questions_7d = db.query(func.count(ChatMessage.id)).filter(
+        ChatMessage.user_id == current_user.id,
+        ChatMessage.created_at >= seven_days_ago
+    ).scalar() or 0
+    
+    # 4. Study Time (StudySession durations)
+    study_time_7d = db.query(func.sum(StudySession.duration_minutes)).filter(
+        StudySession.user_id == current_user.id,
+        StudySession.created_at >= seven_days_ago
+    ).scalar() or 0
+    
+    return DashboardSummary(
+        total_subjects=total_subjects,
+        total_notes=total_notes,
+        questions_asked_7d=questions_7d,
+        study_time_7d_mins=int(study_time_7d)
     )

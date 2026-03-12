@@ -9,9 +9,36 @@ window.addEventListener('load', async () => {
         return;
     }
     loadUserInfo();
-    await loadSubjects(); // Wait for subjects to load first
-    loadRecentLectures(); // Then load lectures
+    loadDashboardSummary();
+    await loadSubjects(); 
+    loadRecentLectures(); 
 });
+
+async function loadDashboardSummary() {
+    try {
+        const response = await fetch(`${API_URL}/analytics/dashboard-summary`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            document.getElementById('totalSubjectsValue').textContent = data.total_subjects;
+            document.getElementById('totalNotesValue').textContent = data.total_notes;
+            document.getElementById('questionsAskedValue').textContent = data.questions_asked_7d;
+            
+            // Format study time
+            const mins = data.study_time_7d_mins;
+            if (mins >= 60) {
+                const hrs = Math.floor(mins / 60);
+                const rm = mins % 60;
+                document.getElementById('studyTimeValue').textContent = `${hrs}h ${rm}m`;
+            } else {
+                document.getElementById('studyTimeValue').textContent = `${mins}m`;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading dashboard summary:', error);
+    }
+}
 
 async function loadUserInfo() {
     let user = JSON.parse(localStorage.getItem('user') || '{}');
