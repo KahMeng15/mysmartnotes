@@ -39,6 +39,7 @@
             <button class="tab-btn" onclick="switchTab('tab-email')">Email Config</button>
             <button class="tab-btn" onclick="switchTab('tab-ip')">IP Filters</button>
             <button class="tab-btn" onclick="switchTab('tab-logs')">System Logs</button>
+            <button class="tab-btn" onclick="switchTab('tab-database')">Database</button>
         </div>
 
         <!-- USERS TAB -->
@@ -292,6 +293,34 @@
                     <thead><tr><th>Time</th><th>User ID</th><th>Action</th><th>IP Address</th><th>Device Info</th><th>Details</th></tr></thead>
                     <tbody><tr><td colspan="6">Loading...</td></tr></tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- DATABASE TAB -->
+        <div id="tab-database" class="admin-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3>Database Inspector</h3>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label for="dbTableSelect">Select Table:</label>
+                    <select id="dbTableSelect" onchange="loadTableData()" style="padding: 6px; border-radius: 4px; min-width: 200px;">
+                        <option value="">-- Select Table --</option>
+                    </select>
+                    <button class="btn btn-outline" onclick="loadTableData()"><i class="ph ph-arrows-clockwise"></i> Refresh</button>
+                </div>
+            </div>
+            
+            <div id="dbTableContainer" style="overflow-x: auto; max-height: 600px; border: 1px solid var(--color-light-gray); border-radius: 8px;">
+                <table class="admin-table" id="dbDataTable" style="margin-top: 0;">
+                    <thead style="position: sticky; top: 0; z-index: 10;">
+                        <tr><th>Select a table to view records</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>No data to display.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="dbTableStats" style="margin-top: 10px; font-size: 13px; color: var(--color-gray);">
+                Showing 0 records.
             </div>
         </div>
 

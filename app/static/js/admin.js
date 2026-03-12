@@ -28,6 +28,81 @@ function switchTab(tabId) {
     if (tabId === 'tab-email') loadEmailConfig();
     if (tabId === 'tab-ip') loadIpFilters();
     if (tabId === 'tab-logs') loadLogs();
+    if (tabId === 'tab-database') loadDbTables();
+}
+
+// ========================
+// DATABASE INSPECTOR
+// ========================
+async function loadDbTables() {
+    try {
+        const tables = await apiCall('/admin/db/tables');
+        const select = document.getElementById('dbTableSelect');
+        const currentValue = select.value;
+        
+        select.innerHTML = '<option value="">-- Select Table --</option>';
+        tables.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            select.appendChild(opt);
+        });
+        
+        if (currentValue && tables.includes(currentValue)) {
+            select.value = currentValue;
+        }
+    } catch (e) { console.error('Error loading tables', e); }
+}
+
+async function loadTableData() {
+    const table = document.getElementById('dbTableSelect').value;
+    if (!table) return;
+    
+    const thead = document.querySelector('#dbDataTable thead');
+    const tbody = document.querySelector('#dbDataTable tbody');
+    const stats = document.getElementById('dbTableStats');
+    
+    thead.innerHTML = '<tr><th>Loading...</th></tr>';
+    tbody.innerHTML = '<tr><td>Fetching data from ' + table + '...</td></tr>';
+    
+    try {
+        const res = await apiCall(`/admin/db/table/${table}`);
+        
+        // Build Header
+        let headerHtml = '<tr>';
+        res.columns.forEach(col => {
+            headerHtml += `<th>${col}</th>`;
+        });
+        headerHtml += '</tr>';
+        thead.innerHTML = headerHtml;
+        
+        // Build Rows
+        if (res.data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${res.columns.length}">No records found in this table.</td></tr>`;
+        } else {
+            let bodyHtml = '';
+            res.data.forEach(row => {
+                bodyHtml += '<tr>';
+                res.columns.forEach(col => {
+                    let val = row[col];
+                    if (val === null) val = '<em style="color:var(--color-gray)">null</em>';
+                    else if (typeof val === 'object') val = JSON.stringify(val);
+                    else if (typeof val === 'string' && val.length > 200) val = val.substring(0, 197) + '...';
+                    
+                    bodyHtml += `<td>${val}</td>`;
+                });
+                bodyHtml += '</tr>';
+            });
+            tbody.innerHTML = bodyHtml;
+        }
+        
+        stats.textContent = `Showing ${res.data.length} records from table: ${table}`;
+        
+    } catch (e) {
+        thead.innerHTML = '<tr><th style="color:red">Error</th></tr>';
+        tbody.innerHTML = `<tr><td>Failed to load data: ${e.message}</td></tr>`;
+        console.error(e);
+    }
 }
 
 async function apiCall(endpoint, method = 'GET', body = null) {

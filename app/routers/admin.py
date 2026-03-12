@@ -294,3 +294,53 @@ def get_user_logs(
         
     logs = query.order_by(desc(UserLog.timestamp)).offset(offset).limit(limit).all()
     return logs
+
+# --- Database Inspection ---
+@router.get("/db/tables")
+def list_db_tables(admin: User = Depends(get_current_admin_user)):
+    """List all available tables in the database"""
+    from app.models.db import Base
+    return sorted(list(Base.metadata.tables.keys()))
+
+@router.get("/db/table/{table_name}")
+def get_table_data(
+    table_name: str,
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user)
+):
+    """Fetch raw data from a specific table"""
+    from app.models.db import Base
+    from sqlalchemy import text
+    
+    if table_name not in Base.metadata.tables:
+        raise HTTPException(status_code=404, detail="Table not found")
+    
+    # Use raw SQL to fetch data for any table generically
+    query = text(f"SELECT * FROM {table_name} LIMIT :limit OFFSET :offset")
+    result = db.execute(query, {"limit": limit, "offset": offset})
+    
+    # Get column names
+    columns = result.keys()
+    
+    # Convert rows to list of dicts
+    data = []
+    for row in result:
+        row_dict = {}
+        for i, col in enumerate(columns):
+            val = row[i]
+            # Convert datetime and other non-serializable types to string
+            if isinstance(val, (datetime.datetime, datetime.date)):
+                val = val.isoformat()
+            elif isinstance(val, bytes):
+                val = f"<binary data: {len(val)} bytes>"
+            row_dict[col] = val
+        data.append(row_dict)
+        
+    return {
+        "table": table_name,
+        "columns": list(columns),
+        "data": data,
+        "count": len(data)
+    }
