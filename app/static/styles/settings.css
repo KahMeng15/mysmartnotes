@@ -110,3 +110,34 @@
     border-radius: 8px;
     border: 1px solid var(--color-light-gray);
 }
+
+.toggle-switch {
+    width: 44px;
+    height: 22px;
+    background: #e4e4e7;
+    border-radius: 11px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.toggle-switch.active {
+    background: var(--color-primary);
+}
+
+.toggle-switch.active::after {
+    left: calc(100% - 20px);
+}

@@ -33,6 +33,24 @@ async def lifespan(app: FastAPI):
         db = SessionLocal()
         templates.seed_default_templates(db)
         
+        # Bootstrap System Settings from .env defaults
+        from app.models.db import SystemSettings
+        sys_settings = db.query(SystemSettings).first()
+        if not sys_settings:
+            logger.info("Initializing SystemSettings from .env defaults")
+            sys_settings = SystemSettings(
+                global_ai_provider=settings.GLOBAL_AI_PROVIDER,
+                global_ai_model=settings.GLOBAL_AI_MODEL,
+                global_ai_api_key=settings.GLOBAL_GEMINI_API_KEY or settings.GLOBAL_HUGGINGFACE_TOKEN,
+                # Note: We prioritize Gemini key if provider is gemini, else HF
+            )
+            # If specifically huggingface, use that token
+            if settings.GLOBAL_AI_PROVIDER == "huggingface":
+                sys_settings.global_ai_api_key = settings.GLOBAL_HUGGINGFACE_TOKEN
+                
+            db.add(sys_settings)
+            db.commit()
+
         # Bootstrap Admin
         if settings.ADMIN_EMAIL and settings.ADMIN_PASSWORD:
             from app.models.db import User
@@ -106,8 +124,36 @@ async def system_settings_middleware(request: Request, call_next):
                     return JSONResponse(status_code=403, content={"detail": "System is in Lockdown Mode. Local network access only."})
             
             # 2. Maintenance Mode
-            if settings.maintenance_mode and not request.url.path.startswith("/admin") and not request.url.path.startswith("/auth"):
-                return JSONResponse(status_code=503, content={"detail": "System is undergoing maintenance. Please try again later."})
+            # Allow /admin, /auth, /login, /maintenance, and /static files to bypass
+            bypass_paths = ["/admin", "/auth", "/login", "/maintenance", "/styles", "/js", "/fonts", "/favicon.ico"]
+            is_bypassed = any(request.url.path.startswith(path) for path in bypass_paths)
+            
+            if settings.maintenance_mode and not is_bypassed:
+                # 2a. Allow admin bypass if authenticated
+                is_admin = False
+                auth_header = request.headers.get("Authorization")
+                if auth_header and auth_header.startswith("Bearer "):
+                    token = auth_header.split(" ")[1]
+                    try:
+                        from app.utils.auth import decode_token
+                        payload = decode_token(token)
+                        if payload:
+                            u_id = payload.get("sub")
+                            if u_id:
+                                from app.models.db import User
+                                user = db.query(User).filter(User.id == int(u_id)).first()
+                                if user and user.is_admin:
+                                    is_admin = True
+                    except Exception as e:
+                        logger.error(f"Error verifying admin bypass: {e}")
+                
+                if not is_admin:
+                    # If it's a browser request (HTML), redirect to maintenance page
+                    if "text/html" in request.headers.get("accept", ""):
+                        from starlette.responses import RedirectResponse
+                        return RedirectResponse(url="/maintenance")
+                    # Otherwise return 503 JSON
+                    return JSONResponse(status_code=503, content={"detail": "System is undergoing maintenance. Only administrators can access."})
             
         # 3. IP Filtering
         filters = db.query(IPFilter).all()
@@ -189,6 +235,10 @@ async def serve_export_templates():
 @app.get("/admin")
 async def serve_admin():
     return FileResponse(os.path.join(static_dir, "admin.html"))
+
+@app.get("/maintenance")
+async def serve_maintenance():
+    return FileResponse(os.path.join(static_dir, "maintenance.html"))
 
 @app.get("/exporttemplate/{id}")
 async def serve_export_template(id: str):

@@ -2,7 +2,8 @@
 import logging
 from typing import Optional, List
 from app.config import get_settings
-from app.models.db import User
+from app.models.db import User, SystemSettings
+from sqlalchemy.orm import Session
 import aiohttp
 import json
 
@@ -15,22 +16,44 @@ class AIClient:
     
     Settings Priority:
     1. User personal settings (if use_global_ai_config=False)
-    2. Global settings from environment (if use_global_ai_config=True)
-    3. System fallback settings (rarely used)
+    2. Global settings from DB/Administrator (if use_global_ai_config=True)
+    3. Global settings from environment (fallback if DB is empty)
     """
     
-    def __init__(self, user: Optional[User] = None):
+    def __init__(self, user: Optional[User] = None, db: Optional[Session] = None):
         self.user = user
+        self.db = db
         
         # Determine settings source
         if user and user.use_global_ai_config:
-            # Use global settings managed by administrator
-            self.provider = settings.GLOBAL_AI_PROVIDER
-            self.ai_model_name = settings.GLOBAL_AI_MODEL or None
-            self.gemini_key = settings.GLOBAL_GEMINI_API_KEY if self.provider == "gemini" else None
-            self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN if self.provider == "huggingface" else None
-            self.ollama_base_url = None
-            logger.info(f"[User {user.id}] Using global AI settings: {self.provider}")
+            # Try to fetch from database SystemSettings first
+            sys_settings = None
+            if db:
+                sys_settings = db.query(SystemSettings).first()
+            
+            if sys_settings:
+                # Use settings from Admin Dashboard (DB)
+                self.provider = sys_settings.global_ai_provider or settings.GLOBAL_AI_PROVIDER
+                self.ai_model_name = sys_settings.global_ai_model or settings.GLOBAL_AI_MODEL or None
+                self.gemini_key = sys_settings.global_ai_api_key if self.provider == "gemini" else None
+                self.hf_token = sys_settings.global_ai_api_key if self.provider == "huggingface" else None
+                self.ollama_base_url = sys_settings.global_ai_base_url if self.provider == "ollama" else None
+                
+                # Fallback check: if DB key is empty, use .env key
+                if self.provider == "gemini" and not self.gemini_key:
+                    self.gemini_key = settings.GLOBAL_GEMINI_API_KEY
+                if self.provider == "huggingface" and not self.hf_token:
+                    self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN
+                
+                logger.info(f"[User {user.id}] Using Global AI settings (DB/Admin managed): {self.provider}")
+            else:
+                # Use global settings from environment as absolute fallback
+                self.provider = settings.GLOBAL_AI_PROVIDER
+                self.ai_model_name = settings.GLOBAL_AI_MODEL or None
+                self.gemini_key = settings.GLOBAL_GEMINI_API_KEY if self.provider == "gemini" else None
+                self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN if self.provider == "huggingface" else None
+                self.ollama_base_url = None
+                logger.info(f"[User {user.id}] Using Global AI settings (.env managed): {self.provider}")
             
         elif user and user.ai_provider:
             # Use user's personal settings
@@ -168,6 +191,6 @@ Format as JSON array with objects containing: question, options (array of 4), co
 
 
 # Global AI client instance wrapper
-def get_ai_client(user: Optional[User] = None) -> AIClient:
+def get_ai_client(user: Optional[User] = None, db: Optional[Session] = None) -> AIClient:
     """Create AI client with user context"""
-    return AIClient(user=user)
+    return AIClient(user=user, db=db)

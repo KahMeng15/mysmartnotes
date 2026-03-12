@@ -85,7 +85,7 @@ async def generate_quiz(
         )
     
     # Generate quiz using AI
-    ai_client = AIClient(current_user)
+    ai_client = AIClient(current_user, db=db)
     
     try:
         questions = ai_client.generate_quiz(
@@ -133,7 +133,7 @@ async def generate_flashcards(
         )
     
     # Generate flashcards using AI
-    ai_client = AIClient(current_user)
+    ai_client = AIClient(current_user, db=db)
     
     try:
         flashcard_data = ai_client.generate_flashcards(
@@ -198,7 +198,7 @@ async def generate_cheatsheet(
         )
     
     # Generate cheatsheet using AI
-    ai_client = AIClient(current_user)
+    ai_client = AIClient(current_user, db=db)
     
     try:
         content = ai_client.generate_summary(

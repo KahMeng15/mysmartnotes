@@ -8,11 +8,30 @@ class SystemSettingsSchema(BaseModel):
     signup_config: str
     maintenance_mode: bool
     footer_text: Optional[str] = None
+    domain_url: Optional[str] = None
     global_ai_provider: str
     global_ai_model: Optional[str] = None
     global_ai_api_key: Optional[str] = None
     global_ai_base_url: Optional[str] = None
     ai_limit_per_user: str
+
+    class Config:
+        from_attributes = True
+
+class UserInvitationCreate(BaseModel):
+    email: EmailStr
+    tier: str = "free"
+
+class UserInvitationResponse(BaseModel):
+    id: int
+    email: str
+    token: str
+    invited_by: int
+    tier: str
+    is_used: bool
+    expires_at: datetime
+    created_at: datetime
+    invitation_link: Optional[str] = None
 
     class Config:
         from_attributes = True

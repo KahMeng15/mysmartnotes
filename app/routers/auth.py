@@ -1,14 +1,14 @@
 """Authentication router"""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from datetime import timedelta
+from datetime import timedelta, datetime
 from pydantic import BaseModel
 import jwt
 import json
 from typing import Optional
 import httpx
 
-from app.models.db import User
+from app.models.db import User, SystemSettings, UserInvitation
 from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, TokenResponse, UserUpdate
 from app.utils.db import get_db
 from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user as get_current_user_from_token
@@ -94,8 +94,34 @@ def get_firebase_config():
 
 
 @router.post("/register", response_model=UserSchema)
-def register(user_data: UserCreate, request: Request, db: Session = Depends(get_db)):
+def register(user_data: UserCreate, request: Request, token: Optional[str] = None, db: Session = Depends(get_db)):
     """Register a new user"""
+    # Check maintenance mode
+    sys_settings = db.query(SystemSettings).first()
+    if sys_settings and sys_settings.maintenance_mode:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Registration is disabled during maintenance."
+        )
+    
+    # Check system signup config
+    signup_config = sys_settings.signup_config if sys_settings else "open"
+    
+    invitation = None
+    if signup_config == "invite":
+        if not token:
+            raise HTTPException(status_code=403, detail="Registration is restricted to invited users only. Token required.")
+        
+        invitation = db.query(UserInvitation).filter(UserInvitation.token == token, UserInvitation.is_used == False).first()
+        if not invitation:
+            raise HTTPException(status_code=403, detail="Invalid or expired invitation token.")
+        
+        if invitation.expires_at < datetime.utcnow():
+            raise HTTPException(status_code=403, detail="Invitation token has expired.")
+            
+        if invitation.email.lower() != user_data.email.lower():
+            raise HTTPException(status_code=403, detail="Invitation token was issued for a different email address.")
+
     # Check if user exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     
@@ -106,15 +132,24 @@ def register(user_data: UserCreate, request: Request, db: Session = Depends(get_
         )
     
     # Create new user
+    is_admin = True if settings.ADMIN_EMAIL and user_data.email.lower() == settings.ADMIN_EMAIL.lower() else False
+    is_approved = True if signup_config != "approval" or is_admin else False
+    
     user = User(
         username=user_data.email,  # Use email as username
         email=user_data.email,
         full_name=user_data.full_name,
         nickname=user_data.nickname,
         hashed_password=hash_password(user_data.password),
-        is_admin=True if settings.ADMIN_EMAIL and user_data.email.lower() == settings.ADMIN_EMAIL.lower() else False
+        is_admin=is_admin,
+        is_approved=is_approved,
+        tier=invitation.tier if invitation else "free"
     )
     db.add(user)
+    
+    if invitation:
+        invitation.is_used = True
+        
     db.commit()
     db.refresh(user)
     
@@ -130,6 +165,15 @@ def register(user_data: UserCreate, request: Request, db: Session = Depends(get_
 @router.post("/login", response_model=TokenResponse)
 def login(credentials: UserLogin, request: Request, db: Session = Depends(get_db)):
     """Login user and return access token"""
+    # Check maintenance mode
+    sys_settings = db.query(SystemSettings).first()
+    if sys_settings and sys_settings.maintenance_mode:
+        if not settings.ADMIN_EMAIL or credentials.email.lower() != settings.ADMIN_EMAIL.lower():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="System is undergoing maintenance. Only administrators can log in at this time."
+            )
+
     user = db.query(User).filter(User.email == credentials.email).first()
     
     try:
@@ -152,6 +196,12 @@ def login(credentials: UserLogin, request: Request, db: Session = Depends(get_db
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is disabled"
+        )
+    
+    if not user.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is pending approval by administrator"
         )
         
     # Auto-elevate admin matching settings
@@ -177,6 +227,14 @@ def login(credentials: UserLogin, request: Request, db: Session = Depends(get_db
 @router.post("/google-login")
 def google_login(google_request: GoogleLoginRequest, request: Request, db: Session = Depends(get_db)):
     """Verify Google token and check if user exists"""
+    # Check maintenance mode
+    sys_settings = db.query(SystemSettings).first()
+    if sys_settings and sys_settings.maintenance_mode:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google Sign-In is disabled during maintenance. Please use administrative email login."
+        )
+
     try:
         print(f"[DEBUG] Received Google login request")
         
@@ -259,6 +317,14 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
 @router.post("/google-complete", response_model=TokenResponse)
 def google_complete(google_request: GoogleCompleteRequest, request: Request, db: Session = Depends(get_db)):
     """Complete Google registration for new user with additional info"""
+    # Check maintenance mode
+    sys_settings = db.query(SystemSettings).first()
+    if sys_settings and sys_settings.maintenance_mode:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google Sign-In is disabled during maintenance."
+        )
+
     try:
         # Verify the Firebase ID token
         claims = verify_firebase_token(google_request.idToken)

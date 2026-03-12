@@ -22,6 +22,7 @@ function switchTab(tabId) {
     
     // Load data based on tab
     if (tabId === 'tab-users') loadUsers();
+    if (tabId === 'tab-invitations') loadInvitations();
     if (tabId === 'tab-settings') loadSystemSettings();
     if (tabId === 'tab-rate-limits') loadRateLimits();
     if (tabId === 'tab-email') loadEmailConfig();
@@ -96,8 +97,57 @@ async function userAction(userId, action, value = null) {
     } catch (e) { alert(e.message); }
 }
 
-function inviteUserModal() {
-    alert('Email invitation feature coming soon.');
+// ========================
+// INVITATIONS
+// ========================
+function openInviteModal() {
+    document.getElementById('inviteModal').style.display = 'flex';
+}
+
+function closeInviteModal() {
+    document.getElementById('inviteModal').style.display = 'none';
+}
+
+async function sendInvite(e) {
+    e.preventDefault();
+    const email = document.getElementById('inviteEmail').value;
+    const tier = document.getElementById('inviteTier').value;
+    
+    try {
+        const res = await apiCall('/admin/invitations', 'POST', { email, tier });
+        alert(`Invitation link created and sent to ${email}:\n\n${res.invitation_link}`);
+        closeInviteModal();
+        loadInvitations();
+    } catch (err) {
+        alert(err.message);
+    }
+}
+
+async function loadInvitations() {
+    try {
+        const invites = await apiCall('/admin/invitations');
+        const tbody = document.querySelector('#invitationsTable tbody');
+        tbody.innerHTML = '';
+        
+        if (invites.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6">No pending invitations</td></tr>';
+            return;
+        }
+        
+        invites.forEach(i => {
+            const tr = document.createElement('tr');
+            const expires = new Date(i.expires_at).toLocaleString();
+            tr.innerHTML = `
+                <td>${i.email}</td>
+                <td><code>${i.token.substring(0, 8)}...</code></td>
+                <td>${i.tier}</td>
+                <td><small>${i.invitation_link}</small></td>
+                <td>${expires}</td>
+                <td>${i.is_used ? '<span style="color:green">Used</span>' : '<span style="color:orange">Pending</span>'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) { console.error(e); }
 }
 
 // ========================
@@ -106,9 +156,17 @@ function inviteUserModal() {
 async function loadSystemSettings() {
     try {
         const s = await apiCall('/admin/system-settings');
-        if (s.lockdown_mode) document.getElementById('lockdownToggle').classList.add('active');
-        if (s.maintenance_mode) document.getElementById('maintenanceToggle').classList.add('active');
+        const lockdownToggle = document.getElementById('lockdownToggle');
+        const maintenanceToggle = document.getElementById('maintenanceToggle');
+
+        if (s.lockdown_mode) lockdownToggle.classList.add('active');
+        else lockdownToggle.classList.remove('active');
+        
+        if (s.maintenance_mode) maintenanceToggle.classList.add('active');
+        else maintenanceToggle.classList.remove('active');
+        
         document.getElementById('signupConfig').value = s.signup_config || 'open';
+        document.getElementById('domainUrl').value = s.domain_url || '';
         document.getElementById('footerText').value = s.footer_text || '';
         document.getElementById('globalAiProvider').value = s.global_ai_provider || 'gemini';
         document.getElementById('globalAiModel').value = s.global_ai_model || '';
@@ -124,6 +182,7 @@ async function saveSystemSettings(e) {
         lockdown_mode: document.getElementById('lockdownToggle').classList.contains('active'),
         maintenance_mode: document.getElementById('maintenanceToggle').classList.contains('active'),
         signup_config: document.getElementById('signupConfig').value,
+        domain_url: document.getElementById('domainUrl').value,
         footer_text: document.getElementById('footerText').value,
         global_ai_provider: document.getElementById('globalAiProvider').value,
         global_ai_model: document.getElementById('globalAiModel').value,
@@ -145,11 +204,6 @@ async function saveSystemSettings(e) {
 async function loadRateLimits() {
     try {
         const s = await apiCall('/admin/rate-limits');
-        ['rlPerUser','rlGlobal','rlChat','rlProcessing','rlSessions'].forEach(k => {
-            const mappedName = k.replace('rl', ''); 
-            const snake = mappedName.replace(/[A-Z]/g, match => `_${match.toLowerCase()}`).substring(1);
-            document.getElementById(k).value = s[snake === 'per_user' ? 'per_user_api' : (snake === 'user_api' ? 'per_user_api' : (snake === 'chat_api' ? 'chat_api' : (snake === 'processing_api' ? 'processing_api' : (snake === 'global' ? 'global_api' : 'sessions'))))] || 0;
-        });
         
         // precise mapping
         document.getElementById('rlPerUser').value = s.per_user_api || 0;

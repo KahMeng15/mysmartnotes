@@ -260,6 +260,7 @@ class SystemSettings(Base):
     signup_config = Column(String(50), default="open") # open, approval, invite
     maintenance_mode = Column(Boolean, default=False)
     footer_text = Column(String(255), nullable=True)
+    domain_url = Column(String(255), nullable=True) # Domain for invitation/reset links
     global_ai_provider = Column(String(50), default="gemini")
     global_ai_model = Column(String(100), nullable=True)
     global_ai_api_key = Column(String(255), nullable=True)
@@ -267,6 +268,23 @@ class SystemSettings(Base):
     ai_limit_per_user = Column(String(50), default="unlimited") # sec, min, hour, day, unlimited
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserInvitation(Base):
+    """Pending user invitations"""
+    __tablename__ = "user_invitations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    token = Column(String(100), nullable=False, unique=True, index=True)
+    invited_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    tier = Column(String(50), default="free")
+    is_used = Column(Boolean, default=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    inviter = relationship("User")
 
 
 class EmailConfig(Base):

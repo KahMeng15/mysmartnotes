@@ -33,6 +33,7 @@
         
         <div style="margin-bottom: 20px; border-bottom: 1px solid var(--color-light-gray); padding-bottom: 10px;">
             <button class="tab-btn active" onclick="switchTab('tab-users')">Users</button>
+            <button class="tab-btn" onclick="switchTab('tab-invitations')">Invitations</button>
             <button class="tab-btn" onclick="switchTab('tab-settings')">System Settings</button>
             <button class="tab-btn" onclick="switchTab('tab-rate-limits')">Rate Limits</button>
             <button class="tab-btn" onclick="switchTab('tab-email')">Email Config</button>
@@ -44,7 +45,7 @@
         <div id="tab-users" class="admin-section active">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h3>Users Management</h3>
-                <button class="btn btn-primary" onclick="inviteUserModal()"><i class="ph ph-paper-plane-tilt"></i> Invite User</button>
+                <button class="btn btn-primary" onclick="openInviteModal()"><i class="ph ph-paper-plane-tilt"></i> Invite User</button>
             </div>
             <div style="overflow-x: auto;">
                 <table class="admin-table" id="usersTable">
@@ -64,6 +65,50 @@
                         <tr><td colspan="11">Loading users...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- INVITATIONS TAB -->
+        <div id="tab-invitations" class="admin-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3>Pending Invitations</h3>
+                <button class="btn btn-primary" onclick="openInviteModal()"><i class="ph ph-paper-plane-tilt"></i> New Invitation</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="admin-table" id="invitationsTable">
+                    <thead>
+                        <tr>
+                            <th>Email</th><th>Token</th><th>Tier</th><th>Link</th><th>Expires</th><th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="6">Loading invitations...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Modal for Invitation -->
+        <div id="inviteModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:12px; width:400px; position:relative;">
+                <h3>Invite User</h3>
+                <form onsubmit="sendInvite(event)">
+                    <div class="form-group" style="margin-bottom:15px;">
+                        <label>Email Address</label>
+                        <input type="email" id="inviteEmail" required placeholder="user@example.com" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:20px;">
+                        <label>User Tier</label>
+                        <select id="inviteTier" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="free">Free</option>
+                            <option value="pro">Pro</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button type="submit" class="btn btn-primary" style="flex:1;">Send Invitation</button>
+                        <button type="button" class="btn btn-outline" onclick="closeInviteModal()" style="flex:1;">Cancel</button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -94,6 +139,12 @@
                         <option value="approval">Require Approval</option>
                         <option value="invite">Strictly Invite Only</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label>System Domain URL</label>
+                    <input type="text" id="domainUrl" placeholder="e.g. https://mysmartnotes.com">
+                    <small style="color: var(--color-gray); font-size: 11px;">Used for generating invitation and reset links</small>
                 </div>
 
                 <div class="form-group">

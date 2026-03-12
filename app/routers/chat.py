@@ -565,7 +565,7 @@ async def ask_question(
 
     t_step2_start = time.time()
     # Initialize AI client early for classification
-    ai_client = AIClient(current_user)
+    ai_client = AIClient(current_user, db=db)
     
     # STEP 1B: Auto-detect conversation continuation (do FIRST before context retrieval)
     conv_id = request.conversation_id

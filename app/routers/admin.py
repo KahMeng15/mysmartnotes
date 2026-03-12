@@ -4,14 +4,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from typing import List, Optional
 import datetime
+import secrets
 
-from app.models.db import User, SystemSettings, EmailConfig, IPFilter, RateLimitConfig, UserLog, Lecture, Subject, SubjectGroup, ChatMessage, StudySession
+from app.models.db import User, SystemSettings, EmailConfig, IPFilter, RateLimitConfig, UserLog, Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation
 from app.schemas.admin import (
-    SystemSettingsSchema, EmailConfigSchema, IPFilterSchema, IPFilterCreate, RateLimitConfigSchema, UserLogSchema, UserAdminResponse, UserActionRequest
+    SystemSettingsSchema, EmailConfigSchema, IPFilterSchema, IPFilterCreate, RateLimitConfigSchema, UserLogSchema, UserAdminResponse, UserActionRequest,
+    UserInvitationCreate, UserInvitationResponse
 )
 from app.utils.db import get_db
 from app.routers.auth import get_current_user
 from app.utils.auth import hash_password
+from app.utils.email import send_invitation_email
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -27,12 +30,36 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)):
 # --- System Settings ---
 @router.get("/system-settings", response_model=SystemSettingsSchema)
 def get_system_settings(db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    from app.config import get_settings
+    app_settings = get_settings()
+    
     settings = db.query(SystemSettings).first()
     if not settings:
-        settings = SystemSettings()
+        settings = SystemSettings(
+            global_ai_provider=app_settings.GLOBAL_AI_PROVIDER,
+            global_ai_model=app_settings.GLOBAL_AI_MODEL,
+            global_ai_api_key=app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GLOBAL_HUGGINGFACE_TOKEN,
+        )
         db.add(settings)
         db.commit()
         db.refresh(settings)
+    else:
+        # Prefill empty fields from .env if they are null/empty in DB
+        updated = False
+        if not settings.global_ai_provider:
+            settings.global_ai_provider = app_settings.GLOBAL_AI_PROVIDER
+            updated = True
+        if not settings.global_ai_model:
+            settings.global_ai_model = app_settings.GLOBAL_AI_MODEL
+            updated = True
+        if not settings.global_ai_api_key:
+            settings.global_ai_api_key = app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GLOBAL_HUGGINGFACE_TOKEN
+            updated = True
+        
+        if updated:
+            db.commit()
+            db.refresh(settings)
+            
     return settings
 
 @router.put("/system-settings", response_model=SystemSettingsSchema)
@@ -187,6 +214,67 @@ def user_action(request: UserActionRequest, db: Session = Depends(get_db), admin
         
     db.commit()
     return {"message": "Action completed successfully"}
+
+# --- Invitations ---
+@router.post("/invitations", response_model=UserInvitationResponse)
+def create_invitation(invite_data: UserInvitationCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    # Check if user already exists
+    existing_user = db.query(User).filter(User.email == invite_data.email).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User with this email already exists")
+
+    # Check if invitation already exists
+    existing_invite = db.query(UserInvitation).filter(UserInvitation.email == invite_data.email, UserInvitation.is_used == False).first()
+    if existing_invite:
+        # Update existing invite
+        existing_invite.token = secrets.token_urlsafe(32)
+        existing_invite.expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=7)
+        db.commit()
+        db.refresh(existing_invite)
+        invite = existing_invite
+    else:
+        invite = UserInvitation(
+            email=invite_data.email,
+            token=secrets.token_urlsafe(32),
+            invited_by=admin.id,
+            tier=invite_data.tier,
+            expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=7)
+        )
+        db.add(invite)
+        db.commit()
+        db.refresh(invite)
+
+    # Generate link
+    settings = db.query(SystemSettings).first()
+    domain = settings.domain_url if settings and settings.domain_url else "http://localhost:8000"
+    if not domain.startswith("http"):
+        domain = f"http://{domain}"
+    
+    invitation_link = f"{domain.rstrip('/')}/signup?token={invite.token}"
+    
+    # Try to send email
+    send_invitation_email(db, invite.email, invitation_link)
+    
+    response = UserInvitationResponse.model_validate(invite)
+    response.invitation_link = invitation_link
+    return response
+
+@router.get("/invitations", response_model=List[UserInvitationResponse])
+def get_invitations(db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    invites = db.query(UserInvitation).order_by(desc(UserInvitation.created_at)).all()
+    results = []
+    
+    settings = db.query(SystemSettings).first()
+    domain = settings.domain_url if settings and settings.domain_url else "http://localhost:8000"
+    if not domain.startswith("http"):
+        domain = f"http://{domain}"
+        
+    for i in invites:
+        resp = UserInvitationResponse.model_validate(i)
+        resp.invitation_link = f"{domain.rstrip('/')}/signup?token={i.token}"
+        results.append(resp)
+        
+    return results
 
 # --- User Logs ---
 @router.get("/logs", response_model=List[UserLogSchema])

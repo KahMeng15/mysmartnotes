@@ -43,7 +43,12 @@ async function handleLogin() {
             setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
         } else {
             const err = await res.json();
-            showMessageBox('loginMsg', 'error', err.detail || 'Login failed. Please check your credentials.');
+            if (res.status === 503) {
+                showMessageBox('loginMsg', 'error', err.detail || 'Under maintenance.');
+                setTimeout(() => { window.location.href = '/maintenance'; }, 2000);
+            } else {
+                showMessageBox('loginMsg', 'error', err.detail || 'Login failed. Please check your credentials.');
+            }
         }
     } catch (e) {
         showMessageBox('loginMsg', 'error', 'Connection error. Please try again.');
@@ -111,7 +116,12 @@ async function handleGoogleSignIn() {
             }
         } else {
             const err = await res.json();
-            showMessageBox('loginMsg', 'error', err.detail || 'Google sign-in failed.');
+            if (res.status === 503) {
+                showMessageBox('loginMsg', 'error', err.detail || 'Under maintenance.');
+                setTimeout(() => { window.location.href = '/maintenance'; }, 2000);
+            } else {
+                showMessageBox('loginMsg', 'error', err.detail || 'Google sign-in failed.');
+            }
             // Sign out from Firebase if backend failed
             window.firebaseAuth.signOut();
         }
@@ -174,7 +184,12 @@ async function handleGoogleComplete(event) {
             setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
         } else {
             const err = await res.json();
-            showMessageBox('googleRegisterMsg', 'error', err.detail || 'Registration failed.');
+            if (res.status === 503) {
+                showMessageBox('googleRegisterMsg', 'error', err.detail || 'Under maintenance.');
+                setTimeout(() => { window.location.href = '/maintenance'; }, 2000);
+            } else {
+                showMessageBox('googleRegisterMsg', 'error', err.detail || 'Registration failed.');
+            }
         }
     } catch (e) {
         console.error('Google registration error:', e);
