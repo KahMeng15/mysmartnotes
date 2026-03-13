@@ -26,6 +26,12 @@ class User(Base):
     ai_base_url = Column(String(255), nullable=True)
     ai_api_key = Column(String(255), nullable=True)
     use_global_ai_config = Column(Boolean, default=False)  # Whether to use global settings instead of personal
+    
+    # Pomodoro Preferences
+    pomo_study_mins = Column(Integer, default=25)
+    pomo_break_mins = Column(Integer, default=5)
+    pomo_long_break_mins = Column(Integer, default=15)
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -173,15 +179,20 @@ class StudySession(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    session_type = Column(String(50))  # flashcard, quiz, chat
+    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=True, index=True)
+    session_type = Column(String(50))  # flashcard, quiz, chat, pomodoro_study, pomodoro_break, stopwatch
     duration_minutes = Column(Integer)
     questions_attempted = Column(Integer, default=0)
     questions_correct = Column(Integer, default=0)
     score = Column(Float)
+    start_time = Column(DateTime, default=datetime.utcnow)
+    end_time = Column(DateTime)
+    status = Column(String(50), default="completed") # completed, interrupted
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     user = relationship("User", back_populates="study_sessions")
+    lecture = relationship("Lecture")
 
 
 class Task(Base):

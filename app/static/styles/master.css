@@ -2996,3 +2996,83 @@ body.auth-page {
 .lecture-item:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
 }
+
+/* Sidebar Pomodoro Widget */
+.sidebar-pomo-widget {
+    background: var(--color-background);
+    border: 1px solid var(--color-light-gray);
+    border-radius: var(--radius-md);
+    margin: 0 12px 12px 12px;
+    padding: 10px;
+    transition: all 0.3s ease;
+}
+
+.pomo-widget-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pomo-widget-info {
+    display: flex;
+    flex-direction: column;
+}
+
+#pomoWidgetTime {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-primary);
+    line-height: 1;
+}
+
+#pomoWidgetMode {
+    font-size: 9px;
+    color: var(--color-gray);
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.pomo-widget-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.pomo-widget-actions button {
+    background: white;
+    border: 1px solid var(--color-light-gray);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--color-gray);
+    transition: all 0.2s;
+}
+
+.pomo-widget-actions button:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    transform: scale(1.1);
+}
+
+.sidebar-collapsed .sidebar-pomo-widget {
+    padding: 8px 4px;
+    margin: 0 4px 12px 4px;
+}
+
+.sidebar-collapsed .pomo-widget-info, 
+.sidebar-collapsed #pomoWidgetMode {
+    display: none;
+}
+
+.sidebar-collapsed .pomo-widget-content {
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sidebar-collapsed .pomo-widget-actions {
+    flex-direction: column;
+}

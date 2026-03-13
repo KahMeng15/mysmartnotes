@@ -197,11 +197,15 @@ class GeneratedDocument(DocumentBase):
 
 # ========== Study Session Schemas ==========
 class StudySessionCreate(BaseModel):
+    lecture_id: Optional[int] = None
     session_type: str
     duration_minutes: int
-    questions_attempted: int
-    questions_correct: int
+    questions_attempted: int = 0
+    questions_correct: int = 0
     score: Optional[float] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    status: Optional[str] = "completed"
 
 
 class StudySession(StudySessionCreate):

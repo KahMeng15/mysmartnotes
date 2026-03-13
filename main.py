@@ -251,6 +251,14 @@ async def serve_maintenance():
 async def serve_export_template(id: str):
     return FileResponse(os.path.join(static_dir, "exporttemplate.html"))
 
+@app.get("/pomodoro")
+async def serve_pomodoro():
+    return FileResponse(os.path.join(static_dir, "pomodoro.html"))
+
+@app.get("/pomodoro_popout.html")
+async def serve_pomodoro_popout():
+    return FileResponse(os.path.join(static_dir, "pomodoro_popout.html"))
+
 @app.get("/")
 async def root():
     return RedirectResponse(url="/login")

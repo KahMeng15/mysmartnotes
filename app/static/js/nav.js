@@ -20,6 +20,25 @@ function injectSidebar() {
     
     const adminItem = isAdmin ? `<li><a href="/admin" class="sidebar-nav-link" data-page="admin"><i class="ph ph-shield-star"></i><span>Admin</span></a></li>` : '';
 
+    // Check Pomodoro state immediately for sync injection
+    const pomoSaved = localStorage.getItem('pomodoroState');
+    let pomoDisplay = 'none';
+    let pomoTime = '00:00';
+    let pomoMode = 'STUDY';
+    let pomoIcon = 'ph ph-play';
+    
+    if (pomoSaved) {
+        const state = JSON.parse(pomoSaved);
+        const mins = Math.floor(Math.abs(state.timeLeft) / 60);
+        const secs = Math.abs(state.timeLeft) % 60;
+        pomoTime = `${mins}:${secs.toString().padStart(2, '0')}`;
+        pomoMode = (state.timerMode || 'study').replace('_', ' ').toUpperCase();
+        pomoIcon = state.isRunning ? 'ph ph-pause' : 'ph ph-play';
+        
+        const isActive = state.isRunning || state.timeLeft < (state.timerMode === 'pomodoro' ? 25*60 : 5*60);
+        if (isActive) pomoDisplay = 'block';
+    }
+
     const sidebarHtml = `
     <aside class="app-sidebar" id="appSidebar">
         <a href="/dashboard.html" class="sidebar-brand">my<br>smart<br>notes</a>
@@ -30,7 +49,7 @@ function injectSidebar() {
             <li><a href="/chat.html" class="sidebar-nav-link" data-page="chat.html"><i class="ph ph-chat-circle-dots"></i><span>Chat</span></a></li>
             <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-exam"></i><span>Quiz</span></a></li>
             <li><a href="/flashcards.html" class="sidebar-nav-link" data-page="flashcards.html"><i class="ph ph-cards"></i><span>Flashcards</span></a></li>
-            <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-clock"></i><span>Pomodoro</span></a></li>
+            <li><a href="/pomodoro.html" class="sidebar-nav-link" data-page="pomodoro.html" id="pomodoroNavLink"><i class="ph ph-clock"></i><span>Pomodoro</span></a></li>
             <li><a href="/upload.html" class="sidebar-nav-link" data-page="upload.html"><i class="ph ph-upload-simple"></i><span>Upload</span></a></li>
             <li><a href="/exporttemplates" class="sidebar-nav-link" data-page="exporttemplates"><i class="ph ph-palette"></i><span>Templates</span></a></li>
             <li class="sidebar-divider"></li>
@@ -42,6 +61,20 @@ function injectSidebar() {
         <button class="sidebar-toggle" onclick="toggleSidebar()" title="Collapse sidebar" id="sidebarToggleBtn">
             <i class="ph ph-caret-left" id="sidebarToggleIcon"></i>
         </button>
+
+        <!-- Pomodoro Mini Widget -->
+        <div id="sidebarPomodoroWidget" class="sidebar-pomo-widget" style="display:${pomoDisplay};">
+            <div class="pomo-widget-content">
+                <div class="pomo-widget-info">
+                    <span id="pomoWidgetTime">${pomoTime}</span>
+                    <small id="pomoWidgetMode">${pomoMode}</small>
+                </div>
+                <div class="pomo-widget-actions">
+                    <button id="pomoWidgetToggle" title="Play/Pause"><i class="${pomoIcon}"></i></button>
+                    <button id="pomoWidgetStop" title="Stop"><i class="ph ph-stop"></i></button>
+                </div>
+            </div>
+        </div>
 
         <div class="sidebar-user" onclick="logout()" title="Logout">
             <div class="sidebar-avatar" id="sidebarAvatarInitial">?</div>
@@ -78,6 +111,7 @@ function injectSidebar() {
     setActiveLink();
     displayUser();
     updateToggleIcon();
+    updateSidebarWidget();
 }
 
 function setActiveLink() {
@@ -165,3 +199,82 @@ window.cancelLogout = function () {
         logoutModal.classList.remove('active');
     }
 };
+
+// Pomodoro Sidebar Sync & Persistence
+const navSyncChannel = new BroadcastChannel('pomodoro_sync');
+let sidePomoInterval = null;
+
+function updateSidebarWidget() {
+    const saved = localStorage.getItem('pomodoroState');
+    if (!saved) return;
+    
+    const state = JSON.parse(saved);
+    const widget = document.getElementById('sidebarPomodoroWidget');
+    if (!widget) return;
+
+    // Show widget if a session is active or paused mid-way
+    const isActive = state.isRunning || state.timeLeft < (state.timerMode === 'pomodoro' ? 25*60 : 5*60);
+    widget.style.display = isActive ? 'block' : 'none';
+
+    if (!isActive) {
+        clearInterval(sidePomoInterval);
+        return;
+    }
+
+    const timeEl = document.getElementById('pomoWidgetTime');
+    const modeEl = document.getElementById('pomoWidgetMode');
+    const toggleBtn = document.getElementById('pomoWidgetToggle');
+
+    const mins = Math.floor(Math.abs(state.timeLeft) / 60);
+    const secs = Math.abs(state.timeLeft) % 60;
+    const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+    
+    if (timeEl) timeEl.textContent = timeStr;
+    if (modeEl) modeEl.textContent = (state.timerMode || 'study').replace('_', ' ').toUpperCase();
+    if (toggleBtn) toggleBtn.innerHTML = state.isRunning ? '<i class="ph ph-pause"></i>' : '<i class="ph ph-play"></i>';
+
+    // If running and no interval, start a local one to keep sidebar ticking
+    if (state.isRunning && !sidePomoInterval) {
+        sidePomoInterval = setInterval(() => {
+            const currentState = JSON.parse(localStorage.getItem('pomodoroState'));
+            if (currentState && currentState.isRunning) {
+                currentState.timeLeft--;
+                if (currentState.timeLeft <= 0) {
+                    currentState.isRunning = false;
+                    clearInterval(sidePomoInterval);
+                    sidePomoInterval = null;
+                }
+                localStorage.setItem('pomodoroState', JSON.stringify(currentState));
+                updateSidebarWidget();
+            } else {
+                clearInterval(sidePomoInterval);
+                sidePomoInterval = null;
+            }
+        }, 1000);
+    }
+}
+
+navSyncChannel.onmessage = (event) => {
+    if (event.data.type === 'TICK') {
+        updateSidebarWidget();
+    }
+};
+
+// Handle widget clicks
+document.addEventListener('click', (e) => {
+    if (e.target.closest('#pomoWidgetToggle')) {
+        const state = JSON.parse(localStorage.getItem('pomodoroState') || '{}');
+        const newRunning = !state.isRunning;
+        state.isRunning = newRunning;
+        localStorage.setItem('pomodoroState', JSON.stringify(state));
+        navSyncChannel.postMessage({ type: 'COMMAND', action: 'TOGGLE' });
+        updateSidebarWidget();
+    }
+    if (e.target.closest('#pomoWidgetStop')) {
+        localStorage.removeItem('pomodoroState');
+        navSyncChannel.postMessage({ type: 'COMMAND', action: 'STOP' });
+        document.getElementById('sidebarPomodoroWidget').style.display = 'none';
+        clearInterval(sidePomoInterval);
+        sidePomoInterval = null;
+    }
+});
