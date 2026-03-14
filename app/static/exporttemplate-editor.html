@@ -535,6 +535,7 @@
 
         function updatePreview() {
             const cfg = gatherConfig();
+            const PX_PER_PT = 793 / 595; // ≈ 1.333 - Define early for use in cover page template
             const page = document.getElementById('previewPage');
             // mm → preview px
             // The preview div is 793px wide (A4 portrait) or 1122px (A4 landscape)
@@ -576,7 +577,6 @@
             // The preview div is 793px wide but CSS-scaled to 0.75 (595px visual).
             // To match PDF proportions (595pt wide), font sizes need ×(793/595)=×1.333
             // so that after scale(0.75) they appear at the correct pt proportion.
-            const PX_PER_PT = 793 / 595; // ≈ 1.333
             const elStyle = (key) => {
                 const s = cfg.elements[key] || {};
                 return `text-align: ${s.alignment || 'left'}; color: ${s.text_color || '#2C3E50'}; font-weight: ${s.font_weight || 'normal'}; font-size: ${(s.font_size || 11) * PX_PER_PT}px; margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px; line-height: ${cfg.spacing.line_spacing};`;

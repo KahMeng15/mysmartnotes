@@ -237,7 +237,7 @@ async def serve_dashboard():
 
 @app.get("/exporttemplates")
 async def serve_export_templates():
-    return FileResponse(os.path.join(static_dir, "exporttemplates.html"))
+    return FileResponse(os.path.join(static_dir, "exporttemplate-selector.html"))
 
 @app.get("/admin")
 async def serve_admin():
@@ -249,7 +249,7 @@ async def serve_maintenance():
 
 @app.get("/exporttemplate/{id}")
 async def serve_export_template(id: str):
-    return FileResponse(os.path.join(static_dir, "exporttemplate.html"))
+    return FileResponse(os.path.join(static_dir, "exporttemplate-editor.html"))
 
 @app.get("/pomodoro")
 async def serve_pomodoro():
