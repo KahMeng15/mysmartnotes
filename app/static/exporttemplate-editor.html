@@ -266,6 +266,7 @@
         let templates = [];
         let selectedTemplateId = null;
         let isDirty = false;
+        let currentTemplate = null;
 
         const ELEMENTS = ['h1', 'h2', 'h3', 'h4', 'h5', 'paragraph', 'list'];
         const ELEMENT_LABELS = {
@@ -306,6 +307,7 @@
                 });
                 if (res.ok) {
                     const tmpl = await res.json();
+                    currentTemplate = tmpl; // Store template data
                     
                     // Set name
                     const nameInput = document.getElementById('templateName');
@@ -331,13 +333,12 @@
                     alert('Failed to load template');
                     window.location.href = '/exporttemplates';
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error(e); alert('Error loading template: ' + e.message); }
         }
 
         async function saveTemplate() {
             if (!selectedTemplateId) return;
-            const tmpl = templates.find(t => t.id === selectedTemplateId);
-            if (!tmpl || tmpl.is_system) return;
+            if (!currentTemplate || currentTemplate.is_system) return;
 
             const config = gatherConfig();
             const name = document.getElementById('templateName').value.trim();
@@ -354,10 +355,13 @@
                 });
                 if (res.ok) {
                     isDirty = false;
-                    alert('Saved!');
+                    currentTemplate.name = name;
+                    currentTemplate.config = config;
+                    showSuccessModal('Template Saved', 'Your template has been saved successfully!');
+                    setTimeout(() => { window.location.href = '/exporttemplates'; }, 1500);
                 } else {
                     const err = await res.json();
-                    alert(err.detail || 'Failed to save');
+                    alert(err.detail || 'Failed to save template');
                 }
             } catch (e) { alert('Error: ' + e.message); }
         }
@@ -377,12 +381,15 @@
                 if (res.ok) {
                     const newTmpl = await res.json();
                     window.location.href = `/exporttemplate/${newTmpl.id}`;
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Failed to create template');
                 }
             } catch (e) { alert('Error: ' + e.message); }
         }
 
         async function duplicateSelectedTemplate() {
-            if (!selectedTemplateId) return;
+            if (!selectedTemplateId || !currentTemplate) return;
             try {
                 const res = await fetch(`/templates/${selectedTemplateId}/duplicate`, {
                     method: 'POST',
@@ -391,22 +398,30 @@
                 if (res.ok) {
                     const newTmpl = await res.json();
                     window.location.href = `/exporttemplate/${newTmpl.id}`;
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Failed to duplicate template');
                 }
             } catch (e) { alert('Error: ' + e.message); }
         }
 
         async function deleteSelectedTemplate() {
-            if (!selectedTemplateId) return;
-            const tmpl = templates.find(t => t.id === selectedTemplateId);
-            if (!tmpl || tmpl.is_system) return;
-            if (!confirm(`Delete "${tmpl.name}"? This cannot be undone.`)) return;
+            if (!selectedTemplateId || !currentTemplate) return;
+            if (currentTemplate.is_system) return;
+            if (!confirm(`Delete "${currentTemplate.name}"? This cannot be undone.`)) return;
 
             try {
-                await fetch(`/templates/${selectedTemplateId}`, {
+                const res = await fetch(`/templates/${selectedTemplateId}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                window.location.href = '/exporttemplates';
+                if (res.ok) {
+                    showSuccessModal('Template Deleted', 'Your template has been deleted successfully!');
+                    setTimeout(() => { window.location.href = '/exporttemplates'; }, 1500);
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Failed to delete template');
+                }
             } catch (e) { alert('Error: ' + e.message); }
         }
 
