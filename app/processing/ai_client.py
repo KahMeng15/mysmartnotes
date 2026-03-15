@@ -23,6 +23,9 @@ class AIClient:
     def __init__(self, user: Optional[User] = None, db: Optional[Session] = None):
         self.user = user
         self.db = db
+        self.connection_error = None
+        self.model = None
+        self.client = None
         
         # Determine settings source
         if user and user.use_global_ai_config:
@@ -121,11 +124,15 @@ class AIClient:
             logger.info("Hugging Face AI initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Hugging Face: {e}")
+            self.client = None
+            self.connection_error = f"[HUGGINGFACE] Connection failed: {e}"
     
     async def generate_text(self, prompt: str, max_tokens: int = 500) -> str:
         """Generate text response"""
         try:
             if self.provider == "gemini":
+                if self.model is None:
+                    return self.connection_error or "[GEMINI] Gemini AI is not properly initialized. Please check your API key."
                 response = self.model.generate_content(prompt)
                 return response.text
             elif self.provider == "huggingface":

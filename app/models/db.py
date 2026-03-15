@@ -46,7 +46,7 @@ class SubjectGroup(Base):
     """Group of subjects (e.g. Semester 1)"""
     __tablename__ = "subject_groups"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(8), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -61,9 +61,9 @@ class Subject(Base):
     """Course/Subject organization"""
     __tablename__ = "subjects"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(8), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    group_id = Column(Integer, ForeignKey("subject_groups.id"), nullable=True)
+    group_id = Column(String(8), ForeignKey("subject_groups.id"), nullable=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
     color = Column(String(7), default="#3b82f6")  # hex color
@@ -80,9 +80,9 @@ class Lecture(Base):
     """Lecture/Document"""
     __tablename__ = "lectures"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(8), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=False, index=True)
+    subject_id = Column(String(8), ForeignKey("subjects.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
     file_name = Column(String(255))
@@ -127,7 +127,7 @@ class GeneratedDocument(Base):
     __tablename__ = "generated_documents"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=False, index=True)
+    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
     document_type = Column(String(50))  # cheatsheet, quiz, summary
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
@@ -143,7 +143,7 @@ class LectureEmbedding(Base):
     __tablename__ = "lecture_embeddings"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=False, index=True)
+    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
     chunk_text = Column(Text, nullable=False)  # Original text of this chunk
     chunk_index = Column(Integer, nullable=False)  # Order of this chunk in lecture
     embedding = Column(JSON, nullable=False)  # Embedding vector as list of floats
@@ -160,7 +160,7 @@ class Flashcard(Base):
     __tablename__ = "flashcards"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=False, index=True)
+    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
     difficulty = Column(String(20), default="medium")  # easy, medium, hard
@@ -179,7 +179,7 @@ class StudySession(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=True, index=True)
+    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=True, index=True)
     session_type = Column(String(50))  # flashcard, quiz, chat, pomodoro_study, pomodoro_break, stopwatch
     duration_minutes = Column(Integer)
     questions_attempted = Column(Integer, default=0)
@@ -219,9 +219,9 @@ class ChatMessage(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=True, index=True)
-    subject_id = Column(Integer, ForeignKey("subjects.id"), nullable=True, index=True)
-    group_id = Column(Integer, ForeignKey("subject_groups.id"), nullable=True, index=True)
+    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=True, index=True)
+    subject_id = Column(String(8), ForeignKey("subjects.id"), nullable=True, index=True)
+    group_id = Column(String(8), ForeignKey("subject_groups.id"), nullable=True, index=True)
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     sources = Column(Text)  # JSON array of sources
@@ -251,7 +251,7 @@ class NoteSnapshot(Base):
     __tablename__ = "note_snapshots"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(Integer, ForeignKey("lectures.id"), nullable=False, index=True)
+    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)

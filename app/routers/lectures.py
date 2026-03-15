@@ -12,7 +12,7 @@ import uuid
 from app.models.db import User, Lecture, Subject
 from app.schemas.schemas import LectureResponse
 from app.utils.auth import get_current_user
-from app.utils.db import get_db
+from app.utils.db import get_db, generate_random_id
 from app.processing.ocr import OCRProcessor
 from app.processing.image_extractor import ImageExtractor
 from app.processing.text_processor import ContentType
@@ -32,7 +32,7 @@ os.makedirs(GENERATED_DIR, exist_ok=True)
 
 @router.get("", response_model=List[LectureResponse])
 async def get_lectures(
-    subject_id: int = None,
+    subject_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -48,7 +48,7 @@ async def get_lectures(
 
 @router.post("/upload", response_model=LectureResponse, status_code=status.HTTP_201_CREATED)
 async def upload_lecture(
-    subject_id: int = Form(...),
+    subject_id: str = Form(...),
     file: UploadFile = File(...),
     title: str = Form(None),
     current_user: User = Depends(get_current_user),
@@ -113,6 +113,7 @@ async def upload_lecture(
     
     # Create lecture record
     db_lecture = Lecture(
+        id=generate_random_id(db, Lecture),
         title=title,
         subject_id=subject_id,
         user_id=current_user.id,
@@ -202,7 +203,7 @@ async def upload_lecture(
 
 @router.get("/{lecture_id}", response_model=LectureResponse)
 async def get_lecture(
-    lecture_id: int,
+    lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -227,9 +228,9 @@ async def get_lecture(
 
 @router.put("/{lecture_id}", response_model=LectureResponse)
 async def update_lecture(
-    lecture_id: int,
+    lecture_id: str,
     title: str = Form(None),
-    subject_id: int = Form(None),
+    subject_id: str = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -270,7 +271,7 @@ async def update_lecture(
 
 @router.post("/{lecture_id}/reprocess-ocr", response_model=LectureResponse)
 async def reprocess_ocr(
-    lecture_id: int,
+    lecture_id: str,
     use_v2: bool = True,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -371,7 +372,7 @@ async def reprocess_ocr(
 
 @router.delete("/{lecture_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_lecture(
-    lecture_id: int,
+    lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -404,7 +405,7 @@ async def delete_lecture(
 
 @router.post("/{lecture_id}/generate-pdf", response_model=dict)
 async def generate_pdf(
-    lecture_id: int,
+    lecture_id: str,
     body: dict = {},
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -512,7 +513,7 @@ async def generate_pdf(
 
 @router.get("/{lecture_id}/download-pdf")
 async def download_pdf(
-    lecture_id: int,
+    lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -556,7 +557,7 @@ async def download_pdf(
 
 @router.post("/{lecture_id}/export", response_model=dict)
 async def export_lecture(
-    lecture_id: int,
+    lecture_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -726,7 +727,7 @@ _export_progress = {}
 
 @router.get("/{lecture_id}/export-status/{task_id}")
 async def get_export_status(
-    lecture_id: int,
+    lecture_id: str,
     task_id: str,
     current_user: User = Depends(get_current_user),
 ):
@@ -739,7 +740,7 @@ async def get_export_status(
 
 @router.get("/{lecture_id}/download-export")
 async def download_export(
-    lecture_id: int,
+    lecture_id: str,
     format: str = "pdf",
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -792,7 +793,7 @@ async def download_export(
 
 @router.put("/{lecture_id}/content", response_model=LectureResponse)
 async def update_lecture_content(
-    lecture_id: int,
+    lecture_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -837,7 +838,7 @@ async def update_lecture_content(
 
 @router.get("/{lecture_id}/download-file")
 async def download_original_file(
-    lecture_id: int,
+    lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

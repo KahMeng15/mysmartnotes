@@ -107,7 +107,7 @@ function displayLectures(lectures) {
 
     listContainer.innerHTML = lectures.map(lecture => `
         <div class="lecture-item">
-            <div class="lecture-info" onclick="openLecture(${lecture.id})" style="cursor: pointer;">
+            <div class="lecture-info" onclick="openLecture('${lecture.id}')" style="cursor: pointer;">
                 <div class="lecture-icon">
                     <i class="ph ${getIconForType(lecture.file_type)}"></i>
                 </div>
@@ -117,10 +117,10 @@ function displayLectures(lectures) {
                 </div>
             </div>
             <div class="lecture-actions">
-                <button onclick="openLecture(${lecture.id})" class="btn btn-outline btn-small">
+                <button onclick="openLecture('${lecture.id}')" class="btn btn-outline btn-small">
                     View
                 </button>
-                <button onclick="deleteLecture(${lecture.id})" class="btn btn-outline btn-small" style="color: var(--color-error);">
+                <button onclick="deleteLecture('${lecture.id}')" class="btn btn-outline btn-small" style="color: var(--color-error);">
                     <i class="ph ph-trash"></i>
                 </button>
             </div>

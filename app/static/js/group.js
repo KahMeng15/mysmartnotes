@@ -72,7 +72,7 @@ function renderSubjects(subjects) {
     }
 
     container.innerHTML = subjects.map(s => `
-        <div class="subject-card" onclick="openSubject(${s.id})" style="border-left: 4px solid ${s.color || '#593C8F'};">
+        <div class="subject-card" onclick="openSubject('${s.id}')" style="border-left: 4px solid ${s.color || '#593C8F'};">
             <div class="subject-title">${s.name}</div>
             <p style="color: var(--color-gray); font-size: 0.9rem; margin-bottom: 1rem; flex: 1;">
                 ${s.description || 'No description'}

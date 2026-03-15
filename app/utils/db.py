@@ -4,6 +4,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from app.config import get_settings
 from app.models.db import Base
 import logging
+import random
+import string
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,24 @@ engine = create_engine(
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def generate_random_id(db: Session, model, length: int = 8) -> str:
+    """Generate a unique case-sensitive alphanumeric ID.
+    
+    Args:
+        db: Database session
+        model: SQLAlchemy model class to check for ID uniqueness
+        length: Length of the ID (default 8)
+    
+    Returns:
+        A unique random alphanumeric ID (case-sensitive)
+    """
+    while True:
+        new_id = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+        if not db.query(model).filter(model.id == new_id).first():
+            return new_id
+        length += 1
 
 
 def get_db() -> Session:

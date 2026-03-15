@@ -159,7 +159,7 @@ async def smart_extract_download(
 
 @router.post("/lectures/{lecture_id}/reprocess-smart")
 async def reprocess_smart(
-    lecture_id: int,
+    lecture_id: str,
     use_ai: bool = False,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

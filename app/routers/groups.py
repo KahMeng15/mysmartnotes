@@ -5,7 +5,7 @@ from typing import List
 from app.models.db import User, SubjectGroup
 from app.schemas.schemas import SubjectGroupCreate, SubjectGroupUpdate, SubjectGroupResponse
 from app.utils.auth import get_current_user
-from app.utils.db import get_db
+from app.utils.db import get_db, generate_random_id
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
@@ -26,6 +26,7 @@ async def create_group(
 ):
     """Create a new subject group"""
     db_group = SubjectGroup(
+        id=generate_random_id(db, SubjectGroup),
         name=group.name,
         user_id=current_user.id
     )
@@ -36,7 +37,7 @@ async def create_group(
 
 @router.put("/{group_id}", response_model=SubjectGroupResponse)
 async def update_group(
-    group_id: int,
+    group_id: str,
     group: SubjectGroupUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -62,7 +63,7 @@ async def update_group(
 
 @router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_group(
-    group_id: int,
+    group_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

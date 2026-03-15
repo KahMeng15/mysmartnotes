@@ -13,7 +13,7 @@ router = APIRouter(prefix="/study-sessions", tags=["study-sessions"])
 
 
 class StudySessionCreate(BaseModel):
-    lecture_id: Optional[int] = None
+    lecture_id: Optional[str] = None
     session_type: str  # "quiz", "flashcard", "reading", "pomodoro_study", "pomodoro_break", "stopwatch"
     duration_minutes: int
     questions_attempted: int = 0
@@ -26,7 +26,7 @@ class StudySessionCreate(BaseModel):
 
 class StudySessionResponse(BaseModel):
     id: int
-    lecture_id: Optional[int] = None
+    lecture_id: Optional[str] = None
     session_type: str
     duration_minutes: int
     questions_attempted: int
@@ -142,7 +142,7 @@ async def get_study_calendar(
 
 @router.get("", response_model=List[StudySessionResponse])
 async def get_study_sessions(
-    lecture_id: int = None,
+    lecture_id: str = None,
     session_type: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

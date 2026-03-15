@@ -70,7 +70,7 @@ class SubjectGroupUpdate(BaseModel):
     name: Optional[str] = None
 
 class SubjectGroup(SubjectGroupBase):
-    id: int
+    id: str
     user_id: int
     created_at: datetime
     updated_at: datetime
@@ -84,7 +84,7 @@ class SubjectBase(BaseModel):
     name: str
     description: Optional[str] = None
     color: str = "#3b82f6"
-    group_id: Optional[int] = None
+    group_id: Optional[str] = None
 
 
 class SubjectCreate(SubjectBase):
@@ -95,11 +95,11 @@ class SubjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
-    group_id: Optional[int] = None
+    group_id: Optional[str] = None
 
 
 class Subject(SubjectBase):
-    id: int
+    id: str
     user_id: int
     created_at: datetime
     
@@ -119,7 +119,7 @@ class SubjectGroupResponse(SubjectGroup):
 # ========== Lecture Schemas ==========
 class LectureBase(BaseModel):
     title: str
-    subject_id: int
+    subject_id: str
 
 
 class LectureCreate(LectureBase):
@@ -127,7 +127,7 @@ class LectureCreate(LectureBase):
 
 
 class Lecture(LectureBase):
-    id: int
+    id: str
     file_path: str
     file_type: str
     file_size: int
@@ -159,7 +159,7 @@ class FlashcardBase(BaseModel):
 
 
 class FlashcardCreate(FlashcardBase):
-    lecture_id: int
+    lecture_id: str
 
 
 class FlashcardUpdate(BaseModel):
@@ -170,7 +170,7 @@ class FlashcardUpdate(BaseModel):
 
 class Flashcard(FlashcardBase):
     id: int
-    lecture_id: int
+    lecture_id: str
     times_reviewed: int
     times_correct: int
     created_at: datetime
@@ -187,7 +187,7 @@ class DocumentBase(BaseModel):
 
 class GeneratedDocument(DocumentBase):
     id: int
-    lecture_id: int
+    lecture_id: str
     file_path: str
     created_at: datetime
     
@@ -197,7 +197,7 @@ class GeneratedDocument(DocumentBase):
 
 # ========== Study Session Schemas ==========
 class StudySessionCreate(BaseModel):
-    lecture_id: Optional[int] = None
+    lecture_id: Optional[str] = None
     session_type: str
     duration_minutes: int
     questions_attempted: int = 0
@@ -233,7 +233,7 @@ class TaskResponse(BaseModel):
 
 # ========== Chat Schemas ==========
 class ChatMessage(BaseModel):
-    lecture_id: int
+    lecture_id: str
     message: str
 
 
@@ -251,7 +251,7 @@ class NoteSnapshotCreate(BaseModel):
 
 class NoteSnapshotResponse(BaseModel):
     id: int
-    lecture_id: int
+    lecture_id: str
     user_id: int
     name: str
     content: str

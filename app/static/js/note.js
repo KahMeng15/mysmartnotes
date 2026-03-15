@@ -1860,7 +1860,7 @@ async function sendNoteChat() {
                 ai_mode: chatAiMode,
                 output_format: chatOutputFormat,
                 conversation_id: chatConversationId,
-                lecture_id: parseInt(lectureId),
+                lecture_id: lectureId,
                 auto_detect_conversation: true,
                 reply_to_message_id: replyInfo ? replyInfo.id : null
             })

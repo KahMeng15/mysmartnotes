@@ -7,24 +7,12 @@ from typing import List, Optional
 
 from app.models.db import User, ExportTemplate
 from app.utils.auth import get_current_user
-from app.utils.db import get_db
+from app.utils.db import get_db, generate_random_id
 from app.schemas.schemas import TemplateCreate, TemplateDuplicate, TemplateUpdate
-
-logger = logging.getLogger(__name__)
-import random
-import string
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/templates", tags=["templates"])
-
-def generate_template_id(db: Session, length=8):
-    """Generate a unique alphanumeric ID for templates."""
-    while True:
-        new_id = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
-        if not db.query(ExportTemplate).filter(ExportTemplate.id == new_id).first():
-            return new_id
-        length += 1
 
 # ─── Default template configs ──────────────────────────────────
 
@@ -227,7 +215,7 @@ async def create_template(
     config = template_data.config or SEEDED_TEMPLATES[0]["config"]  # Default to Standard Academic config
     
     tmpl = ExportTemplate(
-        id=generate_template_id(db),
+        id=generate_random_id(db, ExportTemplate),
         user_id=current_user.id,
         name=name,
         description=template_data.description or "",
@@ -334,7 +322,7 @@ async def duplicate_template(
     custom_name = (duplicate_data.name if duplicate_data else None) or f"{source.name} copy"
     
     new_tmpl = ExportTemplate(
-        id=generate_template_id(db),
+        id=generate_random_id(db, ExportTemplate),
         user_id=current_user.id,
         name=custom_name,
         description=source.description,

@@ -224,7 +224,7 @@
             
             // Generate Subject Cards
             const subjectsHtml = subjects.length > 0 ? subjects.map(s => `
-                <div class="subject-card" onclick="event.stopPropagation(); openSubject(${s.id})" style="border-left: 4px solid ${s.color || '#593C8F'};">
+                <div class="subject-card" onclick="event.stopPropagation(); openSubject('${s.id}')" style="border-left: 4px solid ${s.color || '#593C8F'};">
                     <div class="subject-title">${s.name}</div>
                     <p style="color: var(--color-gray); font-size: 0.9rem; margin-bottom: 1rem; flex: 1;">
                         ${s.description || 'No description'}
@@ -244,16 +244,16 @@
             if (!isUngrouped) {
                 actionsHtml = `
                     <div class="group-actions">
-                        <button onclick="event.stopPropagation(); openSubjectModal(${group.id})" class="btn btn-outline btn-small">
+                        <button onclick="event.stopPropagation(); openSubjectModal('${group.id}')" class="btn btn-outline btn-small">
                             <i class="ph ph-plus"></i> Subject
                         </button>
                          <button onclick="event.stopPropagation(); location.href='upload.html?group_id=${group.id}'" class="btn btn-outline btn-small">
                             <i class="ph ph-upload-simple"></i> Upload
                         </button>
-                        <button onclick="event.stopPropagation(); openEditGroupModal(${group.id}, '${group.name.replace(/'/g, "\\'")}')" class="btn btn-outline btn-small">
+                        <button onclick="event.stopPropagation(); openEditGroupModal('${group.id}', '${group.name.replace(/'/g, "\\'")}')" class="btn btn-outline btn-small">
                             <i class="ph ph-pencil-simple"></i>
                         </button>
-                        <button onclick="event.stopPropagation(); deleteGroup(${group.id})" class="btn btn-outline btn-small">
+                        <button onclick="event.stopPropagation(); deleteGroup('${group.id}')" class="btn btn-outline btn-small">
                             <i class="ph ph-trash"></i>
                         </button>
                     </div>
@@ -271,13 +271,13 @@
 
             // Build minimize button for non-ungrouped groups
             const minimizeButtonHtml = !isUngrouped ? `
-                <button onclick="event.stopPropagation(); toggleGroupMinimize(${group.id})" class="btn btn-outline btn-small btn-minimize">
+                <button onclick="event.stopPropagation(); toggleGroupMinimize('${group.id}')" class="btn btn-outline btn-small btn-minimize">
                     ${isMinimized ? '<i class="ph ph-caret-right"></i>' : '<i class="ph ph-caret-down"></i>'}
                 </button>
             ` : '';
 
             return `
-                <div class="group-section" data-group-id="${group.id}" ${!isUngrouped ? `onclick="window.location.href='group.html?id=${group.id}'"` : ''} style="${!isUngrouped ? 'cursor: pointer;' : ''}">
+                <div class="group-section" data-group-id="${group.id}" ${!isUngrouped ? `onclick="window.location.href='group.html?id=${encodeURIComponent(group.id)}'"` : ''} style="${!isUngrouped ? 'cursor: pointer;' : ''}">
                     <div class="group-header ${isMinimized ? 'minimized' : ''}">
                         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
                             ${minimizeButtonHtml}
@@ -458,7 +458,7 @@
                         name,
                         description: desc,
                         color,
-                        group_id: groupId ? parseInt(groupId) : null
+                        group_id: groupId || null
                     })
                 });
                 if (res.ok) {
@@ -509,14 +509,6 @@
         }
 
         function openSubject(id) {
-            window.location.href = `note.html?id=${id}`; // Note: user renamed lecture-view to note.html, assumption is subject links to note.html? Wait, subject links to subject.html usually.
-            // Let's check original code. It was `window.location.href = 'subject.html?id=${id}'`.
-            // Wait, I should double check where 'subject.html' links to.
-            // In the file view earlier: `window.location.href = 'subject.html?id=${id}'` (line 460)
-            // But I see `note.html` referenced in tasks.
-            // Task says: "Rename lecture-view.html to note.html".
-            // Subject page is likely `subject.html`.
-            // I will keep it as `subject.html` unless I see evidence otherwise.
             window.location.href = `subject.html?id=${id}`;
         }
 

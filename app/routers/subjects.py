@@ -6,7 +6,7 @@ from typing import List
 from app.models.db import User, Subject
 from app.schemas.schemas import SubjectCreate, SubjectUpdate, SubjectResponse
 from app.utils.auth import get_current_user
-from app.utils.db import get_db
+from app.utils.db import get_db, generate_random_id
 
 router = APIRouter(prefix="/subjects", tags=["subjects"])
 
@@ -41,6 +41,7 @@ async def create_subject(
         )
     
     db_subject = Subject(
+        id=generate_random_id(db, Subject),
         name=subject.name,
         description=subject.description,
         color=subject.color,
@@ -55,7 +56,7 @@ async def create_subject(
 
 @router.put("/{subject_id}", response_model=SubjectResponse)
 async def update_subject(
-    subject_id: int,
+    subject_id: str,
     subject: SubjectUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -96,7 +97,7 @@ async def update_subject(
 
 @router.delete("/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_subject(
-    subject_id: int,
+    subject_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

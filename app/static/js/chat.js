@@ -404,9 +404,9 @@ async function sendMessage() {
         auto_detect_conversation: true,  // Enable auto-detection
         reply_to_message_id: replyInfo ? replyInfo.id : null  // Send ID to backend
     };
-    if (currentScope.type === 'note') payload.lecture_id = parseInt(currentScope.id);
-    else if (currentScope.type === 'subject') payload.subject_id = parseInt(currentScope.id);
-    else if (currentScope.type === 'group') payload.group_id = parseInt(currentScope.id);
+    if (currentScope.type === 'note') payload.lecture_id = currentScope.id;
+    else if (currentScope.type === 'subject') payload.subject_id = currentScope.id;
+    else if (currentScope.type === 'group') payload.group_id = currentScope.id;
 
     try {
         const resp = await fetch(`${API_URL}/chat/ask`, {
@@ -584,7 +584,7 @@ function displayMessages() {
                     const lectureId = src.lecture_id || currentScope.id;
                     const preview = src.text_preview || 'View reference';
                     return `
-                        <div class="source-item" onclick="openSourceReference(${lectureId}, ${src.position || 0})"
+                        <div class="source-item" onclick="openSourceReference('${lectureId}', ${src.position || 0})"
                                 style="cursor:pointer;padding:6px 10px;margin:4px 0;background:white;border:1px solid #e0e0e0;border-radius:4px;transition:all 0.2s;font-size:11px;">
                             <div style="font-weight:600;color:#1976d2;margin-bottom:2px;">
                                 <i class="ph ph-file-text"></i> [${citationNum}] Reference${score}

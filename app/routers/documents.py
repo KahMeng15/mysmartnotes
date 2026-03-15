@@ -21,36 +21,36 @@ class QuizQuestion(BaseModel):
 
 
 class QuizResponse(BaseModel):
-    lecture_id: int
+    lecture_id: str
     questions: List[QuizQuestion]
     total_questions: int
 
 
 class FlashcardRequest(BaseModel):
-    lecture_id: int
+    lecture_id: str
     quantity: int = 10
 
 
 class FlashcardGeneratedResponse(BaseModel):
-    lecture_id: int
+    lecture_id: str
     count: int
     message: str
 
 
 class CheatsheetRequest(BaseModel):
-    lecture_id: int
+    lecture_id: str
     format: str = "markdown"  # markdown or html
 
 
 class CheatsheetResponse(BaseModel):
-    lecture_id: int
+    lecture_id: str
     title: str
     content: str
 
 
 class DocumentResponse(BaseModel):
     id: int
-    lecture_id: int
+    lecture_id: str
     title: str
     document_type: str
     file_path: str
@@ -59,7 +59,7 @@ class DocumentResponse(BaseModel):
 
 @router.post("/quiz", response_model=QuizResponse)
 async def generate_quiz(
-    lecture_id: int,
+    lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -230,7 +230,7 @@ async def generate_cheatsheet(
 
 @router.get("", response_model=List[DocumentResponse])
 async def list_documents(
-    lecture_id: int = None,
+    lecture_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

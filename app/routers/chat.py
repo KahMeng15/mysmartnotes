@@ -23,15 +23,15 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    lecture_id: Optional[int] = None
-    subject_id: Optional[int] = None
-    group_id: Optional[int] = None
+    lecture_id: Optional[str] = None
+    subject_id: Optional[str] = None
+    group_id: Optional[str] = None
     message: str
     ai_mode: str = "elaborate"
     output_format: str = "sentence"
     conversation_id: Optional[str] = None
     auto_detect_conversation: bool = True  # Auto-detect if this is a conversation continuation
-    reply_to_message_id: Optional[int] = None  # Reply to a specific message in conversation
+    reply_to_message_id: Optional[str] = None  # Reply to a specific message in conversation
 
 
 class ChatMessageResponse(BaseModel):
@@ -41,15 +41,15 @@ class ChatMessageResponse(BaseModel):
     sources: list = []
     detailed_sources: list = []
     created_at: str
-    lecture_id: Optional[int] = None
-    subject_id: Optional[int] = None
-    group_id: Optional[int] = None
+    lecture_id: Optional[str] = None
+    subject_id: Optional[str] = None
+    group_id: Optional[str] = None
     ai_mode: Optional[str] = None
     output_format: Optional[str] = None
     ai_model: Optional[str] = None
     conversation_id: Optional[str] = None
     conversation_title: Optional[str] = None
-    reply_to_message_id: Optional[int] = None
+    reply_to_message_id: Optional[str] = None
     timings: Optional[dict] = None
 
 
@@ -58,9 +58,9 @@ class ConversationSummary(BaseModel):
     title: str
     message_count: int
     last_message_at: str
-    lecture_id: Optional[int] = None
-    subject_id: Optional[int] = None
-    group_id: Optional[int] = None
+    lecture_id: Optional[str] = None
+    subject_id: Optional[str] = None
+    group_id: Optional[str] = None
     scope_type: Optional[str] = None
     is_pinned: bool = False
     is_favourite: bool = False
@@ -77,7 +77,7 @@ class ChatResponse(BaseModel):
     detailed_sources: Optional[list] = []
     conversation_id: Optional[str] = None
     conversation_title: Optional[str] = None
-    reply_to_message_id: Optional[int] = None
+    reply_to_message_id: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

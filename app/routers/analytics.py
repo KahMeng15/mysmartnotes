@@ -14,7 +14,7 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
 class ProgressStat(BaseModel):
-    lecture_id: int
+    lecture_id: str
     lecture_title: str
     completion_percentage: float
     flashcards_studied: int
@@ -22,7 +22,7 @@ class ProgressStat(BaseModel):
 
 
 class TimeSpentStat(BaseModel):
-    lecture_id: int
+    lecture_id: str
     lecture_title: str
     total_minutes: float
     sessions_count: int

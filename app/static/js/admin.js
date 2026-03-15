@@ -349,7 +349,7 @@ async function loadIpFilters() {
                 <td>${f.filter_type}</td>
                 <td>${f.rule_type}</td>
                 <td>${f.value}</td>
-                <td><button class="action-btn" style="color:red" onclick="deleteIpFilter(${f.id})">Remove</button></td>
+                <td><button class="action-btn" style="color:red" onclick="deleteIpFilter('${f.id}')">Remove</button></td>
             `;
             tbody.appendChild(tr);
         });
