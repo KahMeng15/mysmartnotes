@@ -185,7 +185,16 @@ async function handleEditSubject(e) {
         if (res.ok) {
             closeModal('editSubjectModal');
             showSuccessModal('Subject Updated', 'Your subject has been updated successfully!');
-            loadSubjectDetails(); // Reload details
+            // Set up done button to reload details
+            const successModal = document.getElementById('successModal');
+            const handleDone = () => {
+                closeSuccessModal();
+                loadSubjectDetails();
+            };
+            const doneBtn = successModal.querySelector('.btn-save');
+            if (doneBtn) {
+                doneBtn.onclick = handleDone;
+            }
         } else {
             alert('Failed to update subject');
         }
