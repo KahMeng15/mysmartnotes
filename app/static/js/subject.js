@@ -184,6 +184,7 @@ async function handleEditSubject(e) {
 
         if (res.ok) {
             closeModal('editSubjectModal');
+            showSuccessModal('Subject Updated', 'Your subject has been updated successfully!');
             loadSubjectDetails(); // Reload details
         } else {
             alert('Failed to update subject');
@@ -194,36 +195,57 @@ async function handleEditSubject(e) {
 }
 
 async function deleteSubject() {
-    if (!confirm('Are you sure you want to delete this subject? All lectures within it will also be deleted.')) return;
-    try {
-        const response = await fetch(`${API_URL}/subjects/${subjectId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-            alert('Subject deleted successfully');
-            window.location.href = 'mynotes.html'; // Update redirect to mynotes.html
-        } else {
-            alert('Failed to delete subject');
+    showConfirmModal('Are you sure you want to delete this subject? All lectures within it will also be deleted.', async function() {
+        try {
+            const response = await fetch(`${API_URL}/subjects/${subjectId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                showSuccessModal('Subject Deleted', 'The subject has been deleted successfully!');
+                // Redirect after modal is closed
+                const successModal = document.getElementById('successModal');
+                const handleDone = () => {
+                    window.location.href = 'mynotes.html';
+                };
+                const doneBtn = successModal.querySelector('.btn-save');
+                if (doneBtn) {
+                    doneBtn.onclick = handleDone;
+                }
+            } else {
+                alert('Failed to delete subject');
+            }
+        } catch (error) {
+            alert('Error deleting subject');
         }
-    } catch (error) {
-        alert('Error deleting subject');
-    }
+    });
 }
 
 async function deleteLecture(id) {
-    if (!confirm('Delete this lecture?')) return;
-    try {
-        const response = await fetch(`${API_URL}/lectures/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-            loadLectures();
+    showConfirmModal('Delete this lecture?', async function() {
+        try {
+            const response = await fetch(`${API_URL}/lectures/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (response.ok) {
+                showSuccessModal('Lecture Deleted', 'The lecture has been deleted successfully!');
+                // Reload after modal is closed
+                const successModal = document.getElementById('successModal');
+                const handleDone = () => {
+                    loadLectures();
+                };
+                const doneBtn = successModal.querySelector('.btn-save');
+                if (doneBtn) {
+                    doneBtn.onclick = handleDone;
+                }
+            } else {
+                alert('Failed to delete lecture');
+            }
+        } catch (error) {
+            alert('Error deleting lecture');
         }
-    } catch (error) {
-        alert('Error deleting lecture');
-    }
+    });
 }
 
 function logout() {

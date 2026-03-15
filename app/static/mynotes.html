@@ -253,7 +253,7 @@
                         <button onclick="event.stopPropagation(); openEditGroupModal(${group.id}, '${group.name.replace(/'/g, "\\'")}')" class="btn btn-outline btn-small">
                             <i class="ph ph-pencil-simple"></i>
                         </button>
-                        <button onclick="event.stopPropagation(); deleteGroup(${group.id})" class="btn btn-outline btn-small"">
+                        <button onclick="event.stopPropagation(); deleteGroup(${group.id})" class="btn btn-outline btn-small">
                             <i class="ph ph-trash"></i>
                         </button>
                     </div>
@@ -404,7 +404,11 @@
                 });
                 if (res.ok) {
                     closeModal('groupModal');
+                    document.getElementById('groupNameInput').value = '';
+                    showSuccessModal('Group Created', 'Your new group has been created successfully!');
                     fetchData(); // Reload
+                } else {
+                    alert('Failed to create group');
                 }
             } catch (err) {
                 alert('Failed to create group');
@@ -426,6 +430,7 @@
                 });
                 if (res.ok) {
                     closeModal('editGroupModal');
+                    showSuccessModal('Group Updated', 'Your group has been updated successfully!');
                     fetchData(); // Reload
                 } else {
                     alert('Failed to update group');
@@ -458,7 +463,12 @@
                 });
                 if (res.ok) {
                     closeModal('subjectModal');
+                    document.getElementById('subjectNameInput').value = '';
+                    document.getElementById('subjectDescInput').value = '';
+                    showSuccessModal('Subject Created', 'Your new subject has been created successfully!');
                     fetchData();
+                } else {
+                    alert('Failed to create subject');
                 }
             } catch (err) {
                 alert('Failed to create subject');
@@ -466,15 +476,35 @@
         }
 
         async function deleteGroup(id) {
-            if (!confirm("Delete this group? Subjects in it will be deleted.")) return;
+            showConfirmModal('Delete this group? Subjects in it will be deleted.', () => performDeleteGroup(id));
+        }
+
+        async function performDeleteGroup(id) {
             try {
                 const res = await fetch(`${API_URL}/groups/${id}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (res.ok) fetchData();
+                
+                if (res.ok) {
+                    showSuccessModal('Group Deleted', 'The group has been deleted successfully!');
+                    // Wait for modal to be rendered, then override the button
+                    setTimeout(() => {
+                        const successModal = document.getElementById('successModal');
+                        const doneBtn = successModal.querySelector('.btn-save');
+                        if (doneBtn) {
+                            doneBtn.onclick = () => {
+                                closeSuccessModal();
+                                fetchData();
+                            };
+                        }
+                    }, 100);
+                } else {
+                    const errorText = await res.text();
+                    alert('Failed to delete group: ' + res.status);
+                }
             } catch (err) {
-                alert('Failed to delete group');
+                alert('Failed to delete group: ' + err.message);
             }
         }
 

@@ -145,7 +145,7 @@ async function handleEditGroup(e) {
             closeModal('editGroupModal');
             currentGroup.name = name;
             document.getElementById('groupTitle').textContent = name;
-            // Optional: trim query params or reload to reflect? Title update is enough.
+            showSuccessModal('Group Updated', 'Your group has been updated successfully!');
         } else {
             alert('Failed to update group');
         }
@@ -155,18 +155,30 @@ async function handleEditGroup(e) {
 }
 
 async function deleteGroup() {
-    if (!confirm("Delete this group? Subjects in it will be deleted or ungrouped.")) return;
-    try {
-        const res = await fetch(`${API_URL}/groups/${groupId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-            window.location.href = 'mynotes.html';
+    showConfirmModal('Delete this group? Subjects in it will be deleted or ungrouped.', async function() {
+        try {
+            const res = await fetch(`${API_URL}/groups/${groupId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                showSuccessModal('Group Deleted', 'The group has been deleted successfully!');
+                // Redirect after modal is closed
+                const successModal = document.getElementById('successModal');
+                const handleDone = () => {
+                    window.location.href = 'mynotes.html';
+                };
+                const doneBtn = successModal.querySelector('.btn-save');
+                if (doneBtn) {
+                    doneBtn.onclick = handleDone;
+                }
+            } else {
+                alert('Failed to delete group');
+            }
+        } catch (err) {
+            alert('Failed to delete group');
         }
-    } catch (err) {
-        alert('Failed to delete group');
-    }
+    });
 }
 
 function logout() {

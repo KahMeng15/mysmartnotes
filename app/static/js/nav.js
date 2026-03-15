@@ -200,6 +200,90 @@ window.cancelLogout = function () {
     }
 };
 
+window.showSuccessModal = function (title, message) {
+    // Create success modal if it doesn't exist
+    let successModal = document.getElementById('successModal');
+    if (!successModal) {
+        successModal = document.createElement('div');
+        successModal.id = 'successModal';
+        successModal.className = 'modal';
+        document.body.appendChild(successModal);
+    }
+
+    // Update content
+    successModal.innerHTML = `
+        <div class="modal-content text-center" style="min-height: auto;">
+            <div class="modal-icon success">
+                <i class="ph ph-check-circle"></i>
+            </div>
+            <h3>${title || 'Success!'}</h3>
+            <p style="color: var(--color-gray); margin-bottom: var(--spacing-lg);">${message || 'Operation completed successfully.'}</p>
+            <div class="modal-buttons">
+                <button type="button" class="btn-save" onclick="closeSuccessModal()">Done</button>
+            </div>
+        </div>
+    `;
+
+    // Show the modal
+    successModal.classList.add('active');
+};
+
+window.closeSuccessModal = function () {
+    const successModal = document.getElementById('successModal');
+    if (successModal) {
+        successModal.classList.remove('active');
+    }
+};
+
+window.showConfirmModal = function (message, onConfirm) {
+    // Create confirm modal if it doesn't exist
+    let confirmModal = document.getElementById('confirmationModal');
+    if (!confirmModal) {
+        confirmModal = document.createElement('div');
+        confirmModal.id = 'confirmationModal';
+        confirmModal.className = 'modal';
+        document.body.appendChild(confirmModal);
+    }
+
+    // Update content
+    confirmModal.innerHTML = `
+        <div class="modal-content" style="min-height: auto;">
+            <h3>Confirm Action</h3>
+            <p style="color: var(--color-gray); margin-bottom: var(--spacing-lg);">${message}</p>
+            <div class="modal-buttons">
+                <button type="button" class="btn-save" id="confirmDeleteBtn" style="background: var(--color-error);" onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='var(--color-error)'">Delete</button>
+                <button type="button" class="btn-cancel" onclick="closeConfirmModal()">Cancel</button>
+            </div>
+        </div>
+    `;
+
+    // Store the callback and attach to button
+    window._confirmCallback = onConfirm;
+    const deleteBtn = confirmModal.querySelector('#confirmDeleteBtn');
+    if (deleteBtn) {
+        deleteBtn.onclick = function() {
+            if (window._confirmCallback) {
+                const callback = window._confirmCallback; // Save reference BEFORE closing
+                closeConfirmModal();
+                callback(); // Execute AFTER closing
+            } else {
+                closeConfirmModal();
+            }
+        };
+    }
+
+    // Show the modal
+    confirmModal.classList.add('active');
+};
+
+window.closeConfirmModal = function () {
+    const confirmModal = document.getElementById('confirmationModal');
+    if (confirmModal) {
+        confirmModal.classList.remove('active');
+    }
+    window._confirmCallback = null;
+};
+
 // Pomodoro Sidebar Sync & Persistence
 const navSyncChannel = new BroadcastChannel('pomodoro_sync');
 let sidePomoInterval = null;

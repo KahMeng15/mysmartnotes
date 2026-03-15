@@ -1418,6 +1418,22 @@ textarea {
   color: var(--color-gray);
 }
 
+.modal-content.text-center {
+  text-align: center;
+}
+
+.modal-icon {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-icon.success {
+  color: var(--color-success);
+}
+
 /* ===== UTILITIES ===== */
 
 .mt-1 {

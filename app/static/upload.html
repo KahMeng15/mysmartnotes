@@ -95,14 +95,6 @@
                         </div>
                     </div>
 
-                    <!-- Progress -->
-                    <div id="progressContainer" style="display: none;">
-                        <p style="font-size: var(--font-size-sm); color: var(--color-gray);">Uploading...</p>
-                        <div class="progress-bar">
-                            <div id="progressFill" class="progress-fill" style="width: 0%"></div>
-                        </div>
-                    </div>
-
                     <!-- Submit -->
                     <div style="margin-top: var(--spacing-lg); display: flex; gap: var(--spacing-md);">
                         <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Upload</button>
@@ -154,6 +146,18 @@
                     <button type="button" onclick="closeCreateSubjectModal()" class="btn-cancel">Cancel</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Upload Progress Modal -->
+    <div id="progressModal" class="modal">
+        <div class="modal-content" style="min-height: auto;">
+            <h3>Uploading File...</h3>
+            <p style="color: var(--color-gray); margin-bottom: var(--spacing-lg);">Please wait while your file is being processed.</p>
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <p style="text-align: center; color: var(--color-gray); font-size: var(--font-size-sm); margin-top: var(--spacing-md);"><span id="progressPercent">0</span>%</p>
         </div>
     </div>
 
@@ -291,7 +295,7 @@
                         document.getElementById('groupSelect').value = newGroup.id;
                         filterSubjects();
                     }
-                    alert('Group created successfully!');
+                    showSuccessModal('Group Created', 'Your new group has been created successfully!');
                 } else {
                     alert('Failed to create group');
                 }
@@ -348,7 +352,7 @@
                         filterSubjects();
                         document.getElementById('subjectSelect').value = newSubj.id;
                     }
-                    alert('Subject created successfully!');
+                    showSuccessModal('Subject Created', 'Your new subject has been created successfully!');
                 } else {
                     const error = await response.json();
                     alert('Error: ' + (error.detail || 'Failed to create subject'));
@@ -395,12 +399,12 @@
             fileDisplay.style.display = 'block';
 
             fileDisplay.innerHTML = `
-                <div class="file-item" style="border: none; padding: 0;">
+                <div class="file-item">
                     <div style="display: flex; align-items: center; gap: var(--spacing-md);">
                         <div style="font-size: 2rem; color: var(--color-primary);"><i class="ph ph-file-text"></i></div>
                         <div>
                             <div style="font-weight: 600; margin-bottom: 0.25rem;">${file.name}</div>
-                            <div style="font-size: 0.9rem; color: var(--color-gray);">${sizeMB} MB</div>
+                            <div style="font-size: 0.9rem; color: var(--color-gray); text-align: left;">${sizeMB} MB</div>
                         </div>
                     </div>
                     <button type="button" onclick="event.stopPropagation(); clearFile()" class="btn btn-outline btn-small">Remove</button>
@@ -437,18 +441,41 @@
             formData.append('subject_id', subjectId);
 
             try {
-                document.getElementById('progressContainer').style.display = 'block';
+                // Show progress modal
+                document.getElementById('progressModal').classList.add('active');
+                document.getElementById('progressFill').style.width = '0%';
+                document.getElementById('progressPercent').textContent = '0';
+
                 const response = await fetch('/lectures/upload', {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
 
+                // Simulate progress to 100% when response received
+                document.getElementById('progressFill').style.width = '100%';
+                document.getElementById('progressPercent').textContent = '100';
+
                 if (response.ok) {
                     const result = await response.json();
-                    alert('Lecture uploaded and processed successfully!');
-                    window.location.href = `/note/${result.id}`;
+                    
+                    // Close progress modal and show success
+                    document.getElementById('progressModal').classList.remove('active');
+                    showSuccessModal('Upload Complete', 'Your lecture has been uploaded and processed successfully!');
+                    
+                    // Redirect after modal is closed
+                    const successModal = document.getElementById('successModal');
+                    const handleDone = () => {
+                        window.location.href = `/note/${result.id}`;
+                    };
+                    
+                    // Replace the Done button's onclick with redirect
+                    const doneBtn = successModal.querySelector('.btn-save');
+                    if (doneBtn) {
+                        doneBtn.onclick = handleDone;
+                    }
                 } else {
+                    document.getElementById('progressModal').classList.remove('active');
                     try {
                         const error = await response.json();
                         alert('Upload failed: ' + (error.detail || 'Unknown error'));
@@ -459,9 +486,8 @@
                     }
                 }
             } catch (error) {
+                document.getElementById('progressModal').classList.remove('active');
                 alert('Error: ' + error.message);
-            } finally {
-                document.getElementById('progressContainer').style.display = 'none';
             }
         }
 
