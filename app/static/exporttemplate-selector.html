@@ -111,7 +111,26 @@
             if (!token) window.location.href = 'login.html';
             loadTemplates();
             // Attach global click listener to close menus
-            document.addEventListener('click', closeAllTemplateMenus);
+            document.addEventListener('click', (e) => closeAllTemplateMenus(e));
+            // Attach event delegation for menu items
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('.duplicate-btn')) {
+                    e.stopPropagation();
+                    const btn = e.target.closest('.duplicate-btn');
+                    const templateId = btn.dataset.templateId;
+                    openDuplicateModal(templateId);
+                } else if (e.target.closest('.rename-btn')) {
+                    e.stopPropagation();
+                    const btn = e.target.closest('.rename-btn');
+                    const templateId = btn.dataset.templateId;
+                    openRenameModal(templateId);
+                } else if (e.target.closest('.delete-btn')) {
+                    e.stopPropagation();
+                    const btn = e.target.closest('.delete-btn');
+                    const templateId = btn.dataset.templateId;
+                    openDeleteModal(templateId);
+                }
+            });
         });
 
         // ─── API ─────────────────────────────────────────────────
@@ -190,7 +209,11 @@
             }
         }
 
-        function closeAllTemplateMenus() {
+        function closeAllTemplateMenus(event) {
+            // Don't close if clicking on a menu item or button
+            if (event && event.target.closest('.duplicate-btn, .rename-btn, .delete-btn, .template-menu-dropdown')) {
+                return;
+            }
             document.querySelectorAll('.template-menu-dropdown.active').forEach(menu => {
                 menu.classList.remove('active');
             });
@@ -255,7 +278,10 @@
         }
 
         async function confirmDuplicate() {
-            if (!pendingActionTemplateId) return;
+            const templateId = pendingActionTemplateId;  // Save ID before modal closes
+            if (!templateId) {
+                return;
+            }
             const newName = document.getElementById('duplicateTemplateInput').value.trim();
             if (!newName) {
                 alert('Template name cannot be empty');
@@ -264,7 +290,7 @@
             closeDuplicateModal();
             
             try {
-                const res = await fetch(`/templates/${pendingActionTemplateId}/duplicate`, {
+                const res = await fetch(`/templates/${templateId}/duplicate`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -310,14 +336,17 @@
         }
 
         async function confirmRename() {
-            if (!pendingActionTemplateId) return;
+            const templateId = pendingActionTemplateId;  // Save ID before modal closes
+            if (!templateId) {
+                return;
+            }
             const newName = document.getElementById('renameInput').value.trim();
             if (!newName) {
                 alert('Template name cannot be empty');
                 return;
             }
 
-            const tmpl = templates.find(t => t.id === pendingActionTemplateId);
+            const tmpl = templates.find(t => t.id === templateId);
             if (newName === tmpl.name) {
                 closeRenameModal();
                 return;
@@ -326,7 +355,7 @@
             closeRenameModal();
 
             try {
-                const res = await fetch(`/templates/${pendingActionTemplateId}`, {
+                const res = await fetch(`/templates/${templateId}`, {
                     method: 'PUT',
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -340,8 +369,8 @@
                     const err = await res.json();
                     alert(err.detail || 'Failed to rename');
                 }
-            } catch (e) { 
-                alert('Error renaming template: ' + e.message); 
+            } catch (e) {
+                alert('Error renaming template: ' + e.message);
             }
         }
 
@@ -361,11 +390,14 @@
         }
 
         async function confirmDelete() {
-            if (!pendingActionTemplateId) return;
+            const templateId = pendingActionTemplateId;  // Save ID before modal closes
+            if (!templateId) {
+                return;
+            }
             closeDeleteModal();
 
             try {
-                const res = await fetch(`/templates/${pendingActionTemplateId}`, {
+                const res = await fetch(`/templates/${templateId}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -374,8 +406,7 @@
                 } else {
                     alert('Failed to delete template');
                 }
-            } catch (e) { 
-                alert('Error deleting template: ' + e.message); 
+            } catch (e) {
             }
         }
 
@@ -415,15 +446,15 @@
                         <button class="template-menu-btn" onclick="event.stopPropagation(); toggleTemplateMenu(event, '${t.id}')">
                             <i class="ph ph-dots-three-vertical"></i>
                         </button>
-                        <div class="template-menu-dropdown" data-template-id="${t.id}" onclick="event.stopPropagation()">
-                            <button class="template-menu-item" onclick="openDuplicateModal('${t.id}')">
+                        <div class="template-menu-dropdown" data-template-id="${t.id}">
+                            <button class="template-menu-item duplicate-btn" data-template-id="${t.id}">
                                 <i class="ph ph-copy"></i> Duplicate
                             </button>
                             ${!t.is_system ? `
-                                <button class="template-menu-item" onclick="openRenameModal('${t.id}')">
+                                <button class="template-menu-item rename-btn" data-template-id="${t.id}">
                                     <i class="ph ph-pencil"></i> Rename
                                 </button>
-                                <button class="template-menu-item danger" onclick="openDeleteModal('${t.id}')">
+                                <button class="template-menu-item danger delete-btn" data-template-id="${t.id}">
                                     <i class="ph ph-trash"></i> Delete
                                 </button>
                             ` : ''}
