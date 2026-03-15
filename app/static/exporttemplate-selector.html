@@ -24,7 +24,7 @@
             <div id="templatesIndexView" class="templates-index-view">
                 <div class="d-flex justify-content-between align-items-center" style="margin-bottom: var(--spacing-xl);">
                     <h1><i class="ph ph-palette" style="margin-right: 8px;"></i> Export Templates</h1>
-                    <button class="btn btn-primary" onclick="createNewTemplate()">
+                    <button class="btn btn-primary" onclick="openCreateTemplateModal()">
                         <i class="ph ph-plus"></i> New Template
                     </button>
                 </div>
@@ -39,12 +39,66 @@
         </div>
     </div>
 
+    <!-- Create Template Modal -->
+    <div id="createTemplateModal" class="modal">
+        <div class="modal-content" style="min-height: auto;">
+            <h3>Create New Template</h3>
+            <input type="text" id="createTemplateInput" placeholder="Template name" style="width: 100%; padding: var(--spacing-md); border: 1px solid var(--color-light-gray); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg); font-size: var(--font-size-md);" />
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-primary" onclick="confirmCreateTemplate()">Create</button>
+                <button type="button" class="btn btn-secondary" onclick="closeCreateTemplateModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Duplicate Template Modal -->
+    <div id="duplicateModal" class="modal">
+        <div class="modal-content" style="min-height: auto;">
+            <h3>Duplicate Template</h3>
+            <p style="margin-bottom: var(--spacing-md); color: var(--color-gray);" id="duplicateTemplateName"></p>
+            <label style="display: block; margin-bottom: var(--spacing-sm); font-weight: 500; font-size: var(--font-size-sm);">New template name:</label>
+            <input type="text" id="duplicateTemplateInput" placeholder="New template name" style="width: 100%; padding: var(--spacing-md); border: 1px solid var(--color-light-gray); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg); font-size: var(--font-size-md);" />
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-primary" onclick="confirmDuplicate()">Duplicate</button>
+                <button type="button" class="btn btn-secondary" onclick="closeDuplicateModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Template Modal -->
+    <div id="renameModal" class="modal">
+        <div class="modal-content" style="min-height: auto;">
+            <h3>Rename Template</h3>
+            <input type="text" id="renameInput" placeholder="Template name" style="width: 100%; padding: var(--spacing-md); border: 1px solid var(--color-light-gray); border-radius: var(--radius-md); margin-bottom: var(--spacing-lg); font-size: var(--font-size-md);" />
+            <div class="modal-buttons">
+                <button type="button" class="btn btn-primary" onclick="confirmRename()">Rename</button>
+                <button type="button" class="btn btn-secondary" onclick="closeRenameModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Template Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content" style="min-height: auto;">
+            <h3>Delete Template?</h3>
+            <p style="margin-bottom: var(--spacing-md); color: var(--color-gray);" id="deleteTemplateName"></p>
+            <p style="margin-bottom: var(--spacing-lg); color: var(--color-error);">This action cannot be undone.</p>
+            <div class="modal-buttons">
+                <button type="button" class="btn" style="background: var(--color-error); color: white;" 
+                    onmouseover="this.style.background='#c0392b'"
+                    onmouseout="this.style.background='var(--color-error)'" onclick="confirmDelete()">Delete</button>
+                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_URL = '';
         const token = localStorage.getItem('token');
         let templates = [];
         let selectedTemplateId = null;
         let isDirty = false;
+        let pendingActionTemplateId = null;
 
         const ELEMENTS = ['h1', 'h2', 'h3', 'h4', 'h5', 'paragraph', 'list'];
         const ELEMENT_LABELS = {
@@ -56,6 +110,8 @@
         window.addEventListener('load', () => {
             if (!token) window.location.href = 'login.html';
             loadTemplates();
+            // Attach global click listener to close menus
+            document.addEventListener('click', closeAllTemplateMenus);
         });
 
         // ─── API ─────────────────────────────────────────────────
@@ -70,6 +126,10 @@
                     renderTemplateList();
                 }
             } catch (e) { console.error(e); }
+        }
+
+        function selectTemplate(templateId) {
+            window.location.href = `/exporttemplate/${templateId}`;
         }
 
         async function saveTemplate() {
@@ -101,8 +161,7 @@
             } catch (e) { alert('Error: ' + e.message); }
         }
 
-        async function createNewTemplate() {
-            const name = prompt('Template name:');
+        async function createNewTemplate(name) {
             if (!name) return;
             try {
                 const res = await fetch('/templates', {
@@ -121,37 +180,214 @@
             } catch (e) { alert('Error: ' + e.message); }
         }
 
-        async function duplicateSelectedTemplate() {
-            if (!selectedTemplateId) return;
-            try {
-                const res = await fetch(`/templates/${selectedTemplateId}/duplicate`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const newTmpl = await res.json();
-                    await loadTemplates();
-                    selectTemplate(newTmpl.id);
-                }
-            } catch (e) { alert('Error: ' + e.message); }
+        // ─── Modal Functions ──────────────────────────────────────
+
+        function toggleTemplateMenu(event, templateId) {
+            closeAllTemplateMenus();
+            const dropdown = document.querySelector(`.template-menu-dropdown[data-template-id="${templateId}"]`);
+            if (dropdown) {
+                dropdown.classList.add('active');
+            }
         }
 
-        async function deleteSelectedTemplate() {
-            if (!selectedTemplateId) return;
-            const tmpl = templates.find(t => t.id === selectedTemplateId);
-            if (!tmpl || tmpl.is_system) return;
-            if (!confirm(`Delete "${tmpl.name}"? This cannot be undone.`)) return;
+        function closeAllTemplateMenus() {
+            document.querySelectorAll('.template-menu-dropdown.active').forEach(menu => {
+                menu.classList.remove('active');
+            });
+        }
+
+        function openCreateTemplateModal() {
+            const createInput = document.getElementById('createTemplateInput');
+            createInput.value = '';
+            createInput.focus();
+            createInput.addEventListener('keypress', handleCreateTemplateKeypress);
+            document.getElementById('createTemplateModal').classList.add('active');
+        }
+
+        function closeCreateTemplateModal() {
+            document.getElementById('createTemplateModal').classList.remove('active');
+            document.getElementById('createTemplateInput').removeEventListener('keypress', handleCreateTemplateKeypress);
+        }
+
+        function handleCreateTemplateKeypress(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmCreateTemplate();
+            }
+        }
+
+        async function confirmCreateTemplate() {
+            const name = document.getElementById('createTemplateInput').value.trim();
+            if (!name) {
+                alert('Template name cannot be empty');
+                return;
+            }
+            closeCreateTemplateModal();
+            await createNewTemplate(name);
+        }
+
+        function openDuplicateModal(templateId) {
+            closeAllTemplateMenus();
+            pendingActionTemplateId = templateId;
+            const tmpl = templates.find(t => t.id === templateId);
+            if (tmpl) {
+                document.getElementById('duplicateTemplateName').textContent = `Duplicating: "${tmpl.name}"`;
+                const duplicateInput = document.getElementById('duplicateTemplateInput');
+                duplicateInput.value = `${tmpl.name} copy`;
+                duplicateInput.focus();
+                duplicateInput.select();
+                duplicateInput.addEventListener('keypress', handleDuplicateKeypress);
+                document.getElementById('duplicateModal').classList.add('active');
+            }
+        }
+
+        function closeDuplicateModal() {
+            document.getElementById('duplicateModal').classList.remove('active');
+            document.getElementById('duplicateTemplateInput').removeEventListener('keypress', handleDuplicateKeypress);
+            pendingActionTemplateId = null;
+        }
+
+        function handleDuplicateKeypress(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmDuplicate();
+            }
+        }
+
+        async function confirmDuplicate() {
+            if (!pendingActionTemplateId) return;
+            const newName = document.getElementById('duplicateTemplateInput').value.trim();
+            if (!newName) {
+                alert('Template name cannot be empty');
+                return;
+            }
+            closeDuplicateModal();
+            
+            try {
+                const res = await fetch(`/templates/${pendingActionTemplateId}/duplicate`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: newName })
+                });
+                if (res.ok) {
+                    await loadTemplates();
+                } else {
+                    alert('Failed to duplicate template');
+                }
+            } catch (e) { 
+                alert('Error duplicating template: ' + e.message); 
+            }
+        }
+
+        function openRenameModal(templateId) {
+            closeAllTemplateMenus();
+            pendingActionTemplateId = templateId;
+            const tmpl = templates.find(t => t.id === templateId);
+            if (tmpl) {
+                const renameInput = document.getElementById('renameInput');
+                renameInput.value = tmpl.name;
+                renameInput.focus();
+                renameInput.select();
+                renameInput.addEventListener('keypress', handleRenameKeypress);
+                document.getElementById('renameModal').classList.add('active');
+            }
+        }
+
+        function closeRenameModal() {
+            document.getElementById('renameModal').classList.remove('active');
+            document.getElementById('renameInput').removeEventListener('keypress', handleRenameKeypress);
+            pendingActionTemplateId = null;
+        }
+
+        function handleRenameKeypress(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmRename();
+            }
+        }
+
+        async function confirmRename() {
+            if (!pendingActionTemplateId) return;
+            const newName = document.getElementById('renameInput').value.trim();
+            if (!newName) {
+                alert('Template name cannot be empty');
+                return;
+            }
+
+            const tmpl = templates.find(t => t.id === pendingActionTemplateId);
+            if (newName === tmpl.name) {
+                closeRenameModal();
+                return;
+            }
+
+            closeRenameModal();
 
             try {
-                await fetch(`/templates/${selectedTemplateId}`, {
+                const res = await fetch(`/templates/${pendingActionTemplateId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: newName, config: tmpl.config })
+                });
+                if (res.ok) {
+                    await loadTemplates();
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || 'Failed to rename');
+                }
+            } catch (e) { 
+                alert('Error renaming template: ' + e.message); 
+            }
+        }
+
+        function openDeleteModal(templateId) {
+            closeAllTemplateMenus();
+            pendingActionTemplateId = templateId;
+            const tmpl = templates.find(t => t.id === templateId);
+            if (tmpl && !tmpl.is_system) {
+                document.getElementById('deleteTemplateName').textContent = `Delete "${tmpl.name}"?`;
+                document.getElementById('deleteModal').classList.add('active');
+            }
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('active');
+            pendingActionTemplateId = null;
+        }
+
+        async function confirmDelete() {
+            if (!pendingActionTemplateId) return;
+            closeDeleteModal();
+
+            try {
+                const res = await fetch(`/templates/${pendingActionTemplateId}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                selectedTemplateId = null;
-                await loadTemplates();
-                closeEditor();
-            } catch (e) { alert('Error: ' + e.message); }
+                if (res.ok) {
+                    await loadTemplates();
+                } else {
+                    alert('Failed to delete template');
+                }
+            } catch (e) { 
+                alert('Error deleting template: ' + e.message); 
+            }
         }
+
+        // Close modals when clicking Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeCreateTemplateModal();
+                closeDuplicateModal();
+                closeRenameModal();
+                closeDeleteModal();
+            }
+        });
 
         // ─── Render ──────────────────────────────────────────────
 
@@ -174,8 +410,24 @@
                 const bodyBg = '#ffffff';
 
                 return `
-                <div class="template-card" onclick="window.location.href='/exporttemplate/${t.id}'">
+                <div class="template-card" onclick="if (!event.target.closest('.template-menu-btn') && !event.target.closest('.template-menu-dropdown')) { window.location.href='/exporttemplate/${t.id}'; }">
                     <div class="template-preview-wrapper" style="background: ${bodyBg};">
+                        <button class="template-menu-btn" onclick="event.stopPropagation(); toggleTemplateMenu(event, '${t.id}')">
+                            <i class="ph ph-dots-three-vertical"></i>
+                        </button>
+                        <div class="template-menu-dropdown" data-template-id="${t.id}" onclick="event.stopPropagation()">
+                            <button class="template-menu-item" onclick="openDuplicateModal('${t.id}')">
+                                <i class="ph ph-copy"></i> Duplicate
+                            </button>
+                            ${!t.is_system ? `
+                                <button class="template-menu-item" onclick="openRenameModal('${t.id}')">
+                                    <i class="ph ph-pencil"></i> Rename
+                                </button>
+                                <button class="template-menu-item danger" onclick="openDeleteModal('${t.id}')">
+                                    <i class="ph ph-trash"></i> Delete
+                                </button>
+                            ` : ''}
+                        </div>
                         <div class="mini-doc-preview">
                             ${coverEnabled ? 
                                 `<div class="mini-cover" style="color: ${coverColor};">Title</div>` : ''}

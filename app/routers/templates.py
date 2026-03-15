@@ -3,11 +3,12 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.models.db import User, ExportTemplate
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
+from app.schemas.schemas import TemplateCreate, TemplateDuplicate, TemplateUpdate
 
 logger = logging.getLogger(__name__)
 import random
@@ -214,22 +215,22 @@ async def get_template(
 
 @router.post("", response_model=dict, status_code=201)
 async def create_template(
-    body: dict,
+    template_data: TemplateCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new user template"""
-    name = body.get("name")
+    name = template_data.name
     if not name:
         raise HTTPException(status_code=400, detail="Template name is required")
     
-    config = body.get("config", SEEDED_TEMPLATES[0]["config"])  # Default to Standard Academic config
+    config = template_data.config or SEEDED_TEMPLATES[0]["config"]  # Default to Standard Academic config
     
     tmpl = ExportTemplate(
         id=generate_template_id(db),
         user_id=current_user.id,
         name=name,
-        description=body.get("description", ""),
+        description=template_data.description or "",
         is_default=False,
         config=config,
     )
@@ -252,7 +253,7 @@ async def create_template(
 @router.put("/{template_id}", response_model=dict)
 async def update_template(
     template_id: str,
-    body: dict,
+    template_data: TemplateUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -265,12 +266,12 @@ async def update_template(
     if not tmpl:
         raise HTTPException(status_code=404, detail="Template not found or not editable")
     
-    if "name" in body:
-        tmpl.name = body["name"]
-    if "description" in body:
-        tmpl.description = body["description"]
-    if "config" in body:
-        tmpl.config = body["config"]
+    if template_data.name is not None:
+        tmpl.name = template_data.name
+    if template_data.description is not None:
+        tmpl.description = template_data.description
+    if template_data.config is not None:
+        tmpl.config = template_data.config
     
     tmpl.updated_at = datetime.utcnow()
     db.commit()
@@ -312,10 +313,15 @@ async def delete_template(
 @router.post("/{template_id}/duplicate", response_model=dict, status_code=201)
 async def duplicate_template(
     template_id: str,
+    duplicate_data: Optional[TemplateDuplicate] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Duplicate a template (system or user) as a new user template"""
+    """Duplicate a template (system or user) as a new user template
+    
+    Optional body: {"name": "custom name for the duplicate"}
+    If name is not provided, defaults to "{original_name} copy"
+    """
     source = db.query(ExportTemplate).filter(
         ExportTemplate.id == template_id,
         (ExportTemplate.user_id == current_user.id) | (ExportTemplate.user_id.is_(None))
@@ -324,10 +330,13 @@ async def duplicate_template(
     if not source:
         raise HTTPException(status_code=404, detail="Template not found")
     
+    # Use custom name from body if provided, otherwise default to "{name} copy"
+    custom_name = (duplicate_data.name if duplicate_data else None) or f"{source.name} copy"
+    
     new_tmpl = ExportTemplate(
         id=generate_template_id(db),
         user_id=current_user.id,
-        name=f"{source.name} (Copy)",
+        name=custom_name,
         description=source.description,
         is_default=False,
         config=source.config,

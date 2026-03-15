@@ -1,7 +1,7 @@
 """Request/Response schemas"""
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 
 
 # ========== User Schemas ==========
@@ -264,3 +264,20 @@ class NoteSnapshotResponse(BaseModel):
 # ========== Lecture Content Update ==========
 class LectureContentUpdate(BaseModel):
     extracted_text: str
+
+
+# ========== Export Template Schemas ==========
+class TemplateCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    config: Optional[Any] = None
+
+
+class TemplateDuplicate(BaseModel):
+    name: Optional[str] = None
+
+
+class TemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    config: Optional[Any] = None
