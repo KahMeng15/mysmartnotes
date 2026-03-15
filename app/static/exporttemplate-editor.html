@@ -20,18 +20,29 @@
 
 <body>
     <!-- Edit View: Chat-like interface -->
-    <div id="templateEditView" class="template-edit-view chat-container page-card" style="padding: 0; display: flex; height: 100vh; border-radius: 0;">
-                    <!-- Settings Sidebar (replaces conversation list) -->
+    <div id="templateEditView" class="template-edit-view chat-container page-card" style="padding: 0; display: flex; height: 100vh;">
+                    <!-- Settings Sidebar -->
                     <div class="chat-sidebar template-settings-sidebar">
-                        <div class="sidebar-header" style="justify-content: flex-start; gap: var(--spacing-md); margin-bottom: var(--spacing-lg);">
-                            <button class="btn-icon" onclick="closeEditor()" title="Back to templates"><i class="ph ph-arrow-left"></i></button>
-                            <h3 style="margin: 0;">Settings</h3>
+                        <div class="sidebar-header">
+                            <h3 style="margin: 0;"><i class="ph ph-pencil-simple"></i> Template Editor</h3>
                         </div>
                         
                         <div class="settings-scroll-area">
+                            <!-- Basic Info -->
+                            <div class="settings-group">
+                                <h4><i class="ph ph-info"></i> Basic Info</h4>
+                                <div class="group-content">
+                                    <div class="setting-row">
+                                        <label>Template Name</label>
+                                        <input type="text" id="templateName" placeholder="Template Name" oninput="markDirty()" class="standard-input">
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Page Setup -->
                             <div class="settings-group">
                                 <h4><i class="ph ph-file"></i> Page Setup</h4>
+                                <div class="group-content">
                                 <div class="setting-row">
                                     <label>Page Size</label>
                                     <select id="cfgPageSize" onchange="markDirty(); updatePreview();">
@@ -75,11 +86,13 @@
                                     <input type="number" id="cfgMarginRight" step="1" min="0" max="80" value="19"
                                         onchange="markDirty(); updatePreview();">
                                 </div>
+                                </div>
                             </div>
 
                             <!-- Spacing -->
                             <div class="settings-group">
                                 <h4><i class="ph ph-text-align-justify"></i> Spacing</h4>
+                                <div class="group-content">
                                 <div class="setting-row">
                                     <label>Line Spacing</label>
                                     <input type="number" id="cfgLineSpacing" step="0.05" min="1" max="3" value="1.15"
@@ -90,19 +103,23 @@
                                     <input type="number" id="cfgParagraphSpacing" step="1" min="0" max="30" value="8"
                                         onchange="markDirty(); updatePreview();">
                                 </div>
+                                </div>
                             </div>
 
                             <!-- Element Styles -->
                             <div class="settings-group">
                                 <h4><i class="ph ph-text-t"></i> Element Styles</h4>
+                                <div class="group-content">
                                 <div id="elementStylesContainer">
                                     <!-- Populated by JS -->
+                                </div>
                                 </div>
                             </div>
 
                             <!-- Table Styles -->
                             <div class="settings-group">
                                 <h4><i class="ph ph-table"></i> Table Styles</h4>
+                                <div class="group-content">
                                 <div class="setting-row">
                                     <label>Header BG</label>
                                     <input type="color" id="tbl_header_bg" value="#593f8f"
@@ -161,11 +178,13 @@
                                         <option value="right">Right</option>
                                     </select>
                                 </div>
+                                </div>
                             </div>
 
                             <!-- Cover Page -->
                             <div class="settings-group">
                                 <h4><i class="ph ph-book-open"></i> Cover Page</h4>
+                                <div class="group-content">
                                 <div class="setting-row">
                                     <label>Enabled</label>
                                     <div class="mini-toggle active" id="cfgCoverEnabled"
@@ -186,11 +205,13 @@
                                     <div class="mini-toggle active" id="cfgCoverShowDate"
                                         onclick="this.classList.toggle('active'); markDirty(); updatePreview();"></div>
                                 </div>
+                                </div>
                             </div>
 
                             <!-- Footer -->
                             <div class="settings-group">
                                 <h4><i class="ph ph-text-align-center"></i> Footer</h4>
+                                <div class="group-content">
                                 <div class="setting-row">
                                     <label>Page Numbers</label>
                                     <div class="mini-toggle active" id="cfgFooterPageNumber"
@@ -199,31 +220,43 @@
                                 <div class="setting-row">
                                     <label>Custom Text</label>
                                     <input type="text" id="cfgFooterText" placeholder="Optional footer text"
-                                        style="width: 140px;" oninput="markDirty(); updatePreview();">
+                                        oninput="markDirty(); updatePreview();">
+                                </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Sidebar Footer with Save Button -->
+                        <div class="sidebar-footer">
+                            <button class="btn btn-primary" onclick="saveTemplate()" id="saveBtn" style="width: 100%; padding: 10px 16px; margin-bottom: var(--spacing-sm);">Save Template</button>
+                            <button class="btn btn-secondary" onclick="closeEditor()" style="width: 100%; padding: 10px 16px;">Discard Changes</button>
+                        </div>
+                    </div>
+
+                    <!-- Main Preview Area -->
+                    <div class="chat-main template-preview-main">
+
+                        <div class="preview-container">
+                            <div class="preview-scroll-area" id="previewScrollArea">
+                                <div class="preview-page" id="previewPage">
+                                    <!-- Populated by JS -->
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Main Preview Area (replaces chat main) -->
-                    <div class="chat-main template-preview-main">
-                        <div class="chat-header">
-                            <div class="chat-header-top align-items-center" style="gap: var(--spacing-md);">
-                                <i class="ph ph-text-aa" style="font-size: 24px; color: var(--color-primary);"></i>
-                                <input type="text" id="templateName" placeholder="Template Name" oninput="markDirty()" class="clean-input" style="flex: 1; font-size: 1.2rem; font-weight: 600;">
-                                <div class="header-actions">
-                                    <button class="btn-icon" onclick="duplicateSelectedTemplate()" title="Duplicate"><i class="ph ph-copy"></i></button>
-                                    <button class="btn-icon danger" onclick="deleteSelectedTemplate()" title="Delete" id="deleteBtn"><i class="ph ph-trash"></i></button>
-                                    <button class="btn btn-primary" onclick="saveTemplate()" id="saveBtn" style="padding: 6px 16px;"><i class="ph ph-floppy-disk"></i> Save</button>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Floating Zoom Control (bottom right) -->
+                    <div class="floating-zoom-card">
+                        <button class="zoom-btn-small" onclick="zoomOut()" title="Zoom Out"><i class="ph ph-minus"></i></button>
+                        <span id="zoomLevel" class="zoom-level-display">100%</span>
+                        <button class="zoom-btn-small" onclick="zoomIn()" title="Zoom In"><i class="ph ph-plus"></i></button>
+                        <button class="zoom-btn-small" onclick="resetZoom()" title="Reset Zoom"><i class="ph ph-arrows-out"></i></button>
+                    </div>
 
-                        <div class="chat-messages" style="background: var(--color-bg); justify-content: flex-start; align-items: center; padding-top: var(--spacing-xl);">
-                            <div class="preview-page" id="previewPage">
-                                <!-- Populated by JS -->
-                            </div>
-                        </div>
+                    <!-- Page Selection Card (for cover pages) -->
+                    <div class="floating-page-card" id="pageSelectionCard" style="display: none;">
+                        <button class="page-btn" id="pageShowCover" onclick="showCoverPage()" title="View Cover"><i class="ph ph-book"></i> Cover</button>
+                        <button class="page-btn active" id="pageShowContents" onclick="showContentsPage()" title="View Contents"><i class="ph ph-text"></i> Contents</button>
                     </div>
     </div>
 
@@ -250,6 +283,18 @@
             } else {
                 window.location.href = '/exporttemplates';
             }
+            
+            // Add trackpad/scroll wheel zoom support
+            document.addEventListener('wheel', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    if (e.deltaY < 0) {
+                        zoomIn();
+                    } else if (e.deltaY > 0) {
+                        zoomOut();
+                    }
+                }
+            }, { passive: false });
         });
 
         // ─── API ─────────────────────────────────────────────────
@@ -263,13 +308,20 @@
                     const tmpl = await res.json();
                     
                     // Set name
-                    document.getElementById('templateName').value = tmpl.name;
+                    const nameInput = document.getElementById('templateName');
+                    if (nameInput) {
+                        nameInput.value = tmpl.name;
 
-                    // Disable editing for system templates
-                    const isSystem = tmpl.is_system;
-                    document.getElementById('templateName').readOnly = isSystem;
-                    document.getElementById('saveBtn').style.display = isSystem ? 'none' : '';
-                    document.getElementById('deleteBtn').style.display = isSystem ? 'none' : '';
+                        // Disable editing for system templates
+                        const isSystem = tmpl.is_system;
+                        nameInput.readOnly = isSystem;
+                        
+                        // Only update saveBtn if it exists
+                        const saveBtn = document.getElementById('saveBtn');
+                        if (saveBtn) {
+                            saveBtn.style.display = isSystem ? 'none' : '';
+                        }
+                    }
 
                     // Load config
                     loadConfig(tmpl.config);
@@ -361,7 +413,22 @@
 
 
         function closeEditor() {
-            if (isDirty && !confirm('You have unsaved changes. Discard?')) return;
+            if (isDirty) {
+                showDiscardModal();
+            } else {
+                window.location.href = '/exporttemplates';
+            }
+        }
+
+        function showDiscardModal() {
+            document.getElementById('discardChangesModal').classList.add('active');
+        }
+
+        function closeDiscardModal() {
+            document.getElementById('discardChangesModal').classList.remove('active');
+        }
+
+        function confirmDiscard() {
             window.location.href = '/exporttemplates';
         }
 
@@ -485,6 +552,10 @@
 
         function buildElementStyles(cfg) {
             const container = document.getElementById('elementStylesContainer');
+            if (!container) {
+                console.warn('Element styles container not found');
+                return;
+            }
             container.innerHTML = ELEMENTS.map(el => {
                 const style = cfg.elements?.[el] || {};
                 const label = ELEMENT_LABELS[el];
@@ -531,33 +602,109 @@
             }).join('');
         }
 
+        // ─── Zoom Control ────────────────────────────────────────
+        let currentZoom = 1;
+        let currentPageView = 'contents'; // Track which page view is displayed: 'cover' or 'contents'
+        
+        function zoomIn() {
+            currentZoom = Math.min(currentZoom + 0.1, 2);
+            applyZoom();
+        }
+        
+        function zoomOut() {
+            currentZoom = Math.max(currentZoom - 0.1, 0.5);
+            applyZoom();
+        }
+        
+        function resetZoom() {
+            currentZoom = 1;
+            applyZoom();
+        }
+
+        // ─── Page View Control ───────────────────────────────────
+        function showCoverPage() {
+            currentPageView = 'cover';
+            updatePageViewButtons();
+            updatePreview();
+        }
+
+        function showContentsPage() {
+            currentPageView = 'contents';
+            updatePageViewButtons();
+            updatePreview();
+        }
+
+        function updatePageViewButtons() {
+            const coverBtn = document.getElementById('pageShowCover');
+            const contentsBtn = document.getElementById('pageShowContents');
+            if (coverBtn) {
+                coverBtn.classList.toggle('active', currentPageView === 'cover');
+            }
+            if (contentsBtn) {
+                contentsBtn.classList.toggle('active', currentPageView === 'contents');
+            }
+        }
+        
+        function applyZoom() {
+            const page = document.getElementById('previewPage');
+            if (page) {
+                page.style.transform = `scale(${currentZoom})`;
+            }
+            const zoomLevelEl = document.getElementById('zoomLevel');
+            if (zoomLevelEl) {
+                zoomLevelEl.textContent = Math.round(currentZoom * 100) + '%';
+            }
+        }
+
         // ─── Live Preview ────────────────────────────────────────
+        
+        // Page size definitions in mm (width x height for portrait)
+        const PAGE_SIZES = {
+            'A4': { width: 210, height: 297 },
+            'Letter': { width: 215.9, height: 279.4 },
+            'Legal': { width: 215.9, height: 355.6 }
+        };
 
         function updatePreview() {
             const cfg = gatherConfig();
-            const PX_PER_PT = 793 / 595; // ≈ 1.333 - Define early for use in cover page template
+            const PX_PER_PT = 793 / 595; // ≈ 1.333
             const page = document.getElementById('previewPage');
-            // mm → preview px
-            // The preview div is 793px wide (A4 portrait) or 1122px (A4 landscape)
-            // A4 portrait is 210mm wide. So scale factor is 793/210 = ~3.77 px per mm
-            const isLandscape = cfg.page.orientation === 'landscape';
-            const pxPerMm = isLandscape ? (1122 / 297) : (793 / 210);
-            const paddingV = (cfg.page.margins.top * pxPerMm) + 'px';
-            const paddingH = (cfg.page.margins.left * pxPerMm) + 'px';
-            page.style.padding = `${paddingV} ${paddingH}`;
-
-            // Apply orientation to preview page with fixed dimensions
-            if (isLandscape) {
-                page.style.transform = 'scale(0.75)';
-                page.style.transformOrigin = 'top center';
-                page.style.width = '1122px';  // 297mm (A4 landscape) in pixels
-                page.style.height = '793px';  // 210mm (A4 landscape) in pixels
-            } else {
-                page.style.transform = 'scale(0.75)';
-                page.style.transformOrigin = 'top center';
-                page.style.width = '793px';  // 210mm (A4 portrait) in pixels
-                page.style.height = '1122px';  // 297mm (A4 portrait) in pixels
+            if (!page) {
+                console.warn('Preview page element not found');
+                return;
             }
+            const pageSize = PAGE_SIZES[cfg.page.size] || PAGE_SIZES['A4'];
+            const isLandscape = cfg.page.orientation === 'landscape';
+            
+            // Calculate dimensions based on page size (A4 baseline: 210mm x 297mm = 793px x 1122px)
+            const A4_WIDTH_MM = 210;
+            const A4_HEIGHT_MM = 297;
+            const A4_WIDTH_PX = 793;
+            const A4_HEIGHT_PX = 1122;
+            
+            // Scale factor: pixels per mm
+            const pxPerMm = A4_WIDTH_PX / A4_WIDTH_MM;
+            
+            // Calculate actual dimensions for selected page size
+            let pageWidthPx = pageSize.width * pxPerMm;
+            let pageHeightPx = pageSize.height * pxPerMm;
+            
+            // Swap for landscape
+            if (isLandscape) {
+                [pageWidthPx, pageHeightPx] = [pageHeightPx, pageWidthPx];
+            }
+            
+            // Calculate margins in pixels
+            const marginTopPx = cfg.page.margins.top * pxPerMm;
+            const marginLeftPx = cfg.page.margins.left * pxPerMm;
+            const marginBottomPx = cfg.page.margins.bottom * pxPerMm;
+            const marginRightPx = cfg.page.margins.right * pxPerMm;
+            
+            page.style.width = pageWidthPx + 'px';
+            page.style.height = pageHeightPx + 'px';
+            page.style.padding = `${marginTopPx}px ${marginRightPx}px ${marginBottomPx}px ${marginLeftPx}px`;
+            page.style.transform = `scale(${currentZoom})`;
+            page.style.transformOrigin = 'top center';
 
             // Build cover (outside columns)
             let coverHtml = '';
@@ -774,16 +921,56 @@
             page.style.columnCount = '';
             page.style.columnGap = '';
 
-            page.innerHTML = `
-                ${coverHtml}
-                <div class="preview-content" style="${colStyle}">
-                    ${contentHtml}
-                    ${tableHtml}
-                </div>
-                ${footerHtml}
-            `;
+            // Show/hide page selection card based on cover page enabled
+            const pageSelectionCard = document.getElementById('pageSelectionCard');
+            if (pageSelectionCard) {
+                if (cfg.cover_page.enabled && currentPageView === 'cover') {
+                    pageSelectionCard.style.display = 'flex';
+                    // Update button states
+                    updatePageViewButtons();
+                } else if (cfg.cover_page.enabled && currentPageView === 'contents') {
+                    pageSelectionCard.style.display = 'flex';
+                    // Update button states
+                    updatePageViewButtons();
+                } else {
+                    pageSelectionCard.style.display = 'none';
+                }
+            }
+
+            // Build the page content based on view mode
+            let pageContent = '';
+            if (cfg.cover_page.enabled && currentPageView === 'cover') {
+                // Show only cover page
+                pageContent = coverHtml;
+            } else {
+                // Show contents (with cover above if enabled, but user is viewing contents)
+                pageContent = `
+                    ${cfg.cover_page.enabled ? coverHtml : ''}
+                    <div class="preview-content" style="${colStyle}">
+                        ${contentHtml}
+                        ${tableHtml}
+                    </div>
+                    ${footerHtml}
+                `;
+            }
+
+            page.innerHTML = pageContent;
         }
     </script>
+
+    <!-- Discard Changes Modal -->
+    <div id="discardChangesModal" class="modal">
+        <div class="modal-content" style="min-height: auto;">
+            <h3>Discard Changes?</h3>
+            <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray);">Are you sure you want to discard your unsaved changes? This action cannot be undone.</p>
+            <div class="modal-buttons">
+                <button type="button" class="btn-save" style="background: var(--color-error);"
+                    onmouseover="this.style.background='#c0392b'"
+                    onmouseout="this.style.background='var(--color-error)'" onclick="confirmDiscard()">Discard</button>
+                <button type="button" class="btn-cancel" onclick="closeDiscardModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
