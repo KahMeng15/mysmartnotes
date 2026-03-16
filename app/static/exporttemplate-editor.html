@@ -106,6 +106,42 @@
                                 </div>
                             </div>
 
+                            <!-- List Spacing -->
+                            <div class="settings-group">
+                                <h4><i class="ph ph-list"></i> List Spacing</h4>
+                                <div class="group-content">
+                                <div class="setting-row">
+                                    <label>Left Margin (pt)</label>
+                                    <input type="number" id="cfgListLeftMargin" step="1" min="0" max="60" value="24"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Bullet-Text Gap (pt)</label>
+                                    <input type="number" id="cfgListBulletGap" step="1" min="2" max="30" value="6"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Numbered List Format</label>
+                                    <select id="cfgNumFormat" onchange="markDirty(); updatePreview();">
+                                        <option value="1.">1.</option>
+                                        <option value="1)">1)</option>
+                                        <option value="1]">1]</option>
+                                    </select>
+                                </div>
+                                <div class="setting-row">
+                                    <label>Custom Bullet (or preset)</label>
+                                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                        <input type="text" id="cfgCustomBullet" placeholder="•" maxlength="3" value="•" onchange="markDirty(); updatePreview();" style="flex: 1; min-width: 50px;">
+                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '•'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">•</button>
+                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '◆'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">◆</button>
+                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '→'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">→</button>
+                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '✓'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">✓</button>
+                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '-'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">-</button>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+
                             <!-- Element Styles -->
                             <div class="settings-group">
                                 <h4><i class="ph ph-text-t"></i> Element Styles</h4>
@@ -191,14 +227,48 @@
                                         onclick="this.classList.toggle('active'); markDirty(); updatePreview();"></div>
                                 </div>
                                 <div class="setting-row">
-                                    <label>Title Size (pt)</label>
+                                    <label>H1 Text</label>
+                                    <input type="text" id="cfgCoverH1Text" placeholder="Sample Document Title" oninput="markDirty(); updatePreview();" class="standard-input">
+                                </div>
+                                <div class="setting-row">
+                                    <label>H1 Size (pt)</label>
                                     <input type="number" id="cfgCoverTitleSize" min="20" max="60" value="36"
                                         onchange="markDirty(); updatePreview();">
                                 </div>
                                 <div class="setting-row">
-                                    <label>Title Color</label>
+                                    <label>H1 Color</label>
                                     <input type="color" id="cfgCoverTitleColor" value="#1A1A2E"
                                         onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>H2 Text</label>
+                                    <input type="text" id="cfgCoverH2Text" placeholder="Subject Name" oninput="markDirty(); updatePreview();" class="standard-input">
+                                </div>
+                                <div class="setting-row">
+                                    <label>H2 Size (pt)</label>
+                                    <input type="number" id="cfgCoverH2Size" min="10" max="40" value="14"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>H2 Color</label>
+                                    <input type="color" id="cfgCoverH2Color" value="#7f8c8d"
+                                        onchange="markDirty(); updatePreview();">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Horizontal Align</label>
+                                    <select id="cfgCoverHAlign" onchange="markDirty(); updatePreview();">
+                                        <option value="left">Left</option>
+                                        <option value="center" selected>Center</option>
+                                        <option value="right">Right</option>
+                                    </select>
+                                </div>
+                                <div class="setting-row">
+                                    <label>Vertical Align</label>
+                                    <select id="cfgCoverVAlign" onchange="markDirty(); updatePreview();">
+                                        <option value="top">Top</option>
+                                        <option value="middle" selected>Middle</option>
+                                        <option value="bottom">Bottom</option>
+                                    </select>
                                 </div>
                                 <div class="setting-row">
                                     <label>Show Date</label>
@@ -228,8 +298,8 @@
                         
                         <!-- Sidebar Footer with Save Button -->
                         <div class="sidebar-footer">
-                            <button class="btn btn-primary" onclick="saveTemplate()" id="saveBtn" style="width: 100%; padding: 10px 16px; margin-bottom: var(--spacing-sm);">Save Template</button>
-                            <button class="btn btn-secondary" onclick="closeEditor()" style="width: 100%; padding: 10px 16px;">Discard Changes</button>
+                            <button class="btn btn-primary" onclick="saveTemplate()" id="saveBtn" style="flex: 1; padding: 10px 16px;">Save Template</button>
+                            <button class="btn btn-secondary" onclick="closeEditor()" style="flex: 1; padding: 10px 16px;">Discard Changes</button>
                         </div>
                     </div>
 
@@ -251,12 +321,15 @@
                         <span id="zoomLevel" class="zoom-level-display">100%</span>
                         <button class="zoom-btn-small" onclick="zoomIn()" title="Zoom In"><i class="ph ph-plus"></i></button>
                         <button class="zoom-btn-small" onclick="resetZoom()" title="Reset Zoom"><i class="ph ph-arrows-out"></i></button>
-                    </div>
-
-                    <!-- Page Selection Card (for cover pages) -->
-                    <div class="floating-page-card" id="pageSelectionCard" style="display: none;">
-                        <button class="page-btn" id="pageShowCover" onclick="showCoverPage()" title="View Cover"><i class="ph ph-book"></i> Cover</button>
-                        <button class="page-btn active" id="pageShowContents" onclick="showContentsPage()" title="View Contents"><i class="ph ph-text"></i> Contents</button>
+                        
+                        <!-- Divider between zoom and page controls -->
+                        <div style="width: 1px; height: 24px; background: var(--color-light-gray); margin: 0 4px;"></div>
+                        
+                        <!-- Page Selection Buttons (for cover pages) -->
+                        <div id="pageSelectionCard" style="display: none; gap: var(--spacing-sm); align-items: center;">
+                            <button class="page-btn" id="pageShowCover" onclick="showCoverPage()" title="View Cover"><i class="ph ph-book"></i> Cover</button>
+                            <button class="page-btn active" id="pageShowContents" onclick="showContentsPage()" title="View Contents"><i class="ph ph-text"></i> Contents</button>
+                        </div>
                     </div>
     </div>
 
@@ -468,6 +541,8 @@
             // Spacing
             document.getElementById('cfgLineSpacing').value = cfg.spacing?.line_spacing ?? 1.15;
             document.getElementById('cfgParagraphSpacing').value = cfg.spacing?.paragraph_spacing ?? 8;
+            document.getElementById('cfgListLeftMargin').value = cfg.spacing?.list_left_margin ?? 24;
+            document.getElementById('cfgListBulletGap').value = cfg.spacing?.list_bullet_gap ?? 6;
 
             // Table
             const tbl = cfg.table || {};
@@ -485,8 +560,14 @@
 
             // Cover
             toggleSet('cfgCoverEnabled', cfg.cover_page?.enabled ?? true);
+            document.getElementById('cfgCoverH1Text').value = cfg.cover_page?.h1_text || 'Sample Document Title';
             document.getElementById('cfgCoverTitleSize').value = cfg.cover_page?.title_size ?? 36;
             document.getElementById('cfgCoverTitleColor').value = cfg.cover_page?.title_color || '#1A1A2E';
+            document.getElementById('cfgCoverH2Text').value = cfg.cover_page?.h2_text || 'Subject Name';
+            document.getElementById('cfgCoverH2Size').value = cfg.cover_page?.h2_size ?? 14;
+            document.getElementById('cfgCoverH2Color').value = cfg.cover_page?.h2_color || '#7f8c8d';
+            document.getElementById('cfgCoverHAlign').value = cfg.cover_page?.h_align || 'center';
+            document.getElementById('cfgCoverVAlign').value = cfg.cover_page?.v_align || 'middle';
             toggleSet('cfgCoverShowDate', cfg.cover_page?.show_date ?? true);
 
             // Footer
@@ -500,7 +581,7 @@
                 elements[el] = {
                     alignment: document.getElementById(`el_${el}_align`)?.value || 'left',
                     text_color: document.getElementById(`el_${el}_color`)?.value || '#2C3E50',
-                    background_color: null,
+                    background_color: document.getElementById(`el_${el}_bg`)?.value || null,
                     font_weight: document.getElementById(`el_${el}_weight`)?.value || 'normal',
                     font_size: parseInt(document.getElementById(`el_${el}_size`)?.value || 11),
                 };
@@ -525,6 +606,8 @@
                 spacing: {
                     line_spacing: parseFloat(document.getElementById('cfgLineSpacing').value),
                     paragraph_spacing: parseInt(document.getElementById('cfgParagraphSpacing').value),
+                    list_left_margin: parseInt(document.getElementById('cfgListLeftMargin').value),
+                    list_bullet_gap: parseInt(document.getElementById('cfgListBulletGap').value),
                 },
                 elements,
                 table: {
@@ -542,10 +625,20 @@
                 },
                 cover_page: {
                     enabled: document.getElementById('cfgCoverEnabled').classList.contains('active'),
+                    h1_text: document.getElementById('cfgCoverH1Text').value || 'Sample Document Title',
                     title_size: parseInt(document.getElementById('cfgCoverTitleSize').value),
                     title_color: document.getElementById('cfgCoverTitleColor').value,
+                    h2_text: document.getElementById('cfgCoverH2Text').value || 'Subject Name',
+                    h2_size: parseInt(document.getElementById('cfgCoverH2Size').value),
+                    h2_color: document.getElementById('cfgCoverH2Color').value,
+                    h_align: document.getElementById('cfgCoverHAlign').value,
+                    v_align: document.getElementById('cfgCoverVAlign').value,
                     show_date: document.getElementById('cfgCoverShowDate').classList.contains('active'),
                     show_author: false,
+                },
+                list_config: {
+                    number_format: document.getElementById('cfgNumFormat').value || '1.',
+                    custom_bullet: document.getElementById('cfgCustomBullet').value || '•',
                 },
                 header: { enabled: false, text: '' },
                 footer: {
@@ -589,8 +682,12 @@
                                 </select>
                             </div>
                             <div class="setting-row">
-                                <label>Color</label>
+                                <label>Text Color</label>
                                 <input type="color" id="el_${el}_color" value="${style.text_color || '#2C3E50'}" onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Background</label>
+                                <input type="color" id="el_${el}_bg" value="${style.background_color || '#ffffff'}" onchange="markDirty(); updatePreview();" title="Full-width column background color">
                             </div>
                             <div class="setting-row">
                                 <label>Weight</label>
@@ -603,14 +700,6 @@
                                 <label>Size (pt)</label>
                                 <input type="number" id="el_${el}_size" value="${style.font_size || 11}" min="8" max="60" onchange="markDirty(); updatePreview();">
                             </div>
-                            ${isListEl ? `
-                            <div class="setting-row">
-                                <label>Format</label>
-                                <select id="el_${el}_numfmt" onchange="markDirty(); updatePreview();">
-                                    <option value="bullet" ${style.number_format === 'bullet' ? 'selected' : ''}>Bullet</option>
-                                    <option value="numbered" ${style.number_format === 'numbered' ? 'selected' : ''}>Numbered</option>
-                                </select>
-                            </div>` : ''}
                         </div>
                     </div>
                 `;
@@ -724,13 +813,24 @@
             // Build cover (outside columns)
             let coverHtml = '';
             if (cfg.cover_page.enabled) {
+                // Determine vertical alignment
+                let verticalAlign = 'center';
+                let minHeight = '300px';
+                if (cfg.cover_page.v_align === 'top') {
+                    verticalAlign = 'flex-start';
+                    minHeight = 'auto';
+                } else if (cfg.cover_page.v_align === 'bottom') {
+                    verticalAlign = 'flex-end';
+                    minHeight = 'auto';
+                }
+                
                 coverHtml = `
-                    <div class="preview-cover">
-                        <div style="font-size: ${cfg.cover_page.title_size * PX_PER_PT}px; font-weight: bold; color: ${cfg.cover_page.title_color}; margin-bottom: 8px;">
-                            Sample Document Title
+                    <div class="preview-cover" style="display: flex; flex-direction: column; justify-content: ${verticalAlign}; align-items: ${cfg.cover_page.h_align}; min-height: ${minHeight}; padding: 40px; text-align: ${cfg.cover_page.h_align};">
+                        <div style="font-size: ${cfg.cover_page.title_size * PX_PER_PT}px; font-weight: bold; color: ${cfg.cover_page.title_color}; margin-bottom: 12px;">
+                            ${cfg.cover_page.h1_text || 'Sample Document Title'}
                         </div>
-                        <div style="font-size: ${14 * PX_PER_PT}px; color: #7f8c8d;">Extracted and Processed Content</div>
-                        ${cfg.cover_page.show_date ? `<div style="font-size: ${10 * PX_PER_PT}px; color: #95a5a6; margin-top: 8px;">Generated: March 9, 2026</div>` : ''}
+                        <div style="font-size: ${cfg.cover_page.h2_size * PX_PER_PT}px; color: ${cfg.cover_page.h2_color};">${cfg.cover_page.h2_text || 'Subject Name'}</div>
+                        ${cfg.cover_page.show_date ? `<div style="font-size: ${10 * PX_PER_PT}px; color: #95a5a6; margin-top: 20px;">Generated: March 17, 2026</div>` : ''}
                     </div>
                 `;
             }
@@ -741,40 +841,75 @@
             // so that after scale(0.75) they appear at the correct pt proportion.
             const elStyle = (key) => {
                 const s = cfg.elements[key] || {};
-                return `text-align: ${s.alignment || 'left'}; color: ${s.text_color || '#2C3E50'}; font-weight: ${s.font_weight || 'normal'}; font-size: ${(s.font_size || 11) * PX_PER_PT}px; margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px; line-height: ${cfg.spacing.line_spacing};`;
+                return `text-align: ${s.alignment || 'left'}; color: ${s.text_color || '#2C3E50'}; font-weight: ${s.font_weight || 'normal'}; font-size: ${(s.font_size || 11) * PX_PER_PT}px; line-height: ${cfg.spacing.line_spacing};`;
+            };
+
+            // Wrap element with background if applicable
+            const wrapElement = (key, content) => {
+                const s = cfg.elements[key] || {};
+                const style = elStyle(key);
+                const bgColor = s.background_color || null;
+                if (bgColor && bgColor !== '#ffffff' && bgColor.toLowerCase() !== '#ffffff') {
+                    const padding = 8; // tight padding
+                    return `<div style="background: ${bgColor}; padding: ${padding}px 0; margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;"><div style="${style} padding: 0 ${padding}px;">${content}</div></div>`;
+                } else {
+                    return `<div style="${style} margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;">${content}</div>`;
+                }
+            };
+
+            let listHtml = () => {
+                const s = cfg.elements['list'] || {};
+                const marginPt = cfg.spacing?.list_left_margin || 24;
+                const gapPt = cfg.spacing?.list_bullet_gap || 6;
+                const bulletChar = cfg.list_config?.custom_bullet || '•';
+                const style = elStyle('list');
+                const bgColor = s.background_color || null;
+                
+                const items = [
+                    'First foundational concept',
+                    'Second principle with supporting rationale',
+                    'Third methodology for understanding',
+                    'Fourth approach with practical examples',
+                    'Fifth consideration for implementation',
+                    'Sixth element completing the framework',
+                    'Seventh point extending the discussion'
+                ].map((text, idx) => {
+                    const prefix = cfg.list_config?.number_format === '1.' ? (idx + 1) + '.' : 
+                                   cfg.list_config?.number_format === '1)' ? (idx + 1) + ')' :
+                                   cfg.list_config?.number_format === '1]' ? (idx + 1) + ']' : bulletChar;
+                    return `<div style="margin-left: ${marginPt * PX_PER_PT}px; ${style}">${prefix}<span style="margin-left: ${gapPt * PX_PER_PT}px;">${text}</span></div>`;
+                }).join('');
+                
+                if (bgColor && bgColor !== '#ffffff' && bgColor.toLowerCase() !== '#ffffff') {
+                    return `<div style="background: ${bgColor}; padding: 8px 0; margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;"><div style="padding: 0 8px;">${items}</div></div>`;
+                } else {
+                    return `<div style="margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;">${items}</div>`;
+                }
             };
 
             let contentHtml = `
-                <div style="${elStyle('h1')}">1. Introduction to Documentation</div>
-                <div style="${elStyle('paragraph')}">This is a comprehensive sample paragraph demonstrating the body text style in a professional document. It shows exactly how your exported content will appear with the current template settings applied. The layout system intelligently distributes text across multiple columns when enabled.</div>
+                ${wrapElement('h1', '1. Introduction to Documentation')}
+                ${wrapElement('paragraph', 'This is a comprehensive sample paragraph demonstrating the body text style in a professional document. It shows exactly how your exported content will appear with the current template settings applied. The layout system intelligently distributes text across multiple columns when enabled.')}
                 
-                <div style="${elStyle('h2')}">1.1 Key Concepts and Fundamentals</div>
-                <div style="${elStyle('paragraph')}">Understanding the foundational concepts is crucial for effective implementation. This paragraph provides essential background information that sets the context for the more detailed sections that follow. The text demonstrates proper alignment and spacing according to your template configuration.</div>
+                ${wrapElement('h2', '1.1 Key Concepts and Fundamentals')}
+                ${wrapElement('paragraph', 'Understanding the foundational concepts is crucial for effective implementation. This paragraph provides essential background information that sets the context for the more detailed sections that follow. The text demonstrates proper alignment and spacing according to your template configuration.')}
                 
-                <div style="${elStyle('paragraph')}">Additional context and supporting information helps reinforce the key concepts introduced. When working with templates, multiple paragraphs allow for thorough explanation of complex topics. The column layout automatically flows content for optimal distribution.</div>
+                ${wrapElement('paragraph', 'Additional context and supporting information helps reinforce the key concepts introduced. When working with templates, multiple paragraphs allow for thorough explanation of complex topics. The column layout automatically flows content for optimal distribution.')}
                 
-                <div style="${elStyle('h3')}">1.1.1 Detailed Technical Information</div>
-                <div style="${elStyle('paragraph')}">This subsection contains more granular details about specific implementation aspects. Technical documentation requires precise explanations and comprehensive coverage of edge cases and special scenarios that might arise during usage.</div>
+                ${wrapElement('h3', '1.1.1 Detailed Technical Information')}
+                ${wrapElement('paragraph', 'This subsection contains more granular details about specific implementation aspects. Technical documentation requires precise explanations and comprehensive coverage of edge cases and special scenarios that might arise during usage.')}
                 
-                <div style="${elStyle('list')}">
-                    ${cfg.elements.list?.number_format === 'numbered' ? '1.' : '•'} First foundational concept<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '2.' : '•'} Second principle with supporting rationale<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '3.' : '•'} Third methodology for understanding<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '4.' : '•'} Fourth approach with practical examples<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '5.' : '•'} Fifth consideration for implementation<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '6.' : '•'} Sixth element completing the framework<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '7.' : '•'} Seventh point extending the discussion
-                </div>
+                ${listHtml()}
                 
-                <div style="${elStyle('h3')}">1.1.2 Practical Implementation Details</div>
-                <div style="${elStyle('paragraph')}">Moving from theory to practice requires careful planning and execution. Implementation details must account for various scenarios, edge cases, and potential challenges that arise in real-world applications.</div>
+                ${wrapElement('h3', '1.1.2 Practical Implementation Details')}
+                ${wrapElement('paragraph', 'Moving from theory to practice requires careful planning and execution. Implementation details must account for various scenarios, edge cases, and potential challenges that arise in real-world applications.')}
                 
                 <div style="${elStyle('h2')}">2. Main Content and Core Topics</div>
                 <div style="${elStyle('paragraph')}">This section represents the heart of the documentation system. It demonstrates comprehensive coverage of primary topics with sufficient depth and breadth to provide users with actionable information and clear guidance.</div>
                 
-                <div style="${elStyle('paragraph')}">The multi-column layout excels at presenting substantial amounts of information in an organized, readable format. Content naturally flows across columns, maximizing page usage while maintaining readability and visual appeal.</div>
+                ${wrapElement('paragraph', 'The multi-column layout excels at presenting substantial amounts of information in an organized, readable format. Content naturally flows across columns, maximizing page usage while maintaining readability and visual appeal.')}
                 
-                <div style="${elStyle('h3')}">2.1 Subsection: Advanced Concepts</div>
+                ${wrapElement('h3', '2.1 Subsection: Advanced Concepts')}
                 <div style="${elStyle('paragraph')}">Advanced topics build upon foundational knowledge and explore more sophisticated implementations. This subsection provides insights for users seeking deeper understanding and more advanced techniques for complex scenarios.</div>
                 
                 <div style="${elStyle('h4')}">2.1.1 Technical Deep Dive</div>
@@ -784,21 +919,12 @@
                 
                 <div style="${elStyle('paragraph')}">Code examples demonstrate practical implementation patterns and best practices for configuration and usage.</div>
                 
-                <div style="${elStyle('h3')}">2.2 Extended Topics and Additional Coverage</div>
-                <div style="${elStyle('paragraph')}">Extended topic coverage ensures comprehensive treatment of all aspects relevant to users. This prevents gaps in knowledge and provides reference material for various use cases and scenarios.</div>
+                ${wrapElement('h3', '2.2 Extended Topics and Additional Coverage')}
+                ${wrapElement('paragraph', 'Extended topic coverage ensures comprehensive treatment of all aspects relevant to users. This prevents gaps in knowledge and provides reference material for various use cases and scenarios.')}
                 
-                <div style="${elStyle('list')}">
-                    ${cfg.elements.list?.number_format === 'numbered' ? '1.' : '•'} Extended topic point number one<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '2.' : '•'} Comprehensive coverage element two<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '3.' : '•'} Detailed coverage section three<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '4.' : '•'} Additional context element four<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '5.' : '•'} Supplementary information five<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '6.' : '•'} Extended coverage six<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '7.' : '•'} Comprehensive point seven<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '8.' : '•'} Final extended topic eight
-                </div>
+                ${listHtml()}
                 
-                <div style="${elStyle('h2')}">3. Advanced Features and Capabilities</div>
+                ${wrapElement('h2', '3. Advanced Features and Capabilities')}
                 <div style="${elStyle('paragraph')}">Advanced features extend the core functionality with powerful capabilities for specialized use cases. Understanding these advanced features enables users to leverage the full potential of the system and create sophisticated, professional documents.</div>
                 
                 <div style="${elStyle('h3')}">3.1 Template-Based Customization</div>
@@ -812,7 +938,7 @@
                 <div style="${elStyle('h4')}">Three-Column Configuration</div>
                 <div style="${elStyle('paragraph')}">Three-column layout works exceptionally well for documents with significant content, allowing newspapers-style presentation of information. This configuration is ideal for whitepapers, technical documentation, and comprehensive guides.</div>
                 
-                <div style="${elStyle('h2')}">4. Practical Examples and Use Cases</div>
+                ${wrapElement('h2', '4. Practical Examples and Use Cases')}
                 <div style="${elStyle('paragraph')}">Real-world examples demonstrate how templates function in actual scenarios. Practical applications help users understand template benefits and learn how to implement similar solutions for their specific needs and requirements.</div>
                 
                 <div style="${elStyle('h3')}">4.1 Educational Materials</div>
@@ -824,7 +950,7 @@
                 <div style="${elStyle('h3')}">4.3 Technical Specification</div>
                 <div style="${elStyle('paragraph')}">Technical specifications demand precise organization and clear presentation of complex information. Multi-column layouts support this by efficiently using available space while maintaining readability.</div>
                 
-                <div style="${elStyle('h2')}">5. Optimization and Best Practices</div>
+                ${wrapElement('h2', '5. Optimization and Best Practices')}
                 <div style="${elStyle('paragraph')}">Optimizing templates and configurations requires understanding of both aesthetic and functional principles. Following established best practices ensures documents are both beautiful and functional.</div>
                 
                 <div style="${elStyle('h3')}">5.1 Performance Optimization</div>
@@ -846,7 +972,7 @@
                     ${cfg.elements.list?.number_format === 'numbered' ? '10.' : '•'} Test across different devices and output formats
                 </div>
                 
-                <div style="${elStyle('h2')}">6. Troubleshooting and FAQ</div>
+                ${wrapElement('h2', '6. Troubleshooting and FAQ')}
                 <div style="${elStyle('paragraph')}">Common issues and frequently asked questions are addressed in this section. Understanding solutions to typical problems helps users resolve issues quickly and effectively without requiring external support.</div>
                 
                 <div style="${elStyle('h3')}">6.1 Common Questions</div>
@@ -855,21 +981,15 @@
                 <div style="${elStyle('h3')}">6.2 Troubleshooting Guide</div>
                 <div style="${elStyle('paragraph')}">Systematic troubleshooting approaches help identify and resolve issues systematically. Following a structured methodology ensures problems are identified quickly and solutions are implemented effectively.</div>
                 
-                <div style="${elStyle('h2')}">7. Conclusion and Summary</div>
+                ${wrapElement('h2', '7. Conclusion and Summary')}
                 <div style="${elStyle('paragraph')}">This comprehensive guide has covered extensive ground, from foundational concepts through advanced features and practical applications. Templates provide powerful capabilities for creating professional, consistent documents with minimal effort.</div>
                 
                 <div style="${elStyle('paragraph')}">By leveraging template-based customization and multi-column layouts effectively, users can create sophisticated documents that meet professional standards while maintaining content focus. The system is designed to be intuitive yet powerful, accessible to new users while offering advanced capabilities for experienced practitioners.</div>
                 
-                <div style="${elStyle('h3')}">Final Recommendations</div>
-                <div style="${elStyle('list')}">
-                    ${cfg.elements.list?.number_format === 'numbered' ? '1.' : '•'} Explore different template configurations to find your optimal setup<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '2.' : '•'} Experiment with column counts for your specific content types<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '3.' : '•'} Test page orientations to maximize content utilization<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '4.' : '•'} Customize colors and fonts to match your personal or corporate branding<br>
-                    ${cfg.elements.list?.number_format === 'numbered' ? '5.' : '•'} Share successful templates with your team for consistency
-                </div>
+                ${wrapElement('h3', 'Final Recommendations')}
+                ${listHtml()}
                 
-                <div style="${elStyle('paragraph')}">Thank you for exploring the comprehensive template system. We hope this guide has provided valuable insights and guidance for creating professional, beautiful documents effortlessly.</div>
+                ${wrapElement('paragraph', 'Thank you for exploring the comprehensive template system. We hope this guide has provided valuable insights and guidance for creating professional, beautiful documents effortlessly.')}
             `;
 
             // Footer (always anchored at bottom, spans all columns)
@@ -939,11 +1059,7 @@
             // Show/hide page selection card based on cover page enabled
             const pageSelectionCard = document.getElementById('pageSelectionCard');
             if (pageSelectionCard) {
-                if (cfg.cover_page.enabled && currentPageView === 'cover') {
-                    pageSelectionCard.style.display = 'flex';
-                    // Update button states
-                    updatePageViewButtons();
-                } else if (cfg.cover_page.enabled && currentPageView === 'contents') {
+                if (cfg.cover_page.enabled) {
                     pageSelectionCard.style.display = 'flex';
                     // Update button states
                     updatePageViewButtons();
@@ -958,9 +1074,8 @@
                 // Show only cover page
                 pageContent = coverHtml;
             } else {
-                // Show contents (with cover above if enabled, but user is viewing contents)
+                // Show contents only (no cover page)
                 pageContent = `
-                    ${cfg.cover_page.enabled ? coverHtml : ''}
                     <div class="preview-content" style="${colStyle}">
                         ${contentHtml}
                         ${tableHtml}
