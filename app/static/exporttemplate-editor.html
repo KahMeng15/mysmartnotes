@@ -632,14 +632,26 @@
             // Ensure element defaults are set for new elements if not in config
             if (cfg.elements) {
                 if (!cfg.elements.note_title) {
-                    cfg.elements.note_title = { alignment: 'left', text_color: '#2C3E50', background_color: null, font_weight: 'bold', font_size: 18 };
+                    cfg.elements.note_title = { alignment: 'left', text_color: '#2C3E50', background_color: null, font_weight: 'bold', font_size: 18, margin_top: 0, margin_bottom: 8 };
                 }
                 if (!cfg.elements.subject_name) {
-                    cfg.elements.subject_name = { alignment: 'left', text_color: '#2C3E50', background_color: null, font_weight: 'bold', font_size: 14 };
+                    cfg.elements.subject_name = { alignment: 'left', text_color: '#2C3E50', background_color: null, font_weight: 'bold', font_size: 14, margin_top: 0, margin_bottom: 8 };
                 }
                 if (!cfg.elements.group_name) {
-                    cfg.elements.group_name = { alignment: 'left', text_color: '#2C3E50', background_color: null, font_weight: 'normal', font_size: 12 };
+                    cfg.elements.group_name = { alignment: 'left', text_color: '#2C3E50', background_color: null, font_weight: 'normal', font_size: 12, margin_top: 0, margin_bottom: 8 };
                 }
+                // Ensure all elements have margin properties
+                ELEMENTS.forEach(el => {
+                    if (!cfg.elements[el]) {
+                        cfg.elements[el] = {};
+                    }
+                    if (cfg.elements[el].margin_top === undefined) {
+                        cfg.elements[el].margin_top = 0;
+                    }
+                    if (cfg.elements[el].margin_bottom === undefined) {
+                        cfg.elements[el].margin_bottom = 8;
+                    }
+                });
             }
         }
 
@@ -667,6 +679,8 @@
                     background_color: document.getElementById(`el_${el}_bg`)?.value || null,
                     font_weight: document.getElementById(`el_${el}_weight`)?.value || defaultWeight,
                     font_size: parseInt(document.getElementById(`el_${el}_size`)?.value || defaultSize),
+                    margin_top: parseInt(document.getElementById(`el_${el}_margin_top`)?.value || 0),
+                    margin_bottom: parseInt(document.getElementById(`el_${el}_margin_bottom`)?.value || 8),
                 };
                 if (el === 'list') {
                     elements[el].number_format = document.getElementById(`el_${el}_numfmt`)?.value || 'bullet';
@@ -794,6 +808,14 @@
                             <div class="setting-row">
                                 <label>Size (pt)</label>
                                 <input type="number" id="el_${el}_size" value="${style.font_size || defaultSize}" min="8" max="60" onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Top Margin (pt)</label>
+                                <input type="number" id="el_${el}_margin_top" value="${style.margin_top ?? 0}" min="0" max="60" onchange="markDirty(); updatePreview();">
+                            </div>
+                            <div class="setting-row">
+                                <label>Bottom Margin (pt)</label>
+                                <input type="number" id="el_${el}_margin_bottom" value="${style.margin_bottom ?? 8}" min="0" max="60" onchange="markDirty(); updatePreview();">
                             </div>
                         </div>
                     </div>
@@ -944,11 +966,13 @@
                 const s = cfg.elements[key] || {};
                 const style = elStyle(key);
                 const bgColor = s.background_color || null;
+                const marginTopPx = (s.margin_top ?? 0) * PX_PER_PT;
+                const marginBottomPx = (s.margin_bottom ?? 8) * PX_PER_PT;
                 if (bgColor && bgColor !== '#ffffff' && bgColor.toLowerCase() !== '#ffffff') {
                     const padding = 8; // tight padding
-                    return `<div style="background: ${bgColor}; padding: ${padding}px 0; margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;"><div style="${style} padding: 0 ${padding}px;">${content}</div></div>`;
+                    return `<div style="background: ${bgColor}; padding: ${padding}px 0; margin-top: ${marginTopPx}px; margin-bottom: ${marginBottomPx}px;"><div style="${style} padding: 0 ${padding}px;">${content}</div></div>`;
                 } else {
-                    return `<div style="${style} margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;">${content}</div>`;
+                    return `<div style="${style} margin-top: ${marginTopPx}px; margin-bottom: ${marginBottomPx}px;">${content}</div>`;
                 }
             };
 
@@ -959,6 +983,8 @@
                 const bulletChar = cfg.list_config?.custom_bullet || '•';
                 const style = elStyle('list');
                 const bgColor = s.background_color || null;
+                const marginTopPx = (s.margin_top ?? 0) * PX_PER_PT;
+                const marginBottomPx = (s.margin_bottom ?? 8) * PX_PER_PT;
                 
                 const items = [
                     'First foundational concept',
@@ -979,9 +1005,9 @@
                 }).join('');
                 
                 if (bgColor && bgColor !== '#ffffff' && bgColor.toLowerCase() !== '#ffffff') {
-                    return `<div style="background: ${bgColor}; padding: 8px 0; margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;"><div style="padding: 0 8px;">${items}</div></div>`;
+                    return `<div style="background: ${bgColor}; padding: 8px 0; margin-top: ${marginTopPx}px; margin-bottom: ${marginBottomPx}px;"><div style="padding: 0 8px;">${items}</div></div>`;
                 } else {
-                    return `<div style="margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;">${items}</div>`;
+                    return `<div style="margin-top: ${marginTopPx}px; margin-bottom: ${marginBottomPx}px;">${items}</div>`;
                 }
             };
 
@@ -992,6 +1018,8 @@
                 const bulletChar = cfg.list_config?.custom_bullet || '•';
                 const style = elStyle('list');
                 const bgColor = s.background_color || null;
+                const marginTopPx = (s.margin_top ?? 0) * PX_PER_PT;
+                const marginBottomPx = (s.margin_bottom ?? 8) * PX_PER_PT;
                 
                 const items = [
                     'Maintain visual hierarchy through consistent heading styles',
@@ -1007,9 +1035,9 @@
                 }).join('');
                 
                 if (bgColor && bgColor !== '#ffffff' && bgColor.toLowerCase() !== '#ffffff') {
-                    return `<div style="background: ${bgColor}; padding: 8px 0; margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;"><div style="padding: 0 8px;">${items}</div></div>`;
+                    return `<div style="background: ${bgColor}; padding: 8px 0; margin-top: ${marginTopPx}px; margin-bottom: ${marginBottomPx}px;"><div style="padding: 0 8px;">${items}</div></div>`;
                 } else {
-                    return `<div style="margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;">${items}</div>`;
+                    return `<div style="margin-top: ${marginTopPx}px; margin-bottom: ${marginBottomPx}px;">${items}</div>`;
                 }
             };
 
