@@ -129,16 +129,20 @@
                                     </select>
                                 </div>
                                 <div class="setting-row">
-                                    <label>Custom Bullet (or preset)</label>
-                                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                        <input type="text" id="cfgCustomBullet" placeholder="•" maxlength="3" value="•" onchange="markDirty(); updatePreview();" style="flex: 1; min-width: 50px;">
-                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '•'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">•</button>
-                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '◆'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">◆</button>
-                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '→'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">→</button>
-                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '✓'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">✓</button>
-                                        <button type="button" onclick="document.getElementById('cfgCustomBullet').value = '-'; markDirty(); updatePreview();" style="padding: 6px 8px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px;">-</button>
+                                        <label>Bullet Style</label>
+                                        <div style="width: 120px;">
+                                            <select id="cfgCustomBulletPreset" onchange="handleBulletPresetChange(this.value)" style="width: 100%; box-sizing: border-box;">
+                                                <option value="">-- Presets --</option>
+                                                <option value="•">• Bullet</option>
+                                                <option value="◆">◆ Diamond</option>
+                                                <option value="→">→ Arrow</option>
+                                                <option value="✓">✓ Check</option>
+                                                <option value="-">- Dash</option>
+                                                <option value="custom" selected>Custom</option>
+                                            </select>
+                                            <input type="text" id="cfgCustomBullet" placeholder="Enter custom bullet" maxlength="3" value="•" onchange="markDirty(); updatePreview();" style="width: 100%; box-sizing: border-box; margin-top: 8px;">
+                                        </div>
                                     </div>
-                                </div>
                                 </div>
                             </div>
 
@@ -278,6 +282,28 @@
                                 </div>
                             </div>
 
+                            <!-- Header/Titles -->
+                            <div class="settings-group">
+                                <h4><i class="ph ph-text"></i> Header/Titles</h4>
+                                <div class="group-content">
+                                <div class="setting-row">
+                                    <label>Show Note Title</label>
+                                    <div class="mini-toggle active" id="cfgHeaderShowNoteTitle"
+                                        onclick="this.classList.toggle('active'); markDirty(); updatePreview();"></div>
+                                </div>
+                                <div class="setting-row">
+                                    <label>Show Subject Name</label>
+                                    <div class="mini-toggle active" id="cfgHeaderShowSubjectName"
+                                        onclick="this.classList.toggle('active'); markDirty(); updatePreview();"></div>
+                                </div>
+                                <div class="setting-row">
+                                    <label>Show Group Name</label>
+                                    <div class="mini-toggle active" id="cfgHeaderShowGroupName"
+                                        onclick="this.classList.toggle('active'); markDirty(); updatePreview();"></div>
+                                </div>
+                                </div>
+                            </div>
+
                             <!-- Footer -->
                             <div class="settings-group">
                                 <h4><i class="ph ph-text-align-center"></i> Footer</h4>
@@ -341,8 +367,11 @@
         let isDirty = false;
         let currentTemplate = null;
 
-        const ELEMENTS = ['h1', 'h2', 'h3', 'h4', 'h5', 'paragraph', 'list'];
+        const ELEMENTS = ['note_title', 'subject_name', 'group_name', 'h1', 'h2', 'h3', 'h4', 'h5', 'paragraph', 'list'];
         const ELEMENT_LABELS = {
+            note_title: 'Note Title',
+            subject_name: 'Subject Name',
+            group_name: 'Group Name',
             h1: 'Heading 1', h2: 'Heading 2', h3: 'Heading 3',
             h4: 'Heading 4', h5: 'Heading 5',
             paragraph: 'Paragraph', list: 'List',
@@ -526,6 +555,27 @@
             isDirty = true;
         }
 
+        function handleBulletPresetChange(value) {
+            const customInput = document.getElementById('cfgCustomBullet');
+            const preset = document.getElementById('cfgCustomBulletPreset');
+            
+            if (value === 'custom') {
+                // Show custom input
+                customInput.style.display = '';
+                customInput.focus();
+            } else if (value !== '') {
+                // Apply preset and hide custom input
+                customInput.value = value;
+                customInput.style.display = 'none';
+                // Keep the preset selected in dropdown (don't reset it)
+                markDirty();
+                updatePreview();
+            } else {
+                // Hide custom input when "-- Presets --" is selected
+                customInput.style.display = 'none';
+            }
+        }
+
         // ─── Config I/O ──────────────────────────────────────────
 
         function loadConfig(cfg) {
@@ -570,20 +620,53 @@
             document.getElementById('cfgCoverVAlign').value = cfg.cover_page?.v_align || 'middle';
             toggleSet('cfgCoverShowDate', cfg.cover_page?.show_date ?? true);
 
+            // Header/Titles
+            toggleSet('cfgHeaderShowNoteTitle', cfg.header?.show_note_title ?? true);
+            toggleSet('cfgHeaderShowSubjectName', cfg.header?.show_subject_name ?? true);
+            toggleSet('cfgHeaderShowGroupName', cfg.header?.show_group_name ?? true);
+
             // Footer
             toggleSet('cfgFooterPageNumber', cfg.footer?.show_page_number ?? true);
             document.getElementById('cfgFooterText').value = cfg.footer?.custom_text || '';
+            
+            // Ensure element defaults are set for new elements if not in config
+            if (cfg.elements) {
+                if (!cfg.elements.note_title) {
+                    cfg.elements.note_title = { alignment: 'left', text_color: '#2C3E50', background_color: null, font_weight: 'bold', font_size: 18 };
+                }
+                if (!cfg.elements.subject_name) {
+                    cfg.elements.subject_name = { alignment: 'left', text_color: '#2C3E50', background_color: null, font_weight: 'bold', font_size: 14 };
+                }
+                if (!cfg.elements.group_name) {
+                    cfg.elements.group_name = { alignment: 'left', text_color: '#2C3E50', background_color: null, font_weight: 'normal', font_size: 12 };
+                }
+            }
         }
 
         function gatherConfig() {
             const elements = {};
             ELEMENTS.forEach(el => {
+                // Get defaults based on element type
+                let defaultSize = 11;
+                let defaultWeight = 'normal';
+                let defaultColor = '#2C3E50';
+                
+                if (el === 'note_title') {
+                    defaultSize = 18;
+                    defaultWeight = 'bold';
+                } else if (el === 'subject_name') {
+                    defaultSize = 14;
+                    defaultWeight = 'bold';
+                } else if (el === 'group_name') {
+                    defaultSize = 12;
+                }
+                
                 elements[el] = {
                     alignment: document.getElementById(`el_${el}_align`)?.value || 'left',
-                    text_color: document.getElementById(`el_${el}_color`)?.value || '#2C3E50',
+                    text_color: document.getElementById(`el_${el}_color`)?.value || defaultColor,
                     background_color: document.getElementById(`el_${el}_bg`)?.value || null,
-                    font_weight: document.getElementById(`el_${el}_weight`)?.value || 'normal',
-                    font_size: parseInt(document.getElementById(`el_${el}_size`)?.value || 11),
+                    font_weight: document.getElementById(`el_${el}_weight`)?.value || defaultWeight,
+                    font_size: parseInt(document.getElementById(`el_${el}_size`)?.value || defaultSize),
                 };
                 if (el === 'list') {
                     elements[el].number_format = document.getElementById(`el_${el}_numfmt`)?.value || 'bullet';
@@ -640,7 +723,12 @@
                     number_format: document.getElementById('cfgNumFormat').value || '1.',
                     custom_bullet: document.getElementById('cfgCustomBullet').value || '•',
                 },
-                header: { enabled: false, text: '' },
+                header: {
+                    enabled: true,
+                    show_note_title: document.getElementById('cfgHeaderShowNoteTitle').classList.contains('active'),
+                    show_subject_name: document.getElementById('cfgHeaderShowSubjectName').classList.contains('active'),
+                    show_group_name: document.getElementById('cfgHeaderShowGroupName').classList.contains('active'),
+                },
                 footer: {
                     enabled: true,
                     show_page_number: document.getElementById('cfgFooterPageNumber').classList.contains('active'),
@@ -668,6 +756,13 @@
                 const style = cfg.elements?.[el] || {};
                 const label = ELEMENT_LABELS[el];
                 const isListEl = el === 'list';
+                
+                // Set default font sizes for header elements
+                let defaultSize = 11;
+                if (el === 'note_title') defaultSize = 18;
+                else if (el === 'subject_name') defaultSize = 14;
+                else if (el === 'group_name') defaultSize = 12;
+                
                 return `
                     <div class="element-style-card">
                         <div class="element-name">${label}</div>
@@ -698,7 +793,7 @@
                             </div>
                             <div class="setting-row">
                                 <label>Size (pt)</label>
-                                <input type="number" id="el_${el}_size" value="${style.font_size || 11}" min="8" max="60" onchange="markDirty(); updatePreview();">
+                                <input type="number" id="el_${el}_size" value="${style.font_size || defaultSize}" min="8" max="60" onchange="markDirty(); updatePreview();">
                             </div>
                         </div>
                     </div>
@@ -806,7 +901,7 @@
             
             page.style.width = pageWidthPx + 'px';
             page.style.height = pageHeightPx + 'px';
-            page.style.padding = `${marginTopPx}px ${marginRightPx}px ${marginBottomPx}px ${marginLeftPx}px`;
+            page.style.padding = '0';
             page.style.transform = `scale(${currentZoom})`;
             page.style.transformOrigin = 'top center';
 
@@ -877,7 +972,10 @@
                     const prefix = cfg.list_config?.number_format === '1.' ? (idx + 1) + '.' : 
                                    cfg.list_config?.number_format === '1)' ? (idx + 1) + ')' :
                                    cfg.list_config?.number_format === '1]' ? (idx + 1) + ']' : bulletChar;
-                    return `<div style="margin-left: ${marginPt * PX_PER_PT}px; ${style}">${prefix}<span style="margin-left: ${gapPt * PX_PER_PT}px;">${text}</span></div>`;
+                    return `<div style="display: flex; margin-left: ${marginPt * PX_PER_PT}px; margin-bottom: 4px;">
+                        <div style="flex-shrink: 0; width: 20px; ${style}">${prefix}</div>
+                        <div style="flex: 1; margin-left: ${gapPt * PX_PER_PT}px; ${style}">${text}</div>
+                    </div>`;
                 }).join('');
                 
                 if (bgColor && bgColor !== '#ffffff' && bgColor.toLowerCase() !== '#ffffff') {
@@ -887,7 +985,48 @@
                 }
             };
 
+            let unorderedListHtml = () => {
+                const s = cfg.elements['list'] || {};
+                const marginPt = cfg.spacing?.list_left_margin || 24;
+                const gapPt = cfg.spacing?.list_bullet_gap || 6;
+                const bulletChar = cfg.list_config?.custom_bullet || '•';
+                const style = elStyle('list');
+                const bgColor = s.background_color || null;
+                
+                const items = [
+                    'Maintain visual hierarchy through consistent heading styles',
+                    'Use appropriate colors that convey meaning and maintain readability',
+                    'Ensure adequate white space between sections and elements',
+                    'Choose typography that balances professionalism with character',
+                    'Test layouts with varying content lengths and volume'
+                ].map((text) => {
+                    return `<div style="display: flex; margin-left: ${marginPt * PX_PER_PT}px; margin-bottom: 4px;">
+                        <div style="flex-shrink: 0; width: 20px; ${style}">${bulletChar}</div>
+                        <div style="flex: 1; margin-left: ${gapPt * PX_PER_PT}px; ${style}">${text}</div>
+                    </div>`;
+                }).join('');
+                
+                if (bgColor && bgColor !== '#ffffff' && bgColor.toLowerCase() !== '#ffffff') {
+                    return `<div style="background: ${bgColor}; padding: 8px 0; margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;"><div style="padding: 0 8px;">${items}</div></div>`;
+                } else {
+                    return `<div style="margin-bottom: ${cfg.spacing.paragraph_spacing * PX_PER_PT}px;">${items}</div>`;
+                }
+            };
+
+            // Build header titles if any are enabled - each as separate element
+            let headerHtml = '';
+            if (cfg.header?.show_note_title) {
+                headerHtml += wrapElement('note_title', 'Sample Note Title');
+            }
+            if (cfg.header?.show_subject_name) {
+                headerHtml += wrapElement('subject_name', 'Sample Subject');
+            }
+            if (cfg.header?.show_group_name) {
+                headerHtml += wrapElement('group_name', 'Sample Group');
+            }
+
             let contentHtml = `
+                ${headerHtml}
                 ${wrapElement('h1', '1. Introduction to Documentation')}
                 ${wrapElement('paragraph', 'This is a comprehensive sample paragraph demonstrating the body text style in a professional document. It shows exactly how your exported content will appear with the current template settings applied. The layout system intelligently distributes text across multiple columns when enabled.')}
                 
@@ -922,7 +1061,7 @@
                 ${wrapElement('h3', '2.2 Extended Topics and Additional Coverage')}
                 ${wrapElement('paragraph', 'Extended topic coverage ensures comprehensive treatment of all aspects relevant to users. This prevents gaps in knowledge and provides reference material for various use cases and scenarios.')}
                 
-                ${listHtml()}
+                ${unorderedListHtml()}
                 
                 ${wrapElement('h2', '3. Advanced Features and Capabilities')}
                 <div style="${elStyle('paragraph')}">Advanced features extend the core functionality with powerful capabilities for specialized use cases. Understanding these advanced features enables users to leverage the full potential of the system and create sophisticated, professional documents.</div>
@@ -992,10 +1131,11 @@
                 ${wrapElement('paragraph', 'Thank you for exploring the comprehensive template system. We hope this guide has provided valuable insights and guidance for creating professional, beautiful documents effortlessly.')}
             `;
 
-            // Footer (always anchored at bottom, spans all columns)
+            // Footer (positioned in bottom margin, left and right aligned)
             let footerHtml = `
-                <div class="preview-footer">
-                    ${cfg.footer.show_page_number ? 'Page 1 | ' : ''}Generated by mysmartnotes.vercel.app | Create notes and study smart!${cfg.footer.custom_text ? ' | ' + cfg.footer.custom_text : ''}
+                <div class="preview-footer" style="display: flex; justify-content: space-between; align-items: center; padding: ${10 * PX_PER_PT}px ${marginLeftPx}px ${10 * PX_PER_PT}px ${marginLeftPx}px; font-size: 7pt; color: #95a5a6; position: absolute; bottom: 0; left: 0; right: 0; background: white;">
+                    <div style="flex: 1; text-align: left;">Generated by mysmartnotes.vercel.app | Create notes and study smart!${cfg.footer.custom_text ? ' | ' + cfg.footer.custom_text : ''}</div>
+                    <div style="flex-shrink: 0; text-align: right;">${cfg.footer.show_page_number ? 'Page 1' : ''}</div>
                 </div>
             `;
 
@@ -1056,16 +1196,42 @@
             page.style.columnCount = '';
             page.style.columnGap = '';
 
-            // Show/hide page selection card based on cover page enabled
+            // Show/hide page selection card and divider based on cover page enabled
             const pageSelectionCard = document.getElementById('pageSelectionCard');
+            const dividerElement = pageSelectionCard?.previousElementSibling;
+            
             if (pageSelectionCard) {
                 if (cfg.cover_page.enabled) {
                     pageSelectionCard.style.display = 'flex';
+                    if (dividerElement) dividerElement.style.display = '';
                     // Update button states
                     updatePageViewButtons();
                 } else {
                     pageSelectionCard.style.display = 'none';
+                    if (dividerElement) dividerElement.style.display = 'none';
                 }
+            }
+
+            // Disable/enable all cover page inputs based on cover page enabled
+            const coverPageInputIds = [
+                'cfgCoverH1Text', 'cfgCoverTitleSize', 'cfgCoverTitleColor',
+                'cfgCoverH2Text', 'cfgCoverH2Size', 'cfgCoverH2Color',
+                'cfgCoverHAlign', 'cfgCoverVAlign'
+            ];
+            coverPageInputIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.disabled = !cfg.cover_page.enabled;
+                    el.style.cursor = cfg.cover_page.enabled ? 'pointer' : 'not-allowed';
+                    el.style.opacity = cfg.cover_page.enabled ? '1' : '0.5';
+                }
+            });
+            
+            // Also disable the show date toggle
+            const showDateToggle = document.getElementById('cfgCoverShowDate');
+            if (showDateToggle) {
+                showDateToggle.style.pointerEvents = cfg.cover_page.enabled ? 'auto' : 'none';
+                showDateToggle.style.opacity = cfg.cover_page.enabled ? '1' : '0.5';
             }
 
             // Build the page content based on view mode
@@ -1076,11 +1242,15 @@
             } else {
                 // Show contents only (no cover page)
                 pageContent = `
-                    <div class="preview-content" style="${colStyle}">
-                        ${contentHtml}
-                        ${tableHtml}
+                    <div style="position: relative; width: 100%; height: 100%; display: flex; flex-direction: column;">
+                        <div style="padding: ${marginTopPx}px ${marginRightPx}px ${marginBottomPx}px ${marginLeftPx}px; flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+                            <div class="preview-content" style="${colStyle} width: 100%; height: 100%;">
+                                ${contentHtml}
+                                ${tableHtml}
+                            </div>
+                        </div>
+                        ${footerHtml}
                     </div>
-                    ${footerHtml}
                 `;
             }
 
