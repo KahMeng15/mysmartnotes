@@ -13,6 +13,8 @@ from docx import Document
 from docx.shared import Pt, Inches, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.section import WD_ORIENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 import re
 
 from app.processing.text_processor import ContentSegment, ContentType
@@ -47,6 +49,24 @@ class DocxGenerator:
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 
         self.output_docx = os.path.join(self.output_dir, "OUTPUT.docx")
+
+    def _set_cell_background(self, cell, fill_color):
+        """Set background color for a table cell"""
+        if not fill_color or fill_color.lower() == '#ffffff':
+            return
+        fill_color = fill_color.lstrip('#')
+        shading_elm = OxmlElement('w:shd')
+        shading_elm.set(qn('w:fill'), fill_color)
+        cell._tc.get_or_add_tcPr().append(shading_elm)
+
+    def _set_number_of_columns(self, section, cols):
+        """Set number of columns for a section"""
+        if cols <= 1:
+            return
+        sectPr = section._sectPr
+        cols_el = sectPr.xpath('./w:cols')[0]
+        cols_el.set(qn('w:num'), str(cols))
+        cols_el.set(qn('w:space'), '720') # 0.5 inch gap default (720 twentieths of a point)
 
     def generate_docx(
         self,
@@ -90,6 +110,7 @@ class DocxGenerator:
                 self._create_toc_placeholder(doc, content_segments)
 
             # Page size and orientation setup from template
+            cols = 1
             if template_config and "page" in template_config:
                 page_cfg = template_config["page"]
                 size_name = page_cfg.get("size", "A4").upper()
@@ -100,6 +121,7 @@ class DocxGenerator:
                     width_cm, height_cm = height_cm, width_cm
                 
                 margins = page_cfg.get("margins", {"top": 25, "bottom": 25, "left": 19, "right": 19})
+                cols = int(page_cfg.get("columns", 1))
                 
                 for section in doc.sections:
                     section.page_width = Cm(width_cm)
@@ -111,7 +133,12 @@ class DocxGenerator:
                     if orientation == "landscape":
                         section.orientation = WD_ORIENT.LANDSCAPE
 
-            # Main content
+            # Main content - Start a new section if columns > 1
+            if cols > 1:
+                from docx.enum.section import WD_SECTION
+                new_section = doc.add_section(WD_SECTION.CONTINUOUS)
+                self._set_number_of_columns(new_section, cols)
+            
             if progress_callback:
                 progress_callback("Rendering content", 50)
             self._create_content(doc, content_segments, extracted_images)
@@ -144,7 +171,9 @@ class DocxGenerator:
         
         # Helper to parse hex color
         def hex_to_rgb(hex_str):
+            if not hex_str: return (0, 0, 0)
             hex_str = hex_str.lstrip('#')
+            if len(hex_str) != 6: return (0, 0, 0)
             return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
         
         # Normal style
@@ -157,7 +186,8 @@ class DocxGenerator:
         font.color.rgb = RGBColor(*p_color)
 
         pf = style.paragraph_format
-        pf.space_after = Pt(spacing_cfg.get("paragraph_spacing", 8))
+        pf.space_after = Pt(p_cfg.get("margin_bottom", spacing_cfg.get("paragraph_spacing", 8)))
+        pf.space_before = Pt(p_cfg.get("margin_top", 0))
         pf.line_spacing = spacing_cfg.get("line_spacing", 1.15)
 
         # Heading styles from template or defaults
@@ -168,6 +198,8 @@ class DocxGenerator:
             "Heading 4": {"key": "h4", "size": 16, "color": "#333333", "bold": True, "space_before": 10, "space_after": 6},
             "Title":     {"key": "note_title", "size": 28, "color": "#1A1A2E", "bold": True, "space_before": 24, "space_after": 12},
             "Subtitle":  {"key": "subject_name", "size": 18, "color": "#2C3E50", "bold": True, "space_before": 12, "space_after": 8},
+            "List Bullet": {"key": "list", "size": 11, "color": "#2C3E50", "bold": False, "space_before": 0, "space_after": 4},
+            "List Number": {"key": "list", "size": 11, "color": "#2C3E50", "bold": False, "space_before": 0, "space_after": 4},
         }
         
         # Add custom styles for GroupName if needed
@@ -192,11 +224,18 @@ class DocxGenerator:
                 h_style.font.color.rgb = RGBColor(*h_color)
                 h_style.font.bold = h_el.get("font_weight", "bold") == "bold"
                 
-                h_spacing = tc.get("spacing", {})
                 h_style.paragraph_format.space_before = Pt(h_el.get("margin_top", defaults["space_before"]))
                 h_style.paragraph_format.space_after = Pt(h_el.get("margin_bottom", defaults["space_after"]))
                 h_style.paragraph_format.alignment = _get_docx_alignment(h_el.get("alignment", "left"))
-                h_style.paragraph_format.line_spacing = h_spacing.get("line_spacing", 1.15)
+                h_style.paragraph_format.line_spacing = spacing_cfg.get("line_spacing", 1.15)
+                
+                # Apply background color (shading) if present
+                bg_color = h_el.get("background_color")
+                if bg_color and bg_color.lower() != '#ffffff':
+                    shading_elm = OxmlElement('w:shd')
+                    shading_elm.set(qn('w:fill'), bg_color.lstrip('#'))
+                    h_style.paragraph_format.element.get_or_add_pPr().append(shading_elm)
+                    
             except (KeyError, ValueError):
                 pass
 
@@ -291,6 +330,37 @@ class DocxGenerator:
 
         doc.add_page_break()
 
+    def _prepare_content(self, segment: ContentSegment, style_name: str) -> str:
+        """
+        Prepare segment content:
+        - Strip and replace list prefix chars with proper bullet / number
+        """
+        content = segment.content
+        tc = getattr(self, '_template_config', None) or {}
+        list_cfg = tc.get("list_config", {})
+        custom_bullet = list_cfg.get("custom_bullet", "•")
+        num_format = list_cfg.get("number_format", "1.")
+
+        if style_name == "List Bullet":
+            # Strip leading markdown list markers (-, *, +, •) and replace with custom_bullet
+            content = re.sub(r'^\s*[-*+•]\s+', '', content)
+            content = f'{custom_bullet}  {content}'
+        elif style_name == "List Number":
+            # Strip leading "1." / "2." etc. and replace with the configured format
+            m = re.match(r'^\s*(\d+)\.\s+', content)
+            if m:
+                num = m.group(1)
+                content = re.sub(r'^\s*\d+\.\s+', '', content)
+                
+                # Apply number format
+                prefix = f"{num}."
+                if num_format == "1)": prefix = f"{num})"
+                elif num_format == "1]": prefix = f"{num}]"
+                
+                content = f'{prefix}  {content}'
+
+        return content
+
     def _create_content(
         self,
         doc: Document,
@@ -332,13 +402,10 @@ class DocxGenerator:
             elif segment.content_type == ContentType.H3:
                 doc.add_heading(segment.content, level=3)
             elif segment.content_type == ContentType.LIST:
-                # Handle bullet points
-                content = segment.content
-                content = re.sub(r'^\s*[-*+•]\s+', '', content)
+                content = self._prepare_content(segment, "List Bullet")
                 doc.add_paragraph(content, style="List Bullet")
             elif segment.content_type == ContentType.ORDERED_LIST:
-                content = segment.content
-                content = re.sub(r'^\s*\d+\.\s+', '', content)
+                content = self._prepare_content(segment, "List Number")
                 doc.add_paragraph(content, style="List Number")
             elif segment.content_type == ContentType.CODE:
                 para = doc.add_paragraph()
@@ -379,6 +446,11 @@ class DocxGenerator:
         body_fs = tbl_cfg.get("body_font_size", 9)
         align_str = tbl_cfg.get("alignment", "left").lower()
         
+        hdr_bg = tbl_cfg.get("header_bg_color", "#593f8f")
+        hdr_fg = tbl_cfg.get("header_text_color", "#ffffff")
+        odd_bg = tbl_cfg.get("odd_row_color", "#ffffff")
+        even_bg = tbl_cfg.get("even_row_color", "#f5f4fb")
+        
         def _get_docx_alignment(a_str):
             if a_str == 'center': return WD_ALIGN_PARAGRAPH.CENTER
             if a_str == 'right': return WD_ALIGN_PARAGRAPH.RIGHT
@@ -388,17 +460,38 @@ class DocxGenerator:
         table = doc.add_table(rows=len(rows_data), cols=len(rows_data[0]))
         table.style = 'Table Grid'
         
+        # Helper to parse hex color to RGBColor
+        def hex_to_rgb_obj(hex_str):
+            if not hex_str: return RGBColor(0, 0, 0)
+            hex_str = hex_str.lstrip('#')
+            return RGBColor(int(hex_str[0:2], 16), int(hex_str[2:4], 16), int(hex_str[4:6], 16))
+
         for r_idx, row in enumerate(rows_data):
             for c_idx, cell_text in enumerate(row):
                 if c_idx >= len(table.columns): continue
                 cell = table.cell(r_idx, c_idx)
+                
+                # Background color
+                if r_idx == 0:
+                    self._set_cell_background(cell, hdr_bg)
+                elif r_idx % 2 == 0: # Even row (0-indexed, so 2nd row of data is index 1, which is odd...)
+                    # Wait, r_idx 0 is header. 
+                    # Row 1 (data row 1) is odd.
+                    # Row 2 (data row 2) is even.
+                    self._set_cell_background(cell, even_bg)
+                else: # Odd row
+                    self._set_cell_background(cell, odd_bg)
+
                 # Set text and formatting
                 para = cell.paragraphs[0]
                 para.alignment = h_align
                 run = para.add_run(cell_text)
                 run.font.size = Pt(header_fs if r_idx == 0 else body_fs)
                 run.font.name = tc.get("font_family", "Instrument Sans")
-                if r_idx == 0: run.bold = True
+                
+                if r_idx == 0:
+                    run.bold = True
+                    run.font.color.rgb = hex_to_rgb_obj(hdr_fg)
                 
         doc.add_paragraph("")
 
