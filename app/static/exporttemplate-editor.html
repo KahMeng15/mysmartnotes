@@ -89,9 +89,59 @@
                                 </div>
                             </div>
 
+                            <!-- Code Blocks -->
+                            <div class="settings-group">
+                                <h4><i class="ph ph-code"></i> Code Blocks</h4>
+                                <div class="group-content">
+                                    <div class="setting-row">
+                                        <label>Font Size</label>
+                                        <input type="number" id="cfgCodeFontSize" value="10" min="6" max="24" onchange="markDirty(); updatePreview();">
+                                    </div>
+                                    <div class="setting-row">
+                                        <label>Text Color</label>
+                                        <input type="color" id="cfgCodeTextColor" value="#2c3e50" onchange="markDirty(); updatePreview();">
+                                    </div>
+                                    <div class="setting-row">
+                                        <label>Background</label>
+                                        <input type="color" id="cfgCodeBgColor" value="#f8f9fa" onchange="markDirty(); updatePreview();">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tables -->
+                            <div class="settings-group">
+                                <h4><i class="ph ph-table"></i> Tables</h4>
+                                <div class="group-content">
+                                    <div class="setting-row">
+                                        <label>Header BG</label>
+                                        <input type="color" id="cfgTableHeadBg" value="#593f8f" onchange="markDirty(); updatePreview();">
+                                    </div>
+                                    <div class="setting-row">
+                                        <label>Header Text</label>
+                                        <input type="color" id="cfgTableHeadText" value="#ffffff" onchange="markDirty(); updatePreview();">
+                                    </div>
+                                    <div class="setting-row">
+                                        <label>Odd Row</label>
+                                        <input type="color" id="cfgTableOddRow" value="#ffffff" onchange="markDirty(); updatePreview();">
+                                    </div>
+                                    <div class="setting-row">
+                                        <label>Even Row</label>
+                                        <input type="color" id="cfgTableEvenRow" value="#f5f4fb" onchange="markDirty(); updatePreview();">
+                                    </div>
+                                    <div class="setting-row">
+                                        <label>Alignment</label>
+                                        <select id="cfgTableAlign" onchange="markDirty(); updatePreview();">
+                                            <option value="left">Left</option>
+                                            <option value="center">Center</option>
+                                            <option value="right">Right</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Spacing -->
                             <div class="settings-group">
-                                <h4><i class="ph ph-text-align-justify"></i> Spacing</h4>
+                                <h4><i class="ph ph-arrows-out-line"></i> Spacing</h4>
                                 <div class="group-content">
                                 <div class="setting-row">
                                     <label>Line Spacing</label>
@@ -588,8 +638,20 @@
             document.getElementById('cfgMarginLeft').value = cfg.page?.margins?.left ?? 19;
             document.getElementById('cfgMarginRight').value = cfg.page?.margins?.right ?? 19;
 
+            // Tables
+            document.getElementById('cfgTableHeadBg').value = cfg.table?.header_bg_color || '#593f8f';
+            document.getElementById('cfgTableHeadText').value = cfg.table?.header_text_color || '#ffffff';
+            document.getElementById('cfgTableOddRow').value = cfg.table?.odd_row_color || '#ffffff';
+            document.getElementById('cfgTableEvenRow').value = cfg.table?.even_row_color || '#f5f4fb';
+            document.getElementById('cfgTableAlign').value = cfg.table?.alignment || 'left';
+
+            // Code Blocks
+            document.getElementById('cfgCodeFontSize').value = cfg.elements?.code?.font_size || 10;
+            document.getElementById('cfgCodeTextColor').value = cfg.elements?.code?.text_color || '#2c3e50';
+            document.getElementById('cfgCodeBgColor').value = cfg.elements?.code?.background_color || '#f8f9fa';
+
             // Spacing
-            document.getElementById('cfgLineSpacing').value = cfg.spacing?.line_spacing ?? 1.15;
+            document.getElementById('cfgLineSpacing').value = cfg.spacing?.line_spacing || 1.15;
             document.getElementById('cfgParagraphSpacing').value = cfg.spacing?.paragraph_spacing ?? 8;
             document.getElementById('cfgListLeftMargin').value = cfg.spacing?.list_left_margin ?? 24;
             document.getElementById('cfgListBulletGap').value = cfg.spacing?.list_bullet_gap ?? 6;
@@ -706,19 +768,18 @@
                     list_left_margin: parseInt(document.getElementById('cfgListLeftMargin').value),
                     list_bullet_gap: parseInt(document.getElementById('cfgListBulletGap').value),
                 },
-                elements,
+                elements: elements,
                 table: {
-                    header_bg_color: document.getElementById('tbl_header_bg').value,
-                    header_text_color: document.getElementById('tbl_header_fg').value,
-                    odd_row_color: document.getElementById('tbl_odd_row').value,
-                    even_row_color: document.getElementById('tbl_even_row').value,
-                    border_color: document.getElementById('tbl_border_color').value,
-                    border_width: parseFloat(document.getElementById('tbl_border_width').value),
-                    repeat_header: document.getElementById('tbl_repeat_header').classList.contains('active'),
-                    cell_padding: parseInt(document.getElementById('tbl_cell_padding').value),
-                    header_font_size: parseInt(document.getElementById('tbl_header_fs').value),
-                    body_font_size: parseInt(document.getElementById('tbl_body_fs').value),
-                    alignment: document.getElementById('tbl_alignment').value,
+                    header_bg_color: document.getElementById('cfgTableHeadBg').value,
+                    header_text_color: document.getElementById('cfgTableHeadText').value,
+                    odd_row_color: document.getElementById('cfgTableOddRow').value,
+                    even_row_color: document.getElementById('cfgTableEvenRow').value,
+                    alignment: document.getElementById('cfgTableAlign').value,
+                },
+                code_block: {
+                    font_size: parseInt(document.getElementById('cfgCodeFontSize').value),
+                    text_color: document.getElementById('cfgCodeTextColor').value,
+                    background_color: document.getElementById('cfgCodeBgColor').value,
                 },
                 cover_page: {
                     enabled: document.getElementById('cfgCoverEnabled').classList.contains('active'),
@@ -958,6 +1019,11 @@
             // so that after scale(0.75) they appear at the correct pt proportion.
             const elStyle = (key) => {
                 const s = cfg.elements[key] || {};
+                const PX_PER_PT = 793 / 595;
+                if (key === 'code') {
+                    const c = cfg.code_block || {};
+                    return `font-family: 'Courier New', monospace; font-size: ${(c.font_size || 9) * PX_PER_PT}px; color: ${c.text_color || '#2c3e50'}; background-color: ${c.background_color || '#f8f9fa'}; padding: 12px; border-radius: 4px; display: block; white-space: pre-wrap; margin: 12px 0; border: 1px solid #e1e4e8;`;
+                }
                 return `text-align: ${s.alignment || 'left'}; color: ${s.text_color || '#2C3E50'}; font-weight: ${s.font_weight || 'normal'}; font-size: ${(s.font_size || 11) * PX_PER_PT}px; line-height: ${cfg.spacing.line_spacing};`;
             };
 
@@ -965,6 +1031,7 @@
             const wrapElement = (key, content) => {
                 const s = cfg.elements[key] || {};
                 const style = elStyle(key);
+                if (key === 'code') return `<div style="${style}">${content}</div>`;
                 const bgColor = s.background_color || null;
                 const marginTopPx = (s.margin_top ?? 0) * PX_PER_PT;
                 const marginBottomPx = (s.margin_bottom ?? 8) * PX_PER_PT;
@@ -974,6 +1041,45 @@
                 } else {
                     return `<div style="${style} margin-top: ${marginTopPx}px; margin-bottom: ${marginBottomPx}px;">${content}</div>`;
                 }
+            };
+
+            const tableHtml = () => {
+                const t = cfg.table || {};
+                const PX_PER_PT = 793 / 595;
+                const pSize = (cfg.elements['paragraph']?.font_size || 11) * PX_PER_PT;
+                const hSize = pSize + 2;
+                const bSize = pSize - 2;
+                
+                return `
+                    <div style="margin: 16px 0; width: 100%; overflow: hidden; border: 1px solid #cccccc; border-radius: 4px;">
+                        <table style="width: 100%; border-collapse: collapse; font-family: 'Instrument Sans', sans-serif; text-align: ${t.alignment || 'left'};">
+                            <thead>
+                                <tr style="background-color: ${t.header_bg_color || '#593f8f'}; color: ${t.header_text_color || '#ffffff'}; font-weight: bold; font-size: ${hSize}px;">
+                                    <th style="padding: 10px; border: 1px solid #cccccc;">Header 1</th>
+                                    <th style="padding: 10px; border: 1px solid #cccccc;">Header 2</th>
+                                    <th style="padding: 10px; border: 1px solid #cccccc;">Header 3</th>
+                                </tr>
+                            </thead>
+                            <tbody style="font-size: ${bSize}px; color: #2C3E50;">
+                                <tr style="background-color: ${t.odd_row_color || '#ffffff'};">
+                                    <td style="padding: 8px; border: 1px solid #cccccc;">Data Row 1</td>
+                                    <td style="padding: 8px; border: 1px solid #cccccc;">Value A</td>
+                                    <td style="padding: 8px; border: 1px solid #cccccc;">Status OK</td>
+                                </tr>
+                                <tr style="background-color: ${t.even_row_color || '#f5f4fb'};">
+                                    <td style="padding: 8px; border: 1px solid #cccccc;">Data Row 2</td>
+                                    <td style="padding: 8px; border: 1px solid #cccccc;">Value B</td>
+                                    <td style="padding: 8px; border: 1px solid #cccccc;">In Progress</td>
+                                </tr>
+                                <tr style="background-color: ${t.odd_row_color || '#ffffff'};">
+                                    <td style="padding: 8px; border: 1px solid #cccccc;">Data Row 3</td>
+                                    <td style="padding: 8px; border: 1px solid #cccccc;">Value C</td>
+                                    <td style="padding: 8px; border: 1px solid #cccccc;">Pending</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
             };
 
             let listHtml = () => {
@@ -1083,8 +1189,10 @@
                 <div style="${elStyle('paragraph')}">Technical deep dives provide comprehensive exploration of system internals and implementation mechanisms. Understanding these mechanisms enables better decision-making and optimization of templates for specific use cases.</div>
                 
                 <div style="${elStyle('code')}">const advConfig = {<br>&nbsp;&nbsp;columns: 3,<br>&nbsp;&nbsp;orientation: 'landscape',<br>&nbsp;&nbsp;pageSize: 'A4'<br>};</div>
-                
-                <div style="${elStyle('paragraph')}">Code examples demonstrate practical implementation patterns and best practices for configuration and usage.</div>
+
+                ${tableHtml()}
+
+                <div style="${elStyle('paragraph')}">Code examples and tables demonstrate practical implementation patterns and best practices for configuration and usage.</div>
                 
                 ${wrapElement('h3', '2.2 Extended Topics and Additional Coverage')}
                 ${wrapElement('paragraph', 'Extended topic coverage ensures comprehensive treatment of all aspects relevant to users. This prevents gaps in knowledge and provides reference material for various use cases and scenarios.')}
@@ -1167,51 +1275,6 @@
                 </div>
             `;
 
-            // Build live preview table reflecting table config
-            const tbl = cfg.table || {};
-            const hdrBg = tbl.header_bg_color || '#593f8f';
-            const hdrFg = tbl.header_text_color || '#ffffff';
-            const oddBg = tbl.odd_row_color || '#ffffff';
-            const evenBg = tbl.even_row_color || '#f5f4fb';
-            const bdrClr = tbl.border_color || '#cccccc';
-            const bdrW = (tbl.border_width ?? 0.5) + 'px';
-            const pad = (tbl.cell_padding ?? 6) * PX_PER_PT + 'px';
-            const hFs = (tbl.header_font_size ?? 10) * PX_PER_PT + 'px';
-            const bFs = (tbl.body_font_size ?? 9) * PX_PER_PT + 'px';
-            const align = tbl.alignment || 'left';
-            const cellStyle = `border: ${bdrW} solid ${bdrClr}; padding: ${pad}; text-align: ${align};`;
-            const tableHtml = `
-                <div style="margin-top: 8px;">
-                    <div style="font-size: 7px; color: #888; margin-bottom: 3px;">↓ Table Preview</div>
-                    <table style="width: 100%; border-collapse: collapse; font-family: inherit;">
-                        <thead>
-                            <tr>
-                                <th style="${cellStyle} background: ${hdrBg}; color: ${hdrFg}; font-size: ${hFs}; font-weight: bold;">Column A</th>
-                                <th style="${cellStyle} background: ${hdrBg}; color: ${hdrFg}; font-size: ${hFs}; font-weight: bold;">Column B</th>
-                                <th style="${cellStyle} background: ${hdrBg}; color: ${hdrFg}; font-size: ${hFs}; font-weight: bold;">Column C</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 1 Alpha</td>
-                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 1 Beta</td>
-                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 1 Gamma</td>
-                            </tr>
-                            <tr>
-                                <td style="${cellStyle} background: ${evenBg}; font-size: ${bFs};">Row 2 Alpha</td>
-                                <td style="${cellStyle} background: ${evenBg}; font-size: ${bFs};">Row 2 Beta</td>
-                                <td style="${cellStyle} background: ${evenBg}; font-size: ${bFs};">Row 2 Gamma</td>
-                            </tr>
-                            <tr>
-                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 3 Alpha</td>
-                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 3 Beta</td>
-                                <td style="${cellStyle} background: ${oddBg}; font-size: ${bFs};">Row 3 Gamma</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            `;
-
             // Apply columns to the content wrapper only (footer stays outside)
             let colStyle = '';
             if (cfg.page.columns > 1) {
@@ -1274,7 +1337,6 @@
                         <div style="padding: ${marginTopPx}px ${marginRightPx}px ${marginBottomPx}px ${marginLeftPx}px; flex: 1; overflow: hidden; display: flex; flex-direction: column;">
                             <div class="preview-content" style="${colStyle} width: 100%; height: 100%;">
                                 ${contentHtml}
-                                ${tableHtml}
                             </div>
                         </div>
                         ${footerHtml}

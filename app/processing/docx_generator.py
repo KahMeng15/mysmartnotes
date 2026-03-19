@@ -168,6 +168,7 @@ class DocxGenerator:
         tc = getattr(self, '_template_config', None) or {}
         el_cfg = tc.get("elements", {})
         spacing_cfg = tc.get("spacing", {})
+        code_cfg = tc.get("code_block", {})
         
         # Helper to parse hex color
         def hex_to_rgb(hex_str):
@@ -189,6 +190,21 @@ class DocxGenerator:
         pf.space_after = Pt(p_cfg.get("margin_bottom", spacing_cfg.get("paragraph_spacing", 8)))
         pf.space_before = Pt(p_cfg.get("margin_top", 0))
         pf.line_spacing = spacing_cfg.get("line_spacing", 1.15)
+
+        # Handle Code style specially
+        c_style = doc.styles["Code"] if "Code" in doc.styles else doc.styles.add_style('Code', 1)
+        c_style.font.name = "Courier New"
+        c_style.font.size = Pt(code_cfg.get("font_size", 9))
+        c_color = hex_to_rgb(code_cfg.get("text_color", "#2c3e50"))
+        c_style.font.color.rgb = RGBColor(*c_color)
+        c_bg = code_cfg.get("background_color", "#f8f9fa")
+        if c_bg and c_bg.lower() != '#ffffff':
+            shading_elm = OxmlElement('w:shd')
+            shading_elm.set(qn('w:fill'), c_bg.lstrip('#'))
+            c_style.paragraph_format.element.get_or_add_pPr().append(shading_elm)
+        c_style.paragraph_format.left_indent = Pt(15)
+        c_style.paragraph_format.space_before = Pt(8)
+        c_style.paragraph_format.space_after = Pt(8)
 
         # Heading styles from template or defaults
         heading_defaults = {

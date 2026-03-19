@@ -614,6 +614,7 @@ class DocumentGenerator:
         """Apply template element styles to paragraph style"""
         elements_config = self._template_config.get("elements", {})
         spacing_config = self._template_config.get("spacing", {})
+        code_config = self._template_config.get("code_block", {})
         
         # Map style names to element keys
         style_map = {
@@ -627,6 +628,16 @@ class DocumentGenerator:
             return base_style
         
         elem_config = elements_config.get(element_key, {})
+        
+        # Override for code blocks if code_block config exists
+        if style_name == "Code" and code_config:
+            elem_config = {
+                "font_size": code_config.get("font_size", 9),
+                "text_color": code_config.get("text_color", "#2c3e50"),
+                "background_color": code_config.get("background_color", "#f8f9fa"),
+                "margin_top": 8,
+                "margin_bottom": 8,
+            }
         
         # Get spacing settings
         line_spacing = spacing_config.get("line_spacing", 1.15)
