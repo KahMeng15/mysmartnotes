@@ -24,6 +24,10 @@ class ContentType(str, Enum):
     LIST = "list"  # List item (bullet)
     ORDERED_LIST = "ordered_list"  # Numbered list
     TABLE_ROW = "table_row"  # Table row
+    IMAGE = "image"  # Image
+    NOTE_TITLE = "note_title"
+    SUBJECT_NAME = "subject_name"
+    GROUP_NAME = "group_name"
 
 
 @dataclass

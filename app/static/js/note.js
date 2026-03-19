@@ -1405,11 +1405,9 @@ function selectExportFormat(format) {
 
 async function doExport() {
     const format = selectedExportFormat;
-    const includeCover = document.getElementById('exportIncludeCover').checked;
-    const includeTOC = document.getElementById('exportIncludeTOC').checked;
 
     const templateSelect = document.getElementById('exportTemplateSelect');
-    const templateId = templateSelect.value ? parseInt(templateSelect.value) : null;
+    const templateId = templateSelect.value || null;
 
     // Show progress
     document.getElementById('exportProgress').style.display = 'block';
@@ -1430,9 +1428,7 @@ async function doExport() {
 
     try {
         const payload = {
-            format: format,
-            include_cover: includeCover,
-            include_toc: includeTOC
+            format: format
         };
         if (templateId) payload.template_id = templateId;
 

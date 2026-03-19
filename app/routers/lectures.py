@@ -564,6 +564,7 @@ async def export_lecture(
 ):
     """Export lecture as PDF or DOCX"""
     import uuid
+    logger.info(f"[Export] Received request for lecture {lecture_id} with body: {body}")
     task_id = str(uuid.uuid4())[:8]
     _export_progress[task_id] = {"step": "Starting", "percent": 0, "status": "running"}
     
@@ -577,8 +578,7 @@ async def export_lecture(
             detail="Format must be 'pdf' or 'docx'"
         )
     
-    include_toc = body.get("include_toc", True)
-    include_cover = body.get("include_cover", True)
+    include_cover = body.get("include_cover")
     template_id = body.get("template_id", None)
     
     # Load template config if provided
@@ -592,33 +592,73 @@ async def export_lecture(
         if tmpl:
             template_config = tmpl.config
             logger.info(f"[Export] Loaded template '{tmpl.name}' (ID: {template_id})")
-            logger.info(f"[Export] Template config: {template_config}")
+            logger.debug(f"[Export] Template Config Keys: {list(template_config.keys()) if template_config else 'None'}")
+            
+            # Apply template settings for include_cover if not explicitly in request body
+            if include_cover is None:
+                include_cover = template_config.get("cover_page", {}).get("enabled", True)
+                
+            logger.info(f"[Export] Cover: {include_cover}")
         else:
-            logger.warning(f"[Export] Template ID {template_id} not found")
-    else:
-        logger.info(f"[Export] No template ID provided, using defaults")
+            logger.warning(f"[Export] Template ID {template_id} not found in database")
+    
+    # Final defaults if still None
+    if include_cover is None: include_cover = True
 
     # Get lecture
     lecture = db.query(Lecture).filter(
         Lecture.id == lecture_id,
         Lecture.user_id == current_user.id
     ).first()
-    
+
     if not lecture:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lecture not found"
         )
-    
+
+    # Build segments from structured content or markdown
+    from app.processing.text_processor import ContentSegment, ContentType
+    segments = []
+    images = []  # Currently disabled - image feature not yet implemented
+
     try:
-        # Build segments from structured content or markdown
-        from app.processing.text_processor import ContentSegment
-        segments = []
-        images = []  # Currently disabled - image feature not yet implemented
-        
+        # Inject header segments based on template config
+        if template_config and "header" in template_config:
+            h_cfg = template_config["header"]
+            if h_cfg.get("show_note_title"):
+                segments.append(ContentSegment(
+                    content=lecture.title,
+                    content_type=ContentType.NOTE_TITLE,
+                    page_number=1
+                ))
+            if h_cfg.get("show_subject_name") and lecture.subject:
+                segments.append(ContentSegment(
+                    content=lecture.subject.name,
+                    content_type=ContentType.SUBJECT_NAME,
+                    page_number=1
+                ))
+            if h_cfg.get("show_group_name") and lecture.subject and lecture.subject.group_id:
+                from app.models.db import SubjectGroup
+                group = db.query(SubjectGroup).filter(SubjectGroup.id == lecture.subject.group_id).first()
+                if group:
+                    segments.append(ContentSegment(
+                        content=group.name,
+                        content_type=ContentType.GROUP_NAME,
+                        page_number=1
+                    ))
+
+        # Flag to skip first H1 if we already injected a NOTE_TITLE
+        skip_first_h1 = template_config and template_config.get("header", {}).get("show_note_title", False)
+
         if lecture.extracted_content_structured:
             structured_data = json.loads(lecture.extracted_content_structured)
             for item in structured_data:
+                # If it's the first H1 and we are skipping it, do so
+                if skip_first_h1 and item["type"] == "h1":
+                    skip_first_h1 = False  # Only skip the VERY first one
+                    continue
+                
                 segment = ContentSegment(
                     content=item["content"],
                     content_type=ContentType(item["type"]),
@@ -631,6 +671,11 @@ async def export_lecture(
         elif lecture.extracted_text:
             structured_data = _markdown_to_segments(lecture.extracted_text)
             for item in structured_data:
+                # If it's the first H1 and we are skipping it, do so
+                if skip_first_h1 and item["type"] == "h1":
+                    skip_first_h1 = False  # Only skip the VERY first one
+                    continue
+                    
                 segment = ContentSegment(
                     content=item["content"],
                     content_type=ContentType(item["type"]),
@@ -658,7 +703,7 @@ async def export_lecture(
             output_path = generator.generate_pdf(
                 content_segments=segments,
                 extracted_images=images,
-                include_toc=include_toc,
+                include_toc=False,
                 include_cover=include_cover,
                 template_config=template_config,
                 progress_callback=progress_callback,
@@ -675,7 +720,7 @@ async def export_lecture(
             output_path = generator.generate_docx(
                 content_segments=segments,
                 extracted_images=images,
-                include_toc=include_toc,
+                include_toc=False,
                 include_cover=include_cover,
                 template_config=template_config,
                 progress_callback=progress_callback,

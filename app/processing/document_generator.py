@@ -428,15 +428,31 @@ class DocumentGenerator:
         """Create title page using cover_page config if available"""
         story = []
         
-        story.append(Spacer(1, 1.5 * inch))
-        
         # Read cover page config
         cover_cfg = {}
         if self._template_config and "cover_page" in self._template_config:
             cover_cfg = self._template_config["cover_page"]
         
+        # Vertical alignment
+        v_align = cover_cfg.get("v_align", "middle")
+        if v_align == "top":
+            story.append(Spacer(1, 0.5 * inch))
+        elif v_align == "middle":
+            story.append(Spacer(1, 3.5 * inch))
+        else: # bottom
+            story.append(Spacer(1, 7.0 * inch))
+            
+        title_text = cover_cfg.get("h1_text") or self.lecture_title
         title_font_size = cover_cfg.get("title_size", 36)
         title_color = cover_cfg.get("title_color", "#1A1A2E")
+        
+        h2_text = cover_cfg.get("h2_text") or "Extracted and Processed Content"
+        h2_size = cover_cfg.get("h2_size", 14)
+        h2_color = cover_cfg.get("h2_color", "#7f8c8d")
+        
+        h_align_str = cover_cfg.get("h_align", "center")
+        h_align = self._get_alignment(h_align_str)
+        
         show_date = cover_cfg.get("show_date", True)
         
         # Title
@@ -444,33 +460,36 @@ class DocumentGenerator:
             "CoverTitle",
             fontSize=title_font_size,
             textColor=colors.HexColor(title_color),
-            alignment=TA_CENTER,
-            fontName="Helvetica-Bold",
+            alignment=h_align,
+            fontName="Instrument Sans-Bold",
             spaceAfter=12,
             leading=title_font_size * 1.2,
         )
-        story.append(Paragraph(self.lecture_title, title_style))
+        story.append(Paragraph(title_text, title_style))
         
-        story.append(Spacer(1, 0.3 * inch))
+        story.append(Spacer(1, 0.1 * inch))
         
-        # Subtitle
+        # Subtitle (H2)
         subtitle_style = ParagraphStyle(
             "CoverSubtitle",
-            fontSize=14,
-            textColor=colors.HexColor("#7f8c8d"),
-            alignment=TA_CENTER,
+            fontSize=h2_size,
+            textColor=colors.HexColor(h2_color),
+            alignment=h_align,
+            fontName="Instrument Sans",
             spaceAfter=12,
+            leading=h2_size * 1.2,
         )
-        story.append(Paragraph("Extracted and Processed Content", subtitle_style))
+        story.append(Paragraph(h2_text, subtitle_style))
         
         # Date (only if show_date is True)
         if show_date:
-            story.append(Spacer(1, 0.5 * inch))
+            story.append(Spacer(1, 0.2 * inch))
             meta_style = ParagraphStyle(
                 "CoverMeta",
                 fontSize=10,
                 textColor=colors.HexColor("#95a5a6"),
-                alignment=TA_CENTER,
+                alignment=h_align,
+                fontName="Instrument Sans",
                 spaceAfter=6,
             )
             story.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y')}", meta_style))
@@ -585,6 +604,9 @@ class DocumentGenerator:
             ContentType.ORDERED_LIST: "OrderedList",
             ContentType.CODE: "Code",
             ContentType.BODY: "Body",
+            ContentType.NOTE_TITLE: "NoteTitle",
+            ContentType.SUBJECT_NAME: "SubjectName",
+            ContentType.GROUP_NAME: "GroupName",
         }
         return type_to_style.get(segment.content_type, "Body")
     
@@ -596,7 +618,8 @@ class DocumentGenerator:
         # Map style names to element keys
         style_map = {
             "H1": "h1", "H2": "h2", "H3": "h3", "H4": "h4", "H5": "h5",
-            "Body": "paragraph", "List": "list", "OrderedList": "list", "Code": "code"
+            "Body": "paragraph", "List": "list", "OrderedList": "list", "Code": "code",
+            "NoteTitle": "note_title", "SubjectName": "subject_name", "GroupName": "group_name"
         }
         
         element_key = style_map.get(style_name)
@@ -607,7 +630,10 @@ class DocumentGenerator:
         
         # Get spacing settings
         line_spacing = spacing_config.get("line_spacing", 1.15)
-        paragraph_spacing = spacing_config.get("paragraph_spacing", 8)
+        
+        # Element-specific margins (fallback to global paragraph spacing if not set)
+        margin_top = elem_config.get("margin_top", spacing_config.get("paragraph_spacing", 8))
+        margin_bottom = elem_config.get("margin_bottom", spacing_config.get("paragraph_spacing", 8))
         
         # Calculate leading from line_spacing
         base_font_size = elem_config.get("font_size", base_style.fontSize)
@@ -618,21 +644,37 @@ class DocumentGenerator:
         
         # Get colors and font info
         text_color = elem_config.get("text_color", "#2C3E50")
+        bg_color = elem_config.get("background_color")
+        if bg_color and bg_color.lower() == "#ffffff":
+            bg_color = None
+            
         font_weight = elem_config.get("font_weight", "normal")
         
         # Create modified style with all template settings
-        return ParagraphStyle(
+        style = ParagraphStyle(
             name=f"{base_style.name}_templated",
             parent=base_style,
             fontSize=base_font_size,
             textColor=colors.HexColor(text_color),
+            backColor=colors.HexColor(bg_color) if bg_color else None,
             fontName="Instrument Sans-Bold" if font_weight == "bold" else "Instrument Sans",
             alignment=alignment,
             leading=leading,
-            spaceAfter=paragraph_spacing,
-            spaceBefore=paragraph_spacing,
+            spaceAfter=margin_bottom,
+            spaceBefore=margin_top,
         )
-    
+
+        # Apply list-specific indentations
+        if style_name in ["List", "OrderedList"]:
+            list_left_margin = spacing_config.get("list_left_margin", 24)
+            list_bullet_gap = spacing_config.get("list_bullet_gap", 6)
+            # leftIndent is total indent, firstLineIndent is relative to leftIndent
+            # to make bullet hang, firstLineIndent should be negative.
+            style.leftIndent = list_left_margin + list_bullet_gap
+            style.firstLineIndent = -(list_bullet_gap + 10) # 10 is approximate bullet width
+
+        return style
+
     def _parse_inline_markdown(self, text: str) -> str:
         """
         Convert inline markdown syntax to ReportLab paragraph XML.
@@ -675,17 +717,27 @@ class DocumentGenerator:
         import re
         content = segment.content
 
+        list_cfg = self._template_config.get("list_config", {})
+        custom_bullet = list_cfg.get("custom_bullet", "•")
+        num_format = list_cfg.get("number_format", "1.")
+
         if style_name == "List":
-            # Strip leading markdown list markers (-, *, +, •) and replace with •
+            # Strip leading markdown list markers (-, *, +, •) and replace with custom_bullet
             content = re.sub(r'^\s*[-*+•]\s+', '', content)
-            content = f'\u2022\u00a0\u00a0{content}'
+            content = f'{custom_bullet}\u00a0\u00a0{content}'
         elif style_name == "OrderedList":
-            # Strip leading "1." / "2." etc. and replace with the raw number
+            # Strip leading "1." / "2." etc. and replace with the configured format
             m = re.match(r'^\s*(\d+)\.\s+', content)
             if m:
                 num = m.group(1)
                 content = re.sub(r'^\s*\d+\.\s+', '', content)
-                content = f'{num}.\u00a0\u00a0{content}'
+                
+                # Apply number format
+                prefix = f"{num}."
+                if num_format == "1)": prefix = f"{num})"
+                elif num_format == "1]": prefix = f"{num}]"
+                
+                content = f'{prefix}\u00a0\u00a0{content}'
 
         return self._parse_inline_markdown(content)
 

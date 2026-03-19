@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 class DocxGenerator:
     """Generates styled DOCX from structured content"""
+    
+    # Page size mapping (width, height) in cm
+    PAGE_SIZES = {
+        'A4': (21.0, 29.7),
+        'LETTER': (21.59, 27.94),
+        'LEGAL': (21.59, 35.56),
+        'A3': (29.7, 42.0),
+    }
 
     def __init__(
         self,
@@ -56,6 +64,11 @@ class DocxGenerator:
         try:
             extracted_images = extracted_images or []
             self._template_config = template_config
+            
+            # Debug logging
+            logger.info(f"[DOCX Export] Template config type: {type(template_config)}")
+            logger.info(f"[DOCX Export] Template config value: {template_config}")
+            
             doc = Document()
 
             if progress_callback:
@@ -76,22 +89,27 @@ class DocxGenerator:
                     progress_callback("Building table of contents", 35)
                 self._create_toc_placeholder(doc, content_segments)
 
-            # Margins setup from template
+            # Page size and orientation setup from template
             if template_config and "page" in template_config:
                 page_cfg = template_config["page"]
-                margins = page_cfg.get("margins", {})
-                if margins:
-                    for section in doc.sections:
-                        if "top" in margins: section.top_margin = Cm(margins["top"] / 10.0)
-                        if "bottom" in margins: section.bottom_margin = Cm(margins["bottom"] / 10.0)
-                        if "left" in margins: section.left_margin = Cm(margins["left"] / 10.0)
-                        if "right" in margins: section.right_margin = Cm(margins["right"] / 10.0)
-                        
+                size_name = page_cfg.get("size", "A4").upper()
+                width_cm, height_cm = self.PAGE_SIZES.get(size_name, self.PAGE_SIZES['A4'])
+                
                 orientation = page_cfg.get("orientation", "portrait").lower()
                 if orientation == "landscape":
-                    for section in doc.sections:
+                    width_cm, height_cm = height_cm, width_cm
+                
+                margins = page_cfg.get("margins", {"top": 25, "bottom": 25, "left": 19, "right": 19})
+                
+                for section in doc.sections:
+                    section.page_width = Cm(width_cm)
+                    section.page_height = Cm(height_cm)
+                    section.top_margin = Cm(margins.get("top", 25) / 10.0)
+                    section.bottom_margin = Cm(margins.get("bottom", 25) / 10.0)
+                    section.left_margin = Cm(margins.get("left", 19) / 10.0)
+                    section.right_margin = Cm(margins.get("right", 19) / 10.0)
+                    if orientation == "landscape":
                         section.orientation = WD_ORIENT.LANDSCAPE
-                        section.page_width, section.page_height = section.page_height, section.page_width
 
             # Main content
             if progress_callback:
@@ -148,7 +166,14 @@ class DocxGenerator:
             "Heading 2": {"key": "h2", "size": 24, "color": "#2C3E50", "bold": True, "space_before": 14, "space_after": 10},
             "Heading 3": {"key": "h3", "size": 20, "color": "#34495E", "bold": True, "space_before": 12, "space_after": 8},
             "Heading 4": {"key": "h4", "size": 16, "color": "#333333", "bold": True, "space_before": 10, "space_after": 6},
+            "Title":     {"key": "note_title", "size": 28, "color": "#1A1A2E", "bold": True, "space_before": 24, "space_after": 12},
+            "Subtitle":  {"key": "subject_name", "size": 18, "color": "#2C3E50", "bold": True, "space_before": 12, "space_after": 8},
         }
+        
+        # Add custom styles for GroupName if needed
+        if "GroupName" not in doc.styles:
+            style = doc.styles.add_style('GroupName', 1) # 1 = PARAGRAPH
+            heading_defaults["GroupName"] = {"key": "group_name", "size": 12, "color": "#7f8c8d", "bold": False, "space_before": 4, "space_after": 8}
 
         # Setup Alignment mapping helper function
         def _get_docx_alignment(align_str):
@@ -156,12 +181,6 @@ class DocxGenerator:
             if align_str == 'right': return WD_ALIGN_PARAGRAPH.RIGHT
             if align_str == 'justify': return WD_ALIGN_PARAGRAPH.JUSTIFY
             return WD_ALIGN_PARAGRAPH.LEFT
-            
-        p_align = _get_docx_alignment(p_cfg.get("alignment", "left"))
-        try:
-            doc.styles["Normal"].paragraph_format.alignment = p_align
-        except:
-            pass
 
         for style_name, defaults in heading_defaults.items():
             try:
@@ -172,45 +191,75 @@ class DocxGenerator:
                 h_color = hex_to_rgb(h_el.get("text_color", defaults["color"]))
                 h_style.font.color.rgb = RGBColor(*h_color)
                 h_style.font.bold = h_el.get("font_weight", "bold") == "bold"
-                h_style.paragraph_format.space_before = Pt(defaults["space_before"])
-                h_style.paragraph_format.space_after = Pt(defaults["space_after"])
+                
+                h_spacing = tc.get("spacing", {})
+                h_style.paragraph_format.space_before = Pt(h_el.get("margin_top", defaults["space_before"]))
+                h_style.paragraph_format.space_after = Pt(h_el.get("margin_bottom", defaults["space_after"]))
                 h_style.paragraph_format.alignment = _get_docx_alignment(h_el.get("alignment", "left"))
-            except KeyError:
+                h_style.paragraph_format.line_spacing = h_spacing.get("line_spacing", 1.15)
+            except (KeyError, ValueError):
                 pass
 
     def _create_cover_page(self, doc: Document):
-        """Create a cover page"""
-        # Add vertical spacing
-        for _ in range(6):
+        """Create a cover page using template settings"""
+        tc = getattr(self, '_template_config', None) or {}
+        cover_cfg = tc.get("cover_page", {})
+        
+        # Helper to parse hex color
+        def hex_to_rgb(hex_str):
+            hex_str = hex_str.lstrip('#')
+            return tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+            
+        # Vertical alignment via spacers
+        v_align = cover_cfg.get("v_align", "middle")
+        if v_align == "top":
+            spacer_count = 1
+        elif v_align == "middle":
+            spacer_count = 8
+        else: # bottom
+            spacer_count = 16
+            
+        for _ in range(spacer_count):
             doc.add_paragraph("")
 
+        # Horizontal alignment
+        h_align_str = cover_cfg.get("h_align", "center")
+        def _get_docx_alignment(align_str):
+            if align_str == 'center': return WD_ALIGN_PARAGRAPH.CENTER
+            if align_str == 'right': return WD_ALIGN_PARAGRAPH.RIGHT
+            return WD_ALIGN_PARAGRAPH.LEFT
+        h_align = _get_docx_alignment(h_align_str)
+
         # Title
+        title_text = cover_cfg.get("h1_text") or self.lecture_title
         title_para = doc.add_paragraph()
-        title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = title_para.add_run(self.lecture_title)
-        run.font.size = Pt(36)
-        run.font.color.rgb = RGBColor(0x1A, 0x1A, 0x2E)
+        title_para.alignment = h_align
+        run = title_para.add_run(title_text)
+        run.font.size = Pt(cover_cfg.get("title_size", 36))
+        t_color = hex_to_rgb(cover_cfg.get("title_color", "#1A1A2E"))
+        run.font.color.rgb = RGBColor(*t_color)
         run.bold = True
-        run.font.name = "Instrument Sans"
+        run.font.name = tc.get("font_family", "Instrument Sans")
 
         # Subtitle
+        subtitle_text = cover_cfg.get("h2_text") or "Extracted and Processed Content"
         subtitle_para = doc.add_paragraph()
-        subtitle_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = subtitle_para.add_run("Extracted and Processed Content")
-        run.font.size = Pt(14)
-        run.font.color.rgb = RGBColor(0x7F, 0x8C, 0x8D)
-        run.font.name = "Instrument Sans"
-
-        # Spacer
-        doc.add_paragraph("")
+        subtitle_para.alignment = h_align
+        run = subtitle_para.add_run(subtitle_text)
+        run.font.size = Pt(cover_cfg.get("h2_size", 14))
+        s_color = hex_to_rgb(cover_cfg.get("h2_color", "#7F8C8D"))
+        run.font.color.rgb = RGBColor(*s_color)
+        run.font.name = tc.get("font_family", "Instrument Sans")
 
         # Date
-        date_para = doc.add_paragraph()
-        date_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = date_para.add_run(f"Generated: {datetime.now().strftime('%B %d, %Y')}")
-        run.font.size = Pt(10)
-        run.font.color.rgb = RGBColor(0x95, 0xA5, 0xA6)
-        run.font.name = "Instrument Sans"
+        if cover_cfg.get("show_date", True):
+            doc.add_paragraph("")
+            date_para = doc.add_paragraph()
+            date_para.alignment = h_align
+            run = date_para.add_run(f"Generated: {datetime.now().strftime('%B %d, %Y')}")
+            run.font.size = Pt(10)
+            run.font.color.rgb = RGBColor(0x95, 0xA5, 0xA6)
+            run.font.name = tc.get("font_family", "Instrument Sans")
 
         # Page break after cover
         doc.add_page_break()
@@ -248,7 +297,8 @@ class DocxGenerator:
         content_segments: List[ContentSegment],
         extracted_images: List[ExtractedImage],
     ):
-        """Create main content"""
+        """Create main content using template styles"""
+        tc = getattr(self, '_template_config', None) or {}
         # Image lookup by page
         images_by_page = {}
         for img in extracted_images:
@@ -256,8 +306,26 @@ class DocxGenerator:
                 images_by_page[img.page_number] = []
             images_by_page[img.page_number].append(img)
 
-        for segment in content_segments:
-            if segment.content_type == ContentType.H1:
+        i = 0
+        while i < len(content_segments):
+            segment = content_segments[i]
+            
+            # Check if this is a table row - collect all consecutive table rows
+            if segment.content_type == ContentType.TABLE_ROW:
+                table_segments = []
+                while i < len(content_segments) and content_segments[i].content_type == ContentType.TABLE_ROW:
+                    table_segments.append(content_segments[i])
+                    i += 1
+                self._render_table(doc, table_segments)
+                continue
+
+            if segment.content_type == ContentType.NOTE_TITLE:
+                doc.add_paragraph(segment.content, style="Title")
+            elif segment.content_type == ContentType.SUBJECT_NAME:
+                doc.add_paragraph(segment.content, style="Subtitle")
+            elif segment.content_type == ContentType.GROUP_NAME:
+                doc.add_paragraph(segment.content, style="GroupName")
+            elif segment.content_type == ContentType.H1:
                 doc.add_heading(segment.content, level=1)
             elif segment.content_type == ContentType.H2:
                 doc.add_heading(segment.content, level=2)
@@ -267,10 +335,11 @@ class DocxGenerator:
                 # Handle bullet points
                 content = segment.content
                 content = re.sub(r'^\s*[-*+•]\s+', '', content)
-                para = doc.add_paragraph(content, style="List Bullet")
-                for run in para.runs:
-                    run.font.name = tc.get("font_family", "Instrument Sans")
-                    run.font.size = Pt(11)
+                doc.add_paragraph(content, style="List Bullet")
+            elif segment.content_type == ContentType.ORDERED_LIST:
+                content = segment.content
+                content = re.sub(r'^\s*\d+\.\s+', '', content)
+                doc.add_paragraph(content, style="List Number")
             elif segment.content_type == ContentType.CODE:
                 para = doc.add_paragraph()
                 run = para.add_run(segment.content)
@@ -280,18 +349,58 @@ class DocxGenerator:
                 para.paragraph_format.left_indent = Pt(15)
             else:
                 # Body text
-                para = doc.add_paragraph(segment.content)
-                for run in para.runs:
-                    run.font.name = tc.get("font_family", "Instrument Sans")
-                    run.font.size = Pt(11)
-                    run.font.color.rgb = RGBColor(0x2C, 0x3E, 0x50)
+                doc.add_paragraph(segment.content)
 
             # Add images for this page
             if segment.page_number in images_by_page:
                 for img in images_by_page[segment.page_number]:
                     self._add_image(doc, img)
-                # Remove so images aren't duplicated
                 del images_by_page[segment.page_number]
+            
+            i += 1
+
+    def _render_table(self, doc: Document, table_segments: List[ContentSegment]):
+        """Render a table in DOCX using template settings"""
+        if not table_segments: return
+        
+        # Parse rows
+        rows_data = []
+        for s in table_segments:
+            # Simple markdown table parser
+            cells = [c.strip() for c in s.content.split("|") if c.strip() and not c.strip().startswith("---")]
+            if cells: rows_data.append(cells)
+        if not rows_data: return
+
+        tc = getattr(self, '_template_config', None) or {}
+        tbl_cfg = tc.get("table", {})
+        
+        # Table settings
+        header_fs = tbl_cfg.get("header_font_size", 10)
+        body_fs = tbl_cfg.get("body_font_size", 9)
+        align_str = tbl_cfg.get("alignment", "left").lower()
+        
+        def _get_docx_alignment(a_str):
+            if a_str == 'center': return WD_ALIGN_PARAGRAPH.CENTER
+            if a_str == 'right': return WD_ALIGN_PARAGRAPH.RIGHT
+            return WD_ALIGN_PARAGRAPH.LEFT
+        h_align = _get_docx_alignment(align_str)
+
+        table = doc.add_table(rows=len(rows_data), cols=len(rows_data[0]))
+        table.style = 'Table Grid'
+        
+        for r_idx, row in enumerate(rows_data):
+            for c_idx, cell_text in enumerate(row):
+                if c_idx >= len(table.columns): continue
+                cell = table.cell(r_idx, c_idx)
+                # Set text and formatting
+                para = cell.paragraphs[0]
+                para.alignment = h_align
+                run = para.add_run(cell_text)
+                run.font.size = Pt(header_fs if r_idx == 0 else body_fs)
+                run.font.name = tc.get("font_family", "Instrument Sans")
+                if r_idx == 0: run.bold = True
+                
+        doc.add_paragraph("")
 
     def _add_image(self, doc: Document, image_obj: ExtractedImage):
         """Add image to document"""
@@ -319,17 +428,25 @@ class DocxGenerator:
             logger.error(f"Error adding image {image_obj.filename}: {e}")
 
     def _create_footer(self, doc: Document):
-        """Add branded footer to all sections"""
-        generated_date = datetime.now().strftime("%B %d, %Y %I:%M %p")
-        footer_text = f"Generated by mysmartnotes.vercel.app | Create notes and study smart! | {generated_date}"
+        """Add branded footer to all sections using template settings"""
+        tc = getattr(self, '_template_config', None) or {}
+        footer_cfg = tc.get("footer", {})
+        
+        custom_text = footer_cfg.get("custom_text", "")
+        parts = ["Generated by mysmartnotes.vercel.app | Create notes and study smart!"]
+        if custom_text: parts.append(custom_text)
+        footer_text = " | ".join(parts)
 
         for section in doc.sections:
             footer = section.footer
             footer.is_linked_to_previous = False
             footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
             footer_para.text = ""
+            
+            # Note: Automatic page numbering in DOCX footer is complex via python-docx.
+            # We will just use the text for now.
             run = footer_para.add_run(footer_text)
             run.font.size = Pt(7)
             run.font.color.rgb = RGBColor(0x95, 0xA5, 0xA6)
-            run.font.name = "Instrument Sans"
+            run.font.name = tc.get("font_family", "Instrument Sans")
             footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
