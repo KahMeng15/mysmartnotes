@@ -163,12 +163,27 @@ class DocxGenerator:
             logger.error(f"Error generating DOCX: {e}", exc_info=True)
             raise
 
+    def _set_font(self, font_obj, font_name: str):
+        """
+        Robustly set font name for a font object.
+        Sets both the python-docx property and the underlying XML elements
+        to ensure Word picks it up for all character sets (ascii, hAnsi, eastAsia, cs).
+        """
+        font_obj.name = font_name
+        rFonts = font_obj._element.get_or_add_rPr().get_or_add_rFonts()
+        rFonts.set(qn('w:ascii'), font_name)
+        rFonts.set(qn('w:hAnsi'), font_name)
+        rFonts.set(qn('w:eastAsia'), font_name)
+        rFonts.set(qn('w:cs'), font_name)
+
     def _setup_styles(self, doc: Document):
         """Configure default document styles, applying template if available"""
         tc = getattr(self, '_template_config', None) or {}
         el_cfg = tc.get("elements", {})
         spacing_cfg = tc.get("spacing", {})
         code_cfg = tc.get("code_block", {})
+        
+        font_family = tc.get("font_family", "Instrument Sans")
         
         # Helper to parse hex color
         def hex_to_rgb(hex_str):
@@ -181,7 +196,7 @@ class DocxGenerator:
         p_cfg = el_cfg.get("paragraph", {})
         style = doc.styles["Normal"]
         font = style.font
-        font.name = tc.get("font_family", "Instrument Sans")
+        self._set_font(font, font_family)
         font.size = Pt(p_cfg.get("font_size", 11))
         p_color = hex_to_rgb(p_cfg.get("text_color", "#000000"))
         font.color.rgb = RGBColor(*p_color)
@@ -193,7 +208,7 @@ class DocxGenerator:
 
         # Handle Code style specially
         c_style = doc.styles["Code"] if "Code" in doc.styles else doc.styles.add_style('Code', 1)
-        c_style.font.name = "Courier New"
+        self._set_font(c_style.font, "Courier New")
         c_style.font.size = Pt(code_cfg.get("font_size", 9))
         c_color = hex_to_rgb(code_cfg.get("text_color", "#2c3e50"))
         c_style.font.color.rgb = RGBColor(*c_color)
@@ -234,7 +249,7 @@ class DocxGenerator:
             try:
                 h_style = doc.styles[style_name]
                 h_el = el_cfg.get(defaults["key"], {})
-                h_style.font.name = tc.get("font_family", "Instrument Sans")
+                self._set_font(h_style.font, font_family)
                 h_style.font.size = Pt(h_el.get("font_size", defaults["size"]))
                 h_color = hex_to_rgb(h_el.get("text_color", defaults["color"]))
                 h_style.font.color.rgb = RGBColor(*h_color)
@@ -294,7 +309,7 @@ class DocxGenerator:
         t_color = hex_to_rgb(cover_cfg.get("title_color", "#1A1A2E"))
         run.font.color.rgb = RGBColor(*t_color)
         run.bold = True
-        run.font.name = tc.get("font_family", "Instrument Sans")
+        self._set_font(run.font, tc.get("font_family", "Instrument Sans"))
 
         # Subtitle
         subtitle_text = cover_cfg.get("h2_text") or "Extracted and Processed Content"
@@ -304,7 +319,7 @@ class DocxGenerator:
         run.font.size = Pt(cover_cfg.get("h2_size", 14))
         s_color = hex_to_rgb(cover_cfg.get("h2_color", "#7F8C8D"))
         run.font.color.rgb = RGBColor(*s_color)
-        run.font.name = tc.get("font_family", "Instrument Sans")
+        self._set_font(run.font, tc.get("font_family", "Instrument Sans"))
 
         # Date
         if cover_cfg.get("show_date", True):
@@ -314,19 +329,22 @@ class DocxGenerator:
             run = date_para.add_run(f"Generated: {datetime.now().strftime('%B %d, %Y')}")
             run.font.size = Pt(10)
             run.font.color.rgb = RGBColor(0x95, 0xA5, 0xA6)
-            run.font.name = tc.get("font_family", "Instrument Sans")
+            self._set_font(run.font, tc.get("font_family", "Instrument Sans"))
 
         # Page break after cover
         doc.add_page_break()
 
     def _create_toc_placeholder(self, doc: Document, content_segments: List[ContentSegment]):
         """Create a table of contents section"""
+        tc = getattr(self, '_template_config', None) or {}
+        font_family = tc.get("font_family", "Instrument Sans")
+        
         toc_heading = doc.add_paragraph()
         run = toc_heading.add_run("Table of Contents")
         run.font.size = Pt(16)
         run.bold = True
         run.font.color.rgb = RGBColor(0x1A, 0x1A, 0x1A)
-        run.font.name = "Instrument Sans"
+        self._set_font(run.font, font_family)
 
         # List headings from content
         for segment in content_segments:
@@ -340,7 +358,7 @@ class DocxGenerator:
                 for run in entry.runs:
                     run.font.size = Pt(11)
                     run.font.color.rgb = RGBColor(0x2C, 0x3E, 0x50)
-                    run.font.name = "Instrument Sans"
+                    self._set_font(run.font, font_family)
                 if segment.content_type == ContentType.H2:
                     entry.paragraph_format.left_indent = Pt(20)
 
@@ -503,7 +521,7 @@ class DocxGenerator:
                 para.alignment = h_align
                 run = para.add_run(cell_text)
                 run.font.size = Pt(header_fs if r_idx == 0 else body_fs)
-                run.font.name = tc.get("font_family", "Instrument Sans")
+                self._set_font(run.font, tc.get("font_family", "Instrument Sans"))
                 
                 if r_idx == 0:
                     run.bold = True
@@ -557,5 +575,5 @@ class DocxGenerator:
             run = footer_para.add_run(footer_text)
             run.font.size = Pt(7)
             run.font.color.rgb = RGBColor(0x95, 0xA5, 0xA6)
-            run.font.name = tc.get("font_family", "Instrument Sans")
+            self._set_font(run.font, tc.get("font_family", "Instrument Sans"))
             footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
