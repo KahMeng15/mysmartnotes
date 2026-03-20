@@ -7,6 +7,8 @@ let currentSummaryMode = 'elaborate';
 let currentSummaryFormat = 'sentence';
 let isRegeneratingSummary = false;
 let currentProcessingMethod = 'whole';
+let currentVersionId = null;
+let deleteConfirmVersionId = null;
 
 const MODE_META = {
     quick: { label: 'Quick', icon: 'ph-lightning' },
@@ -67,20 +69,31 @@ async function loadSummaryVersions() {
             
             list.innerHTML = summaries.map((s, idx) => {
                 const date = new Date(s.created_at);
-                const isLatest = idx === 0;
+                const isSelected = currentVersionId === s.id;
                 // If title is just "Summary - X", fallback to generic version. Otherwise use title.
                 let label = s.title.startsWith('Summary -') ? `Version ${summaries.length - idx}` : s.title;
                 
+                const bgColor = isSelected ? 'rgba(89, 60, 143, 0.1)' : 'var(--color-white)';
+                const borderColor = isSelected ? 'var(--color-primary)' : 'var(--color-light-gray)';
+                
+                // Format date using browser's local timezone (includes both date and time)
+                const dateString = date.toLocaleString(undefined, { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
                 return `
-                <div class="summary-version-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border: 1px solid var(--color-light-gray); border-radius: var(--radius-sm); background: var(--color-white); cursor: pointer; transition: all 0.15s;" onmouseover="this.style.borderColor='var(--color-primary)'" onmouseout="this.style.borderColor='var(--color-light-gray)'" onclick="loadSummaryVersion(${s.id})">
+                <div class="summary-version-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border: 1px solid ${borderColor}; border-radius: var(--radius-sm); background: ${bgColor}; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.borderColor='var(--color-primary)'" onmouseout="this.style.borderColor='${borderColor}'" onclick="loadSummaryVersion(${s.id})">
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark); display: flex; align-items: center; gap: 6px;">
                             ${label}
-                            ${isLatest ? '<span style="background: var(--color-primary); color: white; padding: 2px 6px; border-radius: 10px; font-size: 8px;">Active</span>' : ''}
                         </div>
-                        <div style="font-size: 10px; color: var(--color-gray); margin-top: 2px;">${date.toLocaleString()}</div>
+                        <div style="font-size: 10px; color: var(--color-gray); margin-top: 2px;">${dateString}</div>
                     </div>
-                    <button class="btn btn-outline btn-small" style="color: var(--color-error); padding: 4px 8px; margin-left: 8px;" onclick="event.stopPropagation(); deleteSummaryVersion(${s.id})" title="Delete">
+                    <button class="btn btn-outline btn-small" style="color: var(--color-error); padding: 4px 8px; margin-left: 8px;" onclick="event.stopPropagation(); showDeleteConfirm(${s.id})" title="Delete">
                         <i class="ph ph-trash"></i>
                     </button>
                 </div>
@@ -99,16 +112,36 @@ async function loadSummaryVersion(docId) {
             const data = await res.json();
             if (data.content) {
                 summaryData = data.content;
+                quickreadData = data.quickread || null;
+                currentSummaryMode = data.mode || 'elaborate';
+                currentSummaryFormat = data.output_format || 'sentence';
+                currentProcessingMethod = data.processing_method || 'whole';
+                currentVersionId = docId;
                 displaySummary();
+                loadSummaryVersions();
             }
         }
     } catch (e) { console.error('Error loading version:', e); }
 }
 
-async function deleteSummaryVersion(docId) {
-    if (!confirm("Are you sure you want to delete this summary version?")) return;
+function showDeleteConfirm(docId) {
+    deleteConfirmVersionId = docId;
+    document.getElementById('deleteConfirmModal').classList.add('active');
+}
+
+function closeDeleteConfirmModal() {
+    document.getElementById('deleteConfirmModal').classList.remove('active');
+    deleteConfirmVersionId = null;
+}
+
+async function confirmDeleteVersion() {
+    const docIdToDelete = deleteConfirmVersionId;
+    if (!docIdToDelete) return;
+    
+    closeDeleteConfirmModal();
+    
     try {
-        const res = await fetch(`/documents/${docId}`, {
+        const res = await fetch(`/documents/${docIdToDelete}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -116,7 +149,9 @@ async function deleteSummaryVersion(docId) {
             await loadSummaryVersions();
             await loadSummary();
         }
-    } catch (e) { alert('Error deleting summary version: ' + e.message); }
+    } catch (e) { 
+        alert('Error deleting summary version: ' + e.message);
+    }
 }
 
 async function loadSummary() {
@@ -133,6 +168,11 @@ async function loadSummary() {
         if (res.ok) {
             const data = await res.json();
             summaryData = data.content;
+            quickreadData = data.quickread || null;
+            currentSummaryMode = data.mode || 'elaborate';
+            currentSummaryFormat = data.output_format || 'sentence';
+            currentProcessingMethod = data.processing_method || 'whole';
+            currentVersionId = data.id;
             displaySummary();
             
             // Also load note metadata for breadcrumbs
@@ -361,6 +401,7 @@ async function generateSummary() {
             const data = await res.json();
             summaryData = data.content;
             quickreadData = data.quickread || null;
+            currentVersionId = data.id;
             
             setTimeout(() => {
                 document.getElementById('summaryProgressModal').classList.remove('active');

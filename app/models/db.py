@@ -132,6 +132,10 @@ class GeneratedDocument(Base):
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
     content = Column(Text)
+    quickread = Column(Text, nullable=True)  # Optional quickread summary
+    mode = Column(String(50), nullable=True)  # elaborate, quick, simple, eli5
+    output_format = Column(String(50), nullable=True)  # sentence, pointform, numbered_list, table
+    processing_method = Column(String(50), nullable=True)  # whole, section
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

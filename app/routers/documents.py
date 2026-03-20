@@ -49,6 +49,10 @@ class SummaryResponse(BaseModel):
     content: str
     is_cached: bool
     quickread: Optional[str] = None  # Optional quickread summary
+    mode: str = "elaborate"
+    output_format: str = "sentence"
+    processing_method: str = "whole"
+    id: Optional[int] = None
 
 
 class FlashcardGeneratedResponse(BaseModel):
@@ -76,6 +80,10 @@ class DocumentResponse(BaseModel):
     file_path: str
     created_at: str
     content: Optional[str] = None
+    quickread: Optional[str] = None  # For summaries
+    mode: Optional[str] = None  # For summaries (elaborate, quick, simple, eli5)
+    output_format: Optional[str] = None  # For summaries (sentence, pointform, numbered_list, table)
+    processing_method: Optional[str] = None  # For summaries (whole, section)
 
 @router.post("/quiz", response_model=QuizResponse)
 async def generate_quiz(
@@ -234,7 +242,11 @@ async def generate_summary_endpoint(
                 title=existing_summary.title,
                 content=existing_summary.content,
                 is_cached=True,
-                quickread=None
+                quickread=existing_summary.quickread,
+                mode=existing_summary.mode or "elaborate",
+                output_format=existing_summary.output_format or "sentence",
+                processing_method=existing_summary.processing_method or "whole",
+                id=existing_summary.id
             )
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
 
@@ -255,6 +267,14 @@ async def generate_summary_endpoint(
                 mode=request.mode,
                 output_format=request.output_format
             )
+            
+            # Generate quickread if requested (quick mode overview)
+            if request.include_quickread:
+                quickread_content = await ai_client.generate_summary(
+                    content=lecture_content,
+                    mode="quick",
+                    output_format="pointform"
+                )
         else:
             # Section by section logic
             import re
@@ -313,7 +333,11 @@ async def generate_summary_endpoint(
             title=f"{request.mode.capitalize()} in {request.output_format.replace('_', ' ')}",
             document_type="summary",
             file_path=f"summary_{lecture.id}.md",
-            content=summary_content
+            content=summary_content,
+            quickread=quickread_content,
+            mode=request.mode,
+            output_format=request.output_format,
+            processing_method=request.processing_method
         )
         db.add(doc)
         db.commit()
@@ -323,7 +347,11 @@ async def generate_summary_endpoint(
             title=f"Summary - {lecture.title}",
             content=summary_content,
             is_cached=False,
-            quickread=quickread_content
+            quickread=quickread_content,
+            mode=request.mode,
+            output_format=request.output_format,
+            processing_method=request.processing_method,
+            id=doc.id
         )
     except Exception as e:
         logger.error(f"Error generating summary: {str(e)}")
@@ -445,7 +473,11 @@ async def get_document(
         document_type=document.document_type,
         file_path=document.file_path,
         created_at=document.created_at.isoformat() if document.created_at else "",
-        content=document.content
+        content=document.content,
+        quickread=document.quickread,
+        mode=document.mode,
+        output_format=document.output_format,
+        processing_method=document.processing_method
     )
 
 
