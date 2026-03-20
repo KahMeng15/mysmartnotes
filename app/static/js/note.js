@@ -1368,6 +1368,12 @@ async function generateFlashcards() {
     } catch (error) { alert('Error: ' + error.message); }
 }
 
+// ===== SUMMARIZATION =====
+function handleSummarizeClick() {
+    if (!lectureId) return;
+    window.location.href = `/note/${lectureId}/summary`;
+}
+
 let selectedExportFormat = 'pdf';
 
 async function exportNote() {

@@ -18,7 +18,7 @@ class FlashcardBase(BaseModel):
 
 
 class FlashcardCreate(FlashcardBase):
-    lecture_id: int
+    lecture_id: str
 
 
 class FlashcardUpdate(BaseModel):
@@ -29,7 +29,7 @@ class FlashcardUpdate(BaseModel):
 
 class FlashcardResponse(FlashcardBase):
     id: int
-    lecture_id: int
+    lecture_id: str
     times_reviewed: int
     times_correct: int
     
@@ -43,8 +43,8 @@ class FlashcardReviewRequest(BaseModel):
 
 @router.get("", response_model=List[FlashcardResponse])
 async def get_flashcards(
-    lecture_id: int = None,
-    subject_id: int = None,
+    lecture_id: str = None,
+    subject_id: str = None,
     difficulty: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

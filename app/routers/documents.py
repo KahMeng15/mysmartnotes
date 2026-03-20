@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 from app.models.db import User, Lecture, GeneratedDocument, Flashcard
@@ -31,6 +31,22 @@ class FlashcardRequest(BaseModel):
     quantity: int = 10
 
 
+class SummaryRequest(BaseModel):
+    lecture_id: str
+    mode: str = "elaborate"  # quick, simple, elaborate, eli5
+    output_format: str = "sentence"  # sentence, pointform, numbered_list, table
+    processing_method: str = "whole"  # whole, section
+    split_level: str = "h1"  # h1, h2, h3
+    force_regenerate: bool = False
+
+
+class SummaryResponse(BaseModel):
+    lecture_id: str
+    title: str
+    content: str
+    is_cached: bool
+
+
 class FlashcardGeneratedResponse(BaseModel):
     lecture_id: str
     count: int
@@ -55,7 +71,7 @@ class DocumentResponse(BaseModel):
     document_type: str
     file_path: str
     created_at: str
-
+    content: Optional[str] = None
 
 @router.post("/quiz", response_model=QuizResponse)
 async def generate_quiz(
@@ -136,7 +152,7 @@ async def generate_flashcards(
     ai_client = AIClient(current_user, db=db)
     
     try:
-        flashcard_data = ai_client.generate_flashcards(
+        flashcard_data = await ai_client.generate_flashcards(
             content=lecture_content,
             num_flashcards=request.quantity
         )
@@ -167,6 +183,138 @@ async def generate_flashcards(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating flashcards: {str(e)}"
+        )
+
+
+@router.post("/flashcards/{lecture_id}", response_model=FlashcardGeneratedResponse)
+async def generate_flashcards_by_path(
+    lecture_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Auto-generate flashcards from lecture content (path param version)"""
+    request = FlashcardRequest(lecture_id=lecture_id)
+    return await generate_flashcards(request, current_user, db)
+
+
+@router.post("/summary", response_model=SummaryResponse)
+async def generate_summary_endpoint(
+    request: SummaryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate or retrieve cached summary for a lecture"""
+    
+    # Verify lecture belongs to user
+    lecture = db.query(Lecture).filter(
+        Lecture.id == request.lecture_id,
+        Lecture.user_id == current_user.id
+    ).first()
+    
+    if not lecture:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lecture not found"
+        )
+
+    # Check for existing summary (unless forced)
+    if not request.force_regenerate:
+        existing_summary = db.query(GeneratedDocument).filter(
+            GeneratedDocument.lecture_id == request.lecture_id,
+            GeneratedDocument.document_type == "summary"
+        ).order_by(GeneratedDocument.created_at.desc()).first()
+
+        if existing_summary:
+            return SummaryResponse(
+                lecture_id=request.lecture_id,
+                title=existing_summary.title,
+                content=existing_summary.content,
+                is_cached=True
+            )
+    # If forcing regeneration, we simply bypass the cache check and generate a new one.
+
+    lecture_content = lecture.extracted_text or ""
+    if not lecture_content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lecture content not available yet. Please wait for processing."
+        )
+    
+    ai_client = AIClient(current_user, db=db)
+    
+    try:
+        if request.processing_method == "whole":
+            summary_content = await ai_client.generate_summary(
+                content=lecture_content,
+                mode=request.mode,
+                output_format=request.output_format
+            )
+        else:
+            # Section by section logic
+            import re
+            # Split by chosen level (e.g. h1 = # , h2 = ## , h3 = ### )
+            # If h2 is chosen, we split by H1 and H2.
+            level_map = {"h1": r"^# ", "h2": r"^#{1,2} ", "h3": r"^#{1,3} "}
+            split_pattern = level_map.get(request.split_level, r"^# ")
+            
+            # Split lines but keep headers
+            lines = lecture_content.split("\n")
+            sections = [] # List of tuples: (title, content)
+            current_title = "Introduction"
+            current_content = []
+            
+            for line in lines:
+                match = re.match(split_pattern, line)
+                if match:
+                    if current_content:
+                        sections.append((current_title, "\n".join(current_content)))
+                    # Extract title from header (remove # symbols)
+                    current_title = line.lstrip("#").strip()
+                    current_content = []
+                current_content.append(line)
+            
+            if current_content:
+                sections.append((current_title, "\n".join(current_content)))
+            
+            # Summarize each section
+            summarized_sections = []
+            for title, content in sections:
+                # Only summarize if there's actual body text beyond the header
+                body_lines = [l for l in content.split("\n") if not re.match(split_pattern, l) and l.strip()]
+                if not body_lines:
+                    continue
+                    
+                section_summary = await ai_client.generate_summary(
+                    content=content,
+                    mode=request.mode,
+                    output_format=request.output_format
+                )
+                summarized_sections.append(f"### {title}\n\n{section_summary}")
+            
+            summary_content = "\n\n".join(summarized_sections)
+
+        # Save generated document
+        doc = GeneratedDocument(
+            lecture_id=request.lecture_id,
+            title=f"{request.mode.capitalize()} in {request.output_format.replace('_', ' ')}",
+            document_type="summary",
+            file_path=f"summary_{lecture.id}.md",
+            content=summary_content
+        )
+        db.add(doc)
+        db.commit()
+        
+        return SummaryResponse(
+            lecture_id=request.lecture_id,
+            title=f"Summary - {lecture.title}",
+            content=summary_content,
+            is_cached=False
+        )
+    except Exception as e:
+        logger.error(f"Error generating summary: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating summary: {str(e)}"
         )
 
 
@@ -201,9 +349,9 @@ async def generate_cheatsheet(
     ai_client = AIClient(current_user, db=db)
     
     try:
-        content = ai_client.generate_summary(
+        content = await ai_client.generate_summary(
             content=lecture_content,
-            format=request.format
+            output_format=request.format
         )
         
         # Save generated document
@@ -281,7 +429,8 @@ async def get_document(
         title=document.title,
         document_type=document.document_type,
         file_path=document.file_path,
-        created_at=document.created_at.isoformat() if document.created_at else ""
+        created_at=document.created_at.isoformat() if document.created_at else "",
+        content=document.content
     )
 
 

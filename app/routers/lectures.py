@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List
 import uuid
 
-from app.models.db import User, Lecture, Subject
+from app.models.db import User, Lecture, Subject, GeneratedDocument
 from app.schemas.schemas import LectureResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
@@ -211,7 +211,9 @@ async def get_lecture(
     import logging
     logger = logging.getLogger(__name__)
     
-    lecture = db.query(Lecture).options(joinedload(Lecture.subject)).filter(
+    lecture = db.query(Lecture).options(
+        joinedload(Lecture.subject).joinedload(Subject.group)
+    ).filter(
         Lecture.id == lecture_id,
         Lecture.user_id == current_user.id
     ).first()
@@ -864,6 +866,13 @@ async def update_lecture_content(
     
     lecture.extracted_text = new_text
     lecture.updated_at = datetime.utcnow()
+    
+    # Invalidate existing summary when content changes
+    db.query(GeneratedDocument).filter(
+        GeneratedDocument.lecture_id == lecture_id,
+        GeneratedDocument.document_type == "summary"
+    ).delete()
+    
     db.commit()
     db.refresh(lecture)
     

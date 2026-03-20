@@ -133,7 +133,14 @@ class AIClient:
             if self.provider == "gemini":
                 if self.model is None:
                     return self.connection_error or "[GEMINI] Gemini AI is not properly initialized. Please check your API key."
-                response = self.model.generate_content(prompt)
+                
+                # Add generation config for max_tokens
+                generation_config = {}
+                if max_tokens:
+                    import google.generativeai as genai
+                    generation_config = genai.types.GenerationConfig(max_output_tokens=max_tokens)
+                
+                response = self.model.generate_content(prompt, generation_config=generation_config)
                 return response.text
             elif self.provider == "huggingface":
                 kwargs = {"max_new_tokens": max_tokens}
@@ -194,6 +201,55 @@ Format as JSON array with objects containing: question, options (array of 4), co
             import json
             return json.loads(response)
         except:
+            return []
+
+    async def generate_summary(self, content: str, mode: str = "elaborate", output_format: str = "sentence") -> str:
+        """Generate summary based on mode and format"""
+        mode_prompts = {
+            "quick": "Give me a quick, high-level summary.",
+            "simple": "Summarize this in simple, easy-to-understand terms.",
+            "elaborate": "Provide a thorough and detailed summary covering all key points.",
+            "eli5": "Explain this to me like I'm five years old."
+        }
+        
+        format_prompts = {
+            "sentence": "Output the summary as a cohesive paragraph or a few sentences.",
+            "pointform": "Output the summary as a list of bullet points.",
+            "numbered_list": "Output the summary as a numbered list.",
+            "table": "Output the summary in a Markdown table format."
+        }
+        
+        prompt = f"""{mode_prompts.get(mode, mode_prompts['elaborate'])}
+{format_prompts.get(output_format, format_prompts['sentence'])}
+
+IMPORTANT: Do NOT include any introductory or concluding remarks such as "Here is a summary" or "Here is the information in point form". 
+Output ONLY the summary content itself.
+
+Content to summarize:
+{content}
+
+Summary:"""
+        return await self.generate_text(prompt, max_tokens=1000)
+
+    async def generate_flashcards(self, content: str, num_flashcards: int = 10) -> List[dict]:
+        """Generate flashcards from content"""
+        prompt = f"""Generate {num_flashcards} study flashcards based on this content:
+
+{content}
+
+Format as JSON array with objects containing: question, answer, difficulty (easy, medium, hard)"""
+        response = await self.generate_text(prompt, max_tokens=1500)
+        try:
+            import json
+            # Clean response if AI adds markdown code blocks
+            clean_response = response.strip()
+            if clean_response.startswith("```json"):
+                clean_response = clean_response[7:-3].strip()
+            elif clean_response.startswith("```"):
+                clean_response = clean_response[3:-3].strip()
+            return json.loads(clean_response)
+        except:
+            logger.error(f"Failed to parse flashcard JSON: {response}")
             return []
 
 

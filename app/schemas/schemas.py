@@ -109,7 +109,7 @@ class Subject(SubjectBase):
 
 class SubjectResponse(Subject):
     """Response schema for subject endpoints"""
-    pass
+    group: Optional[SubjectGroup] = None
 
 
 class SubjectGroupResponse(SubjectGroup):
@@ -148,7 +148,7 @@ class Lecture(LectureBase):
 
 class LectureResponse(Lecture):
     """Response schema for lecture endpoints"""
-    subject: Optional[Subject] = None
+    subject: Optional[SubjectResponse] = None
 
 
 # ========== Flashcard Schemas ==========

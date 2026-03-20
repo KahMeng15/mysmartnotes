@@ -1,0 +1,74 @@
+/* Summary Page Styles */
+.note-page {
+    background-color: var(--color-background);
+}
+
+#summaryContainer {
+    animation: fadeIn 0.3s ease-out;
+    padding: var(--spacing-md);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Modal and Progress Bar (reused from note.css) */
+.progress-container {
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--color-light-gray);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#summaryModeBar, #summaryOutputBar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.mode-pill {
+    padding: 6px 12px;
+    border: 1px solid var(--color-light-gray);
+    border-radius: 20px;
+    background: var(--color-white);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    color: var(--color-gray);
+}
+
+.mode-pill:hover {
+    border-color: var(--color-primary);
+    background: rgba(89, 60, 143, 0.04);
+    color: var(--color-primary);
+}
+
+.mode-pill.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-white);
+}
+
+.mode-pill i {
+    font-size: 14px;
+}

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Note Summary - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles/master.css">
+    <link rel="stylesheet" href="/styles/summary.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/marked.min.js"></script>
+    <script src="/js/summary.js"></script>
+</head>
+
+<body class="note-page">
+
+    <div class="app-layout">
+        <div class="note-content-card page-card">
+            <!-- Sticky header bar with back + breadcrumb -->
+            <div class="note-sticky-header">
+                <div class="note-breadcrumb-row" id="noteBreadcrumb">
+                    <a href="#" id="metaGroup" class="note-nav-crumb-link">Group</a>
+                    <span class="note-nav-sep">›</span>
+                    <a href="#" id="metaSubject" class="note-nav-crumb-link">Subject</a>
+                    <span class="note-nav-sep">›</span>
+                    <span style="color: var(--color-dark); font-weight: 500;">AI Summary</span>
+                </div>
+            </div>
+
+            <div id="summaryContainer">
+                <div class="note-main">
+                    <div class="section-card" style="padding-top: 10px;">
+                        
+                        <div class="note-header" id="noteHeader" style="position: sticky; top: 35px; background: white; z-index: 15; padding: 16px 0;">
+                            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                                <span class="ai-mode-badge" id="displayAiModePill" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(89, 60, 143, 0.1); color: var(--color-primary); font-weight: 600;">
+                                    <i class="ph ph-lightbulb"></i> Elaborate
+                                </span>
+                                <span class="ai-mode-badge" id="displayAiFormatPill" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(89, 60, 143, 0.1); color: var(--color-primary); font-weight: 600;">
+                                    <i class="ph ph-text-t"></i> Sentence
+                                </span>
+                            </div>
+                            <h1 id="contentSubjectName" style="margin: 0;">Subject Name</h1>
+                        </div>
+                        
+                        <div id="summaryText" class="markdown-content">
+                            <div class="loading" style="text-align: center; padding: 40px;">
+                                <div class="spinner" style="margin: 0 auto 16px auto;"><i class="ph ph-spinner ph-spin"></i></div>
+                                <p>Loading summary...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Actions -->
+        <div class="note-action-panel">
+            <div class="action-grid">
+                <button class="action-btn" id="sidebarBackBtn" title="Back to Note"><i class="ph ph-arrow-left"></i> <span>Back</span></button>
+                <button class="action-btn" onclick="showSummaryOptions(true)" title="New Summary"><i class="ph ph-plus"></i> <span>New Summary</span></button>
+            </div>
+            
+            <div class="sidebar-divider"></div>
+            
+            <!-- Summary Versions Section -->
+            <div id="summaryVersionsSection">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
+                    <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">
+                        Versions
+                    </h4>
+                </div>
+                <div id="summaryList" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+                    <div class="empty-state" style="padding: var(--spacing-md); font-size: var(--font-size-xs);">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Options Modal -->
+    <div id="summaryOptionsModal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <h3 style="margin-bottom: var(--spacing-sm);"><i class="ph ph-text-align-left" style="margin-right: 6px;"></i> Summary Options</h3>
+            <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray); font-size: var(--font-size-sm);">
+                Customize how the AI should summarize your note.</p>
+
+            <!-- Mode -->
+            <div style="margin-bottom: var(--spacing-md);">
+                <label style="display: block; margin-bottom: var(--spacing-xs); font-weight: 600; font-size: var(--font-size-sm);">Mode</label>
+                <div class="ai-mode-bar" id="summaryModeBar">
+                    <button class="mode-pill" data-mode="quick" onclick="setSummaryMode('quick')">
+                        <i class="ph ph-lightning"></i> Quick
+                    </button>
+                    <button class="mode-pill" data-mode="simple" onclick="setSummaryMode('simple')">
+                        <i class="ph ph-text-a-underline"></i> Simple
+                    </button>
+                    <button class="mode-pill active" data-mode="elaborate" onclick="setSummaryMode('elaborate')">
+                        <i class="ph ph-lightbulb"></i> Elaborate
+                    </button>
+                    <button class="mode-pill" data-mode="eli5" onclick="setSummaryMode('eli5')">
+                        <i class="ph ph-smiley"></i> ELI5
+                    </button>
+                </div>
+            </div>
+
+            <!-- Output -->
+            <div style="margin-bottom: var(--spacing-md);">
+                <label style="display: block; margin-bottom: var(--spacing-xs); font-weight: 600; font-size: var(--font-size-sm);">Output Format</label>
+                <div class="output-format-bar" id="summaryOutputBar">
+                    <button class="mode-pill active" data-format="sentence" onclick="setSummaryFormat('sentence')">
+                        <i class="ph ph-text-t"></i> Sentence
+                    </button>
+                    <button class="mode-pill" data-format="pointform" onclick="setSummaryFormat('pointform')">
+                        <i class="ph ph-list-bullets"></i> Pointform
+                    </button>
+                    <button class="mode-pill" data-format="numbered_list" onclick="setSummaryFormat('numbered_list')">
+                        <i class="ph ph-list-numbers"></i> Numbered List
+                    </button>
+                    <button class="mode-pill" data-format="table" onclick="setSummaryFormat('table')">
+                        <i class="ph ph-table"></i> Table
+                    </button>
+                </div>
+            </div>
+
+            <!-- Processing Method -->
+            <div style="margin-bottom: var(--spacing-md);">
+                <label style="display: block; margin-bottom: var(--spacing-xs); font-weight: 600; font-size: var(--font-size-sm);">Processing Method</label>
+                <select id="summaryProcessMethod" onchange="onSummaryMethodChange()"
+                    style="width: 100%; padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--color-light-gray); font-family: inherit; font-size: var(--font-size-sm);">
+                    <option value="whole">Process Whole Note (Faster)</option>
+                    <option value="section">Process Section by Section (More Detailed)</option>
+                </select>
+            </div>
+
+            <!-- Split Level (Hidden by default) -->
+            <div id="splitLevelContainer" style="display: none; margin-bottom: var(--spacing-lg);">
+                <label style="display: block; margin-bottom: var(--spacing-xs); font-weight: 600; font-size: var(--font-size-sm);">Header Level for Sections</label>
+                <select id="summarySplitLevel"
+                    style="width: 100%; padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--color-light-gray); font-family: inherit; font-size: var(--font-size-sm);">
+                    <option value="h1">Level 1 Headers (# )</option>
+                    <option value="h2" selected>Level 2 Headers (## )</option>
+                    <option value="h3">Level 3 Headers (### )</option>
+                </select>
+            </div>
+
+            <div class="modal-buttons" style="margin-top: var(--spacing-lg);">
+                <button type="button" class="btn btn-primary" id="generateSummaryBtn" onclick="generateSummary()">Generate Summary</button>
+                <button type="button" class="btn btn-secondary" onclick="closeSummaryModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Progress Modal -->
+    <div id="summaryProgressModal" class="modal">
+        <div class="modal-content" style="max-width: 400px; padding: var(--spacing-xl);">
+            <div style="text-align: center; margin-bottom: var(--spacing-lg);">
+                <div class="spinner" style="font-size: 2rem; color: var(--color-primary); margin-bottom: var(--spacing-md);">
+                    <i class="ph ph-sparkle ph-spin"></i>
+                </div>
+                <h3 style="margin-bottom: 4px;">Summarizing with AI</h3>
+                <p style="color: var(--color-gray); font-size: var(--font-size-sm);" id="summaryProgressMessage">Initializing AI model...</p>
+            </div>
+            
+            <div class="progress-container" style="display: block; background: var(--color-bg); border: none; padding: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span id="summaryProgressLabel" style="font-weight: 600; font-size: 11px; text-transform: uppercase; color: var(--color-dark-gray);">Working...</span>
+                    <span id="summaryProgressPercent" style="font-size: 11px; font-weight: 600; color: var(--color-primary);">0%</span>
+                </div>
+                <div class="progress-bar" style="height: 8px; background: var(--color-light-gray);">
+                    <div id="summaryProgressFill" class="progress-fill" style="width: 0%; transition: width 0.5s ease;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

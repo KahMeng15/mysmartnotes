@@ -223,6 +223,10 @@ static_dir = os.path.join(os.path.dirname(__file__), "app", "static")
 async def serve_note_view(id: str):
     return FileResponse(os.path.join(static_dir, "note.html"))
 
+@app.get("/note/{id}/summary")
+async def serve_summary_view(id: str):
+    return FileResponse(os.path.join(static_dir, "summary.html"))
+
 @app.get("/note/{id}/edit")
 async def serve_note_edit(id: str):
     return FileResponse(os.path.join(static_dir, "note.html"))
