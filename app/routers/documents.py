@@ -4,12 +4,14 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+import logging
 
 from app.models.db import User, Lecture, GeneratedDocument, Flashcard
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.processing.ai_client import AIClient
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
@@ -38,6 +40,7 @@ class SummaryRequest(BaseModel):
     processing_method: str = "whole"  # whole, section
     split_level: str = "h1"  # h1, h2, h3
     force_regenerate: bool = False
+    include_quickread: bool = False  # Generate quick mode summary alongside main summary
 
 
 class SummaryResponse(BaseModel):
@@ -45,6 +48,7 @@ class SummaryResponse(BaseModel):
     title: str
     content: str
     is_cached: bool
+    quickread: Optional[str] = None  # Optional quickread summary
 
 
 class FlashcardGeneratedResponse(BaseModel):
@@ -229,7 +233,8 @@ async def generate_summary_endpoint(
                 lecture_id=request.lecture_id,
                 title=existing_summary.title,
                 content=existing_summary.content,
-                is_cached=True
+                is_cached=True,
+                quickread=None
             )
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
 
@@ -241,6 +246,7 @@ async def generate_summary_endpoint(
         )
     
     ai_client = AIClient(current_user, db=db)
+    quickread_content = None
     
     try:
         if request.processing_method == "whole":
@@ -289,9 +295,17 @@ async def generate_summary_endpoint(
                     mode=request.mode,
                     output_format=request.output_format
                 )
-                summarized_sections.append(f"### {title}\n\n{section_summary}")
+                summarized_sections.append(f"## {title}\n\n{section_summary}")
             
             summary_content = "\n\n".join(summarized_sections)
+            
+            # Generate quickread if requested (quick mode overview)
+            if request.include_quickread:
+                quickread_content = await ai_client.generate_summary(
+                    content=lecture_content,
+                    mode="quick",
+                    output_format="pointform"
+                )
 
         # Save generated document
         doc = GeneratedDocument(
@@ -308,7 +322,8 @@ async def generate_summary_endpoint(
             lecture_id=request.lecture_id,
             title=f"Summary - {lecture.title}",
             content=summary_content,
-            is_cached=False
+            is_cached=False,
+            quickread=quickread_content
         )
     except Exception as e:
         logger.error(f"Error generating summary: {str(e)}")

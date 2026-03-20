@@ -13,6 +13,27 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Display Options Section */
+#displayOptionsSection h4 {
+    margin: 0 0 var(--spacing-md) 0;
+}
+
+#displayOptionsSection label {
+    padding: var(--spacing-sm) 0;
+    margin: 0;
+}
+
+/* Sticky Headers in Markdown Content */
+.markdown-content h2, 
+.markdown-content h3, 
+.markdown-content h4 {
+    position: sticky;
+}
+
+.markdown-content h2 {
+    top: 110px;
+}
+
 /* Modal and Progress Bar (reused from note.css) */
 .progress-container {
     background: var(--color-bg);

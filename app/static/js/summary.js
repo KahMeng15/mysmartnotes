@@ -2,9 +2,11 @@
 let lectureId = null;
 let token = localStorage.getItem('token');
 let summaryData = null;
+let quickreadData = null;
 let currentSummaryMode = 'elaborate';
 let currentSummaryFormat = 'sentence';
 let isRegeneratingSummary = false;
+let currentProcessingMethod = 'whole';
 
 const MODE_META = {
     quick: { label: 'Quick', icon: 'ph-lightning' },
@@ -181,6 +183,7 @@ async function loadNoteMetadata() {
 
 function displaySummary() {
     const summaryText = document.getElementById('summaryText');
+    const quickreadContainer = document.getElementById('quickreadContainer');
     const displayAiModePill = document.getElementById('displayAiModePill');
     const displayAiFormatPill = document.getElementById('displayAiFormatPill');
     
@@ -203,6 +206,26 @@ function displaySummary() {
     } catch (e) {
         summaryText.innerHTML = summaryData.replace(/\n/g, '<br>');
     }
+    
+    // Show Quickread at the top if it exists (section-by-section processing)
+    if (currentProcessingMethod === 'section' && quickreadData) {
+        if (quickreadContainer) {
+            quickreadContainer.style.display = 'block';
+            const quickreadContent = document.getElementById('quickreadContent');
+            if (quickreadContent) {
+                try {
+                    quickreadContent.innerHTML = marked.parse(quickreadData);
+                } catch (e) {
+                    quickreadContent.textContent = quickreadData;
+                }
+            }
+        }
+    } else if (quickreadContainer) {
+        quickreadContainer.style.display = 'none';
+    }
+    
+    // Apply current visibility settings to hide sections from the raw content
+    hideRedundantSections();
 }
 
 // Reuse modal logic from note.js but tailored for this page
@@ -231,7 +254,58 @@ function setSummaryFormat(format) {
 
 function onSummaryMethodChange() {
     const method = document.getElementById('summaryProcessMethod').value;
+    currentProcessingMethod = method;
     document.getElementById('splitLevelContainer').style.display = method === 'section' ? 'block' : 'none';
+}
+
+function toggleElement(elementId, show) {
+    // Hide/show sections from the raw note content based on checkbox state
+    const summaryText = document.getElementById('summaryText');
+    if (!summaryText) return;
+    
+    const headers = summaryText.querySelectorAll('h2, h3, h4, h5');
+    
+    if (elementId === 'objectivesSection') {
+        // Hide/show "Objectives" sections
+        const objectivePatterns = [
+            /^(Learning\s+Objectives?|Module\s+Objectives?|Objectives?)/i
+        ];
+        
+        headers.forEach(header => {
+            for (const pattern of objectivePatterns) {
+                if (pattern.test(header.textContent.trim())) {
+                    header.style.display = show ? '' : 'none';
+                    
+                    // Also hide/show content until next header
+                    let current = header.nextElementSibling;
+                    while (current && !current.matches('h2, h3, h4, h5')) {
+                        current.style.display = show ? '' : 'none';
+                        current = current.nextElementSibling;
+                    }
+                    break;
+                }
+            }
+        });
+    } else if (elementId === 'quickreadSection') {
+        // Hide/show quickread container
+        const quickreadContainer = document.getElementById('quickreadContainer');
+        if (quickreadContainer) {
+            quickreadContainer.style.display = show ? 'block' : 'none';
+        }
+    }
+}
+
+function hideRedundantSections() {
+    // Apply current checkbox states to hide/show sections
+    const toggleObjectives = document.getElementById('toggleObjectives');
+    const toggleQuickread = document.getElementById('toggleQuickread');
+    
+    if (toggleObjectives && !toggleObjectives.checked) {
+        toggleElement('objectivesSection', false);
+    }
+    if (toggleQuickread && !toggleQuickread.checked) {
+        toggleElement('quickreadSection', false);
+    }
 }
 
 function updateSummaryProgress(percent, message, label) {
@@ -275,7 +349,8 @@ async function generateSummary() {
                 output_format: currentSummaryFormat,
                 processing_method: method,
                 split_level: splitLevel,
-                force_regenerate: isRegeneratingSummary
+                force_regenerate: isRegeneratingSummary,
+                include_quickread: method === 'section'
             })
         });
 
@@ -285,6 +360,7 @@ async function generateSummary() {
             updateSummaryProgress(100, 'Complete!', 'Done');
             const data = await res.json();
             summaryData = data.content;
+            quickreadData = data.quickread || null;
             
             setTimeout(() => {
                 document.getElementById('summaryProgressModal').classList.remove('active');

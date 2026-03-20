@@ -37,7 +37,7 @@
                 <div class="note-main">
                     <div class="section-card" style="padding-top: 10px;">
                         
-                        <div class="note-header" id="noteHeader" style="position: sticky; top: 35px; background: white; z-index: 15; padding: 16px 0;">
+                        <div class="note-header" id="noteHeader" style="position: sticky; top: 35px; background: white; z-index: 15; padding-top: 16px;">
                             <div style="display: flex; gap: 6px; margin-bottom: 8px;">
                                 <span class="ai-mode-badge" id="displayAiModePill" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(89, 60, 143, 0.1); color: var(--color-primary); font-weight: 600;">
                                     <i class="ph ph-lightbulb"></i> Elaborate
@@ -49,9 +49,18 @@
                             <h1 id="contentSubjectName" style="margin: 0;">Subject Name</h1>
                         </div>
                         
+                        <!-- Quickread Section at Top -->
+                        <div id="quickreadContainer" style="display: none; margin-bottom: var(--spacing-lg); padding: var(--spacing-md); background: rgba(89, 60, 143, 0.05); border-left: 4px solid var(--color-primary); border-radius: var(--radius-md);">
+                            <h3 style="margin-top: 0; color: var(--color-primary); display: flex; align-items: center; gap: 8px;">
+                                <i class="ph ph-lightning"></i> Quickread
+                            </h3>
+                            <div id="quickreadContent" class="markdown-content" style="font-size: var(--font-size-sm); line-height: 1.6; color: var(--color-gray);"></div>
+                        </div>
+                        
+                        <!-- Main Summary Content -->
                         <div id="summaryText" class="markdown-content">
                             <div class="loading" style="text-align: center; padding: 40px;">
-                                <div class="spinner" style="margin: 0 auto 16px auto;"><i class="ph ph-spinner ph-spin"></i></div>
+                                <div class="spinner" style="margin: 0 auto 16px auto;"><i class="ph ph-spinner"></i></div>
                                 <p>Loading summary...</p>
                             </div>
                         </div>
@@ -65,6 +74,25 @@
             <div class="action-grid">
                 <button class="action-btn" id="sidebarBackBtn" title="Back to Note"><i class="ph ph-arrow-left"></i> <span>Back</span></button>
                 <button class="action-btn" onclick="showSummaryOptions(true)" title="New Summary"><i class="ph ph-plus"></i> <span>New Summary</span></button>
+            </div>
+            
+            <div class="sidebar-divider"></div>
+            
+            <!-- Display Options -->
+            <div id="displayOptionsSection" style="margin-bottom: var(--spacing-md);">
+                <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0 0 var(--spacing-md) 0; text-transform: uppercase; letter-spacing: 0.05em;">
+                    Display
+                </h4>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
+                        <input type="checkbox" id="toggleObjectives" checked onchange="toggleElement('objectivesSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
+                        <span style="font-weight: 500;">Show Objectives</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
+                        <input type="checkbox" id="toggleQuickread" checked onchange="toggleElement('quickreadSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
+                        <span style="font-weight: 500;">Show Quickread</span>
+                    </label>
+                </div>
             </div>
             
             <div class="sidebar-divider"></div>
@@ -160,8 +188,8 @@
     <div id="summaryProgressModal" class="modal">
         <div class="modal-content" style="max-width: 400px; padding: var(--spacing-xl);">
             <div style="text-align: center; margin-bottom: var(--spacing-lg);">
-                <div class="spinner" style="font-size: 2rem; color: var(--color-primary); margin-bottom: var(--spacing-md);">
-                    <i class="ph ph-sparkle ph-spin"></i>
+                <div style="font-size: 2rem; color: var(--color-primary); margin-bottom: var(--spacing-md); display: inline-block;">
+                    <i class="ph ph-sparkle"></i>
                 </div>
                 <h3 style="margin-bottom: 4px;">Summarizing with AI</h3>
                 <p style="color: var(--color-gray); font-size: var(--font-size-sm);" id="summaryProgressMessage">Initializing AI model...</p>
