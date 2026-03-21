@@ -15,6 +15,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
+def format_timestamp(dt: Optional[datetime]) -> str:
+    """Format datetime as ISO string with UTC timezone for client-side parsing"""
+    if not dt:
+        return ""
+    # Add UTC timezone info to ensure JS interprets as UTC
+    if dt.tzinfo is None:
+        # Naive datetime - it's in UTC from our backend
+        iso_str = dt.isoformat()
+        return iso_str + 'Z' if not iso_str.endswith('Z') else iso_str
+    else:
+        return dt.isoformat()
+
+
 class QuizQuestion(BaseModel):
     question: str
     options: List[str]
@@ -52,6 +65,8 @@ class SummaryResponse(BaseModel):
     mode: str = "elaborate"
     output_format: str = "sentence"
     processing_method: str = "whole"
+    split_level: Optional[str] = None
+    processing_time: Optional[float] = None
     id: Optional[int] = None
 
 
@@ -84,6 +99,8 @@ class DocumentResponse(BaseModel):
     mode: Optional[str] = None  # For summaries (elaborate, quick, simple, eli5)
     output_format: Optional[str] = None  # For summaries (sentence, pointform, numbered_list, table)
     processing_method: Optional[str] = None  # For summaries (whole, section)
+    split_level: Optional[str] = None  # For summaries (h1, h2, h3)
+    processing_time: Optional[float] = None  # Processing time in seconds
 
 @router.post("/quiz", response_model=QuizResponse)
 async def generate_quiz(
@@ -233,7 +250,8 @@ async def generate_summary_endpoint(
     if not request.force_regenerate:
         existing_summary = db.query(GeneratedDocument).filter(
             GeneratedDocument.lecture_id == request.lecture_id,
-            GeneratedDocument.document_type == "summary"
+            GeneratedDocument.document_type == "summary",
+            GeneratedDocument.processing_method == request.processing_method
         ).order_by(GeneratedDocument.created_at.desc()).first()
 
         if existing_summary:
@@ -246,6 +264,8 @@ async def generate_summary_endpoint(
                 mode=existing_summary.mode or "elaborate",
                 output_format=existing_summary.output_format or "sentence",
                 processing_method=existing_summary.processing_method or "whole",
+                split_level=existing_summary.split_level,
+                processing_time=existing_summary.processing_time,
                 id=existing_summary.id
             )
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
@@ -260,6 +280,10 @@ async def generate_summary_endpoint(
     ai_client = AIClient(current_user, db=db)
     quickread_content = None
     
+    # Track processing time
+    import time
+    start_time = time.time()
+    
     try:
         if request.processing_method == "whole":
             summary_content = await ai_client.generate_summary(
@@ -267,14 +291,8 @@ async def generate_summary_endpoint(
                 mode=request.mode,
                 output_format=request.output_format
             )
-            
-            # Generate quickread if requested (quick mode overview)
-            if request.include_quickread:
-                quickread_content = await ai_client.generate_summary(
-                    content=lecture_content,
-                    mode="quick",
-                    output_format="pointform"
-                )
+            # Note: quickread is only generated for section-by-section processing
+            quickread_content = None
         else:
             # Section by section logic
             import re
@@ -297,6 +315,7 @@ async def generate_summary_endpoint(
                     # Extract title from header (remove # symbols)
                     current_title = line.lstrip("#").strip()
                     current_content = []
+                    continue  # Skip adding the header line to content
                 current_content.append(line)
             
             if current_content:
@@ -326,6 +345,9 @@ async def generate_summary_endpoint(
                     mode="quick",
                     output_format="pointform"
                 )
+        
+        # Calculate processing time
+        processing_time = time.time() - start_time
 
         # Save generated document
         doc = GeneratedDocument(
@@ -337,7 +359,9 @@ async def generate_summary_endpoint(
             quickread=quickread_content,
             mode=request.mode,
             output_format=request.output_format,
-            processing_method=request.processing_method
+            processing_method=request.processing_method,
+            split_level=request.split_level if request.processing_method == "section" else None,
+            processing_time=processing_time
         )
         db.add(doc)
         db.commit()
@@ -351,6 +375,8 @@ async def generate_summary_endpoint(
             mode=request.mode,
             output_format=request.output_format,
             processing_method=request.processing_method,
+            split_level=request.split_level if request.processing_method == "section" else None,
+            processing_time=processing_time,
             id=doc.id
         )
     except Exception as e:
@@ -442,7 +468,7 @@ async def list_documents(
             title=d.title,
             document_type=d.document_type,
             file_path=d.file_path,
-            created_at=d.created_at.isoformat() if d.created_at else ""
+            created_at=format_timestamp(d.created_at)
         )
         for d in documents
     ]
@@ -472,12 +498,14 @@ async def get_document(
         title=document.title,
         document_type=document.document_type,
         file_path=document.file_path,
-        created_at=document.created_at.isoformat() if document.created_at else "",
+        created_at=format_timestamp(document.created_at),
         content=document.content,
         quickread=document.quickread,
         mode=document.mode,
         output_format=document.output_format,
-        processing_method=document.processing_method
+        processing_method=document.processing_method,
+        split_level=document.split_level,
+        processing_time=document.processing_time
     )
 
 

@@ -9,6 +9,9 @@ let isRegeneratingSummary = false;
 let currentProcessingMethod = 'whole';
 let currentVersionId = null;
 let deleteConfirmVersionId = null;
+let currentSplitLevel = null;
+let currentProcessingTime = null;
+let currentNoteTitleForBreadcrumb = null;
 
 const MODE_META = {
     quick: { label: 'Quick', icon: 'ph-lightning' },
@@ -116,6 +119,8 @@ async function loadSummaryVersion(docId) {
                 currentSummaryMode = data.mode || 'elaborate';
                 currentSummaryFormat = data.output_format || 'sentence';
                 currentProcessingMethod = data.processing_method || 'whole';
+                currentSplitLevel = data.split_level || null;
+                currentProcessingTime = data.processing_time || null;
                 currentVersionId = docId;
                 displaySummary();
                 loadSummaryVersions();
@@ -172,6 +177,8 @@ async function loadSummary() {
             currentSummaryMode = data.mode || 'elaborate';
             currentSummaryFormat = data.output_format || 'sentence';
             currentProcessingMethod = data.processing_method || 'whole';
+            currentSplitLevel = data.split_level || null;
+            currentProcessingTime = data.processing_time || null;
             currentVersionId = data.id;
             displaySummary();
             
@@ -180,7 +187,19 @@ async function loadSummary() {
         } else {
             // If no summary exists, show options to generate one
             showSummaryOptions();
-            document.getElementById('summaryText').innerHTML = '<p style="text-align:center; color:var(--color-gray); padding:20px;">No summary found. Click "Re-generate" or the button below to create one.</p>';
+            const summaryText = document.getElementById('summaryText');
+            summaryText.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; padding: 40px; text-align: center;">
+                    <i class="ph ph-sparkle" style="font-size: 3rem; color: var(--color-primary); margin-bottom: 16px;"></i>
+                    <h2 style="margin-bottom: 8px; color: var(--color-dark);">No Summary Yet</h2>
+                    <p style="color: var(--color-gray); margin-bottom: 24px; max-width: 300px;">
+                        Create your first AI-generated summary to quickly understand the key points of your note.
+                    </p>
+                    <button class="btn btn-primary" onclick="showSummaryOptions(true)" style="padding: 10px 20px;">
+                        <i class="ph ph-plus" style="margin-right: 8px;"></i> Generate Summary
+                    </button>
+                </div>
+            `;
         }
     } catch (e) {
         console.error('Error loading summary:', e);
@@ -198,24 +217,53 @@ async function loadNoteMetadata() {
             const noteTitleEl = document.getElementById('noteTitle');
             if (noteTitleEl) noteTitleEl.textContent = note.title;
             
+            // Store for breadcrumb
+            currentNoteTitleForBreadcrumb = note.title;
+            
             // Update breadcrumbs and titles
             if (note.subject) {
                 const groupLink = document.getElementById('metaGroup');
                 const subjectLink = document.getElementById('metaSubject');
+                const noteBreadcrumb = document.getElementById('noteBreadcrumb');
                 const contentSubjectName = document.getElementById('contentSubjectName');
                 
                 if (contentSubjectName) contentSubjectName.textContent = note.title;
                 
+                // Build complete breadcrumb: Group > Subject > Note > Summary Title
+                let breadcrumbHTML = '';
                 if (note.subject.group && note.subject.group.name) {
-                    groupLink.textContent = note.subject.group.name;
-                    groupLink.href = `/dashboard?group=${note.subject.group.id}`;
+                    breadcrumbHTML += `<a href="/dashboard?group=${note.subject.group.id}" class="note-nav-crumb-link">${note.subject.group.name}</a>`;
                 } else {
-                    groupLink.textContent = "My Notes";
-                    groupLink.href = `/dashboard`;
+                    breadcrumbHTML += `<a href="/dashboard" class="note-nav-crumb-link">My Notes</a>`;
+                }
+                breadcrumbHTML += `<span class="note-nav-sep">›</span>`;
+                breadcrumbHTML += `<a href="/subject.html?id=${note.subject.id}" class="note-nav-crumb-link">${note.subject.name}</a>`;
+                breadcrumbHTML += `<span class="note-nav-sep">›</span>`;
+                breadcrumbHTML += `<a href="/note/${lectureId}" class="note-nav-crumb-link">${note.title}</a>`;
+                breadcrumbHTML += `<span class="note-nav-sep">›</span>`;
+                
+                // Add summary mode to breadcrumb - use class instead of inline styles
+                const summaryModeLabel = MODE_META[currentSummaryMode]?.label || 'Summary';
+                breadcrumbHTML += `<a class="note-nav-crumb-link">${summaryModeLabel} in ${FORMAT_META[currentSummaryFormat]?.label || 'Summary'}</a>`;
+                
+                if (noteBreadcrumb) {
+                    noteBreadcrumb.innerHTML = breadcrumbHTML;
                 }
                 
-                subjectLink.textContent = note.subject.name;
-                subjectLink.href = `/subject.html?id=${note.subject.id}`;
+                if (groupLink) {
+                    if (note.subject.group && note.subject.group.name) {
+                        groupLink.textContent = note.subject.group.name;
+                        groupLink.href = `/dashboard?group=${note.subject.group.id}`;
+                    } else {
+                        groupLink.textContent = "My Notes";
+                        groupLink.href = `/dashboard`;
+                    }
+                }
+                
+                if (subjectLink) {
+                    subjectLink.textContent = note.subject.name;
+                    subjectLink.href = `/subject.html?id=${note.subject.id}`;
+                }
             }
         }
     } catch (e) { console.error('Error loading metadata:', e); }
@@ -240,6 +288,9 @@ function displaySummary() {
         const formatIcon = FORMAT_META[currentSummaryFormat]?.icon || 'ph-text-t';
         displayAiFormatPill.innerHTML = `<i class="ph ${formatIcon}"></i> ${formatLabel}`;
     }
+    
+    // Update Details Section
+    updateDetailsSection();
     
     try {
         summaryText.innerHTML = marked.parse(summaryData);
@@ -266,6 +317,47 @@ function displaySummary() {
     
     // Apply current visibility settings to hide sections from the raw content
     hideRedundantSections();
+}
+
+function formatProcessingTime(seconds) {
+    if (!seconds && seconds !== 0) return '—';
+    if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}m ${secs}s`;
+}
+
+function updateDetailsSection() {
+    const detailsProcessingMode = document.getElementById('detailsProcessingMode');
+    const detailsDividerItem = document.getElementById('detailsDividerItem');
+    const detailsDivider = document.getElementById('detailsDivider');
+    const detailsFormat = document.getElementById('detailsFormat');
+    const detailsProcessingTime = document.getElementById('detailsProcessingTime');
+    
+    if (detailsProcessingMode) {
+        const modeText = currentProcessingMethod === 'section' ? 'Section by section' : 'Whole note';
+        detailsProcessingMode.textContent = modeText;
+    }
+    
+    // Show divider info only for section-by-section processing
+    if (detailsDividerItem && detailsDivider) {
+        if (currentProcessingMethod === 'section' && currentSplitLevel) {
+            detailsDividerItem.style.display = 'flex';
+            detailsDivider.textContent = currentSplitLevel.toUpperCase();
+        } else {
+            detailsDividerItem.style.display = 'none';
+        }
+    }
+    
+    if (detailsFormat) {
+        const formatLabel = FORMAT_META[currentSummaryFormat]?.label || currentSummaryFormat;
+        detailsFormat.textContent = formatLabel;
+    }
+    
+    if (detailsProcessingTime) {
+        detailsProcessingTime.textContent = formatProcessingTime(currentProcessingTime);
+    }
 }
 
 // Reuse modal logic from note.js but tailored for this page
@@ -401,12 +493,18 @@ async function generateSummary() {
             const data = await res.json();
             summaryData = data.content;
             quickreadData = data.quickread || null;
+            currentSummaryMode = data.mode || 'elaborate';
+            currentSummaryFormat = data.output_format || 'sentence';
+            currentProcessingMethod = data.processing_method || 'whole';
+            currentSplitLevel = data.split_level || null;
+            currentProcessingTime = data.processing_time || null;
             currentVersionId = data.id;
             
             setTimeout(() => {
                 document.getElementById('summaryProgressModal').classList.remove('active');
                 displaySummary();
                 loadSummaryVersions();
+                loadNoteMetadata();
                 isRegeneratingSummary = false;
             }, 600);
         } else {

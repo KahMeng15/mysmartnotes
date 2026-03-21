@@ -29,7 +29,7 @@
                     <span class="note-nav-sep">›</span>
                     <a href="#" id="metaSubject" class="note-nav-crumb-link">Subject</a>
                     <span class="note-nav-sep">›</span>
-                    <span style="color: var(--color-dark); font-weight: 500;">AI Summary</span>
+                    <a href="#" class="note-nav-crumb-link">AI Summary</a>
                 </div>
             </div>
 
@@ -70,7 +70,7 @@
         </div>
 
         <!-- Sidebar Actions -->
-        <div class="note-action-panel">
+        <div class="note-action-panel" style="display: flex; flex-direction: column;">
             <div class="action-grid">
                 <button class="action-btn" id="sidebarBackBtn" title="Back to Note"><i class="ph ph-arrow-left"></i> <span>Back</span></button>
                 <button class="action-btn" onclick="showSummaryOptions(true)" title="New Summary"><i class="ph ph-plus"></i> <span>New Summary</span></button>
@@ -78,34 +78,64 @@
             
             <div class="sidebar-divider"></div>
             
-            <!-- Display Options -->
-            <div id="displayOptionsSection" style="margin-bottom: var(--spacing-md);">
-                <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0 0 var(--spacing-md) 0; text-transform: uppercase; letter-spacing: 0.05em;">
-                    Display
-                </h4>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
-                        <input type="checkbox" id="toggleObjectives" checked onchange="toggleElement('objectivesSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
-                        <span style="font-weight: 500;">Show Objectives</span>
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
-                        <input type="checkbox" id="toggleQuickread" checked onchange="toggleElement('quickreadSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
-                        <span style="font-weight: 500;">Show Quickread</span>
-                    </label>
+            <!-- Scrollable middle content -->
+            <div style="flex: 1; overflow-y: auto; min-height: 0;">
+                <!-- Display Options -->
+                <div id="displayOptionsSection" style="margin-bottom: var(--spacing-md);">
+                    <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0 0 var(--spacing-md) 0; text-transform: uppercase; letter-spacing: 0.05em;">
+                        Display
+                    </h4>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
+                            <input type="checkbox" id="toggleObjectives" checked onchange="toggleElement('objectivesSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
+                            <span style="font-weight: 500;">Show Objectives</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
+                            <input type="checkbox" id="toggleQuickread" checked onchange="toggleElement('quickreadSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
+                            <span style="font-weight: 500;">Show Quickread</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="sidebar-divider"></div>
+                
+                <!-- Summary Versions Section -->
+                <div id="summaryVersionsSection">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
+                        <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">
+                            Versions
+                        </h4>
+                    </div>
+                    <div id="summaryList" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto;">
+                        <div class="empty-state" style="padding: var(--spacing-md); font-size: var(--font-size-xs);">Loading...</div>
+                    </div>
                 </div>
             </div>
-            
+
+            <!-- Bottom anchored details section -->
             <div class="sidebar-divider"></div>
             
-            <!-- Summary Versions Section -->
-            <div id="summaryVersionsSection">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
-                    <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">
-                        Versions
-                    </h4>
-                </div>
-                <div id="summaryList" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto;">
-                    <div class="empty-state" style="padding: var(--spacing-md); font-size: var(--font-size-xs);">Loading...</div>
+            <div id="summaryDetailsSection">
+                <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0 0 var(--spacing-md) 0; text-transform: uppercase; letter-spacing: 0.05em;">
+                    Details
+                </h4>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Mode</div>
+                        <div class="info-value" id="detailsProcessingMode">—</div>
+                    </div>
+                    <div class="info-item" id="detailsDividerItem" style="display: none;">
+                        <div class="info-label">Divider</div>
+                        <div class="info-value" id="detailsDivider">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Format</div>
+                        <div class="info-value" id="detailsFormat">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Processing</div>
+                        <div class="info-value" id="detailsProcessingTime">—</div>
+                    </div>
                 </div>
             </div>
         </div>

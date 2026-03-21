@@ -136,6 +136,8 @@ class GeneratedDocument(Base):
     mode = Column(String(50), nullable=True)  # elaborate, quick, simple, eli5
     output_format = Column(String(50), nullable=True)  # sentence, pointform, numbered_list, table
     processing_method = Column(String(50), nullable=True)  # whole, section
+    split_level = Column(String(10), nullable=True)  # h1, h2, h3 - header level for section splitting
+    processing_time = Column(Float, nullable=True)  # Processing time in seconds
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
