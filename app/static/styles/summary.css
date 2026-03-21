@@ -91,14 +91,53 @@
     padding: var(--spacing-md);
     font-size: var(--font-size-xs);
 }
+/* Collapsed Sidebar State */
+.action-collapsed .sidebar-scroll-content,
+.action-collapsed .details-section,
+.action-collapsed .sidebar-divider {
+    display: none !important;
+}
+
+.action-collapsed .note-action-panel {
+    width: 48px;
+    align-items: center;
+    padding: var(--spacing-lg) 0;
+}
+
+.action-collapsed .action-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    align-items: center;
+}
+
+.action-collapsed .action-btn {
+    padding: 10px;
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+}
+
+.action-collapsed .action-btn span {
+    display: none;
+}
+
+.action-collapsed .action-toggle {
+    align-self: center;
+    margin-bottom: 0;
+}
+
 /* Sidebar Sections */
 .note-action-panel {
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
-    height: 100%;
+    overflow: auto;
+    height: calc(100vh - var(--spacing-lg) * 2) !important;
+    max-height: calc(100vh - var(--spacing-lg) * 2) !important;
     min-height: 200px;
 }
+
 
 .action-grid, .sidebar-divider, .details-section, .sidebar-section-title, #displayOptionsSection {
     flex-shrink: 0;
@@ -114,18 +153,28 @@
 }
 
 .sidebar-scroll-content {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    flex: initial;
-    overflow: visible;
+    min-height: 0;
 }
 
 .versions-list {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    overflow: visible;
-    margin-bottom: 24px;
+    overflow-y: auto;
+    min-height: 100px;
+    margin-bottom: 8px;
+    padding-right: 4px;
+}
+
+#summaryVersionsSection {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .display-options-group {
