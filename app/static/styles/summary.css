@@ -91,13 +91,13 @@
     padding: var(--spacing-md);
     font-size: var(--font-size-xs);
 }
-
 /* Sidebar Sections */
 .note-action-panel {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     height: 100%;
+    min-height: 200px;
 }
 
 .action-grid, .sidebar-divider, .details-section, .sidebar-section-title, #displayOptionsSection {
@@ -114,18 +114,18 @@
 }
 
 .sidebar-scroll-content {
-    flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    overflow: hidden; /* Parent container for versions-list */
+    flex: initial;
+    overflow: visible;
 }
 
-#summaryVersionsSection {
-    flex: 1;
+.versions-list {
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    gap: 8px;
+    overflow: visible;
+    margin-bottom: 24px;
 }
 
 .display-options-group {
@@ -180,6 +180,63 @@
     gap: 8px;
     overflow-y: auto;
     min-height: 0;
+}
+
+.version-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--color-light-gray);
+    border-radius: var(--radius-md);
+    background: var(--color-white);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.version-item:hover {
+    border-color: var(--color-primary);
+    background: rgba(89, 60, 143, 0.02);
+}
+
+.version-item.active {
+    border-color: var(--color-primary);
+    background: rgba(89, 60, 143, 0.08);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.version-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-dark);
+}
+
+.version-meta {
+    font-size: 10px;
+    color: var(--color-gray);
+    margin-top: 2px;
+}
+
+.version-delete {
+    background: none;
+    border: none;
+    color: var(--color-gray);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    opacity: 0;
+    margin-left: 8px;
+}
+
+.version-item:hover .version-delete {
+    opacity: 1;
+}
+
+.version-delete:hover {
+    color: var(--color-error);
+    background: rgba(219, 84, 97, 0.1);
 }
 
 /* Details Section */

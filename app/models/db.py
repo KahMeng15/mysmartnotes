@@ -103,6 +103,9 @@ class Lecture(Base):
     summaries = relationship("Summary", back_populates="lecture", cascade="all, delete-orphan")
     flashcards = relationship("Flashcard", back_populates="lecture", cascade="all, delete-orphan")
     embeddings = relationship("LectureEmbedding", back_populates="lecture", cascade="all, delete-orphan")
+    study_sessions = relationship("StudySession", back_populates="lecture", cascade="all, delete-orphan")
+    chat_messages = relationship("ChatMessage", back_populates="lecture", cascade="all, delete-orphan")
+    snapshots = relationship("NoteSnapshot", back_populates="lecture", cascade="all, delete-orphan")
 
 
 class ExportTemplate(Base):
@@ -126,7 +129,8 @@ class Summary(Base):
     """Generated summaries, cheat sheets, etc."""
     __tablename__ = "summaries"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(8), primary_key=True)
+    version = Column(Integer, nullable=False, default=1)  # v1, v2, etc. per lecture
     lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
     summary_type = Column(String(50))  # cheatsheet, quiz, summary
     title = Column(String(255), nullable=False)
@@ -201,7 +205,7 @@ class StudySession(Base):
     
     # Relationships
     user = relationship("User", back_populates="study_sessions")
-    lecture = relationship("Lecture")
+    lecture = relationship("Lecture", back_populates="study_sessions")
 
 
 class Task(Base):
@@ -250,7 +254,7 @@ class ChatMessage(Base):
     
     # Relationships
     user = relationship("User")
-    lecture = relationship("Lecture")
+    lecture = relationship("Lecture", back_populates="chat_messages")
     subject = relationship("Subject")
     group = relationship("SubjectGroup")
 
@@ -268,7 +272,7 @@ class NoteSnapshot(Base):
     
     # Relationships
     user = relationship("User")
-    lecture = relationship("Lecture")
+    lecture = relationship("Lecture", back_populates="snapshots")
 
 
 class SystemSettings(Base):

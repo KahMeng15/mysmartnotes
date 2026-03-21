@@ -8,6 +8,7 @@ let currentSummaryFormat = 'sentence';
 let isRegeneratingSummary = false;
 let currentProcessingMethod = 'whole';
 let currentVersionId = null;
+let currentVersionNum = null;
 let deleteConfirmVersionId = null;
 let currentSplitLevel = null;
 let currentProcessingTime = null;
@@ -87,7 +88,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         let versionToLoad = null;
         
         if (initialSummaryId) {
-            versionToLoad = summaries.find(s => s.id == initialSummaryId);
+            if (initialSummaryId.startsWith('v')) {
+                const vNum = parseInt(initialSummaryId.substring(1));
+                versionToLoad = summaries.find(s => s.version === vNum);
+            } else {
+                versionToLoad = summaries.find(s => s.id == initialSummaryId);
+            }
         }
         
         if (!versionToLoad) {
@@ -113,8 +119,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function updateURL() {
     let url = `/note/${lectureId}/summary`;
-    if (currentVersionId) {
-        url += `/${currentVersionId}`;
+    if (currentVersionId && currentVersionNum) {
+        url += `/v${currentVersionNum}`;
         if (isEditMode) {
             url += `/edit`;
         }
@@ -131,7 +137,7 @@ async function loadSummaryVersions() {
         });
         if (res.ok) {
             const docs = await res.json();
-            const summaries = docs.filter(d => d.summary_type === 'summary').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const summaries = docs.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
             const list = document.getElementById('summaryList');
             if (!list) return summaries;
             
@@ -143,16 +149,12 @@ async function loadSummaryVersions() {
             list.innerHTML = summaries.map((s, idx) => {
                 const date = new Date(s.created_at);
                 const isSelected = currentVersionId === s.id;
-                // If title is just "Summary - X", fallback to generic version. Otherwise use title.
-                let label = s.title.startsWith('Summary -') ? `Version ${summaries.length - idx}` : s.title;
+                
+                let label = s.title;
                 if (s.is_user_edited) {
                     label += ' (Edited)';
                 }
                 
-                const bgColor = isSelected ? 'rgba(89, 60, 143, 0.1)' : 'var(--color-white)';
-                const borderColor = isSelected ? 'var(--color-primary)' : 'var(--color-light-gray)';
-                
-                // Format date using browser's local timezone (includes both date and time)
                 const dateString = date.toLocaleString(undefined, { 
                     month: 'short', 
                     day: 'numeric',
@@ -162,20 +164,19 @@ async function loadSummaryVersions() {
                 });
                 
                 return `
-                <div class="summary-version-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border: 1px solid ${borderColor}; border-radius: var(--radius-sm); background: ${bgColor}; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.borderColor='var(--color-primary)'" onmouseout="this.style.borderColor='${borderColor}'" onclick="loadSummaryVersion(${s.id})">
-                    <div style="flex: 1; min-width: 0;">
-                        <div style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark); display: flex; align-items: center; gap: 6px;">
-                            ${label}
+                    <div class="version-item ${isSelected ? 'active' : ''}" onclick="loadSummaryVersion('${s.id}')">
+                        <div style="flex: 1; min-width: 0;">
+                            <div class="version-title">${label}</div>
+                            <div class="version-meta">${dateString}</div>
                         </div>
-                        <div style="font-size: 10px; color: var(--color-gray); margin-top: 2px;">${dateString}</div>
+                        <button class="version-delete" onclick="event.stopPropagation(); showDeleteConfirm('${s.id}')">
+                            <i class="ph ph-trash"></i>
+                        </button>
                     </div>
-                    <button class="btn btn-outline btn-small" style="color: var(--color-error); padding: 4px 8px; margin-left: 8px;" onclick="event.stopPropagation(); showDeleteConfirm(${s.id})" title="Delete">
-                        <i class="ph ph-trash"></i>
-                    </button>
-                </div>
                 `;
             }).join('');
             return summaries;
+
         }
     } catch (e) { console.error('Error loading versions:', e); }
     return [];
@@ -187,14 +188,19 @@ async function loadSummaryVersion(docId, pushURL = true) {
         return;
     }
     try {
-        const res = await fetch(`/summaries/${docId}`, {
+        let fetchUrl = `/summaries/${docId}`;
+        if (docId.toString().startsWith('v')) {
+            fetchUrl += `?lecture_id=${lectureId}`;
+        }
+        
+        const res = await fetch(fetchUrl, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
             const data = await res.json();
             if (data.content) {
                 // Save last selected version ID
-                localStorage.setItem(`lastSummaryVersion_${lectureId}`, docId);
+                localStorage.setItem(`lastSummaryVersion_${lectureId}`, data.id);
                 
                 summaryData = data.content;
                 quickreadData = data.quickread || null;
@@ -206,7 +212,8 @@ async function loadSummaryVersion(docId, pushURL = true) {
                 currentProcessingTimeMs = data.processing_time_ms || null;
                 currentAIModel = data.model || null;
                 isUserEdited = data.is_user_edited || false;
-                currentVersionId = docId;
+                currentVersionId = data.id;
+                currentVersionNum = data.version;
                 displaySummary();
                 loadSummaryVersions();
                 

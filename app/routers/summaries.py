@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 import logging
+import random
+import string
 
 from app.models.db import User, Lecture, Summary, Flashcard
 from app.utils.auth import get_current_user
@@ -26,6 +28,12 @@ def format_timestamp(dt: Optional[datetime]) -> str:
         return iso_str + 'Z' if not iso_str.endswith('Z') else iso_str
     else:
         return dt.isoformat()
+
+
+def generate_summary_id(length: int = 8) -> str:
+    """Generate a random 8-character ID for a summary"""
+    chars = string.ascii_letters + string.digits
+    return "".join(random.choice(chars) for _ in range(length))
 
 
 class QuizQuestion(BaseModel):
@@ -71,7 +79,8 @@ class SummaryResponse(BaseModel):
     processing_time_ms: Optional[int] = None
     model: Optional[str] = None
     is_user_edited: bool = False
-    id: Optional[int] = None
+    id: Optional[str] = None
+    version: Optional[int] = None
 
 
 class FlashcardGeneratedResponse(BaseModel):
@@ -92,7 +101,8 @@ class CheatsheetResponse(BaseModel):
 
 
 class SummaryItemResponse(BaseModel):
-    id: int
+    id: str
+    version: int
     lecture_id: str
     title: str
     summary_type: str
@@ -277,7 +287,8 @@ async def generate_summary_endpoint(
                 processing_time_ms=existing_summary.processing_time_ms,
                 model=existing_summary.model,
                 is_user_edited=existing_summary.is_user_edited or False,
-                id=existing_summary.id
+                id=existing_summary.id,
+                version=existing_summary.version
             )
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
 
@@ -362,8 +373,17 @@ async def generate_summary_endpoint(
         processing_time = end_time - start_time
         processing_time_ms = int(processing_time * 1000)
 
+        # Calculate next version for this lecture
+        from sqlalchemy import func
+        max_version = db.query(func.max(Summary.version)).filter(
+            Summary.lecture_id == request.lecture_id
+        ).scalar() or 0
+        next_version = max_version + 1
+
         # Save generated summary
         doc = Summary(
+            id=generate_summary_id(),
+            version=next_version,
             lecture_id=request.lecture_id,
             title=f"{request.mode.capitalize()} in {request.output_format.replace('_', ' ')}",
             summary_type="summary",
@@ -380,6 +400,7 @@ async def generate_summary_endpoint(
         )
         db.add(doc)
         db.commit()
+        db.refresh(doc)
         
         return SummaryResponse(
             lecture_id=request.lecture_id,
@@ -394,9 +415,10 @@ async def generate_summary_endpoint(
             split_level=request.split_level if request.processing_method == "section" else None,
             processing_time=processing_time,
             processing_time_ms=processing_time_ms,
-            model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize(),
+            model=doc.model,
             is_user_edited=False,
-            id=doc.id
+            id=doc.id,
+            version=doc.version
         )
     except Exception as e:
         logger.error(f"Error generating summary: {str(e)}")
@@ -472,7 +494,7 @@ class UpdateSummaryRequest(BaseModel):
 
 @router.put("/{summary_id}", response_model=SummaryItemResponse)
 async def update_generated_summary(
-    summary_id: int,
+    summary_id: str,
     request: UpdateSummaryRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -502,6 +524,7 @@ async def update_generated_summary(
     
     return SummaryItemResponse(
         id=doc.id,
+        version=doc.version,
         lecture_id=doc.lecture_id,
         title=doc.title,
         summary_type=doc.summary_type,
@@ -539,6 +562,7 @@ async def list_summaries(
     return [
         SummaryItemResponse(
             id=d.id,
+            version=d.version,
             lecture_id=d.lecture_id,
             title=d.title,
             summary_type=d.summary_type,
@@ -558,24 +582,37 @@ async def list_summaries(
 
 @router.get("/{summary_id}", response_model=SummaryItemResponse)
 async def get_summary(
-    summary_id: int,
+    summary_id: str,
+    lecture_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get a specific generated summary"""
-    summary = db.query(Summary).join(Lecture).filter(
-        Summary.id == summary_id,
+    """Get a specific generated summary by ID or version (if lecture_id provided)"""
+    query = db.query(Summary).join(Lecture).filter(
         Lecture.user_id == current_user.id
-    ).first()
+    )
+    
+    if lecture_id and summary_id.startswith('v'):
+        try:
+            version_num = int(summary_id[1:])
+            summary = query.filter(
+                Summary.lecture_id == lecture_id,
+                Summary.version == version_num
+            ).first()
+        except ValueError:
+            summary = None
+    else:
+        summary = query.filter(Summary.id == summary_id).first()
     
     if not summary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
+            detail="Summary not found"
         )
     
     return SummaryItemResponse(
         id=summary.id,
+        version=summary.version,
         lecture_id=summary.lecture_id,
         title=summary.title,
         summary_type=summary.summary_type,
@@ -596,7 +633,7 @@ async def get_summary(
 
 @router.delete("/{summary_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_summary(
-    summary_id: int,
+    summary_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -618,7 +655,7 @@ async def delete_summary(
 
 @router.post("/{summary_id}/export", response_model=dict)
 async def export_summary(
-    summary_id: int,
+    summary_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -732,7 +769,7 @@ async def export_summary(
 
 @router.get("/{summary_id}/download-export")
 async def download_summary_export(
-    summary_id: int,
+    summary_id: str,
     export_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
