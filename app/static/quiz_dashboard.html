@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Dashboard - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles/master.css">
+    <link rel="stylesheet" href="/styles/mynotes.css">
+    <link rel="stylesheet" href="/styles/quiz.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/nav.js"></script>
+</head>
+<body>
+    <div class="page-card">
+        <!-- Sticky Navigation Header -->
+        <div class="note-sticky-header">
+            <a href="/dashboard" class="note-nav-back">
+                <span>Dashboard</span>
+            </a>
+            <div class="note-breadcrumb-row">
+                <a href="/dashboard" class="note-nav-crumb-link">My Notes</a>
+                <span class="note-nav-sep">›</span>
+                <span class="note-nav-crumb-link active">Quizzes</span>
+            </div>
+        </div>
+
+        <!-- Sticky Header Section -->
+        <div class="page-card-header padding-bottom-md">
+            <!-- Header -->
+            <div class="flex-between">
+                <h1>My Quizzes</h1>
+                <button onclick="openCreateModal()" class="btn btn-primary d-flex align-items-center gap-sm">
+                    <i class="ph ph-plus-circle"></i> Generate Quiz
+                </button>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls-bar">
+                <div class="search-box">
+                    <i class="ph ph-magnifying-glass search-icon"></i>
+                    <input type="text" id="quizSearch" placeholder="Search quizzes..." onkeyup="filterQuizzes()">
+                </div>
+                <select id="quizSort" class="form-control" style="width: auto;" onchange="sortQuizzes()">
+                    <option value="date-desc">Newest First</option>
+                    <option value="date-asc">Oldest First</option>
+                    <option value="name">Name (A-Z)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="page-card-content padding-top-md">
+            <div id="quizList" class="quiz-grid">
+                <div class="empty-state text-center" style="grid-column: 1 / -1; padding: 60px;">
+                    <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px; color: var(--color-primary);"></i>
+                    <p class="margin-top-sm">Loading your quizzes...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Quiz Modal -->
+    <div id="createQuizModal" class="modal">
+        <div class="modal-content modal-content-quiz">
+            <div class="flex-align-start margin-bottom-lg">
+                <div>
+                    <h3 class="margin-bottom-xs"><i class="ph ph-exam" style="color: var(--color-primary); margin-right: 6px;"></i> Create New Quiz</h3>
+                    <p style="color: var(--color-gray); font-size: 14px;">Test your knowledge with AI-generated questions.</p>
+                </div>
+                <button class="btn-icon" onclick="closeModal('createQuizModal')"><i class="ph ph-x"></i></button>
+            </div>
+
+            <div class="method-toggle">
+                <button class="method-btn active" id="btnMethodAi" onclick="setMethod('ai')">
+                    <i class="ph ph-magic-wand"></i> AI Generate
+                </button>
+                <button class="method-btn" id="btnMethodManual" onclick="setMethod('manual')">
+                    <i class="ph ph-keyboard"></i> Manual Setup
+                </button>
+                <input type="hidden" id="creationMethodInput" value="ai">
+            </div>
+
+            <div class="form-group">
+                <label>Quiz Title</label>
+                <input type="text" id="quizTitle" placeholder="e.g. Final Exam Practice" class="form-control">
+                <small style="color: var(--color-gray); font-size: 11px;">Leave blank to auto-generate based on selection</small>
+            </div>
+
+            <!-- AI Section -->
+            <div id="aiSection">
+                <div class="selection-steps">
+                    <div class="step-item">
+                        <label class="step-label">1. Select Group</label>
+                        <select id="groupSelect" class="options-select" onchange="onGroupChange()">
+                            <option value="">Loading groups...</option>
+                        </select>
+                    </div>
+
+                    <div class="step-item">
+                        <label class="step-label">2. Select Subject (Optional)</label>
+                        <select id="subjectSelect" class="options-select" onchange="onSubjectChange()">
+                            <option value="all">All Subjects in Group</option>
+                        </select>
+                    </div>
+
+                    <div class="step-item">
+                        <label class="step-label">3. Select Note (Optional)</label>
+                        <select id="lectureSelect" class="options-select">
+                            <option value="all">All Notes in Subject</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Question Types</label>
+                    <div class="q-type-grid">
+                        <label class="q-type-option">
+                            <input type="checkbox" name="qType" value="objective" checked>
+                            <span>Multiple Choice</span>
+                        </label>
+                        <label class="q-type-option">
+                            <input type="checkbox" name="qType" value="subjective" checked>
+                            <span>Short Answer</span>
+                        </label>
+                        <label class="q-type-option">
+                            <input type="checkbox" name="qType" value="fill_in_the_blank">
+                            <span>Fill in the Blank</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group margin-top-lg">
+                    <div class="flex-between margin-bottom-sm">
+                        <label style="margin-bottom: 0;">Number of Questions</label>
+                        <span id="numQuestionsVal" style="font-weight: 700; color: var(--color-primary);">5</span>
+                    </div>
+                    <input type="range" id="numQuestions" value="5" min="1" max="25" oninput="document.getElementById('numQuestionsVal').textContent = this.value" style="width: 100%; accent-color: var(--color-primary);">
+                </div>
+            </div>
+
+            <!-- Manual Section -->
+            <div id="manualSection" style="display: none;">
+                <div class="form-group">
+                    <label>Import Data (JSON or Raw Text)</label>
+                    <textarea id="manualImport" rows="8" placeholder="Paste your questions here or leave empty to start from scratch..." class="form-control"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-buttons margin-top-xl">
+                <button class="btn btn-primary btn-block" id="modalCreateBtn" onclick="submitCreateQuiz()" style="padding: 12px;">Create Quiz</button>
+                <button class="btn btn-secondary btn-block" onclick="closeModal('createQuizModal')" style="padding: 12px;">Cancel</button>
+            </div>
+            
+            <div id="createError" style="color: var(--color-error); font-size: 13px; margin-top: 12px; display: none; text-align: center; background: rgba(231, 76, 60, 0.05); padding: 8px; border-radius: 4px;"></div>
+        </div>
+    </div>
+
+    <!-- Quiz Progress Modal -->
+    <div id="quizProgressModal" class="modal">
+        <div class="modal-content modal-content-progress">
+            <div class="text-center">
+                <div class="progress-icon-sparkle">
+                    <i class="ph ph-sparkle" style="font-size: 32px; color: var(--color-primary);"></i>
+                </div>
+                <h3 class="margin-bottom-sm">Generating Quiz</h3>
+                <p id="quizProgressMessage" style="color: var(--color-gray); font-size: 14px; margin-bottom: 24px;">Initializing AI model...</p>
+            </div>
+            
+            <div style="width: 100%;">
+                <div class="flex-between margin-bottom-sm" style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--color-dark-gray);">
+                    <span id="quizProgressLabel">Working...</span>
+                    <span id="quizProgressPercent">0%</span>
+                </div>
+                <div class="progress-bar" style="width: 100%; height: 10px; background: var(--color-bg); border-radius: 5px; overflow: hidden;">
+                    <div id="quizProgressFill" class="progress-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--color-primary), #7c5cbf); border-radius: 5px; transition: width 0.4s ease;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/quiz_dashboard.js"></script>
+</body>
+</html>

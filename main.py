@@ -17,7 +17,7 @@ import uvicorn
 
 from app.config import get_settings
 from app.utils.db import init_db
-from app.routers import auth, subjects, lectures, chat, summaries, flashcards, study_sessions, search, analytics, processing, groups, snapshots, templates, admin
+from app.routers import auth, subjects, lectures, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -186,7 +186,7 @@ app.include_router(subjects.router)
 app.include_router(lectures.router)
 app.include_router(chat.router)
 app.include_router(summaries.router)
-app.include_router(flashcards.router)
+
 app.include_router(study_sessions.router)
 app.include_router(search.router)
 app.include_router(analytics.router)
@@ -195,6 +195,7 @@ app.include_router(groups.router)
 app.include_router(snapshots.router)
 app.include_router(templates.router)
 app.include_router(admin.router)
+app.include_router(quiz.router)
 
 # Serve generated files (images, PDFs, etc.)
 generated_dir = os.path.join(os.path.dirname(__file__), "generated")
@@ -247,6 +248,14 @@ async def serve_login():
 async def serve_dashboard():
     return FileResponse(os.path.join(static_dir, "dashboard.html"))
 
+@app.get("/mynotes")
+async def serve_mynotes():
+    return FileResponse(os.path.join(static_dir, "mynotes.html"))
+
+@app.get("/chat")
+async def serve_chat():
+    return FileResponse(os.path.join(static_dir, "chat.html"))
+
 @app.get("/exporttemplates")
 async def serve_export_templates():
     return FileResponse(os.path.join(static_dir, "exporttemplate-selector.html"))
@@ -266,6 +275,18 @@ async def serve_export_template(id: str):
 @app.get("/pomodoro")
 async def serve_pomodoro():
     return FileResponse(os.path.join(static_dir, "pomodoro.html"))
+
+@app.get("/quiz")
+async def serve_quiz_dashboard():
+    return FileResponse(os.path.join(static_dir, "quiz_dashboard.html"))
+
+@app.get("/quiz/{id}")
+async def serve_quiz_view(id: str):
+    return FileResponse(os.path.join(static_dir, "quiz_view.html"))
+
+@app.get("/quiz/{id}/{mode}")
+async def serve_quiz_mode_view(id: str, mode: str):
+    return FileResponse(os.path.join(static_dir, "quiz_view.html"))
 
 @app.get("/pomodoro_popout.html")
 async def serve_pomodoro_popout():

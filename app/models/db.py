@@ -101,7 +101,6 @@ class Lecture(Base):
     user = relationship("User")
     subject = relationship("Subject", back_populates="lectures")
     summaries = relationship("Summary", back_populates="lecture", cascade="all, delete-orphan")
-    flashcards = relationship("Flashcard", back_populates="lecture", cascade="all, delete-orphan")
     embeddings = relationship("LectureEmbedding", back_populates="lecture", cascade="all, delete-orphan")
     study_sessions = relationship("StudySession", back_populates="lecture", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="lecture", cascade="all, delete-orphan")
@@ -168,22 +167,71 @@ class LectureEmbedding(Base):
     lecture = relationship("Lecture", back_populates="embeddings")
 
 
-class Flashcard(Base):
-    """Study flashcards"""
-    __tablename__ = "flashcards"
+class Quiz(Base):
+    """Generated Quizzes"""
+    __tablename__ = "quizzes"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
-    question = Column(Text, nullable=False)
-    answer = Column(Text, nullable=False)
-    difficulty = Column(String(20), default="medium")  # easy, medium, hard
-    times_reviewed = Column(Integer, default=0)
-    times_correct = Column(Integer, default=0)
-    last_reviewed = Column(DateTime)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    scope_type = Column(String(50))  # "group", "subject" or "lecture"
+    group_id = Column(String(8), ForeignKey("subject_groups.id"), nullable=True, index=True)
+    subject_id = Column(String(8), ForeignKey("subjects.id"), nullable=True, index=True)
+    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=True, index=True)
+    model = Column(String(100), nullable=True)  # AI model used
+    processing_time_ms = Column(Integer, nullable=True)  # Processing time in milliseconds
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    lecture = relationship("Lecture", back_populates="flashcards")
+    user = relationship("User")
+    group = relationship("SubjectGroup")
+    subject = relationship("Subject")
+    lecture = relationship("Lecture")
+    questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
+    progress = relationship("QuizProgress", back_populates="quiz", cascade="all, delete-orphan")
+
+
+class QuizQuestion(Base):
+    """Questions for a Quiz"""
+    __tablename__ = "quiz_questions"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False, index=True)
+    question_text = Column(Text, nullable=False)
+    answer_text = Column(Text, nullable=False)
+    question_type = Column(String(50), default="subjective")  # objective, subjective, fill_in_the_blank
+    options = Column(JSON, nullable=True)  # Store options for objective questions
+    order = Column(Integer, default=0)
+    
+    # Relationships
+    quiz = relationship("Quiz", back_populates="questions")
+    progress = relationship("QuizProgress", back_populates="question", cascade="all, delete-orphan")
+
+
+class QuizProgress(Base):
+    """Spaced Repetition track per user per question"""
+    __tablename__ = "quiz_progress"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False, index=True)
+    question_id = Column(Integer, ForeignKey("quiz_questions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    is_correct = Column(Boolean, default=False)
+    times_tested = Column(Integer, default=0)
+    last_tested_at = Column(DateTime, nullable=True) # Legacy
+    next_review_at = Column(DateTime, nullable=True) # Legacy
+    
+    # New SRS fields
+    last_reviewed_at = Column(DateTime, default=datetime.utcnow)
+    interval_days = Column(Integer, default=0)
+    ease_factor = Column(Float, default=2.5)
+    consecutive_correct = Column(Integer, default=0)
+    
+    # Relationships
+    quiz = relationship("Quiz", back_populates="progress")
+    question = relationship("QuizQuestion", back_populates="progress")
+    user = relationship("User")
 
 
 class StudySession(Base):
@@ -193,7 +241,7 @@ class StudySession(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=True, index=True)
-    session_type = Column(String(50))  # flashcard, quiz, chat, pomodoro_study, pomodoro_break, stopwatch
+    session_type = Column(String(50))  # quiz, chat, pomodoro_study, pomodoro_break, stopwatch
     duration_minutes = Column(Integer)
     questions_attempted = Column(Integer, default=0)
     questions_correct = Column(Integer, default=0)

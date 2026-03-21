@@ -2,7 +2,7 @@
 # MySmartNotes - AI-Powered Study Companion
 
 ## 📖 Project Overview
-MySmartNotes is a lightweight, single-container web application designed to convert lecture materials (PDF, PPTX, images) into structured, AI-enhanced study notes. It features RAG-based chat, flashcard generation, quiz creation, and progress analytics.
+MySmartNotes is a lightweight, single-container web application designed to convert lecture materials (PDF, PPTX, images) into structured, AI-enhanced study notes. It features RAG-based chat, quiz creation, and progress analytics.
 
 ## 🛠️ Tech Stack
 - **Backend**: FastAPI (Python 3.9+)
@@ -17,7 +17,7 @@ MySmartNotes is a lightweight, single-container web application designed to conv
 - `app/`: Core application logic
   - `models/`: Database models (`db.py`)
   - `processing/`: Document extraction, OCR, and AI pipeline logic
-  - `routers/`: API endpoints (auth, chat, documents, flashcards, etc.)
+  - `routers/`: API endpoints (auth, chat, documents, quizzes, etc.)
   - `schemas/`: Pydantic models for API validation
   - `static/`: Frontend assets (HTML, JS, CSS, Fonts)
   - `utils/`: Shared utilities (auth, db, tasks, websocket)
@@ -34,7 +34,7 @@ MySmartNotes is a lightweight, single-container web application designed to conv
 1. **Document Processing**: `app/processing/smart_pipeline.py` orchestrates font-aware text extraction, table detection, and OCR.
 2. **Semantic Search (RAG)**: `app/processing/embeddings.py` generates chunks and vectors; `app/processing/search.py` performs similarity search for chat context.
 3. **AI Chat**: `app/routers/chat.py` uses `app/processing/ai_client.py` to interact with multiple providers.
-4. **Flashcards/Quizzes**: `app/processing/document_generator.py` handles AI-driven generation of study aids.
+4. **Quizzes**: `app/processing/document_generator.py` handles AI-driven generation of study aids.
 
 ## 📝 Development Guidelines
 - **Database**: Use `app/utils/db.py` for session management.

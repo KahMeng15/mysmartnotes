@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime, timedelta
 
-from app.models.db import User, Lecture, Flashcard, StudySession, Subject, ChatMessage
+from app.models.db import User, Lecture, StudySession, Subject, ChatMessage
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.schemas.analytics import DashboardSummary
@@ -17,8 +17,6 @@ class ProgressStat(BaseModel):
     lecture_id: str
     lecture_title: str
     completion_percentage: float
-    flashcards_studied: int
-    total_flashcards: int
 
 
 class TimeSpentStat(BaseModel):
@@ -36,8 +34,6 @@ class CompletionStat(BaseModel):
 
 class ProgressResponse(BaseModel):
     total_lectures: int
-    total_flashcards: int
-    total_studied: int
     overall_completion: float
     by_lecture: List[ProgressStat]
 
@@ -69,42 +65,30 @@ async def get_learning_progress(
     if not lectures:
         return ProgressResponse(
             total_lectures=0,
-            total_flashcards=0,
-            total_studied=0,
             overall_completion=0.0,
             by_lecture=[]
         )
     
     by_lecture = []
-    total_studied = 0
-    total_flashcards = 0
+    total_completion = 0
     
     for lecture in lectures:
-        flashcards = db.query(Flashcard).filter(
-            Flashcard.lecture_id == lecture.id
-        ).all()
-        
-        studied = sum(1 for fc in flashcards if fc.is_reviewed)
-        total = len(flashcards)
-        completion_pct = (studied / total * 100) if total > 0 else 0
+        # Placeholder completion logic since standalone flashcards are removed
+        has_summary = lecture.summaries is not None and len(lecture.summaries) > 0
+        completion_pct = 100.0 if has_summary else 0.0
         
         by_lecture.append(ProgressStat(
             lecture_id=lecture.id,
             lecture_title=lecture.title,
-            completion_percentage=completion_pct,
-            flashcards_studied=studied,
-            total_flashcards=total
+            completion_percentage=completion_pct
         ))
         
-        total_studied += studied
-        total_flashcards += total
+        total_completion += completion_pct
     
-    overall_completion = (total_studied / total_flashcards * 100) if total_flashcards > 0 else 0
+    overall_completion = (total_completion / len(lectures)) if lectures else 0
     
     return ProgressResponse(
         total_lectures=len(lectures),
-        total_flashcards=total_flashcards,
-        total_studied=total_studied,
         overall_completion=overall_completion,
         by_lecture=by_lecture
     )
@@ -190,28 +174,19 @@ async def get_completion_rates(
     completion_rates = []
     
     for lecture in lectures:
-        flashcards = db.query(Flashcard).filter(
-            Flashcard.lecture_id == lecture.id
-        ).all()
+        # Placeholder completion logic since standalone flashcards are removed
+        has_summary = lecture.summaries is not None and len(lecture.summaries) > 0
+        completion_pct = 100.0 if has_summary else 0.0
         
-        if not flashcards:
+        if completion_pct == 0:
             status = "not_started"
             not_started_count += 1
-            completion_pct = 0.0
+        elif completion_pct >= 100:
+            status = "completed"
+            completed_count += 1
         else:
-            studied = sum(1 for fc in flashcards if fc.is_reviewed)
-            total = len(flashcards)
-            completion_pct = (studied / total * 100) if total > 0 else 0
-            
-            if completion_pct == 0:
-                status = "not_started"
-                not_started_count += 1
-            elif completion_pct >= 100:
-                status = "completed"
-                completed_count += 1
-            else:
-                status = "in_progress"
-                in_progress_count += 1
+            status = "in_progress"
+            in_progress_count += 1
         
         completion_rates.append(CompletionStat(
             lecture_title=lecture.title,

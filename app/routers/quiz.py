@@ -1,0 +1,366 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+from datetime import datetime
+import json
+import os
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
+
+from app.models.db import User, Quiz, QuizQuestion, Subject, Lecture, QuizProgress, Summary, SubjectGroup
+from app.utils.auth import get_current_user
+from app.utils.db import get_db
+from app.schemas.quiz import (
+    QuizCreate, QuizResponse, QuizQuestionCreate, QuizQuestionResponse,
+    QuizGenerateRequest, QuizCheckRequest, QuizCheckResponse
+)
+from app.processing.ai_client import AIClient, get_ai_client
+from app.processing.quiz_generator import generate_advanced_quiz, check_semantic_answer
+from app.processing.text_processor import ContentSegment, ContentType
+
+# In-memory export progress tracking
+_export_progress = {}
+
+router = APIRouter(prefix="/quizzes", tags=["quizzes"])
+
+@router.get("/", response_model=List[QuizResponse])
+def get_user_quizzes(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all quizzes for the current user."""
+    quizzes = db.query(Quiz).filter(Quiz.user_id == current_user.id).order_by(Quiz.created_at.desc()).all()
+    return quizzes
+
+@router.post("/", response_model=QuizResponse)
+def create_quiz(
+    quiz_in: QuizCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a manual quiz."""
+    quiz = Quiz(
+        user_id=current_user.id,
+        title=quiz_in.title,
+        scope_type=quiz_in.scope_type,
+        group_id=quiz_in.group_id,
+        subject_id=quiz_in.subject_id,
+        lecture_id=quiz_in.lecture_id
+    )
+    db.add(quiz)
+    db.commit()
+    db.refresh(quiz)
+    return quiz
+
+@router.get("/{quiz_id}", response_model=QuizResponse)
+def get_quiz(
+    quiz_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific quiz and its questions."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    return quiz
+
+@router.post("/{quiz_id}/questions", response_model=QuizQuestionResponse)
+def add_question(
+    quiz_id: int,
+    question_in: QuizQuestionCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Add a question to a quiz."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    question = QuizQuestion(
+        quiz_id=quiz.id,
+        question_text=question_in.question_text,
+        answer_text=question_in.answer_text,
+        question_type=question_in.question_type,
+        options=question_in.options,
+        order=question_in.order
+    )
+    db.add(question)
+    db.commit()
+    db.refresh(question)
+    return question
+
+@router.post("/generate", response_model=QuizResponse)
+async def generate_quiz_ai(
+    request: QuizGenerateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate a quiz using AI."""
+    ai_client = get_ai_client(user=current_user, db=db)
+    
+    try:
+        quiz = await generate_advanced_quiz(
+            db=db,
+            user=current_user,
+            ai_client=ai_client,
+            title=request.title,
+            scope_type=request.scope_type,
+            scope_id=request.scope_id,
+            question_types=request.question_types,
+            num_questions=request.number_of_questions
+        )
+        return quiz
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{quiz_id}/check", response_model=QuizCheckResponse)
+async def check_answer_ai(
+    quiz_id: int,
+    question_id: int,
+    request: QuizCheckRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Check a subjective answer using AI Semantic Grading."""
+    # Ensure correct user owns quiz
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    question = db.query(QuizQuestion).filter(QuizQuestion.id == question_id, QuizQuestion.quiz_id == quiz.id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    is_correct = False
+    feedback = ""
+    
+    # Standard logic for objective queries
+    if question.question_type == "objective":
+        is_correct = request.user_answer.strip().lower() == question.answer_text.strip().lower()
+        feedback = "Correct!" if is_correct else "Incorrect."
+    else:
+        # Subjective/Fill in the blank AI logic
+        ai_client = get_ai_client(user=current_user, db=db)
+        result = await check_semantic_answer(
+            ai_client=ai_client,
+            question_text=question.question_text,
+            correct_answer=question.answer_text,
+            user_answer=request.user_answer
+        )
+        is_correct = result.get("is_correct", False)
+        feedback = result.get("feedback", "No feedback available.")
+        
+    # Implement SRS progression
+    progress = db.query(QuizProgress).filter(
+        QuizProgress.user_id == current_user.id,
+        QuizProgress.question_id == question.id
+    ).first()
+    
+    if not progress:
+        progress = QuizProgress(
+            user_id=current_user.id,
+            quiz_id=quiz.id,
+            question_id=question.id,
+            last_reviewed_at=datetime.utcnow(),
+            interval_days=1 if is_correct else 0,
+            ease_factor=2.5,
+            consecutive_correct=1 if is_correct else 0
+        )
+        db.add(progress)
+    else:
+        progress.last_reviewed_at = datetime.utcnow()
+        if is_correct:
+            progress.consecutive_correct += 1
+            progress.interval_days = max(1, int(progress.interval_days * progress.ease_factor))
+            progress.ease_factor += 0.1
+        else:
+            progress.consecutive_correct = 0
+            progress.interval_days = 0
+            progress.ease_factor = max(1.3, progress.ease_factor - 0.2)
+            
+    db.commit()
+    
+    return QuizCheckResponse(
+        is_correct=is_correct,
+        feedback=feedback,
+        correct_answer=question.answer_text
+    )
+
+@router.post("/{quiz_id}/export", response_model=dict)
+async def export_quiz(
+    quiz_id: int,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Export a quiz to PDF or DOCX using DocumentGenerator"""
+    logger.info(f"[Export] Received request for quiz {quiz_id} with body: {body}")
+    task_id = str(uuid.uuid4())[:8]
+    _export_progress[task_id] = {"step": "Starting", "percent": 0, "status": "running"}
+    
+    def progress_callback(step, percent):
+        _export_progress[task_id] = {"step": step, "percent": percent, "status": "running" if percent < 100 else "complete"}
+    
+    export_format = body.get("format", "pdf").lower()
+    if export_format not in ("pdf", "docx"):
+        raise HTTPException(status_code=400, detail="Format must be 'pdf' or 'docx'")
+        
+    include_cover = body.get("include_cover", True)
+    template_id = body.get("template_id", None)
+    
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    questions = db.query(QuizQuestion).filter(QuizQuestion.quiz_id == quiz.id).order_by(QuizQuestion.order).all()
+    if not questions:
+        raise HTTPException(status_code=400, detail="Quiz has no questions to export.")
+        
+    # Load template config if provided
+    template_config = None
+    if template_id:
+        from app.models.db import ExportTemplate
+        tmpl = db.query(ExportTemplate).filter(
+            ExportTemplate.id == template_id,
+            (ExportTemplate.user_id == current_user.id) | (ExportTemplate.user_id.is_(None))
+        ).first()
+        if tmpl:
+            template_config = tmpl.config
+
+    # Build ContentSegments
+    segments = []
+    
+    # Optional headers
+    if template_config and "header" in template_config:
+        h_cfg = template_config["header"]
+        if h_cfg.get("show_note_title"):
+            segments.append(ContentSegment(content=quiz.title, content_type=ContentType.NOTE_TITLE, page_number=1))
+            
+    # Add Questions and Answers
+    for i, q in enumerate(questions):
+        # Question part
+        q_text = f"**Q{i+1}:** {q.question_text}"
+        segments.append(ContentSegment(content=q_text, content_type=ContentType.H3, page_number=1))
+        
+        # Options if objective
+        if q.question_type == "objective" and q.options:
+            try:
+                opts = json.loads(q.options) if isinstance(q.options, str) else q.options
+                for opt in opts:
+                    segments.append(ContentSegment(content=f"- {opt}", content_type=ContentType.LIST, page_number=1))
+            except:
+                pass
+                
+        # Answer part (add spacing)
+        ans_text = f"**Answer:** {q.answer_text}"
+        segments.append(ContentSegment(content="", content_type=ContentType.BODY, page_number=1))
+        segments.append(ContentSegment(content=ans_text, content_type=ContentType.BODY, page_number=1))
+        segments.append(ContentSegment(content="", content_type=ContentType.BODY, page_number=1))
+
+    try:
+        from app.routers.processing import GENERATED_DIR
+        
+        safe_title = "".join(c for c in quiz.title if c.isalnum() or c in (' ', '-', '_')).strip()
+        
+        if export_format == "pdf":
+            from app.processing.document_generator import DocumentGenerator
+            generator = DocumentGenerator(
+                lecture_id=quiz.id, # using quiz.id as a unique dir folder
+                lecture_title=f"Quiz: {quiz.title}",
+                base_output_dir=GENERATED_DIR,
+            )
+            output_path = generator.generate_pdf(
+                content_segments=segments,
+                extracted_images=[],
+                include_toc=False,
+                include_cover=include_cover,
+                template_config=template_config,
+                progress_callback=progress_callback,
+            )
+        else:
+            from app.processing.docx_generator import DocxGenerator
+            generator = DocxGenerator(
+                lecture_id=quiz.id,
+                lecture_title=f"Quiz: {quiz.title}",
+                base_output_dir=GENERATED_DIR,
+            )
+            output_path = generator.generate_docx(
+                content_segments=segments,
+                extracted_images=[],
+                include_toc=False,
+                include_cover=include_cover,
+                template_config=template_config,
+                progress_callback=progress_callback,
+            )
+            
+        gen_doc = Summary(
+            lecture_id=quiz.lecture_id or 1, # fallback if subject-based quiz
+            title=f"{quiz.title} ({export_format.upper()})",
+            file_path=output_path,
+            summary_type=f"quiz_{export_format}",
+        )
+        db.add(gen_doc)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"{export_format.upper()} generated successfully",
+            "download_url": f"/quizzes/{quiz.id}/download-export?format={export_format}",
+            "task_id": task_id,
+            "segments_count": len(segments),
+            "images_count": 0
+        }
+    except Exception as e:
+        logger.error(f"Error exporting {export_format}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{quiz_id}/export-status/{task_id}")
+async def get_export_status(
+    quiz_id: int,
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Get export task progress"""
+    progress = _export_progress.get(task_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return progress
+
+@router.get("/{quiz_id}/download-export")
+async def download_export(
+    quiz_id: int,
+    format: str = "pdf",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download generated export file"""
+    from fastapi.responses import FileResponse
+    
+    export_format = format.lower()
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    gen_doc = db.query(Summary).filter(
+        Summary.summary_type == f"quiz_{export_format}",
+        Summary.title == f"{quiz.title} ({export_format.upper()})"
+    ).order_by(Summary.created_at.desc()).first()
+    
+    if not gen_doc or not os.path.exists(gen_doc.file_path):
+        raise HTTPException(status_code=404, detail=f"{export_format.upper()} not generated yet.")
+        
+    safe_title = "".join(c for c in quiz.title if c.isalnum() or c in (' ', '-', '_')).strip()
+    
+    mime_types = {
+        "pdf": "application/pdf",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    
+    return FileResponse(
+        path=gen_doc.file_path,
+        filename=f"{safe_title}.{export_format}",
+        media_type=mime_types.get(export_format, "application/octet-stream"),
+    )

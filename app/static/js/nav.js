@@ -41,15 +41,15 @@ function injectSidebar() {
 
     const sidebarHtml = `
     <aside class="app-sidebar" id="appSidebar">
-        <a href="/dashboard.html" class="sidebar-brand">my<br>smart<br>notes</a>
+        <a href="/dashboard" class="sidebar-brand">my<br>smart<br>notes</a>
 
         <ul class="sidebar-nav-list" id="sidebarNav">
-            <li><a href="/dashboard.html" class="sidebar-nav-link" data-page="dashboard.html"><i class="ph ph-house-line"></i><span>Home</span></a></li>
-            <li><a href="/mynotes.html" class="sidebar-nav-link" data-page="mynotes.html"><i class="ph ph-notebook"></i><span>Notes</span></a></li>
-            <li><a href="/chat.html" class="sidebar-nav-link" data-page="chat.html"><i class="ph ph-chat-circle-dots"></i><span>Chat</span></a></li>
-            <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-exam"></i><span>Quiz</span></a></li>
-            <li><a href="/flashcards.html" class="sidebar-nav-link" data-page="flashcards.html"><i class="ph ph-cards"></i><span>Flashcards</span></a></li>
-            <li><a href="/pomodoro.html" class="sidebar-nav-link" data-page="pomodoro.html" id="pomodoroNavLink"><i class="ph ph-clock"></i><span>Pomodoro</span></a></li>
+            <li><a href="/dashboard" class="sidebar-nav-link" data-page="dashboard"><i class="ph ph-house-line"></i><span>Home</span></a></li>
+            <li><a href="/mynotes" class="sidebar-nav-link" data-page="mynotes"><i class="ph ph-notebook"></i><span>Notes</span></a></li>
+            <li><a href="/chat" class="sidebar-nav-link" data-page="chat"><i class="ph ph-chat-circle-dots"></i><span>Chat</span></a></li>
+            <li><a href="/quiz" class="sidebar-nav-link" data-page="quiz"><i class="ph ph-exam"></i><span>Quiz</span></a></li>
+
+            <li><a href="/pomodoro" class="sidebar-nav-link" data-page="pomodoro" id="pomodoroNavLink"><i class="ph ph-clock"></i><span>Pomodoro</span></a></li>
             <li><a href="/upload.html" class="sidebar-nav-link" data-page="upload.html"><i class="ph ph-upload-simple"></i><span>Upload</span></a></li>
             <li><a href="/exporttemplates" class="sidebar-nav-link" data-page="exporttemplates"><i class="ph ph-palette"></i><span>Templates</span></a></li>
             <li class="sidebar-divider"></li>

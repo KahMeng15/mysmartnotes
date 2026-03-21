@@ -8,7 +8,7 @@ import logging
 import random
 import string
 
-from app.models.db import User, Lecture, Summary, Flashcard
+from app.models.db import User, Lecture, Summary
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.processing.ai_client import AIClient
@@ -49,11 +49,6 @@ class QuizResponse(BaseModel):
     total_questions: int
 
 
-class FlashcardRequest(BaseModel):
-    lecture_id: str
-    quantity: int = 10
-
-
 class SummaryRequest(BaseModel):
     lecture_id: str
     mode: str = "elaborate"  # quick, simple, elaborate, eli5
@@ -81,12 +76,6 @@ class SummaryResponse(BaseModel):
     is_user_edited: bool = False
     id: Optional[str] = None
     version: Optional[int] = None
-
-
-class FlashcardGeneratedResponse(BaseModel):
-    lecture_id: str
-    count: int
-    message: str
 
 
 class CheatsheetRequest(BaseModel):
@@ -165,82 +154,6 @@ async def generate_quiz(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating quiz: {str(e)}"
         )
-
-
-@router.post("/flashcards", response_model=FlashcardGeneratedResponse)
-async def generate_flashcards(
-    request: FlashcardRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Auto-generate flashcards from lecture content"""
-    
-    # Verify lecture belongs to user
-    lecture = db.query(Lecture).filter(
-        Lecture.id == request.lecture_id,
-        Lecture.user_id == current_user.id
-    ).first()
-    
-    if not lecture:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lecture not found"
-        )
-    
-    lecture_content = lecture.extracted_text or ""
-    if not lecture_content:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Lecture content not available yet. Please wait for processing."
-        )
-    
-    # Generate flashcards using AI
-    ai_client = AIClient(current_user, db=db)
-    
-    try:
-        flashcard_data = await ai_client.generate_flashcards(
-            content=lecture_content,
-            num_flashcards=request.quantity
-        )
-        
-        # Save flashcards to database
-        saved_count = 0
-        for data in flashcard_data:
-            flashcard = Flashcard(
-                lecture_id=request.lecture_id,
-                question=data.get("question", ""),
-                answer=data.get("answer", ""),
-                difficulty=data.get("difficulty", "medium"),
-                times_reviewed=0,
-                times_correct=0
-            )
-            db.add(flashcard)
-            saved_count += 1
-        
-        db.commit()
-        
-        return FlashcardGeneratedResponse(
-            lecture_id=request.lecture_id,
-            count=saved_count,
-            message=f"Generated {saved_count} flashcards successfully"
-        )
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error generating flashcards: {str(e)}"
-        )
-
-
-@router.post("/flashcards/{lecture_id}", response_model=FlashcardGeneratedResponse)
-async def generate_flashcards_by_path(
-    lecture_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Auto-generate flashcards from lecture content (path param version)"""
-    request = FlashcardRequest(lecture_id=lecture_id)
-    return await generate_flashcards(request, current_user, db)
 
 
 @router.post("/summary", response_model=SummaryResponse)

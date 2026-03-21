@@ -231,26 +231,7 @@ Content to summarize:
 Summary:"""
         return await self.generate_text(prompt, max_tokens=1000)
 
-    async def generate_flashcards(self, content: str, num_flashcards: int = 10) -> List[dict]:
-        """Generate flashcards from content"""
-        prompt = f"""Generate {num_flashcards} study flashcards based on this content:
 
-{content}
-
-Format as JSON array with objects containing: question, answer, difficulty (easy, medium, hard)"""
-        response = await self.generate_text(prompt, max_tokens=1500)
-        try:
-            import json
-            # Clean response if AI adds markdown code blocks
-            clean_response = response.strip()
-            if clean_response.startswith("```json"):
-                clean_response = clean_response[7:-3].strip()
-            elif clean_response.startswith("```"):
-                clean_response = clean_response[3:-3].strip()
-            return json.loads(clean_response)
-        except:
-            logger.error(f"Failed to parse flashcard JSON: {response}")
-            return []
 
 
 # Global AI client instance wrapper

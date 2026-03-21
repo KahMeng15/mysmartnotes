@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz View - MySmartNotes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles/master.css">
+    <link rel="stylesheet" href="/styles/note.css">
+    <link rel="stylesheet" href="/styles/quiz.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/nav.js"></script>
+</head>
+<body class="note-page">
+    <div class="app-layout">
+        <!-- Content Card -->
+        <div class="note-content-card page-card">
+            <!-- Sticky Header -->
+            <div class="note-sticky-header">
+                <div class="note-breadcrumb-row" id="quizBreadcrumb">
+                    <a href="/quiz" class="note-nav-crumb-link">Quizzes</a>
+                    <span class="note-nav-sep">›</span>
+                    <span class="note-nav-crumb-link active" id="breadcrumbTitle">Loading Quiz...</span>
+                </div>
+            </div>
+
+            <div class="page-card-content" id="quizMainContent">
+                <div id="quizHeader" class="margin-bottom-xl">
+                    <div class="flex-align-start">
+                        <div>
+                            <h1 id="quizTitle" class="margin-bottom-xs">Loading Quiz...</h1>
+                            <p id="quizSubtitle" style="color: var(--color-gray); font-size: 14px;">Review and test your knowledge</p>
+                        </div>
+                        <div id="practiceScore" class="practice-container">
+                            <div class="practice-score-box">
+                                <span class="score-label">Practice Score</span>
+                                <span id="scoreText" class="score-value">0 / 0</span>
+                            </div>
+                            <button class="btn btn-outline btn-xs" onclick="resetQuiz()">
+                                <i class="ph ph-arrow-counter-clockwise"></i> Reset Progress
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exam Mode Info (Hidden) -->
+                <div id="examStatsBar" class="exam-stats-bar" style="display: none;">
+                    <div>
+                        <span class="step-label">Time Remaining</span>
+                        <div id="examTimer" class="timer-display">15:00</div>
+                    </div>
+                    <button class="btn btn-primary" onclick="submitExam()">
+                        <i class="ph ph-paper-plane-tilt"></i> Submit Exam
+                    </button>
+                </div>
+
+                <!-- Flashcard Controls (Hidden) -->
+                <div id="fcControls" class="flashcard-controls margin-bottom-lg">
+                    <button class="btn btn-outline btn-icon" onclick="prevCard()"><i class="ph ph-caret-left"></i></button>
+                    <span id="fcCounter" class="fc-counter">1 / 10</span>
+                    <button class="btn btn-outline btn-icon" onclick="nextCard()"><i class="ph ph-caret-right"></i></button>
+                </div>
+
+                <!-- Quiz Content -->
+                <div id="quizContainer">
+                    <div class="loading loading-container">
+                        <div class="spinner"><i class="ph ph-spinner-gap ph-spin"></i></div>
+                        <p>Loading questions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Panel (Sidebar) -->
+        <div class="note-action-panel">
+            <h4 class="sidebar-section-title">View Mode</h4>
+            <div class="action-grid" id="modeGrid">
+                <button class="action-btn active" data-mode="show_all" onclick="setMode('show_all')" title="Show All Answers">
+                    <i class="ph ph-list-dashes"></i><span>Show Answers</span>
+                </button>
+                <button class="action-btn" data-mode="hidden" onclick="setMode('hidden')" title="Hide Answers">
+                    <i class="ph ph-eye-slash"></i><span>Hide Answers</span>
+                </button>
+                <button class="action-btn" data-mode="interactive" onclick="setMode('interactive')" title="Practice Mode">
+                    <i class="ph ph-check-square-offset"></i><span>Practice</span>
+                </button>
+                <button class="action-btn" data-mode="flashcard" onclick="setMode('flashcard')" title="Flashcard Mode">
+                    <i class="ph ph-cards"></i><span>Flashcards</span>
+                </button>
+                <button class="action-btn" data-mode="table" onclick="setMode('table')" title="Table View">
+                    <i class="ph ph-table"></i><span>Table View</span>
+                </button>
+                <button class="action-btn" data-mode="exam" onclick="setMode('exam')" title="Exam Simulator">
+                    <i class="ph ph-timer"></i><span>Exam Sim</span>
+                </button>
+            </div>
+
+            <div class="sidebar-divider"></div>
+
+            <h4 class="sidebar-section-title">Actions</h4>
+            <div class="action-grid">
+                <button class="action-btn" onclick="openAddQuestionModal()" title="Add Question">
+                    <i class="ph ph-plus-circle"></i><span>Add Q</span>
+                </button>
+                <button class="action-btn" onclick="exportQuiz()" title="Export Quiz">
+                    <i class="ph ph-export"></i><span>Export</span>
+                </button>
+            </div>
+
+            <button class="action-toggle" onclick="toggleActionPanel()" title="Collapse" id="actionToggleBtn">
+                <i class="ph ph-caret-right" id="actionToggleIcon"></i>
+            </button>
+
+            <div class="sidebar-divider"></div>
+
+            <div id="summaryDetailsSection" class="details-section">
+                <h4 class="sidebar-section-title">Details</h4>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Questions</div>
+                        <div class="info-value" id="infoCount">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Model</div>
+                        <div class="info-value" id="infoModel">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Processing</div>
+                        <div class="info-value" id="infoProcessing">—</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Scope</div>
+                        <div class="info-value" id="infoScope">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Created</div>
+                        <div class="info-value" id="infoDate">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Initial Mode Selection Prompt -->
+    <div id="initialModeModal" class="modal">
+        <div class="modal-content text-center" style="max-width: 600px;">
+            <div class="progress-icon-sparkle">
+                <i class="ph ph-sparkle" style="font-size: 32px; color: var(--color-primary);"></i>
+            </div>
+            <h3 class="margin-bottom-sm">Choose Study Mode</h3>
+            <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 24px;">How would you like to review this quiz today?</p>
+            
+            <div class="action-grid" style="grid-template-columns: repeat(3, 1fr);">
+                <button onclick="setMode('show_all'); closeModal('initialModeModal')">
+                    <i class="ph ph-list-dashes"></i>
+                    <span>Show Answers</span>
+                </button>
+                <button onclick="setMode('hidden'); closeModal('initialModeModal')">
+                    <i class="ph ph-eye-slash"></i>
+                    <span>Hide Answers</span>
+                </button>
+                <button onclick="setMode('interactive'); closeModal('initialModeModal')">
+                    <i class="ph ph-check-square-offset"></i>
+                    <span>Practice</span>
+                </button>
+                <button onclick="setMode('flashcard'); closeModal('initialModeModal')">
+                    <i class="ph ph-cards"></i>
+                    <span>Flashcards</span>
+                </button>
+                <button onclick="setMode('table'); closeModal('initialModeModal')">
+                    <i class="ph ph-table"></i>
+                    <span>Table View</span>
+                </button>
+                <button onclick="setMode('exam'); closeModal('initialModeModal')">
+                    <i class="ph ph-timer"></i>
+                    <span>Exam Simulator</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exam Setup Modal -->
+    <div id="examSetupModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3>Exam Simulator Setup</h3>
+            <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 20px;">Set your desired time limit for this session.</p>
+            
+            <div class="form-group">
+                <label>Time Limit (minutes)</label>
+                <input type="number" id="examTimeLimit" class="form-control" value="15" min="1" max="180">
+                <small style="color: var(--color-gray);">Recommended: <span id="recommendedTime">15</span> mins</small>
+            </div>
+            
+            <div class="modal-buttons margin-top-xl">
+                <button class="btn btn-primary" onclick="startExamSim()">Start Simulator</button>
+                <button class="btn btn-secondary" onclick="closeModal('examSetupModal'); setMode('show_all')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal (Placeholder for consistency) -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content modal-content-export">
+            <h3><i class="ph ph-export"></i> Export Quiz</h3>
+            <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 20px;">Select format to download this quiz.</p>
+            
+            <div class="export-options">
+                <button class="btn btn-outline btn-block" onclick="doExport('pdf')"><i class="ph ph-file-pdf"></i> PDF</button>
+                <button class="btn btn-outline btn-block" onclick="doExport('docx')"><i class="ph ph-file-doc"></i> Word</button>
+            </div>
+            
+            <button class="btn btn-secondary btn-block" onclick="closeModal('exportModal')">Cancel</button>
+        </div>
+    </div>
+
+    <script src="/js/quiz_view.js"></script>
+    <script>
+        function toggleActionPanel() {
+            const layout = document.querySelector('.app-layout');
+            layout.classList.toggle('action-collapsed');
+            const icon = document.getElementById('actionToggleIcon');
+            const isCollapsed = layout.classList.contains('action-collapsed');
+            icon.className = isCollapsed ? 'ph ph-caret-left' : 'ph ph-caret-right';
+        }
+    </script>
+</body>
+</html>

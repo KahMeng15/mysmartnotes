@@ -1,6 +1,6 @@
 # 🚀 MySmartNotes – Smart AI-Powered Study Companion
 
-A lightweight, single-container web application that intelligently converts lecture slides (PDF/PPTX) into structured study materials using advanced AI. Extract clean markdown with properly formatted tables, ask questions via RAG-based chat, generate flashcards and quizzes, and organize your learning journey. Perfect for personal use or small study groups (0-10 people).
+A lightweight, single-container web application that intelligently converts lecture slides (PDF/PPTX) into structured study materials using advanced AI. Extract clean markdown with properly formatted tables, ask questions via RAG-based chat, generate quizzes, and organize your learning journey. Perfect for personal use or small study groups (0-10 people).
 
 ## ✨ Key Features
 
@@ -12,9 +12,8 @@ A lightweight, single-container web application that intelligently converts lect
   - Pre-computed embeddings for fast semantic search
   - Vector DB integrated into SQLite (no external services needed)
   - Context-aware LLM responses from multiple AI providers
-* **Study Tools**: Quiz generation, flashcard system, and cheat sheets
+* **Study Tools**: Quiz generation and cheat sheets
   - Auto-generate practice quizzes from lecture notes
-  - Spaced repetition flashcards for self-testing
   - Export notes as PDF or Word documents
 * **Smart Organization**: Subjects grouped by semester/topic with snapshots
   - Save different versions of lecture notes as snapshots
@@ -160,7 +159,7 @@ See [RESOURCE_REQUIREMENTS.md](RESOURCE_REQUIREMENTS.md) for deployment sizing d
 3. **Organize**: Assign to subject + group (e.g., "Semester 1 → Math")
 4. **Review & Edit**: Built-in markdown editor with live preview
 5. **Search & Chat**: Semantic search + RAG-powered Q&A
-6. **Generate Materials**: Flashcards, quizzes, study guides
+6. **Generate Materials**: Quizzes, study guides
 7. **Track Progress**: Monitor study sessions via analytics dashboard
 
 ## 💡 Use Cases

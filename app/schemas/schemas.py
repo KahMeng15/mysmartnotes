@@ -151,35 +151,7 @@ class LectureResponse(Lecture):
     subject: Optional[SubjectResponse] = None
 
 
-# ========== Flashcard Schemas ==========
-class FlashcardBase(BaseModel):
-    question: str
-    answer: str
-    difficulty: str = "medium"
-
-
-class FlashcardCreate(FlashcardBase):
-    lecture_id: str
-
-
-class FlashcardUpdate(BaseModel):
-    question: Optional[str] = None
-    answer: Optional[str] = None
-    difficulty: Optional[str] = None
-
-
-class Flashcard(FlashcardBase):
-    id: int
-    lecture_id: str
-    times_reviewed: int
-    times_correct: int
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-
-# ========== Summary Schemas ==========
+# ========== Auth Schemas ==========
 class SummaryBase(BaseModel):
     title: str
     summary_type: str

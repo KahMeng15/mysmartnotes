@@ -14,7 +14,7 @@ router = APIRouter(prefix="/study-sessions", tags=["study-sessions"])
 
 class StudySessionCreate(BaseModel):
     lecture_id: Optional[str] = None
-    session_type: str  # "quiz", "flashcard", "reading", "pomodoro_study", "pomodoro_break", "stopwatch"
+    session_type: str  # "quiz", "reading", "pomodoro_study", "pomodoro_break", "stopwatch"
     duration_minutes: int
     questions_attempted: int = 0
     questions_correct: int = 0

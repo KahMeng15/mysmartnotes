@@ -1357,22 +1357,7 @@ function goToChat() {
     window.location.href = `/chat.html?lecture_id=${lectureId}`;
 }
 
-async function generateFlashcards() {
-    if (!lectureId) return;
-    try {
-        const response = await fetch(`/summaries/flashcards/${lectureId}`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-            alert('Flashcards generated! Redirecting...');
-            window.location.href = '/flashcards.html';
-        } else {
-            const error = await response.json();
-            alert('Error: ' + (error.detail || 'Failed to generate flashcards'));
-        }
-    } catch (error) { alert('Error: ' + error.message); }
-}
+
 
 // ===== SUMMARIZATION =====
 function handleSummarizeClick() {
