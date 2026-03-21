@@ -137,7 +137,9 @@ class GeneratedDocument(Base):
     output_format = Column(String(50), nullable=True)  # sentence, pointform, numbered_list, table
     processing_method = Column(String(50), nullable=True)  # whole, section
     split_level = Column(String(10), nullable=True)  # h1, h2, h3 - header level for section splitting
-    processing_time = Column(Float, nullable=True)  # Processing time in seconds
+    processing_time = Column(Float, nullable=True)  # Processing time in seconds (legacy)
+    processing_time_ms = Column(Integer, nullable=True)  # Processing time in milliseconds
+    model = Column(String(100), nullable=True)  # AI model used
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

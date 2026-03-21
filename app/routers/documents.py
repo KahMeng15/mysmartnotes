@@ -67,6 +67,8 @@ class SummaryResponse(BaseModel):
     processing_method: str = "whole"
     split_level: Optional[str] = None
     processing_time: Optional[float] = None
+    processing_time_ms: Optional[int] = None
+    model: Optional[str] = None
     id: Optional[int] = None
 
 
@@ -101,6 +103,8 @@ class DocumentResponse(BaseModel):
     processing_method: Optional[str] = None  # For summaries (whole, section)
     split_level: Optional[str] = None  # For summaries (h1, h2, h3)
     processing_time: Optional[float] = None  # Processing time in seconds
+    processing_time_ms: Optional[int] = None  # Processing time in milliseconds
+    model: Optional[str] = None  # AI model used
 
 @router.post("/quiz", response_model=QuizResponse)
 async def generate_quiz(
@@ -266,6 +270,8 @@ async def generate_summary_endpoint(
                 processing_method=existing_summary.processing_method or "whole",
                 split_level=existing_summary.split_level,
                 processing_time=existing_summary.processing_time,
+                processing_time_ms=existing_summary.processing_time_ms,
+                model=existing_summary.model,
                 id=existing_summary.id
             )
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
@@ -347,7 +353,9 @@ async def generate_summary_endpoint(
                 )
         
         # Calculate processing time
-        processing_time = time.time() - start_time
+        end_time = time.time()
+        processing_time = end_time - start_time
+        processing_time_ms = int(processing_time * 1000)
 
         # Save generated document
         doc = GeneratedDocument(
@@ -361,7 +369,9 @@ async def generate_summary_endpoint(
             output_format=request.output_format,
             processing_method=request.processing_method,
             split_level=request.split_level if request.processing_method == "section" else None,
-            processing_time=processing_time
+            processing_time=processing_time,
+            processing_time_ms=processing_time_ms,
+            model=ai_client.ai_model_name
         )
         db.add(doc)
         db.commit()
@@ -377,6 +387,8 @@ async def generate_summary_endpoint(
             processing_method=request.processing_method,
             split_level=request.split_level if request.processing_method == "section" else None,
             processing_time=processing_time,
+            processing_time_ms=processing_time_ms,
+            model=ai_client.ai_model_name,
             id=doc.id
         )
     except Exception as e:

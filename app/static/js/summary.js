@@ -11,6 +11,8 @@ let currentVersionId = null;
 let deleteConfirmVersionId = null;
 let currentSplitLevel = null;
 let currentProcessingTime = null;
+let currentProcessingTimeMs = null;
+let currentAIModel = null;
 let currentNoteTitleForBreadcrumb = null;
 
 const MODE_META = {
@@ -128,6 +130,8 @@ async function loadSummaryVersion(docId) {
                 currentProcessingMethod = data.processing_method || 'whole';
                 currentSplitLevel = data.split_level || null;
                 currentProcessingTime = data.processing_time || null;
+                currentProcessingTimeMs = data.processing_time_ms || null;
+                currentAIModel = data.model || null;
                 currentVersionId = docId;
                 displaySummary();
                 loadSummaryVersions();
@@ -209,13 +213,17 @@ function showNoSummaryUI() {
     `;
     
     // Also reset detail values
-    const details = ['detailsProcessingMode', 'detailsFormat', 'detailsProcessingTime'];
+    const details = ['detailsProcessingMode', 'detailsModel', 'detailsFormat', 'detailsProcessingTime'];
     details.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = '—';
     });
     const divItem = document.getElementById('detailsDividerItem');
     if (divItem) divItem.style.display = 'none';
+    
+    currentAIModel = null;
+    currentProcessingTime = null;
+    currentProcessingTimeMs = null;
     
     const quickreadContainer = document.getElementById('quickreadContainer');
     if (quickreadContainer) quickreadContainer.style.display = 'none';
@@ -374,17 +382,24 @@ function displaySummary() {
     }
 }
 
-function formatProcessingTime(seconds) {
-    if (!seconds && seconds !== 0) return '—';
-    if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
-    if (seconds < 60) return `${seconds.toFixed(1)}s`;
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.round(seconds % 60);
-    return `${mins}m ${secs}s`;
+function formatProcessingTime(ms) {
+    if (ms === null || ms === undefined || ms === 0) return '—';
+    if (ms < 1000) {
+        return `${ms}ms`;
+    } else {
+        const totalSecs = Math.floor(ms / 1000);
+        if (totalSecs > 3600) {
+            return 'N/A';
+        } else {
+            return totalSecs > 60 ?
+                `${Math.floor(totalSecs / 60)}m ${totalSecs % 60}s` : `${totalSecs}s`;
+        }
+    }
 }
 
 function updateDetailsSection() {
     const detailsProcessingMode = document.getElementById('detailsProcessingMode');
+    const detailsModel = document.getElementById('detailsModel');
     const detailsDividerItem = document.getElementById('detailsDividerItem');
     const detailsDivider = document.getElementById('detailsDivider');
     const detailsFormat = document.getElementById('detailsFormat');
@@ -393,6 +408,10 @@ function updateDetailsSection() {
     if (detailsProcessingMode) {
         const modeText = currentProcessingMethod === 'section' ? 'Section by section' : 'Whole note';
         detailsProcessingMode.textContent = modeText;
+    }
+
+    if (detailsModel) {
+        detailsModel.textContent = currentAIModel || '—';
     }
     
     // Show divider info only for section-by-section processing
@@ -411,7 +430,10 @@ function updateDetailsSection() {
     }
     
     if (detailsProcessingTime) {
-        detailsProcessingTime.textContent = formatProcessingTime(currentProcessingTime);
+        // Use MS if available, fallback to legacy seconds field
+        const timeVal = currentProcessingTimeMs !== null ? currentProcessingTimeMs : 
+                       (currentProcessingTime ? Math.round(currentProcessingTime * 1000) : null);
+        detailsProcessingTime.textContent = formatProcessingTime(timeVal);
     }
 }
 
@@ -560,6 +582,8 @@ async function generateSummary() {
             currentProcessingMethod = data.processing_method || 'whole';
             currentSplitLevel = data.split_level || null;
             currentProcessingTime = data.processing_time || null;
+            currentProcessingTimeMs = data.processing_time_ms || null;
+            currentAIModel = data.model || null;
             currentVersionId = data.id;
             
             setTimeout(() => {
