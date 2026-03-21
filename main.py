@@ -227,6 +227,14 @@ async def serve_note_view(id: str):
 async def serve_summary_view(id: str):
     return FileResponse(os.path.join(static_dir, "summary.html"))
 
+@app.get("/note/{id}/summary/{summary_id}")
+async def serve_summary_version_view(id: str, summary_id: str):
+    return FileResponse(os.path.join(static_dir, "summary.html"))
+
+@app.get("/note/{id}/summary/{summary_id}/edit")
+async def serve_summary_edit_view(id: str, summary_id: str):
+    return FileResponse(os.path.join(static_dir, "summary.html"))
+
 @app.get("/note/{id}/edit")
 async def serve_note_edit(id: str):
     return FileResponse(os.path.join(static_dir, "note.html"))

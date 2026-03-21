@@ -173,6 +173,12 @@ function displayLecture() {
         metaSubject.href = subjectId ? `/subject.html?id=${subjectId}` : '#';
     }
 
+    const metaNote = document.getElementById('metaNote');
+    if (metaNote) {
+        metaNote.textContent = lectureData.title;
+        metaNote.href = `/note/${lectureId}`;
+    }
+
     // Fetch group name
     if (lectureData.subject?.group_id) {
         fetchGroupName(lectureData.subject.group_id);

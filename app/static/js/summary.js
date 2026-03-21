@@ -41,7 +41,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Extract lectureId from URL path: /note/{id}/summary
     const pathParts = window.location.pathname.split('/');
-    lectureId = pathParts[2]; // Path is /note/ID/summary
+    lectureId = pathParts[2]; 
+    let initialSummaryId = pathParts[4] || null; // /note/{id}/summary/{summary_id}
+    const shouldEdit = pathParts[5] === 'edit';
 
     if (!lectureId) {
         alert('Invalid Note ID');
@@ -82,21 +84,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     const summaries = await loadSummaryVersions();
     
     if (summaries && summaries.length > 0) {
-        // Try to load last selected version
-        const lastVersionId = localStorage.getItem(`lastSummaryVersion_${lectureId}`);
-        let versionToLoad = summaries[0];
+        let versionToLoad = null;
         
-        if (lastVersionId) {
-            const found = summaries.find(s => s.id == lastVersionId);
-            if (found) versionToLoad = found;
+        if (initialSummaryId) {
+            versionToLoad = summaries.find(s => s.id == initialSummaryId);
         }
         
-        await loadSummaryVersion(versionToLoad.id);
+        if (!versionToLoad) {
+            // Try to load last selected version
+            const lastVersionId = localStorage.getItem(`lastSummaryVersion_${lectureId}`);
+            versionToLoad = summaries[0];
+            if (lastVersionId) {
+                const found = summaries.find(s => s.id == lastVersionId);
+                if (found) versionToLoad = found;
+            }
+        }
+        
+        await loadSummaryVersion(versionToLoad.id, false);
+        
+        if (shouldEdit && currentVersionId) {
+            toggleEdit();
+        }
     } else {
         showNoSummaryUI();
         showSummaryOptions(false);
     }
 });
+
+function updateURL() {
+    let url = `/note/${lectureId}/summary`;
+    if (currentVersionId) {
+        url += `/${currentVersionId}`;
+        if (isEditMode) {
+            url += `/edit`;
+        }
+    }
+    if (window.location.pathname !== url) {
+        history.pushState(null, '', url);
+    }
+}
 
 async function loadSummaryVersions() {
     try {
@@ -155,7 +181,7 @@ async function loadSummaryVersions() {
     return [];
 }
 
-async function loadSummaryVersion(docId) {
+async function loadSummaryVersion(docId, pushURL = true) {
     if (isEditMode) {
         showEditWarningModal();
         return;
@@ -183,6 +209,8 @@ async function loadSummaryVersion(docId) {
                 currentVersionId = docId;
                 displaySummary();
                 loadSummaryVersions();
+                
+                if (pushURL) updateURL();
                 
                 // Update breadcrumb when switching version
                 loadNoteMetadata();
@@ -767,6 +795,7 @@ function toggleEdit() {
         isSourceMode = false;
         if (sourceTextarea) sourceTextarea.style.display = 'none';
         if (wysiwygArea) wysiwygArea.style.display = 'block';
+        updateURL();
     } else {
         // Switch back to view
         cancelEdit();
@@ -797,6 +826,7 @@ function cancelEdit() {
         editBtn.classList.remove('active');
         editBtn.innerHTML = '<i class="ph ph-pencil-simple"></i> <span>Edit</span>';
     }
+    updateURL();
 }
 
 function showSaveModal() {
@@ -1146,4 +1176,28 @@ async function doExport() {
         alert('Error exporting: ' + e.message);
         document.getElementById('exportSubmitBtn').disabled = false;
     }
+}
+
+function toggleActionPanel() {
+    const layout = document.querySelector('.app-layout');
+    if (!layout) return;
+    layout.classList.toggle('action-collapsed');
+    const isCollapsed = layout.classList.contains('action-collapsed');
+    localStorage.setItem('actionCollapsed', isCollapsed);
+    const icon = document.getElementById('actionToggleIcon');
+    if (icon) {
+        icon.className = isCollapsed ? 'ph ph-caret-left' : 'ph ph-caret-right';
+    }
+}
+
+// Restore action collapsed state
+if (localStorage.getItem('actionCollapsed') === 'true') {
+    document.addEventListener('DOMContentLoaded', () => {
+        const layout = document.querySelector('.app-layout');
+        if (layout) {
+            layout.classList.add('action-collapsed');
+            const icon = document.getElementById('actionToggleIcon');
+            if (icon) icon.className = 'ph ph-caret-left';
+        }
+    });
 }
