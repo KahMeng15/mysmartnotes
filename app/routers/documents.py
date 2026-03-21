@@ -464,6 +464,7 @@ async def generate_cheatsheet(
 class UpdateDocumentRequest(BaseModel):
     content: str
     title: Optional[str] = None
+    quickread: Optional[str] = None
 
 
 @router.put("/{document_id}", response_model=DocumentResponse)
@@ -487,6 +488,8 @@ async def update_generated_document(
     doc.content = request.content
     if request.title:
         doc.title = request.title
+    if request.quickread is not None:
+        doc.quickread = request.quickread
     
     # Mark as user edited
     doc.is_user_edited = True

@@ -470,11 +470,6 @@ function updateDetailsSection() {
         }
     }
     
-    if (detailsFormat) {
-        const formatLabel = FORMAT_META[currentSummaryFormat]?.label || currentSummaryFormat;
-        detailsFormat.textContent = formatLabel;
-    }
-    
     if (detailsProcessingTime) {
         // Use MS if available, fallback to legacy seconds field
         const timeVal = currentProcessingTimeMs !== null ? currentProcessingTimeMs : 
@@ -663,6 +658,8 @@ function toggleEdit() {
     const editBtn = document.getElementById('editBtn');
     const wysiwygArea = document.getElementById('wysiwygArea');
     const sourceTextarea = document.getElementById('sourceTextarea');
+    const quickreadContent = document.getElementById('quickreadContent');
+    const quickreadContainer = document.getElementById('quickreadContainer');
     
     isEditMode = !isEditMode;
     
@@ -682,8 +679,24 @@ function toggleEdit() {
         }
         
         // Load content into editor
-        if (wysiwygArea) wysiwygArea.innerHTML = marked.parse(summaryData || '');
-        if (sourceTextarea) sourceTextarea.value = summaryData || '';
+        if (wysiwygArea) {
+            wysiwygArea.innerHTML = marked.parse(summaryData || '');
+            wysiwygArea.classList.add('markdown-content');
+        }
+        if (sourceTextarea) {
+            sourceTextarea.value = summaryData || '';
+            // Handle resizing if switched to source
+            if (!sourceTextarea.dataset.resizeBound) {
+                sourceTextarea.addEventListener('input', autoResizeTextarea);
+                sourceTextarea.dataset.resizeBound = 'true';
+            }
+        }
+        
+        // Enable Quickread editing if available
+        if (quickreadContent && quickreadContainer && quickreadContainer.style.display !== 'none') {
+            quickreadContent.contentEditable = 'true';
+            quickreadContent.classList.add('quickread-editor-active');
+        }
         
         isSourceMode = false;
         if (sourceTextarea) sourceTextarea.style.display = 'none';
@@ -700,9 +713,15 @@ function cancelEdit() {
     const editorContainer = document.getElementById('editorContainer');
     const editBtn = document.getElementById('editBtn');
     const summaryContainer = document.getElementById('summaryContainer');
+    const quickreadContent = document.getElementById('quickreadContent');
     
     if (summaryContainer) summaryContainer.classList.remove('flex-centering-active');
     
+    if (quickreadContent) {
+        quickreadContent.contentEditable = 'false';
+        quickreadContent.classList.remove('quickread-editor-active');
+    }
+
     if (viewContainer) viewContainer.style.display = 'block';
     if (editorContainer) {
         editorContainer.style.display = 'none';
@@ -730,8 +749,10 @@ function confirmSave() {
 async function saveContent() {
     const wysiwygArea = document.getElementById('wysiwygArea');
     const sourceTextarea = document.getElementById('sourceTextarea');
+    const quickreadContent = document.getElementById('quickreadContent');
     
     let newContent = isSourceMode ? sourceTextarea.value : htmlToMarkdown(wysiwygArea.innerHTML);
+    let newQuickread = quickreadContent ? htmlToMarkdown(quickreadContent.innerHTML) : null;
     
     try {
         const res = await fetch(`/documents/${currentVersionId}`, {
@@ -740,12 +761,16 @@ async function saveContent() {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ content: newContent })
+            body: JSON.stringify({ 
+                content: newContent,
+                quickread: newQuickread
+            })
         });
         
         if (res.ok) {
             const data = await res.json();
             summaryData = data.content;
+            quickreadData = data.quickread || null;
             isUserEdited = data.is_user_edited;
             
             // UI Feedback
@@ -786,8 +811,16 @@ function toggleSource() {
         wysiwygArea.style.display = 'none';
         sourceTextarea.style.display = 'block';
         sourceToggle.classList.add('active');
+        
+        // Auto resize after switch
+        autoResizeTextarea();
+        if (!sourceTextarea.dataset.resizeBound) {
+            sourceTextarea.addEventListener('input', autoResizeTextarea);
+            sourceTextarea.dataset.resizeBound = 'true';
+        }
     } else {
         wysiwygArea.innerHTML = marked.parse(sourceTextarea.value);
+        wysiwygArea.classList.add('markdown-content');
         sourceTextarea.style.display = 'none';
         wysiwygArea.style.display = 'block';
         sourceToggle.classList.remove('active');
@@ -816,43 +849,104 @@ function insertCodeBlock() {
 
 // Simple HTML to Markdown converter for the editor
 function htmlToMarkdown(html) {
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-    
-    let markdown = html
-        .replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n')
-        .replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n')
-        .replace(/<h3>(.*?)<\/h3>/gi, '### $1\n\n')
-        .replace(/<b>(.*?)<\/b>/gi, '**$1**')
-        .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
-        .replace(/<i>(.*?)<\/i>/gi, '*$1*')
-        .replace(/<em>(.*?)<\/em>/gi, '*$1*')
-        .replace(/<u>(.*?)<\/u>/gi, '<ins>$1</ins>')
-        .replace(/<s>(.*?)<\/s>/gi, '~~$1~~')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<p>(.*?)<\/p>/gi, '$1\n\n')
-        .replace(/<ul>([\s\S]*?)<\/ul>/gi, (match, p1) => p1.replace(/<li>(.*?)<\/li>/gi, '* $1\n') + '\n')
-        .replace(/<ol>([\s\S]*?)<\/ol>/gi, (match, p1) => {
-            let i = 1;
-            return p1.replace(/<li>(.*?)<\/li>/gi, () => `${i++}. $1\n`) + '\n';
-        });
-        
-    // Basic table conversion
-    const tables = temp.querySelectorAll('table');
-    tables.forEach(table => {
-        let tableMd = '\n';
-        const rows = table.querySelectorAll('tr');
-        rows.forEach((row, idx) => {
-            const cols = row.querySelectorAll('td, th');
-            tableMd += '| ' + Array.from(cols).map(c => c.innerText.trim()).join(' | ') + ' |\n';
-            if (idx === 0) {
-                tableMd += '| ' + Array.from(cols).map(() => '---').join(' | ') + ' |\n';
-            }
-        });
-        markdown += tableMd + '\n';
-    });
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return nodeToMd(doc.body).trim();
+}
 
-    return markdown.trim();
+function nodeToMd(node) {
+    let result = '';
+    if (!node) return result;
+    for (const child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+            result += child.textContent;
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+            const tag = child.tagName.toLowerCase();
+            const inner = nodeToMd(child);
+            switch (tag) {
+                case 'h1': result += '\n# ' + inner.trim() + '\n\n'; break;
+                case 'h2': result += '\n## ' + inner.trim() + '\n\n'; break;
+                case 'h3': result += '\n### ' + inner.trim() + '\n\n'; break;
+                case 'h4': result += '\n#### ' + inner.trim() + '\n\n'; break;
+                case 'h5': result += '\n##### ' + inner.trim() + '\n\n'; break;
+                case 'p': result += inner.trim() + '\n\n'; break;
+                case 'br': result += '\n'; break;
+                case 'strong': case 'b': result += '**' + inner + '**'; break;
+                case 'em': case 'i': result += '*' + inner + '*'; break;
+                case 'u': result += '<u>' + inner + '</u>'; break;
+                case 's': case 'strike': case 'del': result += '~~' + inner + '~~'; break;
+                case 'code':
+                    if (child.parentElement && child.parentElement.tagName === 'PRE') {
+                        result += inner;
+                    } else {
+                        result += '`' + inner + '`';
+                    }
+                    break;
+                case 'pre': result += '\n```\n' + inner.trim() + '\n```\n\n'; break;
+                case 'blockquote': {
+                    const lines = inner.trim().split('\n');
+                    result += '\n' + lines.map(l => '> ' + l).join('\n') + '\n\n';
+                    break;
+                }
+                case 'ul': {
+                    const items = child.querySelectorAll(':scope > li');
+                    items.forEach(li => { result += '- ' + nodeToMd(li).trim() + '\n'; });
+                    result += '\n';
+                    break;
+                }
+                case 'ol': {
+                    const items = child.querySelectorAll(':scope > li');
+                    items.forEach((li, i) => { result += (i + 1) + '. ' + nodeToMd(li).trim() + '\n'; });
+                    result += '\n';
+                    break;
+                }
+                case 'li': result += inner; break;
+                case 'table': {
+                    let tableMd = '\n\n';
+                    let maxCols = 0;
+                    const rows = child.querySelectorAll('tbody > tr, thead > tr, tr');
+                    const uniqueRows = [];
+                    rows.forEach(tr => {
+                        if (uniqueRows.includes(tr) || tr.closest('table') !== child) return;
+                        uniqueRows.push(tr);
+                        const cells = tr.querySelectorAll('th, td');
+                        maxCols = Math.max(maxCols, cells.length);
+                    });
+
+                    uniqueRows.forEach((tr, i) => {
+                        const cells = Array.from(tr.querySelectorAll('th, td'));
+                        let rowMd = '|';
+                        for (let c = 0; c < maxCols; c++) {
+                            const cell = cells[c];
+                            const cellText = cell ? nodeToMd(cell).replace(/\n/g, '<br>').trim() : '';
+                            rowMd += ' ' + cellText + ' |';
+                        }
+                        tableMd += rowMd + '\n';
+                        if (i === 0) {
+                            tableMd += '|';
+                            for (let c = 0; c < maxCols; c++) {
+                                tableMd += ' --- |';
+                            }
+                            tableMd += '\n';
+                        }
+                    });
+                    result += tableMd + '\n';
+                    break;
+                }
+                case 'a': result += '[' + inner + '](' + (child.getAttribute('href') || '') + ')'; break;
+                case 'img': result += '![' + (child.getAttribute('alt') || '') + '](' + (child.getAttribute('src') || '') + ')'; break;
+                case 'hr': result += '\n---\n\n'; break;
+                default: result += inner;
+            }
+        }
+    }
+    return result;
+}
+
+function autoResizeTextarea() {
+    const sourceTextarea = document.getElementById('sourceTextarea');
+    if (!sourceTextarea) return;
+    sourceTextarea.style.height = 'auto';
+    sourceTextarea.style.height = sourceTextarea.scrollHeight + 'px';
 }
 
 function toggleBlockquote() { execCmd('formatBlock', 'blockquote'); }

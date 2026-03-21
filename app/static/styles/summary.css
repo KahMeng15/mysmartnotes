@@ -9,17 +9,27 @@
 }
 
 #summaryContainer.flex-centering-active,
-#summaryContainer.flex-centering-active .note-main,
-#summaryContainer.flex-centering-active .section-card {
+#summaryContainer.flex-centering-active .note-main {
     display: flex;
     flex-direction: column;
     flex: 1;
 }
 
-#summaryContainer.flex-centering-active .editor-container.active {
-    flex: 1;
+#summaryContainer.flex-centering-active .section-card {
     display: flex;
     flex-direction: column;
+    /* Remove flex: 1 here to let it expand and scroll the page */
+}
+
+#summaryContainer.flex-centering-active .editor-container.active {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+}
+
+.source-textarea {
+    overflow: visible !important;
 }
 
 .note-main {
@@ -259,6 +269,16 @@
     font-size: var(--font-size-sm);
     line-height: var(--line-height-normal);
     color: var(--color-gray);
+    transition: all 0.2s ease;
+}
+
+#quickreadContent.quickread-editor-active {
+    outline: none;
+    border: 2px dashed var(--color-primary);
+    background: white;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    cursor: text;
 }
 
 /* Options Modal Components */

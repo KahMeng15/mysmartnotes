@@ -2493,15 +2493,16 @@ textarea {
 
 .source-textarea {
   width: 100%;
+  flex: 1;
   min-height: 200px;
-  height: auto;
+  height: 100%;
   box-sizing: border-box;
   padding: 16px;
   border: none !important;
   background: transparent !important;
   border-radius: 0;
   resize: none;
-  overflow: hidden;
+  overflow-y: auto;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-loose);
