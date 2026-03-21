@@ -174,13 +174,12 @@
             </div>
         </div>
 
-        <!-- Sidebar Actions -->
         <div class="note-action-panel">
             <div class="action-grid">
-                <button class="action-btn" id="sidebarBackBtn" title="Back to Note"><i class="ph ph-arrow-left"></i> <span>Back</span></button>
+                <button class="action-btn" onclick="showSummaryOptions(true)" title="New Summary"><i class="ph ph-plus"></i> <span>New</span></button>
                 <button class="action-btn" onclick="toggleEdit()" id="editBtn" title="Edit Summary"><i class="ph ph-pencil-simple"></i> <span>Edit</span></button>
                 <button class="action-btn" onclick="exportNote()" title="Export Summary"><i class="ph ph-export"></i> <span>Export</span></button>
-                <button class="action-btn" onclick="showSummaryOptions(true)" title="New Summary"><i class="ph ph-plus"></i> <span>New</span></button>
+                <button class="action-btn" id="sidebarBackBtn" title="Back to Note"><i class="ph ph-arrow-left"></i> <span>Back</span></button>
             </div>
             
             <div class="sidebar-divider"></div>
@@ -375,6 +374,17 @@
             <div class="modal-buttons">
                 <button type="button" class="btn-save btn-danger-static" onclick="confirmDiscard()">Discard</button>
                 <button type="button" class="btn-cancel" onclick="closeDiscardModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Warning Modal (replaces alert) -->
+    <div id="editWarningModal" class="modal">
+        <div class="modal-content modal-content-compact">
+            <h3>Unsaved Changes</h3>
+            <p class="modal-text-gray">Please save or discard your changes before switching versions.</p>
+            <div class="modal-buttons">
+                <button type="button" class="btn-save" onclick="closeEditWarningModal()">Got it</button>
             </div>
         </div>
     </div>

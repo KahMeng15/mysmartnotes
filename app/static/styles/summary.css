@@ -93,35 +93,58 @@
 }
 
 /* Sidebar Sections */
+.note-action-panel {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.action-grid, .sidebar-divider, .details-section, .sidebar-section-title, #displayOptionsSection {
+    flex-shrink: 0;
+}
+
 .sidebar-section-title {
-    font-size: var(--font-size-xs);
+    font-size: 11px;
     font-weight: 600;
     color: var(--color-dark-gray);
-    margin: 0 0 var(--spacing-md) 0;
+    margin: 0 0 var(--spacing-sm) 0;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
 .sidebar-scroll-content {
     flex: 1;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden; /* Parent container for versions-list */
+}
+
+#summaryVersionsSection {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
 }
 
 .display-options-group {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
+    margin-bottom: var(--spacing-md);
 }
 
 .sidebar-option-label {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     cursor: pointer;
-    font-size: var(--font-size-sm);
+    font-size: 11px;
     user-select: none;
     transition: opacity 0.2s ease;
+    color: var(--color-gray);
+    font-weight: 500;
 }
 
 .sidebar-option-label.disabled {
@@ -151,15 +174,32 @@
 }
 
 .versions-list {
+    flex: 1;
     display: flex;
     flex-direction: column;
     gap: 8px;
     overflow-y: auto;
+    min-height: 0;
 }
 
 /* Details Section */
 .details-section {
     margin-top: 0;
+    padding-top: var(--spacing-md);
+}
+
+.details-section .info-item .info-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-gray);
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.details-section .info-item .info-value {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-dark);
 }
 
 /* Display Options Section */

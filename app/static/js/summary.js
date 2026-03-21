@@ -157,7 +157,7 @@ async function loadSummaryVersions() {
 
 async function loadSummaryVersion(docId) {
     if (isEditMode) {
-        alert('Please save or discard your changes before switching versions.');
+        showEditWarningModal();
         return;
     }
     try {
@@ -189,6 +189,14 @@ async function loadSummaryVersion(docId) {
             }
         }
     } catch (e) { console.error('Error loading version:', e); }
+}
+
+function showEditWarningModal() {
+    document.getElementById('editWarningModal').classList.add('active');
+}
+
+function closeEditWarningModal() {
+    document.getElementById('editWarningModal').classList.remove('active');
 }
 
 function showDeleteConfirm(docId) {

@@ -2365,11 +2365,12 @@ textarea {
   color: var(--color-dark);
   border: 1px solid var(--color-light-gray);
   border-radius: 40px;
-  position: sticky;
-  bottom: 24px;
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
   width: max-content;
   max-width: 90%;
-  margin: 0 auto;
   z-index: 1000;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
 }
