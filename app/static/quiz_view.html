@@ -46,6 +46,22 @@
                     </div>
                 </div>
 
+                <!-- Search & Filter Controls -->
+                <div id="quizSearchSection" class="quiz-search-section margin-bottom-lg">
+                    <div class="search-box" style="flex: 1; max-width: none;">
+                        <i class="ph ph-magnifying-glass search-icon"></i>
+                        <input type="text" id="qSearchInput" placeholder="Search your quiz..." onkeyup="if(event.key==='Enter') filterQuestions()">
+                    </div>
+                    <select id="qSearchFilter" class="options-select search-filter-select">
+                        <option value="both">Both</option>
+                        <option value="question">Questions Only</option>
+                        <option value="answer">Answers Only</option>
+                    </select>
+                    <button class="btn btn-primary btn-search" onclick="filterQuestions()">
+                        <i class="ph ph-magnifying-glass"></i> Search
+                    </button>
+                </div>
+
                 <!-- Exam Mode Info (Hidden) -->
                 <div id="examStatsBar" class="exam-stats-bar" style="display: none;">
                     <div>
@@ -213,6 +229,83 @@
             </div>
             
             <button class="btn btn-secondary btn-block" onclick="closeModal('exportModal')">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Add Question Modal -->
+    <div id="addQuestionModal" class="modal">
+        <div class="modal-content modal-content-quiz">
+            <div class="flex-align-start margin-bottom-lg">
+                <div>
+                    <h3 class="margin-bottom-xs"><i class="ph ph-plus-circle" style="color: var(--color-primary); margin-right: 6px;"></i> Add New Question</h3>
+                    <p style="color: var(--color-gray); font-size: 14px;">Expand your quiz with more questions.</p>
+                </div>
+                <button class="btn-icon" onclick="closeModal('addQuestionModal')"><i class="ph ph-x"></i></button>
+            </div>
+
+            <div class="method-toggle">
+                <button class="method-btn active" id="btnAddMethodAi" onclick="setAddMethod('ai')">
+                    <i class="ph ph-magic-wand"></i> AI Generate
+                </button>
+                <button class="method-btn" id="btnAddMethodManual" onclick="setAddMethod('manual')">
+                    <i class="ph ph-keyboard"></i> Manual Input
+                </button>
+                <input type="hidden" id="addMethodInput" value="ai">
+            </div>
+
+            <!-- AI Section -->
+            <div id="addAiSection">
+                <div class="selection-steps">
+                    <p style="color: var(--color-gray); font-size: 14px; margin: 0;">AI will generate a new question based on the content of this quiz (Lecture, Subject, or Group).</p>
+                </div>
+                
+                <div class="form-group">
+                    <label>Preferred Type</label>
+                    <select id="aiQType" class="options-select">
+                        <option value="objective">Multiple Choice</option>
+                        <option value="subjective">Short Answer</option>
+                        <option value="fill_in_the_blank">Fill in the Blank</option>
+                    </select>
+                </div>
+                
+                <div class="modal-buttons margin-top-xl">
+                    <button class="btn btn-primary btn-block" onclick="generateQuestionAi()" id="btnGenerateQ" style="padding: 12px;">
+                        <i class="ph ph-sparkle"></i> Generate Question
+                    </button>
+                </div>
+            </div>
+
+            <!-- Manual Section -->
+            <div id="addManualSection" style="display: none;">
+                <div class="form-group">
+                    <label>Question Type</label>
+                    <select id="newQType" class="options-select" onchange="toggleOptionInputs()">
+                        <option value="subjective">Short Answer / Subjective</option>
+                        <option value="objective">Multiple Choice (Objective)</option>
+                        <option value="fill_in_the_blank">Fill in the Blank</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Question Text</label>
+                    <textarea id="newQText" rows="3" class="form-control" placeholder="Type your question here..."></textarea>
+                </div>
+
+                <div id="newQOptions" style="display: none;" class="form-group">
+                    <label>Options (One per line, first is correct)</label>
+                    <textarea id="newQOptionsText" rows="4" class="form-control" placeholder="Correct option\nIncorrect option 1\nIncorrect option 2..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Target Answer</label>
+                    <textarea id="newQAnswer" rows="2" class="form-control" placeholder="Ground truth answer for grading"></textarea>
+                </div>
+                
+                <div class="modal-buttons margin-top-xl">
+                    <button class="btn btn-primary btn-block" onclick="addQuestion()" style="padding: 12px;">Add Question</button>
+                    <button class="btn btn-secondary btn-block" onclick="closeModal('addQuestionModal')" style="padding: 12px;">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 

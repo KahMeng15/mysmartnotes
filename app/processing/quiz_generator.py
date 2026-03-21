@@ -127,6 +127,67 @@ Respond with ONLY the JSON array.
     
     return quiz
 
+async def generate_single_question(
+    db: Session,
+    user: User,
+    ai_client: AIClient,
+    quiz: Quiz,
+    question_type: str = "subjective"
+) -> Dict[str, Any]:
+    """Generate a single quiz question based on quiz scope."""
+    
+    # Retrieve content based on quiz scope
+    content = ""
+    if quiz.lecture_id:
+        lecture = db.query(Lecture).filter(Lecture.id == quiz.lecture_id).first()
+        if lecture: content = lecture.extracted_text
+    elif quiz.subject_id:
+        lectures = db.query(Lecture).filter(Lecture.subject_id == quiz.subject_id).all()
+        content = "\\n\\n".join([l.extracted_text for l in lectures if l.extracted_text])
+    elif quiz.group_id:
+        subjects = db.query(Subject).filter(Subject.group_id == quiz.group_id).all()
+        subject_ids = [s.id for s in subjects]
+        lectures = db.query(Lecture).filter(Lecture.subject_id.in_(subject_ids)).all()
+        content = "\\n\\n".join([l.extracted_text for l in lectures if l.extracted_text])
+        
+    if not content:
+        # Fallback to any content if quiz has no scope (shouldn't happen with AI quizzes)
+        raise ValueError("No content found for the specified quiz scope.")
+        
+    if len(content) > 30000:
+        content = content[:30000] + "... [truncated]"
+
+    prompt = f"""Generate exactly ONE quiz question based on the following content.
+
+The question MUST be of the type: {question_type}.
+
+Content:
+{content}
+
+Format the response as a strict JSON object. Do not wrap it in markdown codeblocks like ```json, just output the raw JSON object.
+The object must have the following keys:
+- "question_text": The actual question. For fill in the blank, use "_____" to represent the blank.
+- "answer_text": The correct answer (for AI and user reference).
+- "question_type": Must be exactly: "{question_type}".
+- "options": (ONLY for "objective" type) a list of 4 string options containing the correct answer and 3 distractors. Leave as null for other types.
+
+Respond with ONLY the JSON object.
+"""
+    
+    response = await ai_client.generate_text(prompt, max_tokens=1000)
+    
+    try:
+        clean_response = response.strip()
+        if clean_response.startswith("```json"):
+            clean_response = clean_response[7:-3].strip()
+        elif clean_response.startswith("```"):
+            clean_response = clean_response[3:-3].strip()
+            
+        return json.loads(clean_response)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse single question JSON: {response}")
+        raise ValueError("Failed to generate valid quiz question from AI.") from e
+
 
 async def check_semantic_answer(ai_client: AIClient, question_text: str, correct_answer: str, user_answer: str) -> Dict[str, Any]:
     """Check a user's answer semantically against the ground truth answer."""

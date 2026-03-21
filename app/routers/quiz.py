@@ -14,23 +14,26 @@ from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.schemas.quiz import (
     QuizCreate, QuizResponse, QuizQuestionCreate, QuizQuestionResponse,
-    QuizGenerateRequest, QuizCheckRequest, QuizCheckResponse
+    QuizGenerateRequest, QuizCheckRequest, QuizCheckResponse, SingleQuestionGenerateRequest
 )
 from app.processing.ai_client import AIClient, get_ai_client
-from app.processing.quiz_generator import generate_advanced_quiz, check_semantic_answer
+from app.processing.quiz_generator import generate_advanced_quiz, check_semantic_answer, generate_single_question
 from app.processing.text_processor import ContentSegment, ContentType
+
+router = APIRouter(
+    prefix="/quizzes",
+    tags=["quizzes"]
+)
 
 # In-memory export progress tracking
 _export_progress = {}
 
-router = APIRouter(prefix="/quizzes", tags=["quizzes"])
-
 @router.get("/", response_model=List[QuizResponse])
-def get_user_quizzes(
+def get_quizzes(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all quizzes for the current user."""
+    """Get all quizzes for current user."""
     quizzes = db.query(Quiz).filter(Quiz.user_id == current_user.id).order_by(Quiz.created_at.desc()).all()
     return quizzes
 
@@ -66,31 +69,6 @@ def get_quiz(
         raise HTTPException(status_code=404, detail="Quiz not found")
     return quiz
 
-@router.post("/{quiz_id}/questions", response_model=QuizQuestionResponse)
-def add_question(
-    quiz_id: int,
-    question_in: QuizQuestionCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Add a question to a quiz."""
-    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
-    if not quiz:
-        raise HTTPException(status_code=404, detail="Quiz not found")
-    
-    question = QuizQuestion(
-        quiz_id=quiz.id,
-        question_text=question_in.question_text,
-        answer_text=question_in.answer_text,
-        question_type=question_in.question_type,
-        options=question_in.options,
-        order=question_in.order
-    )
-    db.add(question)
-    db.commit()
-    db.refresh(question)
-    return question
-
 @router.post("/generate", response_model=QuizResponse)
 async def generate_quiz_ai(
     request: QuizGenerateRequest,
@@ -114,6 +92,72 @@ async def generate_quiz_ai(
         return quiz
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{quiz_id}/generate_single", response_model=QuizQuestionResponse)
+async def generate_single_question_endpoint(
+    quiz_id: int,
+    request: SingleQuestionGenerateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate a single question for an existing quiz using AI."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    ai_client = get_ai_client(user=current_user, db=db)
+    
+    try:
+        q_data = await generate_single_question(
+            db=db,
+            user=current_user,
+            ai_client=ai_client,
+            quiz=quiz,
+            question_type=request.question_type
+        )
+        
+        # Count current questions for order
+        q_count = db.query(QuizQuestion).filter(QuizQuestion.quiz_id == quiz.id).count()
+        
+        new_q = QuizQuestion(
+            quiz_id=quiz.id,
+            question_text=q_data.get("question_text"),
+            answer_text=q_data.get("answer_text"),
+            question_type=q_data.get("question_type"),
+            options=q_data.get("options"),
+            order=q_count
+        )
+        db.add(new_q)
+        db.commit()
+        db.refresh(new_q)
+        return new_q
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{quiz_id}/questions", response_model=QuizQuestionResponse)
+def add_question(
+    quiz_id: int,
+    question_in: QuizQuestionCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Add a question to a quiz manually."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    question = QuizQuestion(
+        quiz_id=quiz.id,
+        question_text=question_in.question_text,
+        answer_text=question_in.answer_text,
+        question_type=question_in.question_type,
+        options=question_in.options,
+        order=question_in.order
+    )
+    db.add(question)
+    db.commit()
+    db.refresh(question)
+    return question
 
 @router.post("/{quiz_id}/check", response_model=QuizCheckResponse)
 async def check_answer_ai(

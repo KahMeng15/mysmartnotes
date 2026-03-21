@@ -160,8 +160,14 @@ function updateTimerDisplay() {
     }
 }
 
+function filterQuestions() {
+    renderQuestions();
+}
+
 function renderQuestions() {
     const container = document.getElementById('quizContainer');
+    const query = document.getElementById('qSearchInput')?.value.toLowerCase() || '';
+    const filter = document.getElementById('qSearchFilter')?.value || 'both';
     
     if (!currentQuestions || currentQuestions.length === 0) {
         container.innerHTML = `
@@ -176,21 +182,60 @@ function renderQuestions() {
         `;
         return;
     }
+
+    // Filter questions based on search query and filter type
+    const filteredQuestions = currentQuestions.filter(q => {
+        if (!query) return true;
+        
+        const textMatch = q.question_text.toLowerCase().includes(query);
+        const answerMatch = q.answer_text.toLowerCase().includes(query);
+        
+        let optionsMatch = false;
+        if (q.options) {
+            try {
+                const opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+                optionsMatch = opts.some(opt => opt.toLowerCase().includes(query));
+            } catch(e) {}
+        }
+
+        if (filter === 'question') return textMatch || optionsMatch;
+        if (filter === 'answer') return answerMatch;
+        return textMatch || answerMatch || optionsMatch;
+    });
     
+    // Hide search in modes where it doesn't make sense (flashcards, exam)
+    const searchSection = document.getElementById('quizSearchSection');
+    if (searchSection) {
+        searchSection.style.display = (currentMode === 'flashcards' || currentMode === 'examsimulator') ? 'none' : 'flex';
+    }
+
+    if (filteredQuestions.length === 0 && query) {
+        container.innerHTML = `
+            <div class="empty-state" style="padding: 60px;">
+                <i class="ph ph-magnifying-glass" style="font-size: 48px; color: var(--color-gray); margin-bottom: 16px;"></i>
+                <h3>No matches found</h3>
+                <p style="color: var(--color-gray);">Try a different search term.</p>
+            </div>
+        `;
+        return;
+    }
+
     container.innerHTML = '';
     
     if (currentMode === 'tableview') {
-        renderTableMode(container);
+        renderTableMode(container, filteredQuestions);
     } else if (currentMode === 'flashcards') {
-        renderFlashcardMode(container);
+        renderFlashcardMode(container); // Search disabled for flashcards
     } else {
-        currentQuestions.forEach((q, index) => {
-            container.appendChild(createQuestionCard(q, index));
+        filteredQuestions.forEach((q, index) => {
+            // Find actual index from currentQuestions for "Question X" label
+            const actualIndex = currentQuestions.indexOf(q);
+            container.appendChild(createQuestionCard(q, actualIndex));
         });
     }
 }
 
-function renderTableMode(container) {
+function renderTableMode(container, questions) {
     const tableWrap = document.createElement('div');
     tableWrap.className = 'quiz-table-container';
     
@@ -205,14 +250,17 @@ function renderTableMode(container) {
                 </tr>
             </thead>
             <tbody>
-                ${currentQuestions.map((q, i) => `
-                    <tr>
-                        <td style="font-weight: 700; color: var(--color-primary);">${i + 1}</td>
-                        <td><span class="q-type-badge">${q.question_type.replace(/_/g, ' ')}</span></td>
-                        <td style="font-weight: 500;">${q.question_text}</td>
-                        <td style="color: var(--color-success); font-weight: 600;">${q.answer_text}</td>
-                    </tr>
-                `).join('')}
+                ${questions.map((q) => {
+                    const actualIndex = currentQuestions.indexOf(q);
+                    return `
+                        <tr>
+                            <td style="font-weight: 700; color: var(--color-primary);">${actualIndex + 1}</td>
+                            <td><span class="q-type-badge">${q.question_type.replace(/_/g, ' ')}</span></td>
+                            <td style="font-weight: 500;">${q.question_text}</td>
+                            <td style="color: var(--color-success); font-weight: 600;">${q.answer_text}</td>
+                        </tr>
+                    `;
+                }).join('')}
             </tbody>
         </table>
     `;
@@ -485,11 +533,53 @@ async function doExport(format) {
 
 // Modal
 function openAddQuestionModal() {
+    setAddMethod('ai');
     document.getElementById('newQText').value = '';
     document.getElementById('newQAnswer').value = '';
     document.getElementById('newQOptionsText').value = '';
     document.getElementById('addQuestionModal').classList.add('active');
     toggleOptionInputs();
+}
+
+function setAddMethod(method) {
+    document.getElementById('addMethodInput').value = method;
+    document.getElementById('btnAddMethodAi').classList.toggle('active', method === 'ai');
+    document.getElementById('btnAddMethodManual').classList.toggle('active', method === 'manual');
+    document.getElementById('addAiSection').style.display = method === 'ai' ? 'block' : 'none';
+    document.getElementById('addManualSection').style.display = method === 'manual' ? 'block' : 'none';
+}
+
+async function generateQuestionAi() {
+    const qType = document.getElementById('aiQType').value;
+    const btn = document.getElementById('btnGenerateQ');
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i> Generating...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch(`/quizzes/${currentQuiz.id}/generate_single`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question_type: qType })
+        });
+        
+        if (!response.ok) throw new Error('Failed to generate question');
+        
+        const newQ = await response.json();
+        currentQuestions.push(newQ);
+        closeModal('addQuestionModal');
+        
+        // Refresh UI
+        document.getElementById('infoCount').textContent = currentQuestions.length;
+        renderQuestions();
+        
+    } catch (e) {
+        alert("Generation failed: " + e.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 }
 
 function closeModal(id) {

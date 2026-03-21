@@ -54,3 +54,6 @@ class QuizCheckResponse(BaseModel):
     is_correct: bool
     feedback: str
     correct_answer: str
+
+class SingleQuestionGenerateRequest(BaseModel):
+    question_type: str = "subjective" # objective, subjective, fill_in_the_blank
