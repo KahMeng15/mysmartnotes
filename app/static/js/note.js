@@ -1377,7 +1377,12 @@ async function generateFlashcards() {
 // ===== SUMMARIZATION =====
 function handleSummarizeClick() {
     if (!lectureId) return;
-    window.location.href = `/note/${lectureId}/summary`;
+    const lastVersionId = localStorage.getItem(`lastSummaryVersion_${lectureId}`);
+    if (lastVersionId) {
+        window.location.href = `/note/${lectureId}/summary/${lastVersionId}`;
+    } else {
+        window.location.href = `/note/${lectureId}/summary`;
+    }
 }
 
 let selectedExportFormat = 'pdf';
