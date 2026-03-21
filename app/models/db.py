@@ -140,6 +140,7 @@ class GeneratedDocument(Base):
     processing_time = Column(Float, nullable=True)  # Processing time in seconds (legacy)
     processing_time_ms = Column(Integer, nullable=True)  # Processing time in milliseconds
     model = Column(String(100), nullable=True)  # AI model used
+    is_user_edited = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

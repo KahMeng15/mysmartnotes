@@ -14,6 +14,9 @@ let currentProcessingTime = null;
 let currentProcessingTimeMs = null;
 let currentAIModel = null;
 let currentNoteTitleForBreadcrumb = null;
+let isUserEdited = false;
+let isEditMode = false;
+let isSourceMode = false;
 
 const MODE_META = {
     quick: { label: 'Quick', icon: 'ph-lightning' },
@@ -49,12 +52,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sidebarBackBtn = document.getElementById('sidebarBackBtn');
     if (sidebarBackBtn) sidebarBackBtn.onclick = () => window.location.href = `/note/${lectureId}`;
 
+    // Load persistent display choices
+    const savedObjectives = localStorage.getItem('summaryShowObjectives');
+    const savedQuickread = localStorage.getItem('summaryShowQuickread');
+    
+    if (savedObjectives !== null) {
+        const toggleObjectives = document.getElementById('toggleObjectives');
+        if (toggleObjectives) toggleObjectives.checked = savedObjectives === 'true';
+    }
+    
+    if (savedQuickread !== null) {
+        const toggleQuickread = document.getElementById('toggleQuickread');
+        if (toggleQuickread) toggleQuickread.checked = savedQuickread === 'true';
+    }
+
     // Load initial data
     await loadNoteMetadata();
     const summaries = await loadSummaryVersions();
     
     if (summaries && summaries.length > 0) {
-        await loadSummaryVersion(summaries[0].id);
+        // Try to load last selected version
+        const lastVersionId = localStorage.getItem(`lastSummaryVersion_${lectureId}`);
+        let versionToLoad = summaries[0];
+        
+        if (lastVersionId) {
+            const found = summaries.find(s => s.id == lastVersionId);
+            if (found) versionToLoad = found;
+        }
+        
+        await loadSummaryVersion(versionToLoad.id);
     } else {
         showNoSummaryUI();
         showSummaryOptions(false);
@@ -82,6 +108,9 @@ async function loadSummaryVersions() {
                 const isSelected = currentVersionId === s.id;
                 // If title is just "Summary - X", fallback to generic version. Otherwise use title.
                 let label = s.title.startsWith('Summary -') ? `Version ${summaries.length - idx}` : s.title;
+                if (s.is_user_edited) {
+                    label += ' (Edited)';
+                }
                 
                 const bgColor = isSelected ? 'rgba(89, 60, 143, 0.1)' : 'var(--color-white)';
                 const borderColor = isSelected ? 'var(--color-primary)' : 'var(--color-light-gray)';
@@ -116,6 +145,10 @@ async function loadSummaryVersions() {
 }
 
 async function loadSummaryVersion(docId) {
+    if (isEditMode) {
+        alert('Please save or discard your changes before switching versions.');
+        return;
+    }
     try {
         const res = await fetch(`/documents/${docId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -123,6 +156,9 @@ async function loadSummaryVersion(docId) {
         if (res.ok) {
             const data = await res.json();
             if (data.content) {
+                // Save last selected version ID
+                localStorage.setItem(`lastSummaryVersion_${lectureId}`, docId);
+                
                 summaryData = data.content;
                 quickreadData = data.quickread || null;
                 currentSummaryMode = data.mode || 'elaborate';
@@ -132,6 +168,7 @@ async function loadSummaryVersion(docId) {
                 currentProcessingTime = data.processing_time || null;
                 currentProcessingTimeMs = data.processing_time_ms || null;
                 currentAIModel = data.model || null;
+                isUserEdited = data.is_user_edited || false;
                 currentVersionId = docId;
                 displaySummary();
                 loadSummaryVersions();
@@ -189,7 +226,7 @@ function showNoSummaryUI() {
     if (!summaryText) return;
     
     // Add class for flex centering
-    if (summaryContainer) summaryContainer.classList.add('empty-state-active');
+    if (summaryContainer) summaryContainer.classList.add('flex-centering-active');
     
     // Set text container to flex as well
     summaryText.style.display = 'flex';
@@ -224,6 +261,7 @@ function showNoSummaryUI() {
     currentAIModel = null;
     currentProcessingTime = null;
     currentProcessingTimeMs = null;
+    isUserEdited = false;
     
     const quickreadContainer = document.getElementById('quickreadContainer');
     if (quickreadContainer) quickreadContainer.style.display = 'none';
@@ -303,11 +341,12 @@ function displaySummary() {
     const displayAiModePill = document.getElementById('displayAiModePill');
     const displayAiFormatPill = document.getElementById('displayAiFormatPill');
     const toggleQuickread = document.getElementById('toggleQuickread');
+    const toggleObjectives = document.getElementById('toggleObjectives');
     
     if (!summaryData) return;
     
     // Remove centering class when content exists
-    if (summaryContainer) summaryContainer.classList.remove('empty-state-active');
+    if (summaryContainer) summaryContainer.classList.remove('flex-centering-active');
 
     // Reset any empty state styles on the text container
     if (summaryText) {
@@ -332,7 +371,37 @@ function displaySummary() {
         displayAiFormatPill.innerHTML = `<i class="ph ${formatIcon}"></i> ${formatLabel}`;
     }
     
-    // Update Details Section
+    // 1. First, restore user's base preferences from localStorage
+    const savedObjectives = localStorage.getItem('summaryShowObjectives');
+    const savedQuickread = localStorage.getItem('summaryShowQuickread');
+
+    if (toggleObjectives && savedObjectives !== null) {
+        toggleObjectives.checked = savedObjectives === 'true';
+    }
+    if (toggleQuickread && savedQuickread !== null) {
+        toggleQuickread.checked = savedQuickread === 'true';
+    }
+
+    // 2. Then, handle specific version overrides (Whole note processing disables Quickread)
+    if (toggleQuickread) {
+        const label = toggleQuickread.closest('.sidebar-option-label');
+        if (currentProcessingMethod === 'whole') {
+            toggleQuickread.checked = false; // Forced off for UI
+            toggleQuickread.disabled = true;
+            if (label) {
+                label.classList.add('disabled');
+                label.title = 'Quickread only available for section-by-section processing';
+            }
+        } else {
+            toggleQuickread.disabled = false;
+            if (label) {
+                label.classList.remove('disabled');
+                label.title = '';
+            }
+        }
+    }
+
+    // 3. Update details and render markdown
     updateDetailsSection();
     
     try {
@@ -341,7 +410,7 @@ function displaySummary() {
         summaryText.innerHTML = summaryData.replace(/\n/g, '<br>');
     }
     
-    // Show Quickread at the top if it exists (section-by-section processing)
+    // Show Quickread at the top if it exists
     if (currentProcessingMethod === 'section' && quickreadData) {
         if (quickreadContainer) {
             quickreadContainer.style.display = 'block';
@@ -358,48 +427,19 @@ function displaySummary() {
         quickreadContainer.style.display = 'none';
     }
     
-    // Apply current visibility settings to hide sections from the raw content
+    // 4. Finally, apply visibility settings to hide sections from the raw content
     hideRedundantSections();
-
-    // Disable Quickread toggle if processing method is 'whole' (it's only for sections)
-    if (toggleQuickread) {
-        const label = toggleQuickread.closest('.sidebar-option-label');
-        if (currentProcessingMethod === 'whole') {
-            toggleQuickread.checked = false;
-            toggleQuickread.disabled = true;
-            if (label) {
-                label.classList.add('disabled');
-                label.title = 'Quickread only available for section-by-section processing';
-            }
-            if (quickreadContainer) quickreadContainer.style.display = 'none';
-        } else {
-            toggleQuickread.disabled = false;
-            if (label) {
-                label.classList.remove('disabled');
-                label.title = '';
-            }
-        }
-    }
 }
 
 function formatProcessingTime(ms) {
     if (ms === null || ms === undefined || ms === 0) return '—';
-    if (ms < 1000) {
-        return `${ms}ms`;
-    } else {
-        const totalSecs = Math.floor(ms / 1000);
-        if (totalSecs > 3600) {
-            return 'N/A';
-        } else {
-            return totalSecs > 60 ?
-                `${Math.floor(totalSecs / 60)}m ${totalSecs % 60}s` : `${totalSecs}s`;
-        }
-    }
+    return `${ms}ms`;
 }
 
 function updateDetailsSection() {
     const detailsProcessingMode = document.getElementById('detailsProcessingMode');
     const detailsModel = document.getElementById('detailsModel');
+    const detailsEdited = document.getElementById('detailsEdited');
     const detailsDividerItem = document.getElementById('detailsDividerItem');
     const detailsDivider = document.getElementById('detailsDivider');
     const detailsFormat = document.getElementById('detailsFormat');
@@ -412,6 +452,12 @@ function updateDetailsSection() {
 
     if (detailsModel) {
         detailsModel.textContent = currentAIModel || '—';
+    }
+
+    if (detailsEdited) {
+        detailsEdited.textContent = isUserEdited ? 'Yes' : 'No';
+        detailsEdited.style.color = isUserEdited ? 'var(--color-primary)' : 'inherit';
+        detailsEdited.style.fontWeight = isUserEdited ? '600' : 'normal';
     }
     
     // Show divider info only for section-by-section processing
@@ -467,7 +513,7 @@ function onSummaryMethodChange() {
     document.getElementById('splitLevelContainer').style.display = method === 'section' ? 'block' : 'none';
 }
 
-function toggleElement(elementId, show) {
+function toggleElement(elementId, show, saveToStorage = true) {
     // Safety check for Quickread
     if (elementId === 'quickreadSection' && currentProcessingMethod === 'whole' && show) {
         const toggleQuickread = document.getElementById('toggleQuickread');
@@ -482,6 +528,7 @@ function toggleElement(elementId, show) {
     const headers = summaryText.querySelectorAll('h2, h3, h4, h5');
     
     if (elementId === 'objectivesSection') {
+        if (saveToStorage) localStorage.setItem('summaryShowObjectives', show);
         // Hide/show "Objectives" sections
         const objectivePatterns = [
             /^(Learning\s+Objectives?|Module\s+Objectives?|Objectives?)/i
@@ -503,6 +550,7 @@ function toggleElement(elementId, show) {
             }
         });
     } else if (elementId === 'quickreadSection') {
+        if (saveToStorage) localStorage.setItem('summaryShowQuickread', show);
         // Hide/show quickread container
         const quickreadContainer = document.getElementById('quickreadContainer');
         if (quickreadContainer) {
@@ -516,11 +564,11 @@ function hideRedundantSections() {
     const toggleObjectives = document.getElementById('toggleObjectives');
     const toggleQuickread = document.getElementById('toggleQuickread');
     
-    if (toggleObjectives && !toggleObjectives.checked) {
-        toggleElement('objectivesSection', false);
+    if (toggleObjectives) {
+        toggleElement('objectivesSection', toggleObjectives.checked, false);
     }
-    if (toggleQuickread && !toggleQuickread.checked) {
-        toggleElement('quickreadSection', false);
+    if (toggleQuickread) {
+        toggleElement('quickreadSection', toggleQuickread.checked, false);
     }
 }
 
@@ -584,6 +632,7 @@ async function generateSummary() {
             currentProcessingTime = data.processing_time || null;
             currentProcessingTimeMs = data.processing_time_ms || null;
             currentAIModel = data.model || null;
+            isUserEdited = data.is_user_edited || false;
             currentVersionId = data.id;
             
             setTimeout(() => {
@@ -603,3 +652,216 @@ async function generateSummary() {
         alert('Error: ' + e.message);
     }
 }
+
+// --- Editor Logic (Mirrored from note.js) ---
+
+function toggleEdit() {
+    if (!currentVersionId) return;
+    
+    const viewContainer = document.getElementById('viewContainer');
+    const editorContainer = document.getElementById('editorContainer');
+    const editBtn = document.getElementById('editBtn');
+    const wysiwygArea = document.getElementById('wysiwygArea');
+    const sourceTextarea = document.getElementById('sourceTextarea');
+    
+    isEditMode = !isEditMode;
+    
+    if (isEditMode) {
+        // Switch to Edit
+        const summaryContainer = document.getElementById('summaryContainer');
+        if (summaryContainer) summaryContainer.classList.add('flex-centering-active');
+        
+        if (viewContainer) viewContainer.style.display = 'none';
+        if (editorContainer) {
+            editorContainer.style.display = 'flex';
+            editorContainer.classList.add('active');
+        }
+        if (editBtn) {
+            editBtn.classList.add('active');
+            editBtn.innerHTML = '<i class="ph ph-eye"></i> <span>View</span>';
+        }
+        
+        // Load content into editor
+        if (wysiwygArea) wysiwygArea.innerHTML = marked.parse(summaryData || '');
+        if (sourceTextarea) sourceTextarea.value = summaryData || '';
+        
+        isSourceMode = false;
+        if (sourceTextarea) sourceTextarea.style.display = 'none';
+        if (wysiwygArea) wysiwygArea.style.display = 'block';
+    } else {
+        // Switch back to view
+        cancelEdit();
+    }
+}
+
+function cancelEdit() {
+    isEditMode = false;
+    const viewContainer = document.getElementById('viewContainer');
+    const editorContainer = document.getElementById('editorContainer');
+    const editBtn = document.getElementById('editBtn');
+    const summaryContainer = document.getElementById('summaryContainer');
+    
+    if (summaryContainer) summaryContainer.classList.remove('flex-centering-active');
+    
+    if (viewContainer) viewContainer.style.display = 'block';
+    if (editorContainer) {
+        editorContainer.style.display = 'none';
+        editorContainer.classList.remove('active');
+    }
+    if (editBtn) {
+        editBtn.classList.remove('active');
+        editBtn.innerHTML = '<i class="ph ph-pencil-simple"></i> <span>Edit</span>';
+    }
+}
+
+function showSaveModal() {
+    document.getElementById('saveConfirmModal').classList.add('active');
+}
+
+function closeSaveModal() {
+    document.getElementById('saveConfirmModal').classList.remove('active');
+}
+
+function confirmSave() {
+    closeSaveModal();
+    saveContent();
+}
+
+async function saveContent() {
+    const wysiwygArea = document.getElementById('wysiwygArea');
+    const sourceTextarea = document.getElementById('sourceTextarea');
+    
+    let newContent = isSourceMode ? sourceTextarea.value : htmlToMarkdown(wysiwygArea.innerHTML);
+    
+    try {
+        const res = await fetch(`/documents/${currentVersionId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ content: newContent })
+        });
+        
+        if (res.ok) {
+            const data = await res.json();
+            summaryData = data.content;
+            isUserEdited = data.is_user_edited;
+            
+            // UI Feedback
+            cancelEdit();
+            displaySummary();
+            loadSummaryVersions(); // Refresh list to show potential title changes
+        } else {
+            alert('Failed to save summary changes');
+        }
+    } catch (e) {
+        console.error('Error saving summary:', e);
+        alert('Error saving: ' + e.message);
+    }
+}
+
+function showDiscardModal() {
+    document.getElementById('discardConfirmModal').classList.add('active');
+}
+
+function closeDiscardModal() {
+    document.getElementById('discardConfirmModal').classList.remove('active');
+}
+
+function confirmDiscard() {
+    closeDiscardModal();
+    cancelEdit();
+}
+
+function toggleSource() {
+    const wysiwygArea = document.getElementById('wysiwygArea');
+    const sourceTextarea = document.getElementById('sourceTextarea');
+    const sourceToggle = document.getElementById('sourceToggle');
+    
+    isSourceMode = !isSourceMode;
+    
+    if (isSourceMode) {
+        sourceTextarea.value = htmlToMarkdown(wysiwygArea.innerHTML);
+        wysiwygArea.style.display = 'none';
+        sourceTextarea.style.display = 'block';
+        sourceToggle.classList.add('active');
+    } else {
+        wysiwygArea.innerHTML = marked.parse(sourceTextarea.value);
+        sourceTextarea.style.display = 'none';
+        wysiwygArea.style.display = 'block';
+        sourceToggle.classList.remove('active');
+    }
+}
+
+function execCmd(command, value = null) {
+    document.execCommand(command, false, value);
+    const area = document.getElementById('wysiwygArea');
+    if (area) area.focus();
+}
+
+function insertTableWysiwyg() {
+    const area = document.getElementById('wysiwygArea');
+    if (area) area.focus();
+    const html = '<table><thead><tr><th>Header 1</th><th>Header 2</th><th>Header 3</th></tr></thead><tbody><tr><td>Cell 1</td><td>Cell 2</td><td>Cell 3</td></tr><tr><td>Cell 4</td><td>Cell 5</td><td>Cell 6</td></tr></tbody></table><p><br></p>';
+    document.execCommand('insertHTML', false, html);
+}
+
+function insertCodeBlock() {
+    const area = document.getElementById('wysiwygArea');
+    if (area) area.focus();
+    const html = '<pre><code>// your code here</code></pre><p><br></p>';
+    document.execCommand('insertHTML', false, html);
+}
+
+// Simple HTML to Markdown converter for the editor
+function htmlToMarkdown(html) {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    let markdown = html
+        .replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n')
+        .replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n')
+        .replace(/<h3>(.*?)<\/h3>/gi, '### $1\n\n')
+        .replace(/<b>(.*?)<\/b>/gi, '**$1**')
+        .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
+        .replace(/<i>(.*?)<\/i>/gi, '*$1*')
+        .replace(/<em>(.*?)<\/em>/gi, '*$1*')
+        .replace(/<u>(.*?)<\/u>/gi, '<ins>$1</ins>')
+        .replace(/<s>(.*?)<\/s>/gi, '~~$1~~')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<p>(.*?)<\/p>/gi, '$1\n\n')
+        .replace(/<ul>([\s\S]*?)<\/ul>/gi, (match, p1) => p1.replace(/<li>(.*?)<\/li>/gi, '* $1\n') + '\n')
+        .replace(/<ol>([\s\S]*?)<\/ol>/gi, (match, p1) => {
+            let i = 1;
+            return p1.replace(/<li>(.*?)<\/li>/gi, () => `${i++}. $1\n`) + '\n';
+        });
+        
+    // Basic table conversion
+    const tables = temp.querySelectorAll('table');
+    tables.forEach(table => {
+        let tableMd = '\n';
+        const rows = table.querySelectorAll('tr');
+        rows.forEach((row, idx) => {
+            const cols = row.querySelectorAll('td, th');
+            tableMd += '| ' + Array.from(cols).map(c => c.innerText.trim()).join(' | ') + ' |\n';
+            if (idx === 0) {
+                tableMd += '| ' + Array.from(cols).map(() => '---').join(' | ') + ' |\n';
+            }
+        });
+        markdown += tableMd + '\n';
+    });
+
+    return markdown.trim();
+}
+
+function toggleBlockquote() { execCmd('formatBlock', 'blockquote'); }
+
+// Empty stubs for table operations to prevent errors if buttons are clicked
+// Real table editing logic is complex and usually requires a dedicated library or more code
+function insertHtmlRow(pos) { alert('Row insertion is limited in summary editor'); }
+function insertHtmlCol(pos) { alert('Column insertion is limited in summary editor'); }
+function deleteHtmlRow() { alert('Row deletion is limited in summary editor'); }
+function deleteHtmlCol() { alert('Column deletion is limited in summary editor'); }
+function deleteHtmlTable() { alert('Table deletion is limited in summary editor'); }
+function mergeHtmlCells() { alert('Cell merging is limited in summary editor'); }

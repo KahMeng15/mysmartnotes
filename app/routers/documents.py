@@ -69,6 +69,7 @@ class SummaryResponse(BaseModel):
     processing_time: Optional[float] = None
     processing_time_ms: Optional[int] = None
     model: Optional[str] = None
+    is_user_edited: bool = False
     id: Optional[int] = None
 
 
@@ -105,6 +106,7 @@ class DocumentResponse(BaseModel):
     processing_time: Optional[float] = None  # Processing time in seconds
     processing_time_ms: Optional[int] = None  # Processing time in milliseconds
     model: Optional[str] = None  # AI model used
+    is_user_edited: bool = False  # Whether the user has edited this document
 
 @router.post("/quiz", response_model=QuizResponse)
 async def generate_quiz(
@@ -272,6 +274,7 @@ async def generate_summary_endpoint(
                 processing_time=existing_summary.processing_time,
                 processing_time_ms=existing_summary.processing_time_ms,
                 model=existing_summary.model,
+                is_user_edited=existing_summary.is_user_edited or False,
                 id=existing_summary.id
             )
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
@@ -371,7 +374,7 @@ async def generate_summary_endpoint(
             split_level=request.split_level if request.processing_method == "section" else None,
             processing_time=processing_time,
             processing_time_ms=processing_time_ms,
-            model=ai_client.ai_model_name
+            model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()
         )
         db.add(doc)
         db.commit()
@@ -388,7 +391,8 @@ async def generate_summary_endpoint(
             split_level=request.split_level if request.processing_method == "section" else None,
             processing_time=processing_time,
             processing_time_ms=processing_time_ms,
-            model=ai_client.ai_model_name,
+            model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize(),
+            is_user_edited=False,
             id=doc.id
         )
     except Exception as e:
@@ -455,6 +459,59 @@ async def generate_cheatsheet(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating cheatsheet: {str(e)}"
         )
+
+
+class UpdateDocumentRequest(BaseModel):
+    content: str
+    title: Optional[str] = None
+
+
+@router.put("/{document_id}", response_model=DocumentResponse)
+async def update_generated_document(
+    document_id: int,
+    request: UpdateDocumentRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a generated document (e.g. summary edit)"""
+    doc = db.query(GeneratedDocument).filter(GeneratedDocument.id == document_id).first()
+    
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        
+    # Verify ownership through lecture
+    lecture = db.query(Lecture).filter(Lecture.id == doc.lecture_id, Lecture.user_id == current_user.id).first()
+    if not lecture:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this document")
+        
+    doc.content = request.content
+    if request.title:
+        doc.title = request.title
+    
+    # Mark as user edited
+    doc.is_user_edited = True
+    
+    db.commit()
+    db.refresh(doc)
+    
+    return DocumentResponse(
+        id=doc.id,
+        lecture_id=doc.lecture_id,
+        title=doc.title,
+        document_type=doc.document_type,
+        file_path=doc.file_path,
+        created_at=format_timestamp(doc.created_at),
+        content=doc.content,
+        quickread=doc.quickread,
+        mode=doc.mode,
+        output_format=doc.output_format,
+        processing_method=doc.processing_method,
+        split_level=doc.split_level,
+        processing_time=doc.processing_time,
+        processing_time_ms=doc.processing_time_ms,
+        model=doc.model,
+        is_user_edited=doc.is_user_edited
+    )
 
 
 @router.get("", response_model=List[DocumentResponse])
