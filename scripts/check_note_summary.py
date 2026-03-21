@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.utils.db import SessionLocal
-from app.models.db import Lecture, GeneratedDocument
+from app.models.db import Lecture, Summary
 
 def check_note_summary(lecture_id):
     db = SessionLocal()
@@ -26,10 +26,10 @@ def check_note_summary(lecture_id):
     print(f"Content Preview:\n{(lecture.extracted_text or '')[:500]}...\n")
     
     # Get summaries
-    summaries = db.query(GeneratedDocument).filter(
-        GeneratedDocument.lecture_id == lecture_id,
-        GeneratedDocument.document_type == "summary"
-    ).order_by(GeneratedDocument.created_at.desc()).all()
+    summaries = db.query(Summary).filter(
+        Summary.lecture_id == lecture_id,
+        Summary.summary_type == "summary"
+    ).order_by(Summary.created_at.desc()).all()
     
     if not summaries:
         print("No summaries found\n")

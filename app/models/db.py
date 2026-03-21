@@ -100,7 +100,7 @@ class Lecture(Base):
     # Relationships
     user = relationship("User")
     subject = relationship("Subject", back_populates="lectures")
-    documents = relationship("GeneratedDocument", back_populates="lecture", cascade="all, delete-orphan")
+    summaries = relationship("Summary", back_populates="lecture", cascade="all, delete-orphan")
     flashcards = relationship("Flashcard", back_populates="lecture", cascade="all, delete-orphan")
     embeddings = relationship("LectureEmbedding", back_populates="lecture", cascade="all, delete-orphan")
 
@@ -122,13 +122,13 @@ class ExportTemplate(Base):
     user = relationship("User")
 
 
-class GeneratedDocument(Base):
-    """Generated cheat sheets, quizzes, etc."""
-    __tablename__ = "generated_documents"
+class Summary(Base):
+    """Generated summaries, cheat sheets, etc."""
+    __tablename__ = "summaries"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
-    document_type = Column(String(50))  # cheatsheet, quiz, summary
+    summary_type = Column(String(50))  # cheatsheet, quiz, summary
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
     content = Column(Text)
@@ -144,7 +144,7 @@ class GeneratedDocument(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    lecture = relationship("Lecture", back_populates="documents")
+    lecture = relationship("Lecture", back_populates="summaries")
 
 
 class LectureEmbedding(Base):

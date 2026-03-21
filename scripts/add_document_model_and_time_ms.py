@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Migration script to add model and processing_time_ms columns to generated_documents table
+Migration script to add model and processing_time_ms columns to summaries table
 """
 import sys
 import sqlite3
@@ -22,7 +22,7 @@ def migrate():
         cursor = conn.cursor()
         
         # Check which columns exist
-        cursor.execute("PRAGMA table_info(generated_documents)")
+        cursor.execute("PRAGMA table_info(summaries)")
         columns = {col[1]: col for col in cursor.fetchall()}
         
         columns_to_add = {
@@ -37,7 +37,7 @@ def migrate():
             else:
                 print(f"Adding {col_name} column...")
                 cursor.execute(f"""
-                    ALTER TABLE generated_documents 
+                    ALTER TABLE summaries 
                     ADD COLUMN {col_name} {col_type} NULL
                 """)
                 added.append(col_name)
@@ -50,7 +50,7 @@ def migrate():
             if 'processing_time' in columns and 'processing_time_ms' in columns_to_add:
                 print("Migrating data from processing_time to processing_time_ms...")
                 cursor.execute("""
-                    UPDATE generated_documents 
+                    UPDATE summaries 
                     SET processing_time_ms = CAST(processing_time * 1000 AS INTEGER)
                     WHERE processing_time IS NOT NULL AND processing_time_ms IS NULL
                 """)

@@ -179,13 +179,13 @@ class Flashcard(FlashcardBase):
         from_attributes = True
 
 
-# ========== Document Schemas ==========
-class DocumentBase(BaseModel):
+# ========== Summary Schemas ==========
+class SummaryBase(BaseModel):
     title: str
-    document_type: str
+    summary_type: str
 
 
-class GeneratedDocument(DocumentBase):
+class Summary(SummaryBase):
     id: int
     lecture_id: str
     file_path: str

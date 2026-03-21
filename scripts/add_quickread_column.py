@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Migration script to add quickread column to generated_documents table
+Migration script to add quickread column to summaries table
 Run this once to update the database schema
 """
 import sys
@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.config import get_settings
 
 def add_quickread_column():
-    """Add quickread column to generated_documents table if it doesn't exist"""
+    """Add quickread column to summaries table if it doesn't exist"""
     
     settings = get_settings()
     # Extract database path from SQLAlchemy URL
@@ -26,7 +26,7 @@ def add_quickread_column():
         cursor = conn.cursor()
         
         # Check if column exists
-        cursor.execute("PRAGMA table_info(generated_documents)")
+        cursor.execute("PRAGMA table_info(summaries)")
         columns = [col[1] for col in cursor.fetchall()]
         
         if "quickread" in columns:
@@ -36,7 +36,7 @@ def add_quickread_column():
         # Add the column
         print("Adding quickread column...")
         cursor.execute("""
-            ALTER TABLE generated_documents 
+            ALTER TABLE summaries 
             ADD COLUMN quickread TEXT NULL
         """)
         
@@ -44,7 +44,7 @@ def add_quickread_column():
         print("✓ quickread column added successfully")
         
         # Verify it was added
-        cursor.execute("PRAGMA table_info(generated_documents)")
+        cursor.execute("PRAGMA table_info(summaries)")
         columns = [col[1] for col in cursor.fetchall()]
         if "quickread" in columns:
             print("✓ Verification successful: quickread column is now in the table")

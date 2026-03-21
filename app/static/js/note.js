@@ -1354,7 +1354,7 @@ function goToChat() {
 async function generateFlashcards() {
     if (!lectureId) return;
     try {
-        const response = await fetch(`/documents/flashcards/${lectureId}`, {
+        const response = await fetch(`/summaries/flashcards/${lectureId}`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` }
         });

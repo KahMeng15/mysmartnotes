@@ -100,12 +100,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadSummaryVersions() {
     try {
-        const res = await fetch(`/documents?lecture_id=${lectureId}`, {
+        const res = await fetch(`/summaries?lecture_id=${lectureId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
             const docs = await res.json();
-            const summaries = docs.filter(d => d.document_type === 'summary').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const summaries = docs.filter(d => d.summary_type === 'summary').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             const list = document.getElementById('summaryList');
             if (!list) return summaries;
             
@@ -161,7 +161,7 @@ async function loadSummaryVersion(docId) {
         return;
     }
     try {
-        const res = await fetch(`/documents/${docId}`, {
+        const res = await fetch(`/summaries/${docId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
@@ -208,7 +208,7 @@ async function confirmDeleteVersion() {
     closeDeleteConfirmModal();
     
     try {
-        const res = await fetch(`/documents/${docIdToDelete}`, {
+        const res = await fetch(`/summaries/${docIdToDelete}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -651,7 +651,7 @@ async function generateSummary() {
     }, 1500);
 
     try {
-        const res = await fetch('/documents/summary', {
+        const res = await fetch('/summaries/summary', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -810,7 +810,7 @@ async function saveContent() {
     let newQuickread = quickreadContent ? htmlToMarkdown(quickreadContent.innerHTML) : null;
     
     try {
-        const res = await fetch(`/documents/${currentVersionId}`, {
+        const res = await fetch(`/summaries/${currentVersionId}`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -1089,7 +1089,7 @@ async function doExport() {
         const payload = { format: format };
         if (templateId) payload.template_id = templateId;
 
-        const response = await fetch(`/documents/${currentVersionId}/export`, {
+        const response = await fetch(`/summaries/${currentVersionId}/export`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,

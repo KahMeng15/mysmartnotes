@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Migration script to add summary metadata columns to generated_documents table
+Migration script to add summary metadata columns to summaries table
 Run this once to update the database schema
 """
 import sys
@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.config import get_settings
 
 def add_summary_metadata_columns():
-    """Add mode, output_format, and processing_method columns to generated_documents table if they don't exist"""
+    """Add mode, output_format, and processing_method columns to summaries table if they don't exist"""
     
     settings = get_settings()
     # Extract database path from SQLAlchemy URL
@@ -26,7 +26,7 @@ def add_summary_metadata_columns():
         cursor = conn.cursor()
         
         # Check which columns exist
-        cursor.execute("PRAGMA table_info(generated_documents)")
+        cursor.execute("PRAGMA table_info(summaries)")
         columns = {col[1]: col for col in cursor.fetchall()}
         
         columns_to_add = {
@@ -42,7 +42,7 @@ def add_summary_metadata_columns():
             else:
                 print(f"Adding {col_name} column...")
                 cursor.execute(f"""
-                    ALTER TABLE generated_documents 
+                    ALTER TABLE summaries 
                     ADD COLUMN {col_name} {col_type} NULL
                 """)
                 added.append(col_name)
@@ -54,7 +54,7 @@ def add_summary_metadata_columns():
             print("✓ All columns already exist")
         
         # Verify all columns were added
-        cursor.execute("PRAGMA table_info(generated_documents)")
+        cursor.execute("PRAGMA table_info(summaries)")
         all_columns = {col[1] for col in cursor.fetchall()}
         
         missing = set(columns_to_add.keys()) - all_columns

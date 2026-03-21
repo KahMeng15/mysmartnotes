@@ -6,13 +6,13 @@ from typing import List, Optional
 from datetime import datetime
 import logging
 
-from app.models.db import User, Lecture, GeneratedDocument, Flashcard
+from app.models.db import User, Lecture, Summary, Flashcard
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.processing.ai_client import AIClient
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(prefix="/summaries", tags=["summaries"])
 
 
 def format_timestamp(dt: Optional[datetime]) -> str:
@@ -90,11 +90,11 @@ class CheatsheetResponse(BaseModel):
     content: str
 
 
-class DocumentResponse(BaseModel):
+class SummaryItemResponse(BaseModel):
     id: int
     lecture_id: str
     title: str
-    document_type: str
+    summary_type: str
     file_path: str
     created_at: str
     content: Optional[str] = None
@@ -106,7 +106,7 @@ class DocumentResponse(BaseModel):
     processing_time: Optional[float] = None  # Processing time in seconds
     processing_time_ms: Optional[int] = None  # Processing time in milliseconds
     model: Optional[str] = None  # AI model used
-    is_user_edited: bool = False  # Whether the user has edited this document
+    is_user_edited: bool = False  # Whether the user has edited this summary
 
 @router.post("/quiz", response_model=QuizResponse)
 async def generate_quiz(
@@ -254,11 +254,11 @@ async def generate_summary_endpoint(
 
     # Check for existing summary (unless forced)
     if not request.force_regenerate:
-        existing_summary = db.query(GeneratedDocument).filter(
-            GeneratedDocument.lecture_id == request.lecture_id,
-            GeneratedDocument.document_type == "summary",
-            GeneratedDocument.processing_method == request.processing_method
-        ).order_by(GeneratedDocument.created_at.desc()).first()
+        existing_summary = db.query(Summary).filter(
+            Summary.lecture_id == request.lecture_id,
+            Summary.summary_type == "summary",
+            Summary.processing_method == request.processing_method
+        ).order_by(Summary.created_at.desc()).first()
 
         if existing_summary:
             return SummaryResponse(
@@ -360,11 +360,11 @@ async def generate_summary_endpoint(
         processing_time = end_time - start_time
         processing_time_ms = int(processing_time * 1000)
 
-        # Save generated document
-        doc = GeneratedDocument(
+        # Save generated summary
+        doc = Summary(
             lecture_id=request.lecture_id,
             title=f"{request.mode.capitalize()} in {request.output_format.replace('_', ' ')}",
-            document_type="summary",
+            summary_type="summary",
             file_path=f"summary_{lecture.id}.md",
             content=summary_content,
             quickread=quickread_content,
@@ -439,11 +439,11 @@ async def generate_cheatsheet(
             output_format=request.format
         )
         
-        # Save generated document
-        doc = GeneratedDocument(
+        # Save generated summary
+        doc = Summary(
             lecture_id=request.lecture_id,
             title=f"Cheatsheet - {lecture.title}",
-            document_type="cheatsheet",
+            summary_type="cheatsheet",
             file_path=f"cheatsheet_{lecture.id}.md"
         )
         db.add(doc)
@@ -461,21 +461,21 @@ async def generate_cheatsheet(
         )
 
 
-class UpdateDocumentRequest(BaseModel):
+class UpdateSummaryRequest(BaseModel):
     content: str
     title: Optional[str] = None
     quickread: Optional[str] = None
 
 
-@router.put("/{document_id}", response_model=DocumentResponse)
-async def update_generated_document(
-    document_id: int,
-    request: UpdateDocumentRequest,
+@router.put("/{summary_id}", response_model=SummaryItemResponse)
+async def update_generated_summary(
+    summary_id: int,
+    request: UpdateSummaryRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update a generated document (e.g. summary edit)"""
-    doc = db.query(GeneratedDocument).filter(GeneratedDocument.id == document_id).first()
+    """Update a generated summary (e.g. summary edit)"""
+    doc = db.query(Summary).filter(Summary.id == summary_id).first()
     
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
@@ -483,7 +483,7 @@ async def update_generated_document(
     # Verify ownership through lecture
     lecture = db.query(Lecture).filter(Lecture.id == doc.lecture_id, Lecture.user_id == current_user.id).first()
     if not lecture:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this document")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this summary")
         
     doc.content = request.content
     if request.title:
@@ -497,11 +497,11 @@ async def update_generated_document(
     db.commit()
     db.refresh(doc)
     
-    return DocumentResponse(
+    return SummaryItemResponse(
         id=doc.id,
         lecture_id=doc.lecture_id,
         title=doc.title,
-        document_type=doc.document_type,
+        summary_type=doc.summary_type,
         file_path=doc.file_path,
         created_at=format_timestamp(doc.created_at),
         content=doc.content,
@@ -517,110 +517,110 @@ async def update_generated_document(
     )
 
 
-@router.get("", response_model=List[DocumentResponse])
-async def list_documents(
+@router.get("", response_model=List[SummaryItemResponse])
+async def list_summaries(
     lecture_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """List all generated documents for current user"""
-    query = db.query(GeneratedDocument).join(Lecture).filter(
+    """List all generated summaries for current user"""
+    query = db.query(Summary).join(Lecture).filter(
         Lecture.user_id == current_user.id
     )
     
     if lecture_id:
-        query = query.filter(GeneratedDocument.lecture_id == lecture_id)
+        query = query.filter(Summary.lecture_id == lecture_id)
     
-    documents = query.all()
+    summaries = query.all()
     
     return [
-        DocumentResponse(
+        SummaryItemResponse(
             id=d.id,
             lecture_id=d.lecture_id,
             title=d.title,
-            document_type=d.document_type,
+            summary_type=d.summary_type,
             file_path=d.file_path,
             created_at=format_timestamp(d.created_at)
         )
-        for d in documents
+        for d in summaries
     ]
 
 
-@router.get("/{document_id}", response_model=DocumentResponse)
-async def get_document(
-    document_id: int,
+@router.get("/{summary_id}", response_model=SummaryItemResponse)
+async def get_summary(
+    summary_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get a specific generated document"""
-    document = db.query(GeneratedDocument).join(Lecture).filter(
-        GeneratedDocument.id == document_id,
+    """Get a specific generated summary"""
+    summary = db.query(Summary).join(Lecture).filter(
+        Summary.id == summary_id,
         Lecture.user_id == current_user.id
     ).first()
     
-    if not document:
+    if not summary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found"
         )
     
-    return DocumentResponse(
-        id=document.id,
-        lecture_id=document.lecture_id,
-        title=document.title,
-        document_type=document.document_type,
-        file_path=document.file_path,
-        created_at=format_timestamp(document.created_at),
-        content=document.content,
-        quickread=document.quickread,
-        mode=document.mode,
-        output_format=document.output_format,
-        processing_method=document.processing_method,
-        split_level=document.split_level,
-        processing_time=document.processing_time
+    return SummaryItemResponse(
+        id=summary.id,
+        lecture_id=summary.lecture_id,
+        title=summary.title,
+        summary_type=summary.summary_type,
+        file_path=summary.file_path,
+        created_at=format_timestamp(summary.created_at),
+        content=summary.content,
+        quickread=summary.quickread,
+        mode=summary.mode,
+        output_format=summary.output_format,
+        processing_method=summary.processing_method,
+        split_level=summary.split_level,
+        processing_time=summary.processing_time
     )
 
 
-@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_document(
-    document_id: int,
+@router.delete("/{summary_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_summary(
+    summary_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a generated document"""
-    document = db.query(GeneratedDocument).join(Lecture).filter(
-        GeneratedDocument.id == document_id,
+    """Delete a generated summary"""
+    summary = db.query(Summary).join(Lecture).filter(
+        Summary.id == summary_id,
         Lecture.user_id == current_user.id
     ).first()
     
-    if not document:
+    if not summary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found"
         )
     
-    db.delete(document)
+    db.delete(summary)
     db.commit()
 
 
-@router.post("/{document_id}/export", response_model=dict)
-async def export_document(
-    document_id: int,
+@router.post("/{summary_id}/export", response_model=dict)
+async def export_summary(
+    summary_id: int,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Export a specific generated document as PDF or DOCX"""
+    """Export a specific generated summary as PDF or DOCX"""
     import os
     import uuid
     from datetime import datetime
     from pathlib import Path
-    from app.models.db import GeneratedDocument, Lecture, ExportTemplate
+    from app.models.db import Summary, Lecture, ExportTemplate
     from app.processing.text_processor import ContentSegment, ContentType
     
     # 1. Verify existence and ownership
-    doc = db.query(GeneratedDocument).join(Lecture).filter(
-        GeneratedDocument.id == document_id,
+    doc = db.query(Summary).join(Lecture).filter(
+        Summary.id == summary_id,
         Lecture.user_id == current_user.id
     ).first()
     
@@ -659,7 +659,7 @@ async def export_document(
         metadata={"title": doc.title or "Summary"}
     ))
     
-    # 4. Generate the document
+    # 4. Generate the summary
     generated_dir = "generated"
     output_dir = os.path.join(generated_dir, str(doc.lecture_id))
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -693,12 +693,12 @@ async def export_document(
             import shutil
             shutil.move(temp_path, output_path)
             
-        # 5. Store export in GeneratedDocument as a permanent export record
-        new_export = GeneratedDocument(
+        # 5. Store export in Summary as a permanent export record
+        new_export = Summary(
             lecture_id=doc.lecture_id,
             title=f"Export: {doc.title or 'Summary'} ({export_format.upper()})",
             file_path=output_path,
-            document_type=export_format,
+            summary_type=export_format,
             is_user_edited=False
         )
         db.add(new_export)
@@ -707,32 +707,32 @@ async def export_document(
         return {
             "success": True,
             "message": f"{export_format.upper()} generated successfully",
-            "download_url": f"/documents/{document_id}/download-export?export_id={new_export.id}",
+            "download_url": f"/summaries/{summary_id}/download-export?export_id={new_export.id}",
             "filename": filename
         }
     except Exception as e:
         import logging
         logger = logging.getLogger("app")
-        logger.error(f"Error exporting document {document_id}: {e}", exc_info=True)
+        logger.error(f"Error exporting summary {summary_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error exporting: {str(e)}")
 
 
-@router.get("/{document_id}/download-export")
-async def download_document_export(
-    document_id: int,
+@router.get("/{summary_id}/download-export")
+async def download_summary_export(
+    summary_id: int,
     export_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Download a previously generated document export"""
+    """Download a previously generated summary export"""
     import os
     from fastapi.responses import FileResponse
-    from app.models.db import GeneratedDocument, Lecture
+    from app.models.db import Summary, Lecture
     
     try:
-        # Verify export document exists and user owns the parent lecture
-        export_doc = db.query(GeneratedDocument).join(Lecture).filter(
-            GeneratedDocument.id == export_id,
+        # Verify export summary exists and user owns the parent lecture
+        export_doc = db.query(Summary).join(Lecture).filter(
+            Summary.id == export_id,
             Lecture.user_id == current_user.id
         ).first()
         
@@ -745,10 +745,10 @@ async def download_document_export(
             raise HTTPException(status_code=404, detail="Exported file not found on server")
             
         # Get original doc for title
-        original_doc = db.query(GeneratedDocument).filter(GeneratedDocument.id == document_id).first()
+        original_doc = db.query(Summary).filter(Summary.id == summary_id).first()
         safe_title = "".join(c for c in ((original_doc.title if original_doc else "Summary") or "Summary") if c.isalnum() or c in (' ', '-', '_')).strip()
         
-        ext = export_doc.document_type
+        ext = export_doc.summary_type
         mime_types = {
             "pdf": "application/pdf",
             "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

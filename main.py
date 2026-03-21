@@ -17,7 +17,7 @@ import uvicorn
 
 from app.config import get_settings
 from app.utils.db import init_db
-from app.routers import auth, subjects, lectures, chat, documents, flashcards, study_sessions, search, analytics, processing, groups, snapshots, templates, admin
+from app.routers import auth, subjects, lectures, chat, summaries, flashcards, study_sessions, search, analytics, processing, groups, snapshots, templates, admin
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -185,7 +185,7 @@ app.include_router(auth.router)
 app.include_router(subjects.router)
 app.include_router(lectures.router)
 app.include_router(chat.router)
-app.include_router(documents.router)
+app.include_router(summaries.router)
 app.include_router(flashcards.router)
 app.include_router(study_sessions.router)
 app.include_router(search.router)

@@ -54,7 +54,7 @@
                             <div
                                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
                                 <span style="font-weight: 600; font-size: var(--font-size-sm);">Processing
-                                    document...</span>
+                                    note...</span>
                                 <span id="progressPercent"
                                     style="font-size: var(--font-size-sm); color: var(--color-gray);">0%</span>
                             </div>
@@ -63,7 +63,7 @@
                             </div>
                             <p id="progressMessage"
                                 style="font-size: var(--font-size-xs); color: var(--color-gray); margin: 0;">Extracting
-                                text from document...</p>
+                                text from note...</p>
                         </div>
 
                         <!-- Error Container -->
@@ -72,7 +72,7 @@
                                 <strong>Processing Failed</strong>
                                 <p id="errorDetails"
                                     style="margin: var(--spacing-md) 0 0 0; font-size: var(--font-size-sm);">Failed to
-                                    extract text from document</p>
+                                    extract text from note</p>
                             </div>
                         </div>
 
@@ -377,7 +377,7 @@
         <div class="modal-content" style="min-height: auto;">
             <h3>Save Changes?</h3>
             <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray);">Are you sure you want to save the
-                changes made to this document?</p>
+                changes made to this note?</p>
             <div class="modal-buttons">
                 <button type="button" class="btn-save" onclick="confirmSave()">Save</button>
                 <button type="button" class="btn-cancel" onclick="closeSaveModal()">Cancel</button>
@@ -405,7 +405,7 @@
         <div class="modal-content" style="min-height: auto;">
             <h3>Reprocess Document?</h3>
             <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray);">Are you sure you want to reprocess
-                this document? This will overwrite the current content with newly processed data.</p>
+                this note? This will overwrite the current content with newly processed data.</p>
             <div class="modal-buttons">
                 <button type="button" class="btn-save" onclick="confirmReprocess()">Reprocess</button>
                 <button type="button" class="btn-cancel" onclick="closeReprocessModal()">Cancel</button>

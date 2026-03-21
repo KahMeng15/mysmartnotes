@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List
 import uuid
 
-from app.models.db import User, Lecture, Subject, GeneratedDocument
+from app.models.db import User, Lecture, Subject, Summary
 from app.schemas.schemas import LectureResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
@@ -729,13 +729,13 @@ async def export_lecture(
             )
             download_filename = f"{safe_title}.docx"
         
-        # Store in GeneratedDocument
-        from app.models.db import GeneratedDocument
-        gen_doc = GeneratedDocument(
+        # Store in Summary
+        from app.models.db import Summary
+        gen_doc = Summary(
             lecture_id=lecture.id,
             title=f"{lecture.title} ({export_format.upper()})",
             file_path=output_path,
-            document_type=export_format,
+            summary_type=export_format,
         )
         db.add(gen_doc)
         lecture.updated_at = datetime.utcnow()
@@ -813,11 +813,11 @@ async def download_export(
         )
     
     # Look for the generated file
-    from app.models.db import GeneratedDocument
-    gen_doc = db.query(GeneratedDocument).filter(
-        GeneratedDocument.lecture_id == lecture_id,
-        GeneratedDocument.document_type == export_format,
-    ).order_by(GeneratedDocument.created_at.desc()).first()
+    from app.models.db import Summary
+    gen_doc = db.query(Summary).filter(
+        Summary.lecture_id == lecture_id,
+        Summary.summary_type == export_format,
+    ).order_by(Summary.created_at.desc()).first()
     
     if not gen_doc or not os.path.exists(gen_doc.file_path):
         raise HTTPException(
@@ -868,9 +868,9 @@ async def update_lecture_content(
     lecture.updated_at = datetime.utcnow()
     
     # Invalidate existing summary when content changes
-    db.query(GeneratedDocument).filter(
-        GeneratedDocument.lecture_id == lecture_id,
-        GeneratedDocument.document_type == "summary"
+    db.query(Summary).filter(
+        Summary.lecture_id == lecture_id,
+        Summary.summary_type == "summary"
     ).delete()
     
     db.commit()

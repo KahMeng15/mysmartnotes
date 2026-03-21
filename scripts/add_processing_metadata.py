@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migration script to add processing_time and split_level columns to generated_documents table"""
+"""Migration script to add processing_time and split_level columns to summaries table"""
 
 import sqlite3
 import sys
@@ -11,17 +11,17 @@ def migrate():
         cursor = conn.cursor()
         
         # Check if columns already exist
-        cursor.execute("PRAGMA table_info(generated_documents)")
+        cursor.execute("PRAGMA table_info(summaries)")
         columns = [col[1] for col in cursor.fetchall()]
         
         if 'processing_time' not in columns:
             print("Adding processing_time column...")
-            cursor.execute("ALTER TABLE generated_documents ADD COLUMN processing_time REAL")
+            cursor.execute("ALTER TABLE summaries ADD COLUMN processing_time REAL")
             print("✓ processing_time column added")
         
         if 'split_level' not in columns:
             print("Adding split_level column...")
-            cursor.execute("ALTER TABLE generated_documents ADD COLUMN split_level VARCHAR(10)")
+            cursor.execute("ALTER TABLE summaries ADD COLUMN split_level VARCHAR(10)")
             print("✓ split_level column added")
         
         conn.commit()

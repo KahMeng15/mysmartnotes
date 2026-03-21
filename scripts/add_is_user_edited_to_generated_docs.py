@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Migration script to add is_user_edited column to generated_documents table
+Migration script to add is_user_edited column to summaries table
 """
 import sys
 import sqlite3
@@ -22,7 +22,7 @@ def migrate():
         cursor = conn.cursor()
         
         # Check which columns exist
-        cursor.execute("PRAGMA table_info(generated_documents)")
+        cursor.execute("PRAGMA table_info(summaries)")
         columns = {col[1]: col for col in cursor.fetchall()}
         
         col_name = 'is_user_edited'
@@ -31,7 +31,7 @@ def migrate():
         else:
             print(f"Adding {col_name} column...")
             cursor.execute(f"""
-                ALTER TABLE generated_documents 
+                ALTER TABLE summaries 
                 ADD COLUMN {col_name} BOOLEAN DEFAULT 0
             """)
             conn.commit()
