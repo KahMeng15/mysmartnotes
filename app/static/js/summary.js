@@ -167,6 +167,7 @@ async function confirmDeleteVersion() {
                 currentVersionId = null;
                 summaryData = null;
                 showNoSummaryUI();
+                await loadNoteMetadata(); // Refresh breadcrumb to remove version info
             } else {
                 // Load the next available version (latest)
                 await loadSummaryVersion(summaries[0].id);
@@ -179,10 +180,19 @@ async function confirmDeleteVersion() {
 
 function showNoSummaryUI() {
     const summaryText = document.getElementById('summaryText');
+    const noteHeader = document.getElementById('noteHeader');
     if (!summaryText) return;
     
+    // Set container to flex to allow vertical centering
+    summaryText.style.display = 'flex';
+    summaryText.style.flexDirection = 'column';
+    summaryText.style.flex = '1';
+
+    // Hide header (which shows mode/format pills)
+    if (noteHeader) noteHeader.style.display = 'none';
+
     summaryText.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; padding: 40px; text-align: center;">
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 40px; text-align: center;">
             <i class="ph ph-sparkle" style="font-size: 3rem; color: var(--color-primary); margin-bottom: 16px;"></i>
             <h2 style="margin-bottom: 8px; color: var(--color-dark);">No Summary Yet</h2>
             <p style="color: var(--color-gray); margin-bottom: 24px; max-width: 300px;">
@@ -242,9 +252,13 @@ async function loadNoteMetadata() {
                 breadcrumbHTML += `<a href="/note/${lectureId}" class="note-nav-crumb-link">${note.title}</a>`;
                 breadcrumbHTML += `<span class="note-nav-sep">›</span>`;
                 
-                // Add summary mode to breadcrumb - use class instead of inline styles
-                const summaryModeLabel = MODE_META[currentSummaryMode]?.label || 'Summary';
-                breadcrumbHTML += `<a class="note-nav-crumb-link">${summaryModeLabel} in ${FORMAT_META[currentSummaryFormat]?.label || 'Summary'}</a>`;
+                if (currentVersionId) {
+                    // Add summary mode to breadcrumb - use class instead of inline styles
+                    const summaryModeLabel = MODE_META[currentSummaryMode]?.label || 'Summary';
+                    breadcrumbHTML += `<a class="note-nav-crumb-link">${summaryModeLabel} in ${FORMAT_META[currentSummaryFormat]?.label || 'Summary'}</a>`;
+                } else {
+                    breadcrumbHTML += `<a class="note-nav-crumb-link">AI Summary</a>`;
+                }
                 
                 if (noteBreadcrumb) {
                     noteBreadcrumb.innerHTML = breadcrumbHTML;
@@ -271,13 +285,20 @@ async function loadNoteMetadata() {
 
 function displaySummary() {
     const summaryText = document.getElementById('summaryText');
+    const noteHeader = document.getElementById('noteHeader');
     const quickreadContainer = document.getElementById('quickreadContainer');
     const displayAiModePill = document.getElementById('displayAiModePill');
     const displayAiFormatPill = document.getElementById('displayAiFormatPill');
     
     if (!summaryData) return;
     
-    // Update Mode & Format Display
+    // Reset any empty state styles
+    if (summaryText) {
+        summaryText.style.display = 'block';
+        summaryText.style.flex = 'none';
+    }
+
+    // Show header if it was hidden
     if (displayAiModePill) {
         const modeLabel = MODE_META[currentSummaryMode]?.label || currentSummaryMode;
         const modeIcon = MODE_META[currentSummaryMode]?.icon || 'ph-lightbulb';

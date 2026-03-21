@@ -6,6 +6,25 @@
 #summaryContainer {
     animation: fadeIn 0.3s ease-out;
     padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.note-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+}
+
+.note-main .section-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 @keyframes fadeIn {

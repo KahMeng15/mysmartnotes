@@ -33,9 +33,9 @@
                 </div>
             </div>
 
-            <div id="summaryContainer">
-                <div class="note-main">
-                    <div class="section-card" style="padding-top: 10px;">
+            <div id="summaryContainer" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                <div class="note-main" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                    <div class="section-card" style="padding-top: 10px; display: flex; flex-direction: column; flex: 1; min-height: 0;">
                         
                         <div class="note-header" id="noteHeader" style="position: sticky; top: 35px; background: white; z-index: 15; padding-top: 16px;">
                             <div style="display: flex; gap: 6px; margin-bottom: 8px;">
@@ -87,7 +87,7 @@
                     </h4>
                     <div style="display: flex; flex-direction: column; gap: 10px;">
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
-                            <input type="checkbox" id="toggleObjectives" checked onchange="toggleElement('objectivesSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
+                            <input type="checkbox" id="toggleObjectives" onchange="toggleElement('objectivesSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
                             <span style="font-weight: 500;">Show Objectives</span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
