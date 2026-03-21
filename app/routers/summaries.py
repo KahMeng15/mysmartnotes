@@ -349,11 +349,11 @@ async def generate_summary_endpoint(
             
             summary_content = "\n\n".join(summarized_sections)
             
-            # Generate quickread if requested (quick mode overview)
+            # Generate quickread if requested
             if request.include_quickread:
                 quickread_content = await ai_client.generate_summary(
                     content=lecture_content,
-                    mode="quick",
+                    mode=request.mode,
                     output_format="pointform"
                 )
         
