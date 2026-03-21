@@ -44,14 +44,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Navigation buttons
-    const backToNoteBtn = document.getElementById('backToNoteBtn');
-    if (backToNoteBtn) backToNoteBtn.onclick = () => window.location.href = `/note/${lectureId}`;
-    
     const sidebarBackBtn = document.getElementById('sidebarBackBtn');
     if (sidebarBackBtn) sidebarBackBtn.onclick = () => window.location.href = `/note/${lectureId}`;
 
-    await loadSummary();
-    await loadSummaryVersions();
+    // Load initial data
+    await loadNoteMetadata();
+    const summaries = await loadSummaryVersions();
+    
+    if (summaries && summaries.length > 0) {
+        await loadSummaryVersion(summaries[0].id);
+    } else {
+        showNoSummaryUI();
+        showSummaryOptions(false);
+    }
 });
 
 async function loadSummaryVersions() {
@@ -63,11 +68,11 @@ async function loadSummaryVersions() {
             const docs = await res.json();
             const summaries = docs.filter(d => d.document_type === 'summary').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             const list = document.getElementById('summaryList');
-            if (!list) return;
+            if (!list) return summaries;
             
             if (summaries.length === 0) {
                 list.innerHTML = '<div class="empty-state" style="padding: var(--spacing-md); font-size: var(--font-size-xs);">No summaries yet</div>';
-                return;
+                return summaries;
             }
             
             list.innerHTML = summaries.map((s, idx) => {
@@ -102,8 +107,10 @@ async function loadSummaryVersions() {
                 </div>
                 `;
             }).join('');
+            return summaries;
         }
     } catch (e) { console.error('Error loading versions:', e); }
+    return [];
 }
 
 async function loadSummaryVersion(docId) {
@@ -124,6 +131,9 @@ async function loadSummaryVersion(docId) {
                 currentVersionId = docId;
                 displaySummary();
                 loadSummaryVersions();
+                
+                // Update breadcrumb when switching version
+                loadNoteMetadata();
             }
         }
     } catch (e) { console.error('Error loading version:', e); }
@@ -151,60 +161,50 @@ async function confirmDeleteVersion() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok || res.status === 204) {
-            await loadSummaryVersions();
-            await loadSummary();
+            const summaries = await loadSummaryVersions();
+            
+            if (summaries.length === 0) {
+                currentVersionId = null;
+                summaryData = null;
+                showNoSummaryUI();
+            } else {
+                // Load the next available version (latest)
+                await loadSummaryVersion(summaries[0].id);
+            }
         }
     } catch (e) { 
         alert('Error deleting summary version: ' + e.message);
     }
 }
 
-async function loadSummary() {
-    try {
-        const res = await fetch(`/documents/summary`, {
-            method: 'POST',
-            headers: { 
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ lecture_id: lectureId })
-        });
-
-        if (res.ok) {
-            const data = await res.json();
-            summaryData = data.content;
-            quickreadData = data.quickread || null;
-            currentSummaryMode = data.mode || 'elaborate';
-            currentSummaryFormat = data.output_format || 'sentence';
-            currentProcessingMethod = data.processing_method || 'whole';
-            currentSplitLevel = data.split_level || null;
-            currentProcessingTime = data.processing_time || null;
-            currentVersionId = data.id;
-            displaySummary();
-            
-            // Also load note metadata for breadcrumbs
-            loadNoteMetadata();
-        } else {
-            // If no summary exists, show options to generate one
-            showSummaryOptions();
-            const summaryText = document.getElementById('summaryText');
-            summaryText.innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; padding: 40px; text-align: center;">
-                    <i class="ph ph-sparkle" style="font-size: 3rem; color: var(--color-primary); margin-bottom: 16px;"></i>
-                    <h2 style="margin-bottom: 8px; color: var(--color-dark);">No Summary Yet</h2>
-                    <p style="color: var(--color-gray); margin-bottom: 24px; max-width: 300px;">
-                        Create your first AI-generated summary to quickly understand the key points of your note.
-                    </p>
-                    <button class="btn btn-primary" onclick="showSummaryOptions(true)" style="padding: 10px 20px;">
-                        <i class="ph ph-plus" style="margin-right: 8px;"></i> Generate Summary
-                    </button>
-                </div>
-            `;
-        }
-    } catch (e) {
-        console.error('Error loading summary:', e);
-        document.getElementById('summaryText').innerHTML = '<p class="error">Error loading summary.</p>';
-    }
+function showNoSummaryUI() {
+    const summaryText = document.getElementById('summaryText');
+    if (!summaryText) return;
+    
+    summaryText.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 400px; padding: 40px; text-align: center;">
+            <i class="ph ph-sparkle" style="font-size: 3rem; color: var(--color-primary); margin-bottom: 16px;"></i>
+            <h2 style="margin-bottom: 8px; color: var(--color-dark);">No Summary Yet</h2>
+            <p style="color: var(--color-gray); margin-bottom: 24px; max-width: 300px;">
+                Create your first AI-generated summary to quickly understand the key points of your note.
+            </p>
+            <button class="btn btn-primary" onclick="showSummaryOptions(false)" style="padding: 10px 20px;">
+                <i class="ph ph-plus" style="margin-right: 8px;"></i> Generate Summary
+            </button>
+        </div>
+    `;
+    
+    // Also reset detail values
+    const details = ['detailsProcessingMode', 'detailsFormat', 'detailsProcessingTime'];
+    details.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '—';
+    });
+    const divItem = document.getElementById('detailsDividerItem');
+    if (divItem) divItem.style.display = 'none';
+    
+    const quickreadContainer = document.getElementById('quickreadContainer');
+    if (quickreadContainer) quickreadContainer.style.display = 'none';
 }
 
 async function loadNoteMetadata() {
