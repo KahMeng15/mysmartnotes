@@ -2,7 +2,7 @@
 
 let currentQuiz = null;
 let currentQuestions = [];
-let currentMode = 'show_all';
+let currentMode = 'showanswers';
 let currentCardIndex = 0;
 let examTimerInterval = null;
 let timeRemaining = 15 * 60; // Default
@@ -87,21 +87,21 @@ function setMode(mode, updateUrl = true) {
     });
 
     // Clear exam state if exiting exam mode
-    if (mode !== 'exam') {
+    if (mode !== 'examsimulator') {
         clearInterval(examTimerInterval);
         document.getElementById('examStatsBar').style.display = 'none';
     }
     
     // Toggle displays
-    document.getElementById('fcControls').style.display = (mode === 'flashcard') ? 'flex' : 'none';
-    document.getElementById('practiceScore').style.display = (mode === 'interactive') ? 'flex' : 'none';
+    document.getElementById('fcControls').style.display = (mode === 'flashcards') ? 'flex' : 'none';
+    document.getElementById('practiceScore').style.display = (mode === 'practice') ? 'flex' : 'none';
     
     if (updateUrl) {
         history.pushState(null, '', `/quiz/${currentQuiz.id}/${mode}`);
     }
 
     // Special setup for exam mode
-    if (mode === 'exam') {
+    if (mode === 'examsimulator') {
         openExamSetup();
         return; // Don't render yet, wait for setup
     }
@@ -179,9 +179,9 @@ function renderQuestions() {
     
     container.innerHTML = '';
     
-    if (currentMode === 'table') {
+    if (currentMode === 'tableview') {
         renderTableMode(container);
-    } else if (currentMode === 'flashcard') {
+    } else if (currentMode === 'flashcards') {
         renderFlashcardMode(container);
     } else {
         currentQuestions.forEach((q, index) => {
@@ -233,7 +233,6 @@ function renderFlashcardMode(container) {
     card.className = 'flashcard';
     card.onclick = () => card.classList.toggle('flipped');
     
-    // Note: rotating card flips it, we need to hide faces
     card.innerHTML = `
         <div class="flashcard-face">
             <span class="q-type-badge" style="position:absolute; top: 20px; left: 20px;">Question ${currentCardIndex + 1}</span>
@@ -284,7 +283,7 @@ function createQuestionCard(q, index) {
     card.appendChild(text);
     
     // Practice & Exam mode inputs
-    if (currentMode === 'interactive' || currentMode === 'exam') {
+    if (currentMode === 'practice' || currentMode === 'examsimulator') {
         if (q.question_type === 'objective' && q.options) {
             const optsContainer = document.createElement('div');
             optsContainer.className = 'q-options';
@@ -296,15 +295,15 @@ function createQuestionCard(q, index) {
                 optEl.className = 'q-option';
                 
                 // Restore state
-                if (currentMode === 'exam' && examAnswers[q.id] === opt) optEl.classList.add('selected');
-                if (currentMode === 'interactive' && practiceResults[q.id] !== undefined) {
+                if (currentMode === 'examsimulator' && examAnswers[q.id] === opt) optEl.classList.add('selected');
+                if (currentMode === 'practice' && practiceResults[q.id] !== undefined) {
                     if (opt.trim() === q.answer_text.trim()) optEl.classList.add('correct');
                     else if (examAnswers[q.id] === opt) optEl.classList.add('incorrect');
                 }
 
                 optEl.innerHTML = `<span style="opacity: 0.5; font-weight: 700;">${String.fromCharCode(65 + optIdx)}</span> <span>${opt}</span>`;
                 optEl.onclick = () => {
-                    if (currentMode === 'interactive' && practiceResults[q.id] !== undefined) return;
+                    if (currentMode === 'practice' && practiceResults[q.id] !== undefined) return;
                     selectOption(q.id, optEl, opt);
                 };
                 
@@ -319,13 +318,13 @@ function createQuestionCard(q, index) {
             input.oninput = (e) => { examAnswers[q.id] = e.target.value; };
             if (examAnswers[q.id]) input.value = examAnswers[q.id];
             
-            if (currentMode === 'interactive' && practiceResults[q.id] !== undefined) {
+            if (currentMode === 'practice' && practiceResults[q.id] !== undefined) {
                 input.disabled = true;
             }
             card.appendChild(input);
         }
         
-        if (currentMode === 'interactive') {
+        if (currentMode === 'practice') {
             const checkBtn = document.createElement('button');
             checkBtn.className = 'btn btn-primary';
             checkBtn.style.marginTop = '20px';
@@ -342,8 +341,6 @@ function createQuestionCard(q, index) {
             feedback.id = `fb-${q.id}`;
             if (practiceResults[q.id] !== undefined) {
                 feedback.style.display = 'block';
-                // Note: we'd need to store the actual feedback text to restore fully, 
-                // but for now it will just show the correct answer if re-rendered.
                 feedback.innerHTML = `<div style="font-weight:700;">Question Answered</div><div style="margin-top:8px;">Correct Answer: ${q.answer_text}</div>`;
             }
             card.appendChild(feedback);
@@ -363,7 +360,7 @@ function createQuestionCard(q, index) {
         answerContent.style.fontWeight = "600";
         answerContent.textContent = q.answer_text;
         
-        if (currentMode === 'hidden') {
+        if (currentMode === 'hideanswers') {
             answerContent.className = 'hidden-content';
             answerContent.onclick = () => answerContent.classList.toggle('revealed');
             answerContent.title = "Click to reveal answer";
@@ -454,7 +451,7 @@ async function submitAnswerForCheck(qId, cardEl) {
 async function submitExam() {
     clearInterval(examTimerInterval);
     alert("Exam Simulator Finished! Review your answers in the standard or practice modes.");
-    setMode('show_all');
+    setMode('showanswers');
 }
 
 function exportQuiz() {

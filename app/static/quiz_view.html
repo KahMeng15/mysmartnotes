@@ -78,23 +78,23 @@
         <div class="note-action-panel">
             <h4 class="sidebar-section-title">View Mode</h4>
             <div class="action-grid" id="modeGrid">
-                <button class="action-btn active" data-mode="show_all" onclick="setMode('show_all')" title="Show All Answers">
+                <button class="action-btn active" data-mode="showanswers" onclick="setMode('showanswers')" title="Show All Answers">
                     <i class="ph ph-list-dashes"></i><span>Show Answers</span>
                 </button>
-                <button class="action-btn" data-mode="hidden" onclick="setMode('hidden')" title="Hide Answers">
+                <button class="action-btn" data-mode="hideanswers" onclick="setMode('hideanswers')" title="Hide Answers">
                     <i class="ph ph-eye-slash"></i><span>Hide Answers</span>
                 </button>
-                <button class="action-btn" data-mode="interactive" onclick="setMode('interactive')" title="Practice Mode">
+                <button class="action-btn" data-mode="practice" onclick="setMode('practice')" title="Practice Mode">
                     <i class="ph ph-check-square-offset"></i><span>Practice</span>
                 </button>
-                <button class="action-btn" data-mode="flashcard" onclick="setMode('flashcard')" title="Flashcard Mode">
+                <button class="action-btn" data-mode="flashcards" onclick="setMode('flashcards')" title="Flashcard Mode">
                     <i class="ph ph-cards"></i><span>Flashcards</span>
                 </button>
-                <button class="action-btn" data-mode="table" onclick="setMode('table')" title="Table View">
+                <button class="action-btn" data-mode="tableview" onclick="setMode('tableview')" title="Table View">
                     <i class="ph ph-table"></i><span>Table View</span>
                 </button>
-                <button class="action-btn" data-mode="exam" onclick="setMode('exam')" title="Exam Simulator">
-                    <i class="ph ph-timer"></i><span>Exam Sim</span>
+                <button class="action-btn" data-mode="examsimulator" onclick="setMode('examsimulator')" title="Exam Simulator">
+                    <i class="ph ph-timer"></i><span>Exam Simulator</span>
                 </button>
             </div>
 
@@ -103,7 +103,7 @@
             <h4 class="sidebar-section-title">Actions</h4>
             <div class="action-grid">
                 <button class="action-btn" onclick="openAddQuestionModal()" title="Add Question">
-                    <i class="ph ph-plus-circle"></i><span>Add Q</span>
+                    <i class="ph ph-plus-circle"></i><span>Add Question</span>
                 </button>
                 <button class="action-btn" onclick="exportQuiz()" title="Export Quiz">
                     <i class="ph ph-export"></i><span>Export</span>
@@ -154,27 +154,27 @@
             <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 24px;">How would you like to review this quiz today?</p>
             
             <div class="action-grid" style="grid-template-columns: repeat(3, 1fr);">
-                <button onclick="setMode('show_all'); closeModal('initialModeModal')">
+                <button onclick="setMode('showanswers'); closeModal('initialModeModal')">
                     <i class="ph ph-list-dashes"></i>
                     <span>Show Answers</span>
                 </button>
-                <button onclick="setMode('hidden'); closeModal('initialModeModal')">
+                <button onclick="setMode('hideanswers'); closeModal('initialModeModal')">
                     <i class="ph ph-eye-slash"></i>
                     <span>Hide Answers</span>
                 </button>
-                <button onclick="setMode('interactive'); closeModal('initialModeModal')">
+                <button onclick="setMode('practice'); closeModal('initialModeModal')">
                     <i class="ph ph-check-square-offset"></i>
                     <span>Practice</span>
                 </button>
-                <button onclick="setMode('flashcard'); closeModal('initialModeModal')">
+                <button onclick="setMode('flashcards'); closeModal('initialModeModal')">
                     <i class="ph ph-cards"></i>
                     <span>Flashcards</span>
                 </button>
-                <button onclick="setMode('table'); closeModal('initialModeModal')">
+                <button onclick="setMode('tableview'); closeModal('initialModeModal')">
                     <i class="ph ph-table"></i>
                     <span>Table View</span>
                 </button>
-                <button onclick="setMode('exam'); closeModal('initialModeModal')">
+                <button onclick="setMode('examsimulator'); closeModal('initialModeModal')">
                     <i class="ph ph-timer"></i>
                     <span>Exam Simulator</span>
                 </button>
@@ -196,7 +196,7 @@
             
             <div class="modal-buttons margin-top-xl">
                 <button class="btn btn-primary" onclick="startExamSim()">Start Simulator</button>
-                <button class="btn btn-secondary" onclick="closeModal('examSetupModal'); setMode('show_all')">Cancel</button>
+                <button class="btn btn-secondary" onclick="closeModal('examSetupModal'); setMode('showanswers')">Cancel</button>
             </div>
         </div>
     </div>
