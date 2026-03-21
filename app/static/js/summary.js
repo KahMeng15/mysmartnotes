@@ -475,8 +475,6 @@ function updateDetailsSection() {
 
     if (detailsEdited) {
         detailsEdited.textContent = isUserEdited ? 'Yes' : 'No';
-        detailsEdited.style.color = isUserEdited ? 'var(--color-primary)' : 'inherit';
-        detailsEdited.style.fontWeight = isUserEdited ? '600' : 'normal';
     }
     
     // Show divider info only for section-by-section processing
@@ -489,6 +487,11 @@ function updateDetailsSection() {
         }
     }
     
+    if (detailsFormat) {
+        const formatLabel = FORMAT_META[currentSummaryFormat]?.label || currentSummaryFormat;
+        detailsFormat.textContent = formatLabel || '—';
+    }
+
     if (detailsProcessingTime) {
         // Use MS if available, fallback to legacy seconds field
         const timeVal = currentProcessingTimeMs !== null ? currentProcessingTimeMs : 

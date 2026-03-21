@@ -61,6 +61,7 @@ class SummaryResponse(BaseModel):
     title: str
     content: str
     is_cached: bool
+    summary_type: str = "summary"
     quickread: Optional[str] = None  # Optional quickread summary
     mode: str = "elaborate"
     output_format: str = "sentence"
@@ -266,6 +267,7 @@ async def generate_summary_endpoint(
                 title=existing_summary.title,
                 content=existing_summary.content,
                 is_cached=True,
+                summary_type=existing_summary.summary_type,
                 quickread=existing_summary.quickread,
                 mode=existing_summary.mode or "elaborate",
                 output_format=existing_summary.output_format or "sentence",
@@ -384,6 +386,7 @@ async def generate_summary_endpoint(
             title=f"Summary - {lecture.title}",
             content=summary_content,
             is_cached=False,
+            summary_type="summary",
             quickread=quickread_content,
             mode=request.mode,
             output_format=request.output_format,
@@ -540,7 +543,14 @@ async def list_summaries(
             title=d.title,
             summary_type=d.summary_type,
             file_path=d.file_path,
-            created_at=format_timestamp(d.created_at)
+            created_at=format_timestamp(d.created_at),
+            model=d.model,
+            processing_time_ms=d.processing_time_ms,
+            mode=d.mode,
+            output_format=d.output_format,
+            processing_method=d.processing_method,
+            split_level=d.split_level,
+            is_user_edited=d.is_user_edited or False
         )
         for d in summaries
     ]
@@ -577,7 +587,10 @@ async def get_summary(
         output_format=summary.output_format,
         processing_method=summary.processing_method,
         split_level=summary.split_level,
-        processing_time=summary.processing_time
+        processing_time=summary.processing_time,
+        processing_time_ms=summary.processing_time_ms,
+        model=summary.model,
+        is_user_edited=summary.is_user_edited or False
     )
 
 
