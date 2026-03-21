@@ -601,3 +601,166 @@ async def delete_document(
     
     db.delete(document)
     db.commit()
+
+
+@router.post("/{document_id}/export", response_model=dict)
+async def export_document(
+    document_id: int,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Export a specific generated document as PDF or DOCX"""
+    import os
+    import uuid
+    from datetime import datetime
+    from pathlib import Path
+    from app.models.db import GeneratedDocument, Lecture, ExportTemplate
+    from app.processing.text_processor import ContentSegment, ContentType
+    
+    # 1. Verify existence and ownership
+    doc = db.query(GeneratedDocument).join(Lecture).filter(
+        GeneratedDocument.id == document_id,
+        Lecture.user_id == current_user.id
+    ).first()
+    
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    lecture = db.query(Lecture).filter(Lecture.id == doc.lecture_id).first()
+    
+    # 2. Extract options
+    export_format = body.get("format", "pdf").lower()
+    if export_format not in ("pdf", "docx"):
+        raise HTTPException(status_code=400, detail="Format must be 'pdf' or 'docx'")
+        
+    template_id = body.get("template_id")
+    template = None
+    if template_id:
+        template = db.query(ExportTemplate).filter(ExportTemplate.id == template_id).first()
+        
+    # 3. Build content segments
+    segments = []
+    
+    # Add Quickread as a special section if it exists
+    if doc.quickread:
+        segments.append(ContentSegment(
+            content=doc.quickread,
+            content_type=ContentType.H2,
+            page_number=1,
+            metadata={"title": "Quickread"}
+        ))
+        
+    # Add the main content
+    segments.append(ContentSegment(
+        content=doc.content,
+        content_type=ContentType.BODY,
+        page_number=1,
+        metadata={"title": doc.title or "Summary"}
+    ))
+    
+    # 4. Generate the document
+    generated_dir = "generated"
+    output_dir = os.path.join(generated_dir, str(doc.lecture_id))
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    
+    safe_title = "".join(c for c in (doc.title or lecture.title) if c.isalnum() or c in (' ', '-', '_')).strip()
+    filename = f"{safe_title}_{uuid.uuid4().hex[:6]}.{export_format}"
+    output_path = os.path.join(output_dir, filename)
+    
+    try:
+        template_config = template.config if template else None
+        
+        if export_format == "pdf":
+            from app.processing.document_generator import DocumentGenerator
+            generator = DocumentGenerator(
+                lecture_id=doc.lecture_id,
+                lecture_title=lecture.title,
+                base_output_dir=generated_dir
+            )
+            # Generator uses its own internal path, we need to move it after
+            temp_path = generator.generate_pdf(segments, [], template_config=template_config)
+            import shutil
+            shutil.move(temp_path, output_path)
+        else:
+            from app.processing.docx_generator import DocxGenerator
+            generator = DocxGenerator(
+                lecture_id=doc.lecture_id,
+                lecture_title=lecture.title,
+                base_output_dir=generated_dir
+            )
+            temp_path = generator.generate_docx(segments, [], template_config=template_config)
+            import shutil
+            shutil.move(temp_path, output_path)
+            
+        # 5. Store export in GeneratedDocument as a permanent export record
+        new_export = GeneratedDocument(
+            lecture_id=doc.lecture_id,
+            title=f"Export: {doc.title or 'Summary'} ({export_format.upper()})",
+            file_path=output_path,
+            document_type=export_format,
+            is_user_edited=False
+        )
+        db.add(new_export)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"{export_format.upper()} generated successfully",
+            "download_url": f"/documents/{document_id}/download-export?export_id={new_export.id}",
+            "filename": filename
+        }
+    except Exception as e:
+        import logging
+        logger = logging.getLogger("app")
+        logger.error(f"Error exporting document {document_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error exporting: {str(e)}")
+
+
+@router.get("/{document_id}/download-export")
+async def download_document_export(
+    document_id: int,
+    export_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download a previously generated document export"""
+    import os
+    from fastapi.responses import FileResponse
+    from app.models.db import GeneratedDocument, Lecture
+    
+    try:
+        # Verify export document exists and user owns the parent lecture
+        export_doc = db.query(GeneratedDocument).join(Lecture).filter(
+            GeneratedDocument.id == export_id,
+            Lecture.user_id == current_user.id
+        ).first()
+        
+        if not export_doc:
+            logger.error(f"[Download] Export doc {export_id} not found or unauthorized for user {current_user.id}")
+            raise HTTPException(status_code=404, detail="Exported record not found")
+            
+        if not os.path.exists(export_doc.file_path):
+            logger.error(f"[Download] File not found on disk: {export_doc.file_path}")
+            raise HTTPException(status_code=404, detail="Exported file not found on server")
+            
+        # Get original doc for title
+        original_doc = db.query(GeneratedDocument).filter(GeneratedDocument.id == document_id).first()
+        safe_title = "".join(c for c in ((original_doc.title if original_doc else "Summary") or "Summary") if c.isalnum() or c in (' ', '-', '_')).strip()
+        
+        ext = export_doc.document_type
+        mime_types = {
+            "pdf": "application/pdf",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
+        
+        return FileResponse(
+            path=export_doc.file_path,
+            filename=f"{safe_title}.{ext}",
+            media_type=mime_types.get(ext, "application/octet-stream")
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Download] Internal error serving export {export_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

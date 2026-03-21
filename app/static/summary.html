@@ -179,7 +179,8 @@
             <div class="action-grid">
                 <button class="action-btn" id="sidebarBackBtn" title="Back to Note"><i class="ph ph-arrow-left"></i> <span>Back</span></button>
                 <button class="action-btn" onclick="toggleEdit()" id="editBtn" title="Edit Summary"><i class="ph ph-pencil-simple"></i> <span>Edit</span></button>
-                <button class="action-btn" onclick="showSummaryOptions(true)" title="New Summary"><i class="ph ph-plus"></i> <span>New Summary</span></button>
+                <button class="action-btn" onclick="exportNote()" title="Export Summary"><i class="ph ph-export"></i> <span>Export</span></button>
+                <button class="action-btn" onclick="showSummaryOptions(true)" title="New Summary"><i class="ph ph-plus"></i> <span>New</span></button>
             </div>
             
             <div class="sidebar-divider"></div>
@@ -197,6 +198,10 @@
                         <label class="sidebar-option-label">
                             <input type="checkbox" id="toggleQuickread" checked onchange="toggleElement('quickreadSection', this.checked)">
                             <span>Show Quickread</span>
+                        </label>
+                        <label class="sidebar-option-label">
+                            <input type="checkbox" id="toggleNested" onchange="toggleElement('nestedSummary', this.checked)">
+                            <span>Show Nested Summaries</span>
                         </label>
                     </div>
                 </div>
@@ -370,6 +375,58 @@
             <div class="modal-buttons">
                 <button type="button" class="btn-save btn-danger-static" onclick="confirmDiscard()">Discard</button>
                 <button type="button" class="btn-cancel" onclick="closeDiscardModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content" style="min-height: auto; max-width: 420px;">
+            <h3 style="margin-bottom: var(--spacing-md);"><i class="ph ph-export" style="margin-right: 6px;"></i> Export Summary</h3>
+
+            <!-- Format Selector -->
+            <div style="margin-bottom: var(--spacing-lg);">
+                <label style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray); display: block; margin-bottom: var(--spacing-sm);">Format</label>
+                <div style="display: flex; gap: 8px;">
+                    <button class="export-format-btn active" data-format="pdf" onclick="selectExportFormat('pdf')">
+                        <i class="ph ph-file-pdf" style="font-size: 1.2em; color: #e74c3c;"></i> PDF
+                    </button>
+                    <button class="export-format-btn" data-format="docx" onclick="selectExportFormat('docx')">
+                        <i class="ph ph-file-doc" style="font-size: 1.2em; color: #2b579a;"></i> Word (DOCX)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Template Selector -->
+            <div style="margin-bottom: var(--spacing-lg);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
+                    <label style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray);">Template</label>
+                    <a href="/templates" target="_blank" style="font-size: 11px; color: var(--color-primary); text-decoration: none;">
+                        <i class="ph ph-gear"></i> Manage Templates
+                    </a>
+                </div>
+                <select id="exportTemplateSelect" class="options-select">
+                    <option value="">Default (no template)</option>
+                </select>
+            </div>
+
+            <!-- Progress -->
+            <div id="exportProgress" style="display: none; margin-bottom: var(--spacing-lg);">
+                <div style="padding: 12px; background: var(--color-bg); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <div class="spinner" style="width: 16px; height: 16px;"><i class="ph ph-spinner ph-spin" style="font-size: 16px;"></i></div>
+                        <span id="exportProgressText" style="font-size: var(--font-size-sm); color: var(--color-gray); flex: 1;">Starting...</span>
+                        <span id="exportProgressPercent" style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary);">0%</span>
+                    </div>
+                    <div style="width: 100%; height: 6px; background: var(--color-light-gray); border-radius: 3px; overflow: hidden;">
+                        <div id="exportProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--color-primary), #7c5cbf); border-radius: 3px; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="modal-buttons">
+                <button type="button" class="btn-save" id="exportSubmitBtn" onclick="doExport()"><i class="ph ph-download-simple"></i> Export</button>
+                <button type="button" class="btn-cancel" onclick="closeExportModal()">Cancel</button>
             </div>
         </div>
     </div>

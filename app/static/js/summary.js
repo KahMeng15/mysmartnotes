@@ -17,6 +17,7 @@ let currentNoteTitleForBreadcrumb = null;
 let isUserEdited = false;
 let isEditMode = false;
 let isSourceMode = false;
+let selectedExportFormat = 'pdf';
 
 const MODE_META = {
     quick: { label: 'Quick', icon: 'ph-lightning' },
@@ -55,6 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Load persistent display choices
     const savedObjectives = localStorage.getItem('summaryShowObjectives');
     const savedQuickread = localStorage.getItem('summaryShowQuickread');
+    const savedNested = localStorage.getItem('summaryShowNested');
     
     if (savedObjectives !== null) {
         const toggleObjectives = document.getElementById('toggleObjectives');
@@ -64,6 +66,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (savedQuickread !== null) {
         const toggleQuickread = document.getElementById('toggleQuickread');
         if (toggleQuickread) toggleQuickread.checked = savedQuickread === 'true';
+    }
+
+    if (savedNested !== null) {
+        const toggleNested = document.getElementById('toggleNested');
+        if (toggleNested) toggleNested.checked = savedNested === 'true';
+    } else {
+        // Default to false (hidden) if not set
+        const toggleNested = document.getElementById('toggleNested');
+        if (toggleNested) toggleNested.checked = false;
     }
 
     // Load initial data
@@ -374,12 +385,20 @@ function displaySummary() {
     // 1. First, restore user's base preferences from localStorage
     const savedObjectives = localStorage.getItem('summaryShowObjectives');
     const savedQuickread = localStorage.getItem('summaryShowQuickread');
+    const savedNested = localStorage.getItem('summaryShowNested');
 
     if (toggleObjectives && savedObjectives !== null) {
         toggleObjectives.checked = savedObjectives === 'true';
     }
     if (toggleQuickread && savedQuickread !== null) {
         toggleQuickread.checked = savedQuickread === 'true';
+    }
+    if (toggleNested) {
+        if (savedNested !== null) {
+            toggleNested.checked = savedNested === 'true';
+        } else {
+            toggleNested.checked = false; // Default
+        }
     }
 
     // 2. Then, handle specific version overrides (Whole note processing disables Quickread)
@@ -551,6 +570,38 @@ function toggleElement(elementId, show, saveToStorage = true) {
         if (quickreadContainer) {
             quickreadContainer.style.display = show ? 'block' : 'none';
         }
+    } else if (elementId === 'nestedSummary') {
+        if (saveToStorage) localStorage.setItem('summaryShowNested', show);
+        // show=true means user wants to SEE them. show=false means user wants to HIDE them.
+        const shouldShow = show; 
+        const summaryPatterns = [
+            /summary/i,
+            /overview/i
+        ];
+
+        headers.forEach(header => {
+            // Check if it's an H2 as requested, or contains the patterns
+            const isH2 = header.tagName === 'H2';
+            const text = header.textContent.trim();
+            
+            let matches = false;
+            for (const pattern of summaryPatterns) {
+                if (pattern.test(text)) {
+                    matches = true;
+                    break;
+                }
+            }
+
+            if (matches) {
+                // Apply visibility
+                header.style.display = shouldShow ? '' : 'none';
+                let current = header.nextElementSibling;
+                while (current && !current.matches('h2, h3, h4, h5')) {
+                    current.style.display = shouldShow ? '' : 'none';
+                    current = current.nextElementSibling;
+                }
+            }
+        });
     }
 }
 
@@ -558,12 +609,16 @@ function hideRedundantSections() {
     // Apply current checkbox states to hide/show sections
     const toggleObjectives = document.getElementById('toggleObjectives');
     const toggleQuickread = document.getElementById('toggleQuickread');
+    const toggleNested = document.getElementById('toggleNested');
     
     if (toggleObjectives) {
         toggleElement('objectivesSection', toggleObjectives.checked, false);
     }
     if (toggleQuickread) {
         toggleElement('quickreadSection', toggleQuickread.checked, false);
+    }
+    if (toggleNested) {
+        toggleElement('nestedSummary', toggleNested.checked, false);
     }
 }
 
@@ -959,3 +1014,125 @@ function deleteHtmlRow() { alert('Row deletion is limited in summary editor'); }
 function deleteHtmlCol() { alert('Column deletion is limited in summary editor'); }
 function deleteHtmlTable() { alert('Table deletion is limited in summary editor'); }
 function mergeHtmlCells() { alert('Cell merging is limited in summary editor'); }
+
+// --- Export Logic ---
+
+async function exportNote() {
+    if (!currentVersionId) {
+        alert('Please select or generate a summary first.');
+        return;
+    }
+    document.getElementById('exportModal').style.display = 'flex';
+    document.getElementById('exportProgress').style.display = 'none';
+    document.getElementById('exportSubmitBtn').disabled = false;
+
+    // Load templates for dropdown
+    try {
+        const res = await fetch('/templates', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const templates = await res.json();
+            const select = document.getElementById('exportTemplateSelect');
+            select.innerHTML = '<option value="">Default (no template)</option>';
+            templates.forEach(t => {
+                const badge = t.is_system ? ' ★' : '';
+                select.innerHTML += `<option value="${t.id}">${t.name}${badge}</option>`;
+            });
+        }
+    } catch (e) { console.error('Failed to load templates:', e); }
+}
+
+function closeExportModal() {
+    document.getElementById('exportModal').style.display = 'none';
+}
+
+function selectExportFormat(format) {
+    selectedExportFormat = format;
+    document.querySelectorAll('.export-format-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.format === format);
+    });
+}
+
+function updateExportProgress(text, percent) {
+    const pText = document.getElementById('exportProgressText');
+    const pPercent = document.getElementById('exportProgressPercent');
+    const pBar = document.getElementById('exportProgressBar');
+    if (pText) pText.textContent = text;
+    if (pPercent) pPercent.textContent = `${percent}%`;
+    if (pBar) pBar.style.width = `${percent}%`;
+}
+
+async function doExport() {
+    const format = selectedExportFormat;
+    const templateSelect = document.getElementById('exportTemplateSelect');
+    const templateId = templateSelect.value || null;
+
+    // Show progress
+    document.getElementById('exportProgress').style.display = 'block';
+    document.getElementById('exportSubmitBtn').disabled = true;
+    updateExportProgress('Preparing export...', 5);
+
+    // Simulate progress
+    const progressSteps = [
+        { text: 'Building content...', pct: 15, delay: 500 },
+        { text: 'Rendering document...', pct: 35, delay: 1500 },
+        { text: 'Adding styles...', pct: 55, delay: 2500 },
+        { text: 'Generating file...', pct: 70, delay: 4000 },
+        { text: 'Finalizing...', pct: 85, delay: 6000 },
+    ];
+    const progressTimers = progressSteps.map(step =>
+        setTimeout(() => updateExportProgress(step.text, step.pct), step.delay)
+    );
+
+    try {
+        const payload = { format: format };
+        if (templateId) payload.template_id = templateId;
+
+        const response = await fetch(`/documents/${currentVersionId}/export`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        // Clear simulated timers
+        progressTimers.forEach(t => clearTimeout(t));
+
+        if (response.ok) {
+            const data = await response.json();
+            updateExportProgress('Downloading file...', 95);
+
+            // Download the file
+            const dlRes = await fetch(data.download_url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (dlRes.ok) {
+                updateExportProgress('Complete!', 100);
+                const blob = await dlRes.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = data.filename || `summary.${format}`;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                }, 1000);
+            }
+            setTimeout(() => closeExportModal(), 500);
+        } else {
+            const error = await response.json();
+            alert('Export failed: ' + (error.detail || 'Unknown error'));
+            document.getElementById('exportSubmitBtn').disabled = false;
+        }
+    } catch (e) {
+        console.error('Export error:', e);
+        alert('Error exporting: ' + e.message);
+        document.getElementById('exportSubmitBtn').disabled = false;
+    }
+}

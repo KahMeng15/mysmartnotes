@@ -429,3 +429,49 @@
     line-height: 1.4;
     text-align: right;
 }
+
+/* Export Modal Styles */
+.export-format-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: 2px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-white);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    font-family: 'Instrument Sans', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    color: var(--color-dark);
+}
+
+.export-format-btn:hover {
+    border-color: var(--color-primary);
+    background: rgba(89, 60, 143, 0.04);
+}
+
+.export-format-btn.active {
+    border-color: var(--color-primary);
+    background: rgba(89, 60, 143, 0.08);
+    color: var(--color-primary);
+}
+
+.export-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    color: var(--color-dark);
+}
+
+.export-toggle-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
