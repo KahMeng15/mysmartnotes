@@ -181,9 +181,13 @@ async function confirmDeleteVersion() {
 function showNoSummaryUI() {
     const summaryText = document.getElementById('summaryText');
     const noteHeader = document.getElementById('noteHeader');
+    const summaryContainer = document.getElementById('summaryContainer');
     if (!summaryText) return;
     
-    // Set container to flex to allow vertical centering
+    // Add class for flex centering
+    if (summaryContainer) summaryContainer.classList.add('empty-state-active');
+    
+    // Set text container to flex as well
     summaryText.style.display = 'flex';
     summaryText.style.flexDirection = 'column';
     summaryText.style.flex = '1';
@@ -192,13 +196,13 @@ function showNoSummaryUI() {
     if (noteHeader) noteHeader.style.display = 'none';
 
     summaryText.innerHTML = `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 40px; text-align: center;">
-            <i class="ph ph-sparkle" style="font-size: 3rem; color: var(--color-primary); margin-bottom: 16px;"></i>
-            <h2 style="margin-bottom: 8px; color: var(--color-dark);">No Summary Yet</h2>
-            <p style="color: var(--color-gray); margin-bottom: 24px; max-width: 300px;">
+        <div class="empty-summary-container">
+            <i class="ph ph-sparkle empty-summary-icon"></i>
+            <h2 class="empty-summary-title">No Summary Yet</h2>
+            <p class="empty-summary-text">
                 Create your first AI-generated summary to quickly understand the key points of your note.
             </p>
-            <button class="btn btn-primary" onclick="showSummaryOptions(false)" style="padding: 10px 20px;">
+            <button class="btn btn-primary empty-summary-btn" onclick="showSummaryOptions(false)">
                 <i class="ph ph-plus" style="margin-right: 8px;"></i> Generate Summary
             </button>
         </div>
@@ -286,19 +290,29 @@ async function loadNoteMetadata() {
 function displaySummary() {
     const summaryText = document.getElementById('summaryText');
     const noteHeader = document.getElementById('noteHeader');
+    const summaryContainer = document.getElementById('summaryContainer');
     const quickreadContainer = document.getElementById('quickreadContainer');
     const displayAiModePill = document.getElementById('displayAiModePill');
     const displayAiFormatPill = document.getElementById('displayAiFormatPill');
+    const toggleQuickread = document.getElementById('toggleQuickread');
     
     if (!summaryData) return;
     
-    // Reset any empty state styles
+    // Remove centering class when content exists
+    if (summaryContainer) summaryContainer.classList.remove('empty-state-active');
+
+    // Reset any empty state styles on the text container
     if (summaryText) {
         summaryText.style.display = 'block';
         summaryText.style.flex = 'none';
     }
 
     // Show header if it was hidden
+    if (noteHeader) {
+        noteHeader.style.display = 'block';
+    }
+
+    // Update Mode & Format Display
     if (displayAiModePill) {
         const modeLabel = MODE_META[currentSummaryMode]?.label || currentSummaryMode;
         const modeIcon = MODE_META[currentSummaryMode]?.icon || 'ph-lightbulb';
@@ -338,6 +352,26 @@ function displaySummary() {
     
     // Apply current visibility settings to hide sections from the raw content
     hideRedundantSections();
+
+    // Disable Quickread toggle if processing method is 'whole' (it's only for sections)
+    if (toggleQuickread) {
+        const label = toggleQuickread.closest('.sidebar-option-label');
+        if (currentProcessingMethod === 'whole') {
+            toggleQuickread.checked = false;
+            toggleQuickread.disabled = true;
+            if (label) {
+                label.classList.add('disabled');
+                label.title = 'Quickread only available for section-by-section processing';
+            }
+            if (quickreadContainer) quickreadContainer.style.display = 'none';
+        } else {
+            toggleQuickread.disabled = false;
+            if (label) {
+                label.classList.remove('disabled');
+                label.title = '';
+            }
+        }
+    }
 }
 
 function formatProcessingTime(seconds) {
@@ -412,6 +446,13 @@ function onSummaryMethodChange() {
 }
 
 function toggleElement(elementId, show) {
+    // Safety check for Quickread
+    if (elementId === 'quickreadSection' && currentProcessingMethod === 'whole' && show) {
+        const toggleQuickread = document.getElementById('toggleQuickread');
+        if (toggleQuickread) toggleQuickread.checked = false;
+        return;
+    }
+
     // Hide/show sections from the raw note content based on checkbox state
     const summaryText = document.getElementById('summaryText');
     if (!summaryText) return;

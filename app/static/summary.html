@@ -33,20 +33,20 @@
                 </div>
             </div>
 
-            <div id="summaryContainer" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                <div class="note-main" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                    <div class="section-card" style="padding-top: 10px; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+            <div id="summaryContainer">
+                <div class="note-main">
+                    <div class="section-card">
                         
-                        <div class="note-header" id="noteHeader" style="position: sticky; top: 35px; background: white; z-index: 15; padding-top: 16px;">
-                            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-                                <span class="ai-mode-badge" id="displayAiModePill" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(89, 60, 143, 0.1); color: var(--color-primary); font-weight: 600;">
+                        <div class="note-header summary-header" id="noteHeader">
+                            <div class="ai-badges-row">
+                                <span class="ai-mode-badge" id="displayAiModePill">
                                     <i class="ph ph-lightbulb"></i> Elaborate
                                 </span>
-                                <span class="ai-mode-badge" id="displayAiFormatPill" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(89, 60, 143, 0.1); color: var(--color-primary); font-weight: 600;">
+                                <span class="ai-mode-badge" id="displayAiFormatPill">
                                     <i class="ph ph-text-t"></i> Sentence
                                 </span>
                             </div>
-                            <h1 id="contentSubjectName" style="margin: 0;">Subject Name</h1>
+                            <h1 id="contentSubjectName" class="summary-title">Subject Name</h1>
                         </div>
                         
                         <!-- Quickread Section at Top -->
@@ -59,8 +59,8 @@
                         
                         <!-- Main Summary Content -->
                         <div id="summaryText" class="markdown-content">
-                            <div class="loading" style="text-align: center; padding: 40px;">
-                                <div class="spinner" style="margin: 0 auto 16px auto;"><i class="ph ph-spinner"></i></div>
+                            <div class="loading summary-loading">
+                                <div class="spinner"><i class="ph ph-spinner"></i></div>
                                 <p>Loading summary...</p>
                             </div>
                         </div>
@@ -70,7 +70,7 @@
         </div>
 
         <!-- Sidebar Actions -->
-        <div class="note-action-panel" style="display: flex; flex-direction: column;">
+        <div class="note-action-panel">
             <div class="action-grid">
                 <button class="action-btn" id="sidebarBackBtn" title="Back to Note"><i class="ph ph-arrow-left"></i> <span>Back</span></button>
                 <button class="action-btn" onclick="showSummaryOptions(true)" title="New Summary"><i class="ph ph-plus"></i> <span>New Summary</span></button>
@@ -79,20 +79,18 @@
             <div class="sidebar-divider"></div>
             
             <!-- Scrollable middle content -->
-            <div style="flex: 1; overflow-y: auto; min-height: 0;">
+            <div class="sidebar-scroll-content">
                 <!-- Display Options -->
-                <div id="displayOptionsSection" style="margin-bottom: var(--spacing-md);">
-                    <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0 0 var(--spacing-md) 0; text-transform: uppercase; letter-spacing: 0.05em;">
-                        Display
-                    </h4>
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
-                            <input type="checkbox" id="toggleObjectives" onchange="toggleElement('objectivesSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
-                            <span style="font-weight: 500;">Show Objectives</span>
+                <div id="displayOptionsSection">
+                    <h4 class="sidebar-section-title">Display</h4>
+                    <div class="display-options-group">
+                        <label class="sidebar-option-label">
+                            <input type="checkbox" id="toggleObjectives" onchange="toggleElement('objectivesSection', this.checked)">
+                            <span>Show Objectives</span>
                         </label>
-                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: var(--font-size-sm); user-select: none;">
-                            <input type="checkbox" id="toggleQuickread" checked onchange="toggleElement('quickreadSection', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
-                            <span style="font-weight: 500;">Show Quickread</span>
+                        <label class="sidebar-option-label">
+                            <input type="checkbox" id="toggleQuickread" checked onchange="toggleElement('quickreadSection', this.checked)">
+                            <span>Show Quickread</span>
                         </label>
                     </div>
                 </div>
@@ -101,13 +99,11 @@
                 
                 <!-- Summary Versions Section -->
                 <div id="summaryVersionsSection">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
-                        <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0; text-transform: uppercase; letter-spacing: 0.05em;">
-                            Versions
-                        </h4>
+                    <div class="versions-header-row">
+                        <h4 class="sidebar-section-title">Versions</h4>
                     </div>
-                    <div id="summaryList" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto;">
-                        <div class="empty-state" style="padding: var(--spacing-md); font-size: var(--font-size-xs);">Loading...</div>
+                    <div id="summaryList" class="versions-list">
+                        <div class="empty-state summary-empty-state">Loading...</div>
                     </div>
                 </div>
             </div>
@@ -115,10 +111,8 @@
             <!-- Bottom anchored details section -->
             <div class="sidebar-divider"></div>
             
-            <div id="summaryDetailsSection">
-                <h4 style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0 0 var(--spacing-md) 0; text-transform: uppercase; letter-spacing: 0.05em;">
-                    Details
-                </h4>
+            <div id="summaryDetailsSection" class="details-section">
+                <h4 class="sidebar-section-title">Details</h4>
                 <div class="info-grid">
                     <div class="info-item">
                         <div class="info-label">Mode</div>
@@ -143,14 +137,13 @@
 
     <!-- Summary Options Modal -->
     <div id="summaryOptionsModal" class="modal">
-        <div class="modal-content" style="max-width: 450px;">
-            <h3 style="margin-bottom: var(--spacing-sm);"><i class="ph ph-text-align-left" style="margin-right: 6px;"></i> Summary Options</h3>
-            <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray); font-size: var(--font-size-sm);">
-                Customize how the AI should summarize your note.</p>
+        <div class="modal-content modal-content-summary">
+            <h3 class="progress-title-main"><i class="ph ph-text-align-left modal-icon-inline"></i> Summary Options</h3>
+            <p class="progress-subtitle-main">Customize how the AI should summarize your note.</p>
 
             <!-- Mode -->
-            <div style="margin-bottom: var(--spacing-md);">
-                <label style="display: block; margin-bottom: var(--spacing-xs); font-weight: 600; font-size: var(--font-size-sm);">Mode</label>
+            <div class="options-group">
+                <label class="options-label">Mode</label>
                 <div class="ai-mode-bar" id="summaryModeBar">
                     <button class="mode-pill" data-mode="quick" onclick="setSummaryMode('quick')">
                         <i class="ph ph-lightning"></i> Quick
@@ -168,8 +161,8 @@
             </div>
 
             <!-- Output -->
-            <div style="margin-bottom: var(--spacing-md);">
-                <label style="display: block; margin-bottom: var(--spacing-xs); font-weight: 600; font-size: var(--font-size-sm);">Output Format</label>
+            <div class="options-group">
+                <label class="options-label">Output Format</label>
                 <div class="output-format-bar" id="summaryOutputBar">
                     <button class="mode-pill active" data-format="sentence" onclick="setSummaryFormat('sentence')">
                         <i class="ph ph-text-t"></i> Sentence
@@ -187,27 +180,25 @@
             </div>
 
             <!-- Processing Method -->
-            <div style="margin-bottom: var(--spacing-md);">
-                <label style="display: block; margin-bottom: var(--spacing-xs); font-weight: 600; font-size: var(--font-size-sm);">Processing Method</label>
-                <select id="summaryProcessMethod" onchange="onSummaryMethodChange()"
-                    style="width: 100%; padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--color-light-gray); font-family: inherit; font-size: var(--font-size-sm);">
+            <div class="options-group">
+                <label class="options-label">Processing Method</label>
+                <select id="summaryProcessMethod" onchange="onSummaryMethodChange()" class="options-select">
                     <option value="whole">Process Whole Note (Faster)</option>
                     <option value="section">Process Section by Section (More Detailed)</option>
                 </select>
             </div>
 
             <!-- Split Level (Hidden by default) -->
-            <div id="splitLevelContainer" style="display: none; margin-bottom: var(--spacing-lg);">
-                <label style="display: block; margin-bottom: var(--spacing-xs); font-weight: 600; font-size: var(--font-size-sm);">Header Level for Sections</label>
-                <select id="summarySplitLevel"
-                    style="width: 100%; padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--color-light-gray); font-family: inherit; font-size: var(--font-size-sm);">
+            <div id="splitLevelContainer" style="display: none;" class="options-group">
+                <label class="options-label">Header Level for Sections</label>
+                <select id="summarySplitLevel" class="options-select">
                     <option value="h1">Level 1 Headers (# )</option>
                     <option value="h2" selected>Level 2 Headers (## )</option>
                     <option value="h3">Level 3 Headers (### )</option>
                 </select>
             </div>
 
-            <div class="modal-buttons" style="margin-top: var(--spacing-lg);">
+            <div class="modal-buttons modal-footer-spacing">
                 <button type="button" class="btn btn-primary" id="generateSummaryBtn" onclick="generateSummary()">Generate Summary</button>
                 <button type="button" class="btn btn-secondary" onclick="closeSummaryModal()">Cancel</button>
             </div>
@@ -216,22 +207,22 @@
 
     <!-- Summary Progress Modal -->
     <div id="summaryProgressModal" class="modal">
-        <div class="modal-content" style="max-width: 400px; padding: var(--spacing-xl);">
-            <div style="text-align: center; margin-bottom: var(--spacing-lg);">
-                <div style="font-size: 2rem; color: var(--color-primary); margin-bottom: var(--spacing-md); display: inline-block;">
+        <div class="modal-content modal-content-progress">
+            <div class="progress-centered-header">
+                <div class="progress-icon-sparkle">
                     <i class="ph ph-sparkle"></i>
                 </div>
-                <h3 style="margin-bottom: 4px;">Summarizing with AI</h3>
-                <p style="color: var(--color-gray); font-size: var(--font-size-sm);" id="summaryProgressMessage">Initializing AI model...</p>
+                <h3 class="progress-title-main">Summarizing with AI</h3>
+                <p class="progress-subtitle-main" id="summaryProgressMessage">Initializing AI model...</p>
             </div>
             
-            <div class="progress-container" style="display: block; background: var(--color-bg); border: none; padding: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <span id="summaryProgressLabel" style="font-weight: 600; font-size: 11px; text-transform: uppercase; color: var(--color-dark-gray);">Working...</span>
-                    <span id="summaryProgressPercent" style="font-size: 11px; font-weight: 600; color: var(--color-primary);">0%</span>
+            <div class="progress-container progress-wrapper-alt">
+                <div class="progress-info-labels">
+                    <span id="summaryProgressLabel" class="progress-status-text">Working...</span>
+                    <span id="summaryProgressPercent" class="progress-percent-text">0%</span>
                 </div>
-                <div class="progress-bar" style="height: 8px; background: var(--color-light-gray);">
-                    <div id="summaryProgressFill" class="progress-fill" style="width: 0%; transition: width 0.5s ease;"></div>
+                <div class="progress-bar progress-bar-alt">
+                    <div id="summaryProgressFill" class="progress-fill"></div>
                 </div>
             </div>
         </div>
@@ -239,11 +230,11 @@
 
     <!-- Delete Confirmation Modal -->
     <div id="deleteConfirmModal" class="modal">
-        <div class="modal-content" style="min-height: auto;">
+        <div class="modal-content modal-content-compact">
             <h3>Delete Summary Version?</h3>
-            <p style="color: var(--color-gray); margin-bottom: var(--spacing-lg);">This action cannot be undone. Are you sure you want to delete this version?</p>
+            <p class="modal-text-gray">This action cannot be undone. Are you sure you want to delete this version?</p>
             <div class="modal-buttons">
-                <button type="button" class="btn-save" id="confirmDeleteBtn" style="background: var(--color-error);" onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='var(--color-error)'" onclick="confirmDeleteVersion()">Delete</button>
+                <button type="button" class="btn-save btn-danger-static" id="confirmDeleteBtn" onclick="confirmDeleteVersion()">Delete</button>
                 <button type="button" class="btn-cancel" onclick="closeDeleteConfirmModal()">Cancel</button>
             </div>
         </div>
