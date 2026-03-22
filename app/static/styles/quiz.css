@@ -520,40 +520,6 @@
     font-size: 14px;
 }
 
-/* Progress Modal Enhancements */
-.modal-content-progress {
-    padding: var(--spacing-2xl) !important;
-}
-
-.quiz-search-section {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    background: var(--color-bg);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--color-border);
-    margin-bottom: var(--spacing-lg);
-}
-
-.search-filter-select {
-    width: auto;
-    min-width: 140px;
-    padding: var(--spacing-md) var(--spacing-lg);
-    height: auto;
-}
-
-.btn-search {
-    padding: var(--spacing-md) var(--spacing-lg);
-    white-space: nowrap;
-}
-
-.progress-icon-sparkle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 20px;
-}
-
 .practice-score-box {
     text-align: right;
     background: var(--color-bg);

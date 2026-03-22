@@ -12,6 +12,13 @@ class QuizQuestionBase(BaseModel):
 class QuizQuestionCreate(QuizQuestionBase):
     pass
 
+class QuizQuestionUpdate(BaseModel):
+    question_text: Optional[str] = None
+    answer_text: Optional[str] = None
+    question_type: Optional[str] = None
+    options: Optional[Any] = None
+    order: Optional[int] = None
+
 class QuizQuestionResponse(QuizQuestionBase):
     id: int
     quiz_id: str

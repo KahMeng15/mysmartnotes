@@ -15,6 +15,7 @@ from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
 from app.schemas.quiz import (
     QuizCreate, QuizUpdate, QuizResponse, QuizQuestionCreate, QuizQuestionResponse,
+    QuizQuestionUpdate,
     QuizGenerateRequest, QuizCheckRequest, QuizCheckResponse, SingleQuestionGenerateRequest,
     QuizGroupCreate, QuizGroupResponse
 )
@@ -298,6 +299,51 @@ def add_question(
     db.commit()
     db.refresh(question)
     return question
+
+@router.put("/{quiz_id}/questions/{question_id}", response_model=QuizQuestionResponse)
+def update_question(
+    quiz_id: str,
+    question_id: int,
+    question_in: QuizQuestionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a specific question in a quiz."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    question = db.query(QuizQuestion).filter(QuizQuestion.id == question_id, QuizQuestion.quiz_id == quiz.id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    update_data = question_in.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(question, key, value)
+        
+    db.commit()
+    db.refresh(question)
+    return question
+
+@router.delete("/{quiz_id}/questions/{question_id}")
+def delete_question(
+    quiz_id: str,
+    question_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a specific question from a quiz."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    question = db.query(QuizQuestion).filter(QuizQuestion.id == question_id, QuizQuestion.quiz_id == quiz.id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    db.delete(question)
+    db.commit()
+    return {"success": True}
 
 @router.post("/{quiz_id}/check", response_model=QuizCheckResponse)
 async def check_answer_ai(
