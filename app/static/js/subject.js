@@ -7,7 +7,7 @@ let allLectures = [];
 let currentSubject = null;
 
 window.addEventListener('load', () => {
-    if (!token) window.location.href = 'login.html';
+    if (!token) window.location.href = '/login';
     if (!subjectId) {
         alert('No subject specified');
         window.location.href = 'notes.html';

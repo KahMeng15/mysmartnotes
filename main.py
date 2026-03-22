@@ -176,6 +176,36 @@ async def system_settings_middleware(request: Request, call_next):
             db.commit()
 
         response = await call_next(request)
+
+        # 5. Sliding Session (Reset timer on activity)
+        if settings and settings.session_reset_on_activity:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
+                try:
+                    from app.utils.auth import decode_token, create_access_token
+                    from datetime import timedelta
+                    payload = decode_token(token)
+                    if payload:
+                        u_id = payload.get("sub")
+                        if u_id:
+                            # Re-issue token with full duration
+                            expire_minutes = 30 # default
+                            if settings.session_length:
+                                length = settings.session_length
+                                unit = settings.session_unit or "hours"
+                                if unit == "hours": expire_minutes = length * 60
+                                elif unit == "days": expire_minutes = length * 1440
+                            
+                            new_token = create_access_token(
+                                data={"sub": u_id},
+                                expires_delta=timedelta(minutes=expire_minutes)
+                            )
+                            response.headers["X-New-Token"] = new_token
+                            response.headers["Access-Control-Expose-Headers"] = "X-New-Token"
+                except Exception as e:
+                    pass # Silently fail for token re-issue
+
         return response
     finally:
         db.close()

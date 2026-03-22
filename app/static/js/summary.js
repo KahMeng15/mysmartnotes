@@ -36,7 +36,7 @@ const FORMAT_META = {
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!token) {
-        window.location.href = '/login.html';
+        window.location.href = '/login';
         return;
     }
 

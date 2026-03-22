@@ -14,6 +14,9 @@ class SystemSettingsSchema(BaseModel):
     global_ai_api_key: Optional[str] = None
     global_ai_base_url: Optional[str] = None
     ai_limit_per_user: str
+    session_length: int = 24
+    session_unit: str = "hours"
+    session_reset_on_activity: bool = True
 
     class Config:
         from_attributes = True

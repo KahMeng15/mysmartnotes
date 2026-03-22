@@ -24,7 +24,7 @@ const MODES = {
 
 // Initial Load
 window.addEventListener('load', async () => {
-    if (!token) window.location.href = 'login.html';
+    if (!token) window.location.href = '/login';
     
     checkPopout();
     initEventListeners();

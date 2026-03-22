@@ -2,7 +2,7 @@ const API_URL = '';
 const token = localStorage.getItem('token');
 
 window.addEventListener('load', () => {
-    if (!token) window.location.href = 'login.html';
+    if (!token) window.location.href = '/login';
     initializeCharts();
 });
 

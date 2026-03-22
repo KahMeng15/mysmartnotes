@@ -338,6 +338,12 @@ class SystemSettings(Base):
     global_ai_api_key = Column(String(255), nullable=True)
     global_ai_base_url = Column(String(255), nullable=True)
     ai_limit_per_user = Column(String(50), default="unlimited") # sec, min, hour, day, unlimited
+    
+    # Session Management
+    session_length = Column(Integer, default=24)
+    session_unit = Column(String(20), default="hours") # hours, days
+    session_reset_on_activity = Column(Boolean, default=True)
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

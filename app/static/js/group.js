@@ -7,7 +7,7 @@ let currentGroup = null;
 let groupSubjects = [];
 
 window.addEventListener('load', () => {
-    if (!token) window.location.href = 'login.html';
+    if (!token) window.location.href = '/login';
     if (!groupId) {
         alert('No group specified');
         window.location.href = 'notes.html';
@@ -185,7 +185,7 @@ function logout() {
     if (confirm('Logout?')) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = 'login.html';
+        window.location.href = '/login';
     }
 }
 

@@ -190,7 +190,7 @@ window.logout = function () {
 window.confirmLogout = function () {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/login.html';
+    window.location.href = '/login';
 };
 
 window.cancelLogout = function () {

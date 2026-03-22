@@ -3,7 +3,7 @@ const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
 
 window.addEventListener('load', () => {
-    if (!token) window.location.href = 'login.html';
+    if (!token) window.location.href = '/login';
     loadSettings();
     loadStats();
 });
@@ -188,7 +188,7 @@ function toggleNotifications() {
 function clearCache() {
     localStorage.clear();
     alert('Cache cleared');
-    window.location.href = 'login.html';
+    window.location.href = '/login';
 }
 
 async function changePassword() {
@@ -267,7 +267,7 @@ async function deleteAccount() {
         if (res.ok) {
             alert('Account deleted successfully.');
             localStorage.clear();
-            window.location.href = '/login.html';
+            window.location.href = '/login';
         } else {
             const error = await res.json();
             alert('Error: ' + error.detail);

@@ -113,7 +113,7 @@ function scrollToPosition(position) {
 
 // ===== INIT =====
 window.addEventListener('load', () => {
-    if (!token) { window.location.href = '/login.html'; return; }
+    if (!token) { window.location.href = '/login'; return; }
 
     // Extract UUID or integer ID from path /note/123
     const pathParts = window.location.pathname.split('/');

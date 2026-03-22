@@ -210,9 +210,19 @@ def login(credentials: UserLogin, request: Request, db: Session = Depends(get_db
         db.commit()
     
     # Create token
+    sys_settings = db.query(SystemSettings).first()
+    expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+    if sys_settings and sys_settings.session_length:
+        length = sys_settings.session_length
+        unit = sys_settings.session_unit or "hours"
+        if unit == "hours":
+            expire_minutes = length * 60
+        elif unit == "days":
+            expire_minutes = length * 1440
+            
     access_token = create_access_token(
         data={"sub": str(user.id)},
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_delta=timedelta(minutes=expire_minutes)
     )
     
     # Log login
@@ -269,9 +279,19 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
                 user.is_admin = True
                 db.commit()
             
+            sys_settings = db.query(SystemSettings).first()
+            expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+            if sys_settings and sys_settings.session_length:
+                length = sys_settings.session_length
+                unit = sys_settings.session_unit or "hours"
+                if unit == "hours":
+                    expire_minutes = length * 60
+                elif unit == "days":
+                    expire_minutes = length * 1440
+            
             access_token = create_access_token(
                 data={"sub": str(user.id)},
-                expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+                expires_delta=timedelta(minutes=expire_minutes)
             )
             
             # Log login
@@ -354,9 +374,19 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
                 existing_user.is_admin = True
                 db.commit()
                 
+            sys_settings = db.query(SystemSettings).first()
+            expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+            if sys_settings and sys_settings.session_length:
+                length = sys_settings.session_length
+                unit = sys_settings.session_unit or "hours"
+                if unit == "hours":
+                    expire_minutes = length * 60
+                elif unit == "days":
+                    expire_minutes = length * 1440
+            
             access_token = create_access_token(
                 data={"sub": str(existing_user.id)},
-                expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+                expires_delta=timedelta(minutes=expire_minutes)
             )
             return {"access_token": access_token, "token_type": "bearer", "user": existing_user}
         
@@ -375,9 +405,19 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
         db.refresh(user)
         
         # Create JWT token
+        sys_settings = db.query(SystemSettings).first()
+        expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        if sys_settings and sys_settings.session_length:
+            length = sys_settings.session_length
+            unit = sys_settings.session_unit or "hours"
+            if unit == "hours":
+                expire_minutes = length * 60
+            elif unit == "days":
+                expire_minutes = length * 1440
+                
         access_token = create_access_token(
             data={"sub": str(user.id)},
-            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            expires_delta=timedelta(minutes=expire_minutes)
         )
         
         # Log signup

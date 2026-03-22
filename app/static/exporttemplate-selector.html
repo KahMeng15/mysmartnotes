@@ -108,7 +108,7 @@
         };
 
         window.addEventListener('load', () => {
-            if (!token) window.location.href = 'login.html';
+            if (!token) window.location.href = '/login';
             loadTemplates();
             // Attach global click listener to close menus
             document.addEventListener('click', (e) => closeAllTemplateMenus(e));

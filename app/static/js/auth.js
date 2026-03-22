@@ -2,23 +2,23 @@
  * Global Authentication Handler
  * - Checks for token on page load
  * - Intercepts 401 Unauthorized responses
- * - Redirects to login page (login.html) on auth failure
+ * - Redirects to login page (/login) on auth failure
  */
 (function () {
     // 1. Check if token exists on load
     const token = localStorage.getItem('token');
 
     // List of public pages that don't require authentication
-    // Note: login.html is the login page.
-    const publicPages = ['login.html', '/', ''];
+    // Note: /login is the login page.
+    const publicPages = ['/login', '/login.html', '/register.html', '/'];
 
     const currentPath = window.location.pathname;
-    const isPublicPage = publicPages.some(page => currentPath.endsWith(page));
+    const isPublicPage = publicPages.some(page => currentPath === page || currentPath.endsWith(page));
 
     if (!token && !isPublicPage) {
         // If we are on a protected page and have no token, redirect immediately
         console.warn('No auth token found, redirecting to login...');
-        window.location.href = 'login.html';
+        window.location.href = '/login';
         return; // Stop execution
     }
 
@@ -40,7 +40,14 @@
                 console.warn('Authentication expired (401), redirecting to login...');
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                window.location.href = 'login.html';
+                window.location.href = '/login';
+            }
+
+            // Handle sliding session: update token if server provided a new one
+            const newToken = response.headers.get('X-New-Token');
+            if (newToken) {
+                console.debug('Updating session token (sliding session)');
+                localStorage.setItem('token', newToken);
             }
 
             return response;

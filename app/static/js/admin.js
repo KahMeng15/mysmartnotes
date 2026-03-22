@@ -248,6 +248,12 @@ async function loadSystemSettings() {
         document.getElementById('globalAiKey').value = s.global_ai_api_key ? '********' : '';
         document.getElementById('globalAiUrl').value = s.global_ai_base_url || '';
         document.getElementById('aiLimitPerUser').value = s.ai_limit_per_user || 'unlimited';
+        
+        // Session Management
+        document.getElementById('sessionLength').value = s.session_length || 24;
+        document.getElementById('sessionUnit').value = s.session_unit || 'hours';
+        if (s.session_reset_on_activity) document.getElementById('sessionResetToggle').classList.add('active');
+        else document.getElementById('sessionResetToggle').classList.remove('active');
     } catch(e) { console.error('Error loading config', e); }
 }
 
@@ -262,7 +268,10 @@ async function saveSystemSettings(e) {
         global_ai_provider: document.getElementById('globalAiProvider').value,
         global_ai_model: document.getElementById('globalAiModel').value,
         global_ai_base_url: document.getElementById('globalAiUrl').value,
-        ai_limit_per_user: document.getElementById('aiLimitPerUser').value
+        ai_limit_per_user: document.getElementById('aiLimitPerUser').value,
+        session_length: parseInt(document.getElementById('sessionLength').value),
+        session_unit: document.getElementById('sessionUnit').value,
+        session_reset_on_activity: document.getElementById('sessionResetToggle').classList.contains('active')
     };
     const key = document.getElementById('globalAiKey').value;
     if (key && key !== '********') payload.global_ai_api_key = key;

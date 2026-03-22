@@ -121,7 +121,7 @@ function applySavedMode() {
 
 // ── Bootstrap ─────────────────────────────────────────────────────
 window.addEventListener('load', () => {
-    if (!token) { window.location.href = 'login.html'; return; }
+    if (!token) { window.location.href = '/login'; return; }
     applySavedMode();
     loadData();
     setupMessageInput();

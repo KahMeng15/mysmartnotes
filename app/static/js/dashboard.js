@@ -5,7 +5,7 @@ const token = localStorage.getItem('token');
 // Check authentication on page load
 window.addEventListener('load', async () => {
     if (!token) {
-        window.location.href = 'login.html';
+        window.location.href = '/login';
         return;
     }
     loadUserInfo();
@@ -54,7 +54,7 @@ async function loadUserInfo() {
                 name = user.nickname || user.full_name || user.username;
             } else if (response.status === 401) {
                 // Token invalid/expired, redirect to login
-                window.location.href = 'login.html';
+                window.location.href = '/login';
                 return;
             }
         } catch (e) {
