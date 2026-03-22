@@ -164,11 +164,11 @@ function createGroupSection(group, quizzes, isUngrouped = false) {
         `;
     }
 
-    const minimizeButtonHtml = !isUngrouped ? `
+    const minimizeButtonHtml = `
         <button onclick="event.stopPropagation(); toggleGroupMinimize('${group.id}')" class="btn btn-outline btn-small btn-minimize">
             ${isMinimized ? '<i class="ph ph-caret-right"></i>' : '<i class="ph ph-caret-down"></i>'}
         </button>
-    ` : '';
+    `;
 
     return `
         <div class="group-section" data-group-id="${group.id}">
@@ -210,7 +210,7 @@ function createQuizCardHtml(quiz) {
                     <i class="ph ph-exam"></i>
                 </div>
                 <div class="quiz-actions-menu">
-                    <button class="btn-icon-sm" onclick="event.stopPropagation(); toggleQuizActionMenu(event, '${quiz.id}')" title="Actions">
+                    <button class="btn btn-outline btn-small" onclick="event.stopPropagation(); toggleQuizActionMenu(event, '${quiz.id}')" title="Actions">
                         <i class="ph ph-dots-three-vertical"></i>
                     </button>
                     <div id="quiz-menu-${quiz.id}" class="quiz-dropdown-menu">

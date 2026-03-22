@@ -36,7 +36,7 @@
                     <h1>My Quizzes</h1>
                     <div id="activeGroupLabel" style="font-size: 14px; color: var(--color-primary); font-weight: 600; margin-top: 4px; display: none;">
                         <i class="ph ph-folder-open"></i> Group: <span id="currentGroupName">None</span>
-                        <button class="btn-icon-sm" onclick="clearGroupFilter()" title="Clear Group Filter"><i class="ph ph-x"></i></button>
+                        <button class="btn btn-outline btn-small" onclick="clearGroupFilter()" title="Clear Group Filter"><i class="ph ph-x"></i> Clear</button>
                     </div>
                 </div>
                 <div class="flex-align-center gap-md">
@@ -158,8 +158,7 @@
                 <div class="form-group margin-top-lg">
                     <label class="margin-bottom-sm">Number of Questions</label>
                     <div class="flex-align-center gap-md">
-                        <input type="number" id="numQuestions" value="5" min="1" max="500" class="form-control-number">
-                        <span style="color: var(--color-gray); font-size: 13px;">(Max 500 questions)</span>
+                        <input type="number" id="numQuestions" value="5" min="1" max="500"">
                     </div>
                 </div>
             </div>

@@ -392,9 +392,31 @@ function createQuestionCard(q, index) {
     
     const header = document.createElement('div');
     header.className = 'q-header';
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.alignItems = 'center';
+    header.style.marginBottom = 'var(--spacing-md)';
+    header.style.paddingBottom = 'var(--spacing-sm)';
+    header.style.borderBottom = '1px solid var(--color-bg)';
+    
     header.innerHTML = `
-        <div class="q-number">Question ${index + 1}</div>
-        <div class="q-type-badge">${q.question_type.replace(/_/g, ' ')}</div>
+        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+            <div class="q-number">Question ${index + 1}</div>
+            <div class="q-type-badge">${q.question_type.replace(/_/g, ' ')}</div>
+        </div>
+        <div class="quiz-actions-menu">
+            <button class="btn btn-outline btn-small" onclick="event.stopPropagation(); toggleQuestionActionMenu(event, '${q.id}')" title="Actions">
+                <i class="ph ph-dots-three-vertical"></i> More
+            </button>
+            <div id="q-menu-${q.id}" class="quiz-dropdown-menu">
+                <button onclick="event.stopPropagation(); openEditQuestionModal('${q.id}')">
+                    <i class="ph ph-pencil-simple"></i> Edit Question
+                </button>
+                <button onclick="event.stopPropagation(); deleteQuestion('${q.id}')" style="color: var(--color-error);">
+                    <i class="ph ph-trash"></i> Delete
+                </button>
+            </div>
+        </div>
     `;
     card.appendChild(header);
     
@@ -708,5 +730,129 @@ async function addQuestion() {
         
     } catch (e) {
         alert(e.message);
+    }
+}
+
+function toggleQuestionActionMenu(event, qId) {
+    // Close all other menus
+    document.querySelectorAll('.quiz-dropdown-menu').forEach(menu => {
+        if (menu.id !== `q-menu-${qId}`) {
+            menu.classList.remove('active');
+        }
+    });
+    
+    const menu = document.getElementById(`q-menu-${qId}`);
+    menu.classList.toggle('active');
+    
+    // Close on click outside
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target) && !event.target.contains(e.target)) {
+            menu.classList.remove('active');
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    document.addEventListener('click', closeMenu);
+}
+
+function deleteQuestion(qId) {
+    showConfirmModal('Are you sure you want to delete this question?', async () => {
+        try {
+            const response = await fetch(`/quizzes/${currentQuiz.id}/questions/${qId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                currentQuestions = currentQuestions.filter(q => q.id !== qId);
+                renderQuestions();
+                document.getElementById('infoCount').textContent = currentQuestions.length;
+                showSuccessModal('Question Deleted', 'The question has been removed from the quiz.');
+            } else {
+                showErrorModal('Delete Failed', 'Failed to delete the question.');
+            }
+        } catch (e) {
+            console.error(e);
+            showErrorModal('Error', 'An unexpected error occurred.');
+        }
+    });
+}
+
+function openEditQuestionModal(qId) {
+    const q = currentQuestions.find(x => x.id === qId);
+    if (!q) return;
+
+    setAddMethod('manual');
+    document.querySelector('.method-toggle').style.display = 'none';
+    
+    document.getElementById('newQType').value = q.question_type;
+    document.getElementById('newQText').value = q.question_text;
+    document.getElementById('newQAnswer').value = q.answer_text;
+    
+    if (q.question_type === 'objective' && q.options) {
+        let opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+        document.getElementById('newQOptionsText').value = opts.join('\n');
+    }
+    
+    toggleOptionInputs();
+    
+    document.getElementById('addQuestionModal').classList.add('active');
+    
+    const submitBtn = document.querySelector('#addManualSection .btn-primary');
+    submitBtn.textContent = 'Save Changes';
+    submitBtn.onclick = (e) => {
+        e.preventDefault();
+        submitEditQuestion(qId);
+    };
+}
+
+async function submitEditQuestion(qId) {
+    const qtype = document.getElementById('newQType').value;
+    const text = document.getElementById('newQText').value.trim();
+    const answer = document.getElementById('newQAnswer').value.trim();
+    
+    if (!text || !answer) {
+        showErrorModal('Required Fields', "Question and Answer are required.");
+        return;
+    }
+    
+    let optionsList = null;
+    if (qtype === 'objective') {
+        const optsRaw = document.getElementById('newQOptionsText').value.trim();
+        if (!optsRaw) {
+            showErrorModal('Required Fields', "Please provide options for multiple choice.");
+            return;
+        }
+        optionsList = optsRaw.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    }
+    
+    try {
+        const response = await fetch(`/quizzes/${currentQuiz.id}/questions/${qId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                question_text: text,
+                answer_text: answer,
+                question_type: qtype,
+                options: optionsList
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to update question');
+        
+        const updatedQ = await response.json();
+        const idx = currentQuestions.findIndex(x => x.id === qId);
+        currentQuestions[idx] = updatedQ;
+        
+        closeModal('addQuestionModal');
+        renderQuestions();
+        showSuccessModal('Question Updated', 'Changes saved successfully.');
+        
+        // Reset modal for next use
+        document.querySelector('.method-toggle').style.display = 'flex';
+        const addBtn = document.querySelector('#addManualSection .btn-primary');
+        addBtn.textContent = 'Add Question';
+        addBtn.onclick = addQuestion;
+
+    } catch (e) {
+        showErrorModal('Update Failed', e.message);
     }
 }
