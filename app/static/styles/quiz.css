@@ -332,13 +332,12 @@
 }
 
 .hidden-content {
-    filter: blur(4px);
+    filter: blur(10px);
     user-select: none;
     cursor: pointer;
     transition: filter 0.2s;
     background: rgba(0,0,0,0.03);
     border-radius: 4px;
-    padding: 2px 4px;
 }
 
 .hidden-content.revealed {
