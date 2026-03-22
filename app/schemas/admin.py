@@ -17,6 +17,7 @@ class SystemSettingsSchema(BaseModel):
     session_length: int = 24
     session_unit: str = "hours"
     session_reset_on_activity: bool = True
+    max_quiz_questions: int = 500
 
     class Config:
         from_attributes = True

@@ -6,6 +6,15 @@
     margin-top: var(--spacing-lg);
 }
 
+/* Quiz Dashboard Styles - Align with master.css */
+
+.quiz-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
 .quiz-card {
     background: var(--color-white);
     border: 1px solid var(--color-light-gray);
@@ -17,7 +26,65 @@
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
-    overflow: hidden;
+}
+
+.quiz-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.quiz-actions-menu {
+    position: relative;
+}
+
+.quiz-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--color-white);
+    border: 1px solid var(--color-light-gray);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    z-index: 1000;
+    display: none;
+    min-width: 180px;
+    padding: 8px 0;
+    margin-top: 8px;
+}
+
+.quiz-dropdown-menu.active {
+    display: block;
+}
+
+.quiz-dropdown-menu button {
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 14px;
+    color: var(--color-dark);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.quiz-dropdown-menu button:hover {
+    background: var(--color-bg);
+    color: var(--color-primary);
+}
+
+.quiz-dropdown-menu button i {
+    font-size: 18px;
+    color: var(--color-gray);
+}
+
+.quiz-dropdown-menu button:hover i {
+    color: var(--color-primary);
 }
 
 .quiz-card:hover {
@@ -78,6 +145,7 @@
     padding: var(--spacing-lg);
     border-radius: var(--radius-lg);
     margin-bottom: var(--spacing-lg);
+    border: 1px solid var(--color-light-gray);
 }
 
 .step-item {
@@ -280,48 +348,122 @@
 
 /* Flashcard Styles */
 .flashcard-container {
-    perspective: 1000px;
-    height: 350px;
     margin: var(--spacing-xl) auto;
-    max-width: 600px;
+    max-width: 640px;
     width: 100%;
 }
 
 .flashcard {
     width: 100%;
-    height: 100%;
-    position: relative;
-    transform-style: preserve-3d;
-    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    min-height: 320px;
+    padding: var(--spacing-2xl);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    background: var(--color-white);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
 }
 
-.flashcard.flipped {
-    transform: rotateY(180deg);
+.flashcard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 45px rgba(0,0,0,0.08);
+}
+
+.flashcard:focus-visible {
+    outline: 3px solid var(--color-primary-light);
+    outline-offset: 4px;
 }
 
 .flashcard-face {
     position: absolute;
-    width: 100%;
-    height: 100%;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
+    inset: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: var(--spacing-2xl);
+    gap: var(--spacing-md);
     text-align: center;
-    background: var(--color-white);
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-xl);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    padding: var(--spacing-2xl);
+    opacity: 1;
+    transition: opacity 0.4s ease-in-out;
 }
 
-.flashcard-back {
-    transform: rotateY(180deg);
+.flashcard-question {
+    opacity: 1;
+    transition: opacity 0.4s ease-in-out;
+    pointer-events: auto;
+}
+
+.flashcard-answer {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease-in-out;
+}
+
+.flashcard.show-answer .flashcard-question {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.flashcard.show-answer .flashcard-answer {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.flashcard-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.flashcard-answer-label {
+    background: var(--color-primary);
+    color: var(--color-white);
+}
+
+.fc-question-text {
+    font-size: 1.4rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--color-dark);
+}
+
+.fc-answer-text {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    line-height: 1.5;
+}
+
+.flashcard-instruction {
+    font-size: 12px;
+    color: var(--color-gray);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.flashcard-instruction kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    margin: 0 2px;
     background: var(--color-bg);
-    border-color: var(--color-primary-light);
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+/* Hide keyboard hints on touch devices */
+@media (hover: none) and (pointer: coarse) {
+    .flashcard-instruction kbd {
+        display: none;
+    }
 }
 
 .fc-content {
@@ -389,18 +531,21 @@
     gap: 10px;
     align-items: center;
     background: var(--color-bg);
-    padding: 15px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
+    margin-bottom: var(--spacing-lg);
 }
 
 .search-filter-select {
     width: auto;
     min-width: 140px;
+    padding: var(--spacing-md) var(--spacing-lg);
+    height: auto;
 }
 
 .btn-search {
-    padding: 10px 20px;
+    padding: var(--spacing-md) var(--spacing-lg);
+    white-space: nowrap;
 }
 
 .progress-icon-sparkle {
@@ -425,12 +570,99 @@
     gap: 8px;
 }
 
-.btn-xs {
-    padding: 4px 8px;
-    font-size: 11px;
-    height: auto;
-    gap: 4px;
+.btn-icon-sm {
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: pointer;
+    color: var(--color-gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
 }
+
+/* Button & Utility overrides */
+.btn-small {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+/* Quiz Modal Mode Pills */
+.mode-pill-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: var(--spacing-lg);
+}
+
+.mode-pill {
+    padding: 8px 16px;
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--color-light-gray);
+    background: var(--color-white);
+    color: var(--color-gray);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.mode-pill:hover {
+    border-color: var(--color-primary);
+    background: rgba(89, 60, 143, 0.04);
+    color: var(--color-primary);
+}
+
+.mode-pill.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+.form-control-number {
+    width: 120px;
+    padding: 10px;
+    border: 1px solid var(--color-light-gray);
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    text-align: center;
+}
+
+.form-control-number:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(89, 60, 143, 0.1);
+}
+.border-bottom { border-bottom: 1px solid var(--color-bg); }
+
+#activeGroupLabel {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#activeGroupLabel .btn-icon-sm:hover {
+    color: var(--color-error);
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.flex-align-center {
+    display: flex;
+    align-items: center;
+}
+
+.gap-sm { gap: 8px; }
+.gap-md { gap: 16px; }
+
+/* Existing styles ... */
 
 .btn-icon {
     background: none;
@@ -471,9 +703,17 @@
 
 .flashcard-controls {
     display: none;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 20px;
+    gap: 12px;
+}
+
+.fc-nav-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
 }
 
 .fc-counter {

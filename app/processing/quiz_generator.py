@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from app.models.db import User, Quiz, QuizQuestion, Subject, Lecture, SubjectGroup
 from app.processing.ai_client import AIClient
+from app.utils.db import generate_random_id
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,8 @@ async def generate_advanced_quiz(
     scope_type: str,
     scope_id: str,
     question_types: List[str],
-    num_questions: int = 5
+    num_questions: int = 5,
+    quiz_group_id: str = None
 ) -> Quiz:
     """Generate a quiz with specific question types based on scope content."""
     
@@ -98,12 +100,14 @@ Respond with ONLY the JSON array.
 
     # Create the Quiz
     quiz = Quiz(
+        id=generate_random_id(db, Quiz),
         user_id=user.id,
         title=title,
         scope_type=scope_type,
         group_id=group_id,
         subject_id=subject_id,
         lecture_id=lecture_id,
+        quiz_group_id=quiz_group_id,
         model=ai_client.model_name,
         processing_time_ms=processing_time_ms
     )

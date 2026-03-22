@@ -235,6 +235,41 @@ window.closeSuccessModal = function () {
     }
 };
 
+window.showErrorModal = function (title, message) {
+    // Create error modal if it doesn't exist
+    let errorModal = document.getElementById('errorModal');
+    if (!errorModal) {
+        errorModal = document.createElement('div');
+        errorModal.id = 'errorModal';
+        errorModal.className = 'modal';
+        document.body.appendChild(errorModal);
+    }
+
+    // Update content
+    errorModal.innerHTML = `
+        <div class="modal-content text-center" style="min-height: auto;">
+            <div class="modal-icon error" style="color: var(--color-error); font-size: 48px; margin-bottom: 16px;">
+                <i class="ph ph-x-circle"></i>
+            </div>
+            <h3>${title || 'Error'}</h3>
+            <p style="color: var(--color-gray); margin-bottom: var(--spacing-lg);">${message || 'An unexpected error occurred.'}</p>
+            <div class="modal-buttons">
+                <button type="button" class="btn-save" style="background: var(--color-gray);" onclick="closeErrorModal()">Close</button>
+            </div>
+        </div>
+    `;
+
+    // Show the modal
+    errorModal.classList.add('active');
+};
+
+window.closeErrorModal = function () {
+    const errorModal = document.getElementById('errorModal');
+    if (errorModal) {
+        errorModal.classList.remove('active');
+    }
+};
+
 window.showConfirmModal = function (message, onConfirm) {
     // Create confirm modal if it doesn't exist
     let confirmModal = document.getElementById('confirmationModal');

@@ -4,6 +4,7 @@ let currentQuiz = null;
 let currentQuestions = [];
 let currentMode = 'showanswers';
 let currentCardIndex = 0;
+let isFlashcardRevealed = false;
 let examTimerInterval = null;
 let timeRemaining = 15 * 60; // Default
 let examAnswers = {};
@@ -28,6 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const mode = e.currentTarget.dataset.mode;
             setMode(mode);
         });
+    });
+    
+    // Setup keyboard navigation for flashcards
+    document.addEventListener('keydown', (event) => {
+        if (currentMode !== 'flashcards') return;
+        
+        if (event.code === 'Space') {
+            event.preventDefault();
+            toggleFlashcardReveal();
+        } else if (event.code === 'ArrowLeft') {
+            event.preventDefault();
+            prevCard();
+        } else if (event.code === 'ArrowRight') {
+            event.preventDefault();
+            nextCard();
+        }
     });
 });
 
@@ -76,10 +93,27 @@ async function loadQuiz(quizId, initialMode) {
 
 function setMode(mode, updateUrl = true) {
     currentMode = mode;
+    if (mode !== 'flashcards') {
+        isFlashcardRevealed = false;
+    }
     
     // UI state reset
     document.getElementById('quizMainContent').style.filter = 'none';
     document.getElementById('quizMainContent').style.pointerEvents = 'all';
+    
+    // Update breadcrumb with view mode
+    const modeLabels = {
+        'showanswers': 'Show Answers',
+        'hideanswers': 'Hide Answers',
+        'practice': 'Practice',
+        'flashcards': 'Flashcards',
+        'tableview': 'Table View',
+        'examsimulator': 'Exam Simulator'
+    };
+    const modeLabel = modeLabels[mode] || 'View';
+    document.getElementById('breadcrumbViewMode').textContent = modeLabel;
+    document.getElementById('breadcrumbViewMode').style.display = 'inline';
+    document.getElementById('breadcrumbViewSep').style.display = 'inline';
     
     // Update sidebar active state
     document.querySelectorAll('#modeGrid .action-btn').forEach(b => {
@@ -170,6 +204,9 @@ function renderQuestions() {
     const filter = document.getElementById('qSearchFilter')?.value || 'both';
     
     if (!currentQuestions || currentQuestions.length === 0) {
+        isFlashcardRevealed = false;
+        const counterEl = document.getElementById('fcCounter');
+        if (counterEl) counterEl.textContent = '0 / 0';
         container.innerHTML = `
             <div class="empty-state" style="padding: 60px;">
                 <i class="ph ph-file-dashed" style="font-size: 48px; color: var(--color-gray); margin-bottom: 16px;"></i>
@@ -268,33 +305,57 @@ function renderTableMode(container, questions) {
 }
 
 function renderFlashcardMode(container) {
-    if (currentCardIndex >= currentQuestions.length) currentCardIndex = 0;
-    if (currentCardIndex < 0) currentCardIndex = currentQuestions.length - 1;
+    if (currentCardIndex >= currentQuestions.length) {
+        currentCardIndex = 0;
+        isFlashcardRevealed = false;
+    }
+    if (currentCardIndex < 0) {
+        currentCardIndex = currentQuestions.length - 1;
+        isFlashcardRevealed = false;
+    }
     
     const q = currentQuestions[currentCardIndex];
-    document.getElementById('fcCounter').textContent = `${currentCardIndex + 1} / ${currentQuestions.length}`;
-    
+    const counterEl = document.getElementById('fcCounter');
+    if (counterEl) {
+        counterEl.textContent = `${currentCardIndex + 1} / ${currentQuestions.length}`;
+    }
+
     const fcContainer = document.createElement('div');
     fcContainer.className = 'flashcard-container';
     
     const card = document.createElement('div');
     card.className = 'flashcard';
-    card.onclick = () => card.classList.toggle('flipped');
-    
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-pressed', String(isFlashcardRevealed));
+    card.classList.toggle('show-answer', isFlashcardRevealed);
+
+    card.addEventListener('click', () => {
+        toggleFlashcardReveal();
+    });
+    card.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleFlashcardReveal();
+        }
+    });
+
     card.innerHTML = `
-        <div class="flashcard-face">
-            <span class="q-type-badge" style="position:absolute; top: 20px; left: 20px;">Question ${currentCardIndex + 1}</span>
-            <div class="fc-content" style="font-size: 1.4rem; font-weight: 600; line-height: 1.5; color: var(--color-dark);">${q.question_text}</div>
-            <div style="font-size: 12px; color: var(--color-gray); margin-top: 30px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
-                <i class="ph ph-arrow-u-up-right"></i> Click to reveal answer
-            </div>
+        <div class="flashcard-face flashcard-question">
+            <span class="q-type-badge flashcard-label">Question ${currentCardIndex + 1}</span>
+            <div class="fc-content fc-question-text">${q.question_text}</div>
+            <p class="flashcard-instruction">
+                <i class="ph ph-hand-pointing"></i>
+                Click to reveal, or press <kbd>Space</kbd> | <kbd>←</kbd> <kbd>→</kbd> on keyboard
+            </p>
         </div>
-        <div class="flashcard-face flashcard-back">
-            <span class="q-type-badge" style="position:absolute; top: 20px; left: 20px; background: var(--color-primary); color: white;">Answer</span>
-            <div class="fc-content" style="font-size: 1.3rem; font-weight: 600; color: var(--color-primary); line-height: 1.5;">${q.answer_text}</div>
-            <div style="font-size: 12px; color: var(--color-gray); margin-top: 30px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
-                Click to flip back
-            </div>
+        <div class="flashcard-face flashcard-answer">
+            <span class="q-type-badge flashcard-label flashcard-answer-label">Answer</span>
+            <div class="fc-content fc-answer-text">${q.answer_text}</div>
+            <p class="flashcard-instruction">
+                <i class="ph ph-hand-pointing"></i>
+                Click to reveal question, or press <kbd>Space</kbd> to flip
+            </p>
         </div>
     `;
     
@@ -302,13 +363,25 @@ function renderFlashcardMode(container) {
     container.appendChild(fcContainer);
 }
 
+function toggleFlashcardReveal(forceState = null) {
+    if (!currentQuestions.length) return;
+    if (typeof forceState === 'boolean') {
+        isFlashcardRevealed = forceState;
+    } else {
+        isFlashcardRevealed = !isFlashcardRevealed;
+    }
+    renderQuestions();
+}
+
 function prevCard() {
     currentCardIndex--;
+    isFlashcardRevealed = false;
     renderQuestions();
 }
 
 function nextCard() {
     currentCardIndex++;
+    isFlashcardRevealed = false;
     renderQuestions();
 }
 
@@ -438,7 +511,7 @@ async function submitAnswerForCheck(qId, cardEl) {
     }
     
     if (!userAns) {
-        alert("Please provide an answer first.");
+        showErrorModal('Answer Required', 'Please provide an answer first.');
         return;
     }
     
@@ -490,7 +563,7 @@ async function submitAnswerForCheck(qId, cardEl) {
         
     } catch (error) {
         console.error("Check failed", error);
-        alert("Failed to grade answer.");
+        showErrorModal('Grading Failed', 'Failed to grade your answer. Please try again.');
         checkBtn.innerHTML = originalText;
         checkBtn.disabled = false;
     }
@@ -498,7 +571,7 @@ async function submitAnswerForCheck(qId, cardEl) {
 
 async function submitExam() {
     clearInterval(examTimerInterval);
-    alert("Exam Simulator Finished! Review your answers in the standard or practice modes.");
+    showSuccessModal('Exam Finished', 'Exam Simulator Finished! Review your answers in the standard or practice modes.');
     setMode('showanswers');
 }
 
@@ -524,7 +597,7 @@ async function doExport(format) {
         window.location.href = data.download_url;
         closeModal('exportModal');
     } catch (e) {
-        alert("Export failed: " + e.message);
+        showErrorModal('Export Failed', e.message);
     } finally {
         btn.innerHTML = originalContent;
         btn.disabled = false;

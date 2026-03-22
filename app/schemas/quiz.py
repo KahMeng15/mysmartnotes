@@ -14,7 +14,7 @@ class QuizQuestionCreate(QuizQuestionBase):
 
 class QuizQuestionResponse(QuizQuestionBase):
     id: int
-    quiz_id: int
+    quiz_id: str
 
     class Config:
         from_attributes = True
@@ -25,17 +25,41 @@ class QuizBase(BaseModel):
     group_id: Optional[str] = None
     subject_id: Optional[str] = None
     lecture_id: Optional[str] = None
+    quiz_group_id: Optional[str] = None
     model: Optional[str] = None
     processing_time_ms: Optional[int] = None
 
 class QuizCreate(QuizBase):
     pass
 
+class QuizUpdate(BaseModel):
+    title: Optional[str] = None
+    quiz_group_id: Optional[str] = None
+    scope_type: Optional[str] = None
+    group_id: Optional[str] = None
+    subject_id: Optional[str] = None
+    lecture_id: Optional[str] = None
+
 class QuizResponse(QuizBase):
-    id: int
+    id: str
     created_at: datetime
     updated_at: datetime
     questions: List[QuizQuestionResponse] = []
+
+    class Config:
+        from_attributes = True
+
+class QuizGroupBase(BaseModel):
+    name: str
+
+class QuizGroupCreate(QuizGroupBase):
+    pass
+
+class QuizGroupResponse(QuizGroupBase):
+    id: str
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -45,7 +69,8 @@ class QuizGenerateRequest(BaseModel):
     scope_type: str
     scope_id: str
     question_types: List[str] = ["mixed"] # "objective", "subjective", "fill_in_the_blank", "mixed"
-    number_of_questions: int = 5
+    number_of_questions: int = Field(default=5, ge=1, le=500)
+    quiz_group_id: Optional[str] = None
 
 class QuizCheckRequest(BaseModel):
     user_answer: str

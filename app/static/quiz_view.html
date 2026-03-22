@@ -23,7 +23,9 @@
                 <div class="note-breadcrumb-row" id="quizBreadcrumb">
                     <a href="/quiz" class="note-nav-crumb-link">Quizzes</a>
                     <span class="note-nav-sep">›</span>
-                    <span class="note-nav-crumb-link active" id="breadcrumbTitle">Loading Quiz...</span>
+                    <span class="note-nav-crumb-link" id="breadcrumbTitle">Loading Quiz...</span>
+                    <span class="note-nav-sep" id="breadcrumbViewSep" style="display: none;">›</span>
+                    <span class="note-nav-crumb-link active" id="breadcrumbViewMode" style="display: none;">Show Answers</span>
                 </div>
             </div>
 
@@ -73,18 +75,20 @@
                     </button>
                 </div>
 
-                <!-- Flashcard Controls (Hidden) -->
-                <div id="fcControls" class="flashcard-controls margin-bottom-lg">
-                    <button class="btn btn-outline btn-icon" onclick="prevCard()"><i class="ph ph-caret-left"></i></button>
-                    <span id="fcCounter" class="fc-counter">1 / 10</span>
-                    <button class="btn btn-outline btn-icon" onclick="nextCard()"><i class="ph ph-caret-right"></i></button>
-                </div>
-
                 <!-- Quiz Content -->
                 <div id="quizContainer">
                     <div class="loading loading-container">
                         <div class="spinner"><i class="ph ph-spinner-gap ph-spin"></i></div>
                         <p>Loading questions...</p>
+                    </div>
+                </div>
+
+                <!-- Flashcard Controls (Hidden) -->
+                <div id="fcControls" class="flashcard-controls margin-top-lg">
+                    <div class="fc-nav-buttons">
+                        <button class="btn btn-outline btn-icon" onclick="prevCard()" title="Previous Card"><i class="ph ph-caret-left"></i></button>
+                        <span id="fcCounter" class="fc-counter">1 / 10</span>
+                        <button class="btn btn-outline btn-icon" onclick="nextCard()" title="Next Card"><i class="ph ph-caret-right"></i></button>
                     </div>
                 </div>
             </div>

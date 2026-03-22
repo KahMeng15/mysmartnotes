@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy import or_
+from typing import List, Optional
 from datetime import datetime
 import json
 import os
@@ -9,12 +10,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from app.models.db import User, Quiz, QuizQuestion, Subject, Lecture, QuizProgress, Summary, SubjectGroup
+from app.models.db import User, Quiz, QuizQuestion, Subject, Lecture, QuizProgress, Summary, SubjectGroup, QuizGroup
 from app.utils.auth import get_current_user
-from app.utils.db import get_db
+from app.utils.db import get_db, generate_random_id
 from app.schemas.quiz import (
-    QuizCreate, QuizResponse, QuizQuestionCreate, QuizQuestionResponse,
-    QuizGenerateRequest, QuizCheckRequest, QuizCheckResponse, SingleQuestionGenerateRequest
+    QuizCreate, QuizUpdate, QuizResponse, QuizQuestionCreate, QuizQuestionResponse,
+    QuizGenerateRequest, QuizCheckRequest, QuizCheckResponse, SingleQuestionGenerateRequest,
+    QuizGroupCreate, QuizGroupResponse
 )
 from app.processing.ai_client import AIClient, get_ai_client
 from app.processing.quiz_generator import generate_advanced_quiz, check_semantic_answer, generate_single_question
@@ -30,12 +32,110 @@ _export_progress = {}
 
 @router.get("/", response_model=List[QuizResponse])
 def get_quizzes(
+    q: Optional[str] = None,
+    quiz_group_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all quizzes for current user."""
-    quizzes = db.query(Quiz).filter(Quiz.user_id == current_user.id).order_by(Quiz.created_at.desc()).all()
+    """Get all quizzes for current user with optional search and group filtering."""
+    query = db.query(Quiz).filter(Quiz.user_id == current_user.id)
+    
+    if quiz_group_id is not None:
+        if quiz_group_id == "":
+            query = query.filter(Quiz.quiz_group_id == None)
+        else:
+            query = query.filter(Quiz.quiz_group_id == quiz_group_id)
+        
+    if q:
+        search_filter = or_(
+            Quiz.title.ilike(f"%{q}%"),
+            Quiz.questions.any(QuizQuestion.question_text.ilike(f"%{q}%")),
+            Quiz.questions.any(QuizQuestion.answer_text.ilike(f"%{q}%")),
+            # Note info
+            Quiz.lecture.has(Lecture.title.ilike(f"%{q}%")),
+            Quiz.subject.has(Subject.name.ilike(f"%{q}%")),
+            Quiz.group.has(SubjectGroup.name.ilike(f"%{q}%"))
+        )
+        query = query.filter(search_filter)
+        
+    quizzes = query.order_by(Quiz.created_at.desc()).all()
     return quizzes
+
+@router.get("/groups", response_model=List[QuizGroupResponse])
+def get_quiz_groups(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all quiz groups for current user."""
+    return db.query(QuizGroup).filter(QuizGroup.user_id == current_user.id).all()
+
+@router.post("/groups", response_model=QuizGroupResponse)
+def create_quiz_group(
+    group_in: QuizGroupCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a new quiz group."""
+    group = QuizGroup(
+        id=generate_random_id(db, QuizGroup),
+        user_id=current_user.id,
+        name=group_in.name
+    )
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    return group
+
+@router.put("/groups/{group_id}", response_model=QuizGroupResponse)
+def update_quiz_group(
+    group_id: str,
+    group_in: QuizGroupCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a quiz group name."""
+    group = db.query(QuizGroup).filter(QuizGroup.id == group_id, QuizGroup.user_id == current_user.id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    group.name = group_in.name
+    db.commit()
+    db.refresh(group)
+    return group
+
+@router.delete("/groups/{group_id}")
+def delete_quiz_group(
+    group_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a quiz group."""
+    group = db.query(QuizGroup).filter(QuizGroup.id == group_id, QuizGroup.user_id == current_user.id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    db.delete(group)
+    db.commit()
+    return {"success": True}
+
+@router.put("/{quiz_id}/move")
+def move_quiz(
+    quiz_id: str,
+    quiz_group_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Move a quiz to a different group (or remove from group)."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    if quiz_group_id:
+        group = db.query(QuizGroup).filter(QuizGroup.id == quiz_group_id, QuizGroup.user_id == current_user.id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Quiz Group not found")
+            
+    quiz.quiz_group_id = quiz_group_id
+    db.commit()
+    return {"success": True}
 
 @router.post("/", response_model=QuizResponse)
 def create_quiz(
@@ -45,12 +145,14 @@ def create_quiz(
 ):
     """Create a manual quiz."""
     quiz = Quiz(
+        id=generate_random_id(db, Quiz),
         user_id=current_user.id,
         title=quiz_in.title,
         scope_type=quiz_in.scope_type,
         group_id=quiz_in.group_id,
         subject_id=quiz_in.subject_id,
-        lecture_id=quiz_in.lecture_id
+        lecture_id=quiz_in.lecture_id,
+        quiz_group_id=quiz_in.quiz_group_id
     )
     db.add(quiz)
     db.commit()
@@ -59,7 +161,7 @@ def create_quiz(
 
 @router.get("/{quiz_id}", response_model=QuizResponse)
 def get_quiz(
-    quiz_id: int,
+    quiz_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -68,6 +170,43 @@ def get_quiz(
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     return quiz
+
+@router.put("/{quiz_id}", response_model=QuizResponse)
+def update_quiz(
+    quiz_id: str,
+    quiz_in: QuizUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update quiz details (e.g. title)."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    if quiz_in.title is not None:
+        quiz.title = quiz_in.title
+    if quiz_in.quiz_group_id is not None:
+        # Check if quiz_group_id is empty string, which means remove from group
+        quiz.quiz_group_id = quiz_in.quiz_group_id if quiz_in.quiz_group_id != "" else None
+        
+    db.commit()
+    db.refresh(quiz)
+    return quiz
+
+@router.delete("/{quiz_id}")
+def delete_quiz(
+    quiz_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a quiz."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    
+    db.delete(quiz)
+    db.commit()
+    return {"success": True}
 
 @router.post("/generate", response_model=QuizResponse)
 async def generate_quiz_ai(
@@ -87,7 +226,8 @@ async def generate_quiz_ai(
             scope_type=request.scope_type,
             scope_id=request.scope_id,
             question_types=request.question_types,
-            num_questions=request.number_of_questions
+            num_questions=request.number_of_questions,
+            quiz_group_id=request.quiz_group_id
         )
         return quiz
     except ValueError as e:
@@ -95,7 +235,7 @@ async def generate_quiz_ai(
 
 @router.post("/{quiz_id}/generate_single", response_model=QuizQuestionResponse)
 async def generate_single_question_endpoint(
-    quiz_id: int,
+    quiz_id: str,
     request: SingleQuestionGenerateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -136,7 +276,7 @@ async def generate_single_question_endpoint(
 
 @router.post("/{quiz_id}/questions", response_model=QuizQuestionResponse)
 def add_question(
-    quiz_id: int,
+    quiz_id: str,
     question_in: QuizQuestionCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -161,7 +301,7 @@ def add_question(
 
 @router.post("/{quiz_id}/check", response_model=QuizCheckResponse)
 async def check_answer_ai(
-    quiz_id: int,
+    quiz_id: str,
     question_id: int,
     request: QuizCheckRequest,
     current_user: User = Depends(get_current_user),
@@ -234,7 +374,7 @@ async def check_answer_ai(
 
 @router.post("/{quiz_id}/export", response_model=dict)
 async def export_quiz(
-    quiz_id: int,
+    quiz_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -363,7 +503,7 @@ async def export_quiz(
 
 @router.get("/{quiz_id}/export-status/{task_id}")
 async def get_export_status(
-    quiz_id: int,
+    quiz_id: str,
     task_id: str,
     current_user: User = Depends(get_current_user),
 ):
@@ -375,7 +515,7 @@ async def get_export_status(
 
 @router.get("/{quiz_id}/download-export")
 async def download_export(
-    quiz_id: int,
+    quiz_id: str,
     format: str = "pdf",
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

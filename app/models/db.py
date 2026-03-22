@@ -40,6 +40,7 @@ class User(Base):
     study_sessions = relationship("StudySession", back_populates="user", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
     subject_groups = relationship("SubjectGroup", back_populates="user", cascade="all, delete-orphan")
+    quiz_groups = relationship("QuizGroup", back_populates="user", cascade="all, delete-orphan")
 
 
 class SubjectGroup(Base):
@@ -55,6 +56,21 @@ class SubjectGroup(Base):
     # Relationships
     user = relationship("User", back_populates="subject_groups")
     subjects = relationship("Subject", back_populates="group", cascade="all, delete-orphan")
+
+
+class QuizGroup(Base):
+    """Group of quizzes"""
+    __tablename__ = "quiz_groups"
+    
+    id = Column(String(8), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="quiz_groups")
+    quizzes = relationship("Quiz", back_populates="quiz_group", cascade="all, delete-orphan")
 
 
 class Subject(Base):
@@ -171,13 +187,14 @@ class Quiz(Base):
     """Generated Quizzes"""
     __tablename__ = "quizzes"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(8), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     scope_type = Column(String(50))  # "group", "subject" or "lecture"
     group_id = Column(String(8), ForeignKey("subject_groups.id"), nullable=True, index=True)
     subject_id = Column(String(8), ForeignKey("subjects.id"), nullable=True, index=True)
     lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=True, index=True)
+    quiz_group_id = Column(String(8), ForeignKey("quiz_groups.id"), nullable=True, index=True)
     model = Column(String(100), nullable=True)  # AI model used
     processing_time_ms = Column(Integer, nullable=True)  # Processing time in milliseconds
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -188,6 +205,7 @@ class Quiz(Base):
     group = relationship("SubjectGroup")
     subject = relationship("Subject")
     lecture = relationship("Lecture")
+    quiz_group = relationship("QuizGroup", back_populates="quizzes")
     questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
     progress = relationship("QuizProgress", back_populates="quiz", cascade="all, delete-orphan")
 
@@ -197,7 +215,7 @@ class QuizQuestion(Base):
     __tablename__ = "quiz_questions"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False, index=True)
+    quiz_id = Column(String(8), ForeignKey("quizzes.id"), nullable=False, index=True)
     question_text = Column(Text, nullable=False)
     answer_text = Column(Text, nullable=False)
     question_type = Column(String(50), default="subjective")  # objective, subjective, fill_in_the_blank
@@ -214,7 +232,7 @@ class QuizProgress(Base):
     __tablename__ = "quiz_progress"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False, index=True)
+    quiz_id = Column(String(8), ForeignKey("quizzes.id"), nullable=False, index=True)
     question_id = Column(Integer, ForeignKey("quiz_questions.id"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     is_correct = Column(Boolean, default=False)
@@ -343,6 +361,7 @@ class SystemSettings(Base):
     session_length = Column(Integer, default=24)
     session_unit = Column(String(20), default="hours") # hours, days
     session_reset_on_activity = Column(Boolean, default=True)
+    max_quiz_questions = Column(Integer, default=500)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
