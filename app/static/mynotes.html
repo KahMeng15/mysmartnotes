@@ -26,9 +26,9 @@
         </div>
 
         <!-- Sticky Header Section -->
-        <div class="page-card-header" style="padding-bottom: var(--spacing-md);">
+        <div class="page-card-header">
             <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="page-header-row">
                 <h1>My Notes</h1>
                 <button onclick="openGroupModal()" class="btn btn-primary">
                     <i class="ph ph-plus"></i> Create Group
@@ -42,7 +42,7 @@
                     <input type="text" id="searchInput" placeholder="Search groups, subjects, lectures..."
                         onkeyup="filterNotes()">
                 </div>
-                <select id="sortSelect" class="form-control" style="width: auto;" onchange="sortNotes()">
+                <select id="sortSelect" class="form-control" onchange="sortNotes()">
                     <option value="name">Sort by Name (A-Z)</option>
                     <option value="date">Sort by Date Created</option>
                 </select>

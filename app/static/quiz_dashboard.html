@@ -22,16 +22,15 @@
                 <span>Dashboard</span>
             </a>
             <div class="note-breadcrumb-row">
-                <a href="/dashboard" class="note-nav-crumb-link">My Notes</a>
                 <span class="note-nav-sep">›</span>
                 <span class="note-nav-crumb-link active">Quizzes</span>
             </div>
         </div>
 
         <!-- Sticky Header Section -->
-        <div class="page-card-header" style="padding-bottom: var(--spacing-md);">
+        <div class="page-card-header">
             <!-- Header -->
-            <div class="flex-between">
+            <div class="page-header-row">
                 <div>
                     <h1>My Quizzes</h1>
                     <div id="activeGroupLabel" style="font-size: 14px; color: var(--color-primary); font-weight: 600; margin-top: 4px; display: none;">
@@ -56,7 +55,7 @@
                     <input type="text" id="quizSearch" placeholder="Search name, questions, notes..." onkeyup="debounceSearch()">
                 </div>
                 <div class="flex-align-center gap-sm">
-                    <select id="quizSort" class="form-control" style="width: auto;" onchange="renderQuizzes()">
+                    <select id="quizSort" class="form-control" onchange="renderQuizzes()">
                         <option value="date-desc">Newest First</option>
                         <option value="date-asc">Oldest First</option>
                         <option value="name">Name (A-Z)</option>

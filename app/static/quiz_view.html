@@ -30,10 +30,10 @@
             </div>
 
             <div class="page-card-content" id="quizMainContent">
-                <div id="quizHeader" class="margin-bottom-xl">
-                    <div class="flex-align-start">
+                <div id="quizHeader">
+                    <div class="page-header-row">
                         <div>
-                            <h1 id="quizTitle" class="margin-bottom-xs">Loading Quiz...</h1>
+                            <h1 id="quizTitle">Loading Quiz...</h1>
                             <p id="quizSubtitle" style="color: var(--color-gray); font-size: 14px;">Review and test your knowledge</p>
                         </div>
                         <div id="practiceScore" class="practice-container">
@@ -50,7 +50,7 @@
 
                 <!-- Search & Filter Controls -->
                 <div id="quizSearchSection" class="quiz-search-section">
-                    <div class="search-box" style="flex: 1; max-width: none;">
+                    <div class="search-box">
                         <i class="ph ph-magnifying-glass search-icon"></i>
                         <input type="text" id="qSearchInput" placeholder="Search your quiz..." onkeyup="if(event.key==='Enter') filterQuestions()">
                     </div>

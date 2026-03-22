@@ -200,7 +200,7 @@ a:hover {
 /* Sticky header section */
 .page-card-header {
   flex-shrink: 0;
-  padding: var(--spacing-2xl);
+  padding: var(--spacing-2xl) var(--spacing-2xl) var(--spacing-md) var(--spacing-2xl);
   background: var(--color-white);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   position: sticky;
@@ -208,8 +208,19 @@ a:hover {
   z-index: 100;
 }
 
+.page-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.page-header-row h1 {
+  margin-bottom: 0;
+}
+
 .page-card-header h1 {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: 0;
 }
 
 .page-card-header .controls-bar {
@@ -1217,7 +1228,7 @@ textarea {
 }
 
 .btn-outline:hover {
-  background: var(--color-background);
+  /* background: var(--color-background); */
 }
 
 .btn-small {
@@ -1778,30 +1789,41 @@ textarea {
 
 .controls-bar {
   display: flex;
-  justify-content: space-between;
-  gap: var(--spacing-md);
+  align-items: center;
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-xl);
-  flex-wrap: wrap;
+  background: var(--color-bg);
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-light-gray);
+  flex-wrap: nowrap;
 }
 
 .search-box {
   flex: 1;
-  min-width: 300px;
+  min-width: 200px;
   position: relative;
+  display: flex;
+  align-items: center;
+  height: 40px;
+  background: var(--color-white);
+  border-radius: var(--radius-md);
 }
 
 .search-box input {
   width: 100%;
-  padding: var(--spacing-md) var(--spacing-lg);
+  height: 100%;
+  padding: 0 var(--spacing-lg);
   padding-left: 45px;
-  border: 1px solid var(--color-light-gray);
-  border-radius: var(--radius-lg);
+  border: none;
+  background: transparent;
   outline: none;
-  transition: border-color 0.2s;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .search-box input:focus {
-  border-color: var(--color-primary);
+  border: none;
 }
 
 .search-icon {
@@ -1811,6 +1833,7 @@ textarea {
   transform: translateY(-50%);
   color: var(--color-gray);
   font-size: var(--font-size-xl);
+  pointer-events: none;
 }
 
 /* ===== MODALS ===== */

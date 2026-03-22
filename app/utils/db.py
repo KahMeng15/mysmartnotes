@@ -23,18 +23,35 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def generate_random_id(db: Session, model, length: int = 8) -> str:
-    """Generate a unique case-sensitive alphanumeric ID.
+    """Generate a unique case-sensitive alphanumeric ID with model-specific prefix.
     
     Args:
         db: Database session
         model: SQLAlchemy model class to check for ID uniqueness
-        length: Length of the ID (default 8)
+        length: Length of the random part of the ID (default 8)
     
     Returns:
-        A unique random alphanumeric ID (case-sensitive)
+        A unique prefixed random alphanumeric ID (case-sensitive)
     """
+    from app.models.db import SubjectGroup, Subject, Lecture, Summary, Quiz, QuizGroup
+    
+    prefix = ""
+    if model == SubjectGroup:
+        prefix = "gp_"
+    elif model == Subject:
+        prefix = "sj_"
+    elif model == Lecture:
+        prefix = "nt_"
+    elif model == Summary:
+        prefix = "sy"
+    elif model == Quiz:
+        prefix = "qz_"
+    elif model == QuizGroup:
+        prefix = "qg_"
+        
     while True:
-        new_id = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+        random_part = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+        new_id = f"{prefix}{random_part}"
         if not db.query(model).filter(model.id == new_id).first():
             return new_id
         length += 1

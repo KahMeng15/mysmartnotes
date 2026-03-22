@@ -10,7 +10,7 @@ import string
 
 from app.models.db import User, Lecture, Summary
 from app.utils.auth import get_current_user
-from app.utils.db import get_db
+from app.utils.db import get_db, generate_random_id
 from app.processing.ai_client import AIClient
 
 logger = logging.getLogger(__name__)
@@ -28,12 +28,6 @@ def format_timestamp(dt: Optional[datetime]) -> str:
         return iso_str + 'Z' if not iso_str.endswith('Z') else iso_str
     else:
         return dt.isoformat()
-
-
-def generate_summary_id(length: int = 8) -> str:
-    """Generate a random 8-character ID for a summary"""
-    chars = string.ascii_letters + string.digits
-    return "".join(random.choice(chars) for _ in range(length))
 
 
 class QuizQuestion(BaseModel):
@@ -295,7 +289,7 @@ async def generate_summary_endpoint(
 
         # Save generated summary
         doc = Summary(
-            id=generate_summary_id(),
+            id=generate_random_id(db, Summary),
             version=next_version,
             lecture_id=request.lecture_id,
             title=f"{request.mode.capitalize()} in {request.output_format.replace('_', ' ')}",

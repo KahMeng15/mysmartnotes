@@ -47,7 +47,7 @@ class SubjectGroup(Base):
     """Group of subjects (e.g. Semester 1)"""
     __tablename__ = "subject_groups"
     
-    id = Column(String(8), primary_key=True)
+    id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -62,7 +62,7 @@ class QuizGroup(Base):
     """Group of quizzes"""
     __tablename__ = "quiz_groups"
     
-    id = Column(String(8), primary_key=True)
+    id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -77,9 +77,9 @@ class Subject(Base):
     """Course/Subject organization"""
     __tablename__ = "subjects"
     
-    id = Column(String(8), primary_key=True)
+    id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    group_id = Column(String(8), ForeignKey("subject_groups.id"), nullable=True)
+    group_id = Column(String(16), ForeignKey("subject_groups.id"), nullable=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
     color = Column(String(7), default="#3b82f6")  # hex color
@@ -96,9 +96,9 @@ class Lecture(Base):
     """Lecture/Document"""
     __tablename__ = "lectures"
     
-    id = Column(String(8), primary_key=True)
+    id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    subject_id = Column(String(8), ForeignKey("subjects.id"), nullable=False, index=True)
+    subject_id = Column(String(16), ForeignKey("subjects.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
     file_name = Column(String(255))
@@ -127,7 +127,7 @@ class ExportTemplate(Base):
     """User-defined export templates"""
     __tablename__ = "export_templates"
     
-    id = Column(String(8), primary_key=True)
+    id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # NULL = system default
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
@@ -144,9 +144,9 @@ class Summary(Base):
     """Generated summaries, cheat sheets, etc."""
     __tablename__ = "summaries"
     
-    id = Column(String(8), primary_key=True)
+    id = Column(String(16), primary_key=True)
     version = Column(Integer, nullable=False, default=1)  # v1, v2, etc. per lecture
-    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
+    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=False, index=True)
     summary_type = Column(String(50))  # cheatsheet, quiz, summary
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
@@ -171,7 +171,7 @@ class LectureEmbedding(Base):
     __tablename__ = "lecture_embeddings"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
+    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=False, index=True)
     chunk_text = Column(Text, nullable=False)  # Original text of this chunk
     chunk_index = Column(Integer, nullable=False)  # Order of this chunk in lecture
     embedding = Column(JSON, nullable=False)  # Embedding vector as list of floats
@@ -187,14 +187,14 @@ class Quiz(Base):
     """Generated Quizzes"""
     __tablename__ = "quizzes"
     
-    id = Column(String(8), primary_key=True)
+    id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     scope_type = Column(String(50))  # "group", "subject" or "lecture"
-    group_id = Column(String(8), ForeignKey("subject_groups.id"), nullable=True, index=True)
-    subject_id = Column(String(8), ForeignKey("subjects.id"), nullable=True, index=True)
-    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=True, index=True)
-    quiz_group_id = Column(String(8), ForeignKey("quiz_groups.id"), nullable=True, index=True)
+    group_id = Column(String(16), ForeignKey("subject_groups.id"), nullable=True, index=True)
+    subject_id = Column(String(16), ForeignKey("subjects.id"), nullable=True, index=True)
+    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=True, index=True)
+    quiz_group_id = Column(String(16), ForeignKey("quiz_groups.id"), nullable=True, index=True)
     model = Column(String(100), nullable=True)  # AI model used
     processing_time_ms = Column(Integer, nullable=True)  # Processing time in milliseconds
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -215,7 +215,7 @@ class QuizQuestion(Base):
     __tablename__ = "quiz_questions"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    quiz_id = Column(String(8), ForeignKey("quizzes.id"), nullable=False, index=True)
+    quiz_id = Column(String(16), ForeignKey("quizzes.id"), nullable=False, index=True)
     question_text = Column(Text, nullable=False)
     answer_text = Column(Text, nullable=False)
     question_type = Column(String(50), default="subjective")  # objective, subjective, fill_in_the_blank
@@ -232,7 +232,7 @@ class QuizProgress(Base):
     __tablename__ = "quiz_progress"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    quiz_id = Column(String(8), ForeignKey("quizzes.id"), nullable=False, index=True)
+    quiz_id = Column(String(16), ForeignKey("quizzes.id"), nullable=False, index=True)
     question_id = Column(Integer, ForeignKey("quiz_questions.id"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     is_correct = Column(Boolean, default=False)
@@ -258,7 +258,7 @@ class StudySession(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=True, index=True)
+    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=True, index=True)
     session_type = Column(String(50))  # quiz, chat, pomodoro_study, pomodoro_break, stopwatch
     duration_minutes = Column(Integer)
     questions_attempted = Column(Integer, default=0)
@@ -298,9 +298,9 @@ class ChatMessage(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=True, index=True)
-    subject_id = Column(String(8), ForeignKey("subjects.id"), nullable=True, index=True)
-    group_id = Column(String(8), ForeignKey("subject_groups.id"), nullable=True, index=True)
+    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=True, index=True)
+    subject_id = Column(String(16), ForeignKey("subjects.id"), nullable=True, index=True)
+    group_id = Column(String(16), ForeignKey("subject_groups.id"), nullable=True, index=True)
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     sources = Column(Text)  # JSON array of sources
@@ -330,7 +330,7 @@ class NoteSnapshot(Base):
     __tablename__ = "note_snapshots"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(String(8), ForeignKey("lectures.id"), nullable=False, index=True)
+    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
