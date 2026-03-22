@@ -183,21 +183,21 @@
     <!-- Quiz Progress Modal -->
     <div id="quizProgressModal" class="modal">
         <div class="modal-content modal-content-progress">
-            <div class="text-center">
+            <div class="progress-centered-header">
                 <div class="progress-icon-sparkle">
-                    <i class="ph ph-sparkle" style="font-size: 32px; color: var(--color-primary);"></i>
+                    <i class="ph ph-sparkle"></i>
                 </div>
-                <h3 class="margin-bottom-sm">Generating Quiz</h3>
-                <p id="quizProgressMessage" style="color: var(--color-gray); font-size: 14px; margin-bottom: 24px;">Initializing AI model...</p>
+                <h3 class="progress-title-main">Generating Quiz</h3>
+                <p id="quizProgressMessage" class="progress-subtitle-main">Initializing AI model...</p>
             </div>
             
-            <div style="width: 100%;">
-                <div class="flex-between margin-bottom-sm" style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--color-dark-gray);">
-                    <span id="quizProgressLabel">Working...</span>
-                    <span id="quizProgressPercent">0%</span>
+            <div class="progress-wrapper-alt">
+                <div class="progress-info-labels">
+                    <span id="quizProgressLabel" class="progress-status-text">Working...</span>
+                    <span id="quizProgressPercent" class="progress-percent-text">0%</span>
                 </div>
-                <div class="progress-bar" style="width: 100%; height: 10px; background: var(--color-bg); border-radius: 5px; overflow: hidden;">
-                    <div id="quizProgressFill" class="progress-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--color-primary), #7c5cbf); border-radius: 5px; transition: width 0.4s ease;"></div>
+                <div class="progress-bar-alt">
+                    <div id="quizProgressFill" class="progress-fill" style="width: 0%;"></div>
                 </div>
             </div>
         </div>

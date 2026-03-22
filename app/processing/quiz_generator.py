@@ -108,7 +108,7 @@ Respond with ONLY the JSON array.
         subject_id=subject_id,
         lecture_id=lecture_id,
         quiz_group_id=quiz_group_id,
-        model=ai_client.model_name,
+        model=ai_client.ai_model_name or ai_client.provider,
         processing_time_ms=processing_time_ms
     )
     db.add(quiz)

@@ -584,8 +584,11 @@ async function submitCreateQuiz() {
             
             // Show Progress Modal
             closeModal('createQuizModal');
-            document.getElementById('quizProgressModal').classList.add('active');
-            updateQuizProgress(0, 'Initializing AI model...', 'Working...');
+            const progressModal = document.getElementById('quizProgressModal');
+            if (progressModal) {
+                progressModal.classList.add('active');
+                updateQuizProgress(0, 'Initializing AI model...', 'Working...');
+            }
             
             let currentPercent = 5;
             let progressInterval = setInterval(() => {
@@ -595,20 +598,22 @@ async function submitCreateQuiz() {
                 }
             }, 1500);
 
-            response = await fetch('/quizzes/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: title,
-                    scope_type: scopeType,
-                    scope_id: scopeId,
-                    question_types: qTypes,
-                    number_of_questions: numQuestions,
-                    quiz_group_id: quizGroupId || null
-                })
-            });
-
-            clearInterval(progressInterval);
+            try {
+                response = await fetch('/quizzes/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: title,
+                        scope_type: scopeType,
+                        scope_id: scopeId,
+                        question_types: qTypes,
+                        number_of_questions: numQuestions,
+                        quiz_group_id: quizGroupId || null
+                    })
+                });
+            } finally {
+                clearInterval(progressInterval);
+            }
             
         } else {
             // Manual creation
@@ -630,30 +635,59 @@ async function submitCreateQuiz() {
         }
         
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.detail || 'Failed to create quiz');
+            let errorMsg = 'Failed to create quiz';
+            try {
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const errData = await response.json();
+                    errorMsg = errData.detail || errorMsg;
+                } else {
+                    const textError = await response.text();
+                    console.error('Non-JSON error response:', textError);
+                }
+            } catch (e) {
+                console.error('Error parsing error response:', e);
+            }
+            throw new Error(errorMsg);
         }
         
-        const quiz = await response.json();
+        let quiz;
+        try {
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                quiz = await response.json();
+            } else {
+                const rawText = await response.text();
+                console.error('Expected JSON, got:', rawText);
+                throw new Error('Server returned invalid data format');
+            }
+        } catch (e) {
+            console.error('JSON Parse Error:', e);
+            throw new Error('Failed to parse server response: ' + e.message);
+        }
         
         if (method === 'ai') {
-            updateQuizProgress(100, 'Complete!', 'Done');
+            updateQuizProgress(100, 'Quiz generated successfully!', 'Complete');
             setTimeout(() => {
-                document.getElementById('quizProgressModal').classList.remove('active');
+                closeModal('quizProgressModal');
                 window.location.href = `/quiz/${quiz.id}`;
-            }, 600);
+            }, 1000);
         } else {
             closeModal('createQuizModal');
             window.location.href = `/quiz/${quiz.id}`;
         }
         
     } catch (error) {
-        document.getElementById('quizProgressModal').classList.remove('active');
+        console.error('Submit Error:', error);
+        closeModal('quizProgressModal');
         // If we were in AI mode, re-open the create modal so they can see the error
         if (method === 'ai') {
             document.getElementById('createQuizModal').classList.add('active');
         }
         showError(error.message);
+        if (typeof showErrorModal === 'function') {
+            showErrorModal('Generation Failed', error.message);
+        }
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
