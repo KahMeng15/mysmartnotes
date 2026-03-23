@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/styles/quiz.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
+    <script src="/js/utils.js"></script>
     <script src="/js/nav.js"></script>
 </head>
 
@@ -151,49 +152,31 @@
             <h4 class="sidebar-section-title">AI Explain Config</h4>
             <div class="ai-sidebar-settings">
                 <div class="options-group" style="margin-bottom: 12px;">
-                    <label class="options-label">Knowledge Scope</label>
-                    <select id="explainScope" class="options-select" onchange="updateExplainSettings()">
+                    <label class="dropdown-label">Knowledge Scope</label>
+                    <select id="explainScope" class="options-select ai-explain-select" onchange="updateExplainSettings()">
                         <option value="source">Source Material</option>
                         <option value="web">Web Search</option>
                         <option value="both">Both (Mixed)</option>
                     </select>
                 </div>
                 <div class="options-group" style="margin-bottom: 12px;">
-                    <label class="options-label">AI Mode</label>
-                    <div class="ai-mode-bar" id="explainModeBar">
-                        <button class="mode-pill active" data-mode="normal" onclick="setExplainMode('normal')">
-                            <i class="ph ph-stack"></i> Normal
-                        </button>
-                        <button class="mode-pill" data-mode="quick" onclick="setExplainMode('quick')">
-                            <i class="ph ph-lightning"></i> Quick
-                        </button>
-                        <button class="mode-pill" data-mode="simple" onclick="setExplainMode('simple')">
-                            <i class="ph ph-text-a-underline"></i> Simple
-                        </button>
-                        <button class="mode-pill" data-mode="elaborate" onclick="setExplainMode('elaborate')">
-                            <i class="ph ph-lightbulb"></i> Elaborate
-                        </button>
-                        <button class="mode-pill" data-mode="eli5" onclick="setExplainMode('eli5')">
-                            <i class="ph ph-smiley"></i> ELI5
-                        </button>
-                    </div>
+                    <label class="dropdown-label">AI Mode</label>
+                    <select id="explainMode" class="options-select ai-explain-select" onchange="setExplainMode(this.value)">
+                        <option value="normal">Normal</option>
+                        <option value="quick">Quick</option>
+                        <option value="simple">Simple</option>
+                        <option value="elaborate">Elaborate</option>
+                        <option value="eli5">ELI5</option>
+                    </select>
                 </div>
                 <div class="options-group" style="margin-bottom: 12px;">
-                    <label class="options-label">Response Style</label>
-                    <div class="output-format-bar" id="explainOutputBar">
-                        <button class="mode-pill active" data-format="sentence" onclick="setExplainOutput('sentence')">
-                            <i class="ph ph-text-t"></i> Sentence
-                        </button>
-                        <button class="mode-pill" data-format="pointform" onclick="setExplainOutput('pointform')">
-                            <i class="ph ph-list-bullets"></i> Pointform
-                        </button>
-                        <button class="mode-pill" data-format="numbered_list" onclick="setExplainOutput('numbered_list')">
-                            <i class="ph ph-list-numbers"></i> Numbered List
-                        </button>
-                        <button class="mode-pill" data-format="table" onclick="setExplainOutput('table')">
-                            <i class="ph ph-table"></i> Table
-                        </button>
-                    </div>
+                    <label class="dropdown-label">Response Style</label>
+                    <select id="explainOutput" class="options-select ai-explain-select" onchange="setExplainOutput(this.value)">
+                        <option value="sentence">Sentence</option>
+                        <option value="pointform">Pointform</option>
+                        <option value="numbered_list">Numbered List</option>
+                        <option value="table">Table</option>
+                    </select>
                 </div>
             </div>
 
@@ -464,7 +447,7 @@
             <p class="progress-subtitle-main">Customize how the AI should explain this question.</p>
 
             <div class="options-group">
-                <label class="options-label">Knowledge Scope</label>
+                <label class="dropdown-label">Knowledge Scope</label>
                 <select id="modalExplainScope" class="options-select">
                     <option value="source">Source Material Only</option>
                     <option value="web">Web Search Only</option>
@@ -473,43 +456,24 @@
             </div>
 
             <div class="options-group">
-                <label class="options-label">AI Mode</label>
-                <div class="ai-mode-bar" id="modalExplainModeBar">
-                    <button class="mode-pill" data-mode="normal" onclick="setModalExplainMode('normal')">
-                        <i class="ph ph-stack"></i> Normal
-                    </button>
-                    <button class="mode-pill" data-mode="quick" onclick="setModalExplainMode('quick')">
-                        <i class="ph ph-lightning"></i> Quick
-                    </button>
-                    <button class="mode-pill" data-mode="simple" onclick="setModalExplainMode('simple')">
-                        <i class="ph ph-text-a-underline"></i> Simple
-                    </button>
-                    <button class="mode-pill active" data-mode="elaborate" onclick="setModalExplainMode('elaborate')">
-                        <i class="ph ph-lightbulb"></i> Elaborate
-                    </button>
-                    <button class="mode-pill" data-mode="eli5" onclick="setModalExplainMode('eli5')">
-                        <i class="ph ph-smiley"></i> ELI5
-                    </button>
-                </div>
+                <label class="dropdown-label">AI Mode</label>
+                <select id="modalExplainMode" class="options-select" onchange="setModalExplainMode(this.value)">
+                    <option value="normal">Normal</option>
+                    <option value="quick">Quick</option>
+                    <option value="simple">Simple</option>
+                    <option value="elaborate">Elaborate</option>
+                    <option value="eli5">ELI5</option>
+                </select>
             </div>
 
             <div class="options-group">
-                <label class="options-label">Output Format</label>
-                <div class="output-format-bar" id="modalExplainOutputBar">
-                    <button class="mode-pill active" data-format="sentence" onclick="setModalExplainOutput('sentence')">
-                        <i class="ph ph-text-t"></i> Sentence
-                    </button>
-                    <button class="mode-pill" data-format="pointform" onclick="setModalExplainOutput('pointform')">
-                        <i class="ph ph-list-bullets"></i> Pointform
-                    </button>
-                    <button class="mode-pill" data-format="numbered_list"
-                        onclick="setModalExplainOutput('numbered_list')">
-                        <i class="ph ph-list-numbers"></i> Numbered List
-                    </button>
-                    <button class="mode-pill" data-format="table" onclick="setModalExplainOutput('table')">
-                        <i class="ph ph-table"></i> Table
-                    </button>
-                </div>
+                <label class="dropdown-label">Output Format</label>
+                <select id="modalExplainOutput" class="options-select" onchange="setModalExplainOutput(this.value)">
+                    <option value="sentence">Sentence</option>
+                    <option value="pointform">Pointform</option>
+                    <option value="numbered_list">Numbered List</option>
+                    <option value="table">Table</option>
+                </select>
             </div>
 
             <div class="modal-buttons modal-footer-spacing">

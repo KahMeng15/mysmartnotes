@@ -25,6 +25,27 @@ let modalSettings = {
 };
 
 /**
+ * Load explain settings from localStorage (uses shared utility)
+ */
+function loadExplainSettingsFromStorage() {
+    const settings = loadAiExplainSettings();
+    explainSettings.scope = settings.scope;
+    explainSettings.mode = settings.mode;
+    explainSettings.output = settings.output;
+}
+
+/**
+ * Save explain settings to localStorage (uses shared utility)
+ */
+function saveExplainSettingsToStorage() {
+    saveAiExplainSettings({
+        scope: explainSettings.scope,
+        mode: explainSettings.mode,
+        output: explainSettings.output
+    });
+}
+
+/**
  * Convert inline enumerated lists to newline-separated Markdown lists.
  * Handles patterns like:
  *   "however: (1) item, (2) item, (3) item"
@@ -233,6 +254,9 @@ function formatQuizText(text) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Load saved explain settings from localStorage
+    loadExplainSettingsFromStorage();
+    
     // URL format: /quiz/{id} or /quiz/{id}/{mode}
     const pathParts = window.location.pathname.split('/');
     const quizId = pathParts[2];
@@ -292,6 +316,11 @@ async function loadQuiz(quizId, initialMode) {
         // AI Metadata
         document.getElementById('infoModel').textContent = currentQuiz.model || 'Manual';
         document.getElementById('infoProcessing').textContent = currentQuiz.processing_time_ms ? `${currentQuiz.processing_time_ms}ms` : '—';
+
+        // Sync AI explain settings UI with loaded settings
+        document.getElementById('explainScope').value = explainSettings.scope;
+        document.getElementById('explainMode').value = explainSettings.mode;
+        document.getElementById('explainOutput').value = explainSettings.output;
 
         if (initialMode) {
             setMode(initialMode, false);
@@ -516,7 +545,7 @@ function renderTableMode(container, questions) {
                             <td style="font-weight: 700; color: var(--color-primary);">${actualIndex + 1}</td>
                             <td><span class="q-type-badge">${q.question_type.replace(/_/g, ' ')}</span></td>
                             <td style="font-weight: 500;">${formatQuizText(q.question_text)}</td>
-                            <td style="color: var(--color-success); font-weight: 600;">${formatQuizText(q.answer_text)}</td>
+                            <td style="color: var(--color-success);">${formatQuizText(q.answer_text)}</td>
                         </tr>
                     `;
     }).join('')}
@@ -803,7 +832,6 @@ function createQuestionCard(q, index) {
         answerBox.appendChild(answerHeader);
 
         const answerContent = document.createElement('div');
-        answerContent.style.fontWeight = "600";
         answerContent.innerHTML = formatQuizText(q.answer_text);
 
         if (currentMode === 'hideanswers') {
@@ -1193,7 +1221,7 @@ async function explainQuestion(qId, forceRegenerate = false) {
     // Show loading bar
     box.classList.add('active');
     box.innerHTML = `
-        <div class="progress-container margin-top-sm" style="background: rgba(89, 60, 143, 0.03); padding: var(--spacing-lg); border-radius: var(--radius-md);">
+        <div class="progress-container margin-top-sm">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
                 <span style="font-weight: 600; font-size: var(--font-size-sm);">Generating Explanation...</span>
                 <span id="explainProgressPercent-${qId}" style="font-size: var(--font-size-sm); color: var(--color-gray);">0%</span>
@@ -1536,20 +1564,19 @@ async function saveBulkEdits() {
 }
 function setExplainMode(mode) {
     explainSettings.mode = mode;
-    document.querySelectorAll('#explainModeBar .mode-pill-xs').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.mode === mode);
-    });
+    document.getElementById('explainMode').value = mode;
+    saveExplainSettingsToStorage();
 }
 
 function setExplainOutput(output) {
     explainSettings.output = output;
-    document.querySelectorAll('#explainOutputBar .mode-pill-xs').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.format === output);
-    });
+    document.getElementById('explainOutput').value = output;
+    saveExplainSettingsToStorage();
 }
 
 function updateExplainSettings() {
     explainSettings.scope = document.getElementById('explainScope').value;
+    saveExplainSettingsToStorage();
 }
 
 /** Modal AI Settings */
@@ -1572,16 +1599,12 @@ function showExplainOptions(qId) {
 
 function setModalExplainMode(mode) {
     modalSettings.mode = mode;
-    document.querySelectorAll('#modalExplainModeBar .mode-pill').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.mode === mode);
-    });
+    document.getElementById('modalExplainMode').value = mode;
 }
 
 function setModalExplainOutput(output) {
     modalSettings.output = output;
-    document.querySelectorAll('#modalExplainOutputBar .mode-pill').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.format === output);
-    });
+    document.getElementById('modalExplainOutput').value = output;
 }
 
 function regenerateFromModal() {
@@ -1599,6 +1622,7 @@ function regenerateFromModal() {
     // But usually consistency is good. Let's keep them changed or revert?
     // Let's keep them changed to match user's latest preference.
     syncSidebarWithModal();
+    saveExplainSettingsToStorage();
 }
 
 function syncSidebarWithModal() {

@@ -122,3 +122,46 @@ function hslToHex(h, s, l) {
 
     return "#" + r + g + b;
 }
+
+/**
+ * ─── Global AI Settings Management ───────────────────────────────────
+ * Shared utility functions for persisting AI explanation settings
+ * across all pages (quiz, summary, chat)
+ */
+
+/**
+ * Load AI explanation settings from localStorage
+ * @returns {Object} Settings object with scope, mode, output properties
+ */
+function loadAiExplainSettings() {
+    try {
+        const stored = localStorage.getItem('aiExplainSettings');
+        if (stored) {
+            const settings = JSON.parse(stored);
+            return {
+                scope: settings.scope || 'source',
+                mode: settings.mode || 'normal',
+                output: settings.output || 'sentence'
+            };
+        }
+    } catch (error) {
+        console.warn('Failed to load AI explain settings:', error);
+    }
+    return { scope: 'source', mode: 'normal', output: 'sentence' };
+}
+
+/**
+ * Save AI explanation settings to localStorage
+ * @param {Object} settings - Object with scope, mode, output properties
+ */
+function saveAiExplainSettings(settings) {
+    try {
+        localStorage.setItem('aiExplainSettings', JSON.stringify({
+            scope: settings.scope,
+            mode: settings.mode,
+            output: settings.output
+        }));
+    } catch (error) {
+        console.warn('Failed to save AI explain settings:', error);
+    }
+}

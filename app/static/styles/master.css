@@ -3047,7 +3047,7 @@ body.auth-page {
     background: var(--color-background);
     border: 1px solid var(--color-light-gray);
     border-radius: var(--radius-md);
-    margin: 0 12px 12px 12px;
+    margin-bottom: 12px;
     padding: 10px;
     transition: all 0.3s ease;
 }
