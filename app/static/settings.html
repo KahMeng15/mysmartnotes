@@ -20,12 +20,12 @@
     <!-- Content -->
     <div class="page-card">
         <div class="page-card-header">
-            <div class="page-header-row">
+            <div class="page-header-row" style="margin: 0;">
                 <h1>Settings</h1>
             </div>
         </div>
 
-        <div class="page-card-content">
+        <div class="page-card-content" style="padding-top: 0;">
             <div class="settings-container">
                 <!-- 1. Profile Settings -->
                 <div class="settings-section">
@@ -148,7 +148,9 @@
                     </div>
                     
                     <div style="margin-top: var(--spacing-lg);">
-                        <button onclick="clearCache()" class="btn btn-block">Clear Cache</button>
+                        <button onclick="showFeatureComingSoon()" class="btn btn-block" disabled style="opacity: 0.5; cursor: not-allowed;">
+                            <i class="ph ph-clock"></i> Clear Cache - Coming Soon
+                        </button>
                     </div>
 
                     <div class="danger-zone">
@@ -158,10 +160,10 @@
                         <p style="color: var(--color-gray); margin-bottom: var(--spacing-md); font-size: var(--font-size-sm);">
                             These actions cannot be undone.</p>
                         <div style="display: flex; flex-direction: column; gap: var(--spacing-md);">
-                            <button onclick="downloadData()" class="btn btn-block">
-                                <i class="ph ph-download-simple"></i> Download My Data
+                            <button onclick="showFeatureComingSoon()" class="btn btn-block" disabled style="opacity: 0.5; cursor: not-allowed;">
+                                <i class="ph ph-download-simple"></i> Download My Data - Coming Soon
                             </button>
-                            <button onclick="deleteAccount()" class="btn btn-secondary btn-block">
+                            <button onclick="confirmDeleteAccount()" class="btn btn-secondary btn-block">
                                 <i class="ph ph-trash"></i> Delete Account
                             </button>
                         </div>
@@ -233,7 +235,7 @@
 
                     <div class="section-footer">
                         <button type="button" class="btn btn-primary btn-block"
-                            onclick="document.getElementById('aiConfigForm').requestSubmit()">Save AI Configuration</button>
+                            onclick="saveAiConfiguration()">Save AI Configuration</button>
                     </div>
                 </div>
 
@@ -241,7 +243,7 @@
                 <div class="settings-section">
                     <h3><i class="ph ph-info"></i> About & Support</h3>
                     <div style="color: var(--color-gray); font-size: var(--font-size-sm); flex: 1; align-content: start;">
-                        <p><strong>MySmartNotes</strong> v1.0.0</p>
+                        <p><strong>mysmartnotes</strong> version alpha</p>
                         <p>An AI-powered study companion to help you learn efficiently.</p>
                         <div style="margin-top: var(--spacing-lg);">
                             <a href="#" style="color: var(--color-primary); display: block; margin-bottom: 4px;">Terms of Service</a>

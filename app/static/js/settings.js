@@ -138,11 +138,11 @@ async function updateProfile(event) {
             const requiresApiKey = ['gemini', 'huggingface', 'chatgpt', 'claude', 'openrouter'].includes(provider);
 
             if (requiresBaseUrl && !baseUrl) {
-                alert(`Base URL is required for ${provider}`);
+                showErrorModal('Validation Error', `Base URL is required for ${provider}`);
                 return;
             }
             if (requiresApiKey && !apiKey) {
-                alert(`API Key is required for ${provider}`);
+                showErrorModal('Validation Error', `API Key is required for ${provider}`);
                 return;
             }
             
@@ -164,14 +164,16 @@ async function updateProfile(event) {
         if (response.ok) {
             const updatedUser = await response.json();
             localStorage.setItem('user', JSON.stringify(updatedUser));
-            alert('✓ AI configuration saved successfully');
-            location.reload(); // Reload to reflect changes
+            showSuccessModal('Configuration Saved', 'Your AI configuration has been saved successfully.');
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
         } else {
             const error = await response.json();
-            alert('Error: ' + (error.detail || 'Failed to save settings'));
+            showErrorModal('Error', error.detail || 'Failed to save settings');
         }
     } catch (error) {
-        alert('Error updating profile: ' + error.message);
+        showErrorModal('Error', error.message || 'Failed to update profile');
     }
 }
 
@@ -185,10 +187,20 @@ function toggleNotifications() {
     toggle.classList.toggle('active');
 }
 
+function saveAiConfiguration() {
+    updateProfile(new Event('submit', { bubbles: true }));
+}
+
+function showFeatureComingSoon() {
+    showErrorModal('Coming Soon', 'This feature will be available in a future update.');
+}
+
 function clearCache() {
     localStorage.clear();
-    alert('Cache cleared');
-    window.location.href = '/login';
+    showSuccessModal('Cache Cleared', 'Your cache has been cleared. Redirecting to login...');
+    setTimeout(() => {
+        window.location.href = '/login';
+    }, 2000);
 }
 
 async function changePassword() {
@@ -234,30 +246,17 @@ async function changePassword() {
 }
 
 async function downloadData() {
-    try {
-        const res = await fetch('/auth/download-data', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error('Failed to fetch data');
-        
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `mysmartnotes_export.json`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-    } catch(err) {
-        alert('Error downloading data: ' + err.message);
-    }
+    showErrorModal('Coming Soon', 'This feature will be available in a future update.');
+}
+
+function confirmDeleteAccount() {
+    showConfirmModal(
+        'Are you absolutely sure? This will permanently delete your account and all your data. This cannot be undone.',
+        deleteAccount
+    );
 }
 
 async function deleteAccount() {
-    if (!confirm('Are you sure? This cannot be undone.')) return;
-    if (!confirm('This will permanently delete all your data. Are you absolutely sure?')) return;
-
     try {
         const res = await fetch('/auth/profile', {
             method: 'DELETE',
@@ -265,14 +264,16 @@ async function deleteAccount() {
         });
         
         if (res.ok) {
-            alert('Account deleted successfully.');
-            localStorage.clear();
-            window.location.href = '/login';
+            showSuccessModal('Account Deleted', 'Your account has been deleted. Redirecting to login...');
+            setTimeout(() => {
+                localStorage.clear();
+                window.location.href = '/login';
+            }, 2000);
         } else {
             const error = await res.json();
-            alert('Error: ' + error.detail);
+            showErrorModal('Error', error.detail || 'Failed to delete account');
         }
     } catch(err) {
-        alert('Error: ' + err.message);
+        showErrorModal('Error', err.message || 'Failed to delete account');
     }
 }
