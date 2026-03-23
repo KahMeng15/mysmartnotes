@@ -17,6 +17,9 @@ class UserCreate(BaseModel):
     password: str
     nickname: str
     full_name: Optional[str] = None
+    agree_tos: bool = False
+    agree_privacy: bool = False
+    agree_fair_use: bool = False
 
 
 class UserLogin(BaseModel):

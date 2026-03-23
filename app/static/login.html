@@ -79,7 +79,28 @@
                 <label class="form-label" for="regPassword">Password</label>
                 <input class="form-input" type="password" id="regPassword" placeholder="••••••••">
             </div>
-            <button class="btn btn-next btn-block" style="margin-top:24px;" onclick="handleRegister()">Create
+            <div style="margin-top: 16px; margin-bottom: 16px; border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+                <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 10px;">I agree to:</div>
+                <div style="display: flex; align-items: flex-start; margin-bottom: 8px;">
+                    <input type="checkbox" id="regAgreeTos" style="margin-top: 2px; margin-right: 8px;">
+                    <label for="regAgreeTos" style="font-size: 0.85rem; cursor: pointer;">
+                        <a href="/support/termsofservice" target="_blank" style="color: #1a73e8; text-decoration: none;">Terms of Service</a>
+                    </label>
+                </div>
+                <div style="display: flex; align-items: flex-start; margin-bottom: 8px;">
+                    <input type="checkbox" id="regAgreePrivacy" style="margin-top: 2px; margin-right: 8px;">
+                    <label for="regAgreePrivacy" style="font-size: 0.85rem; cursor: pointer;">
+                        <a href="/support/privacypolicy" target="_blank" style="color: #1a73e8; text-decoration: none;">Privacy Policy</a>
+                    </label>
+                </div>
+                <div style="display: flex; align-items: flex-start;">
+                    <input type="checkbox" id="regAgreeFairUse" style="margin-top: 2px; margin-right: 8px;">
+                    <label for="regAgreeFairUse" style="font-size: 0.85rem; cursor: pointer;">
+                        <a href="/support/fairuse" target="_blank" style="color: #1a73e8; text-decoration: none;">Fair Use Policy</a>
+                    </label>
+                </div>
+            </div>
+            <button class="btn btn-next btn-block" style="margin-top:16px;" onclick="handleRegister()">Create
                 Account</button>
             <p class="toggle-link">Already have an account? <a onclick="switchPanel('login')">Sign in</a></p>
         </div>
@@ -103,7 +124,28 @@
                     <input class="form-input" type="text" id="googleNickname" placeholder="What should we call you?"
                         required>
                 </div>
-                <button type="submit" class="btn btn-next btn-block" style="margin-top:24px;">Create Account</button>
+                <div style="margin-top: 16px; margin-bottom: 16px; border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
+                    <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 10px;">I agree to:</div>
+                    <div style="display: flex; align-items: flex-start; margin-bottom: 8px;">
+                        <input type="checkbox" id="googleAgreeTos" style="margin-top: 2px; margin-right: 8px;">
+                        <label for="googleAgreeTos" style="font-size: 0.85rem; cursor: pointer;">
+                            <a href="/support/termsofservice" target="_blank" style="color: #1a73e8; text-decoration: none;">Terms of Service</a>
+                        </label>
+                    </div>
+                    <div style="display: flex; align-items: flex-start; margin-bottom: 8px;">
+                        <input type="checkbox" id="googleAgreePrivacy" style="margin-top: 2px; margin-right: 8px;">
+                        <label for="googleAgreePrivacy" style="font-size: 0.85rem; cursor: pointer;">
+                            <a href="/support/privacypolicy" target="_blank" style="color: #1a73e8; text-decoration: none;">Privacy Policy</a>
+                        </label>
+                    </div>
+                    <div style="display: flex; align-items: flex-start;">
+                        <input type="checkbox" id="googleAgreeFairUse" style="margin-top: 2px; margin-right: 8px;">
+                        <label for="googleAgreeFairUse" style="font-size: 0.85rem; cursor: pointer;">
+                            <a href="/support/fairuse" target="_blank" style="color: #1a73e8; text-decoration: none;">Fair Use Policy</a>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-next btn-block" style="margin-top:16px;">Create Account</button>
                 <p class="toggle-link">Changed your mind? <a onclick="closeGoogleRegisterModal()">Cancel</a></p>
             </form>
         </div>

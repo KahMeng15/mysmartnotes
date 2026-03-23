@@ -59,15 +59,25 @@ async function handleRegister() {
     const nickname = document.getElementById('regNickname').value.trim();
     const email = document.getElementById('regEmail').value.trim();
     const password = document.getElementById('regPassword').value;
+    const agree_tos = document.getElementById('regAgreeTos').checked;
+    const agree_privacy = document.getElementById('regAgreePrivacy').checked;
+    const agree_fair_use = document.getElementById('regAgreeFairUse').checked;
+    
     if (!nickname || !email || !password) {
         showMessageBox('registerMsg', 'error', 'All fields are required.');
         return;
     }
+    
+    if (!agree_tos || !agree_privacy || !agree_fair_use) {
+        showMessageBox('registerMsg', 'error', 'You must agree to all policies to register.');
+        return;
+    }
+    
     try {
         const res = await fetch('/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nickname, email, password })
+            body: JSON.stringify({ nickname, email, password, agree_tos, agree_privacy, agree_fair_use })
         });
         if (res.ok) {
             showMessageBox('registerMsg', 'success', 'Account created! Please sign in.');
@@ -164,8 +174,17 @@ async function handleGoogleComplete(event) {
     }
 
     const nickname = document.getElementById('googleNickname').value.trim();
+    const agree_tos = document.getElementById('googleAgreeTos').checked;
+    const agree_privacy = document.getElementById('googleAgreePrivacy').checked;
+    const agree_fair_use = document.getElementById('googleAgreeFairUse').checked;
+    
     if (!nickname) {
         showMessageBox('googleRegisterMsg', 'error', 'Please enter a nickname.');
+        return;
+    }
+    
+    if (!agree_tos || !agree_privacy || !agree_fair_use) {
+        showMessageBox('googleRegisterMsg', 'error', 'You must agree to all policies to register.');
         return;
     }
 
@@ -173,7 +192,7 @@ async function handleGoogleComplete(event) {
         const res = await fetch('/auth/google-complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken: window.googleIdToken, nickname })
+            body: JSON.stringify({ idToken: window.googleIdToken, nickname, agree_tos, agree_privacy, agree_fair_use })
         });
 
         if (res.ok) {

@@ -17,7 +17,7 @@ import uvicorn
 
 from app.config import get_settings
 from app.utils.db import init_db
-from app.routers import auth, subjects, lectures, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz
+from app.routers import auth, subjects, lectures, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -226,6 +226,7 @@ app.include_router(snapshots.router)
 app.include_router(templates.router)
 app.include_router(admin.router)
 app.include_router(quiz.router)
+app.include_router(support.router)
 
 # Serve generated files (images, PDFs, etc.)
 generated_dir = os.path.join(os.path.dirname(__file__), "generated")

@@ -33,6 +33,9 @@ class GoogleCompleteRequest(BaseModel):
     """Complete Google registration with additional info"""
     idToken: str
     nickname: str
+    agree_tos: bool = False
+    agree_privacy: bool = False
+    agree_fair_use: bool = False
 
 
 def verify_firebase_token(id_token_str: str):
@@ -106,6 +109,23 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
     
     # Check system signup config
     signup_config = sys_settings.signup_config if sys_settings else "open"
+    
+    # Check required agreement fields
+    if not user_data.agree_tos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must agree to the Terms of Service to register."
+        )
+    if not user_data.agree_privacy:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must agree to the Privacy Policy to register."
+        )
+    if not user_data.agree_fair_use:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must agree to the Fair Use Policy to register."
+        )
     
     invitation = None
     if signup_config == "invite":
@@ -346,6 +366,23 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
         )
 
     try:
+        # Check required agreement fields
+        if not google_request.agree_tos:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You must agree to the Terms of Service to register."
+            )
+        if not google_request.agree_privacy:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You must agree to the Privacy Policy to register."
+            )
+        if not google_request.agree_fair_use:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You must agree to the Fair Use Policy to register."
+            )
+        
         # Verify the Firebase ID token
         claims = verify_firebase_token(google_request.idToken)
         
