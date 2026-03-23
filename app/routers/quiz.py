@@ -425,8 +425,11 @@ async def explain_question_endpoint(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
     
-    # Check if cached explanation exists and ignore if we want a fresh one (optional, but requested to cache)
-    if question.explanation and request.scope != "web": # If it's already explained and not web-specific, return it
+    # Check if cached explanation exists and matches requested mode/format
+    if (question.explanation and 
+        question.explanation_mode == request.ai_mode and 
+        question.explanation_output == request.output_format and 
+        request.scope != "web"):
          return question
 
     ai_client = get_ai_client(user=current_user, db=db)
@@ -479,8 +482,13 @@ async def explain_question_endpoint(
     format_prompt = "Respond in clear sentences."
     if request.output_format == "pointform": format_prompt = "Respond in bullet points."
     
+    user_answer_context = ""
+    if request.user_answer:
+        user_answer_context = f"\nThe user provided this answer: '{request.user_answer}'. Please explain why this answer is correct or incorrect compared to the true answer."
+
     prompt = f"""{mode_prompt}
 {format_prompt}
+{user_answer_context}
 
 Question: {question.question_text}
 Answer: {question.answer_text}
@@ -493,6 +501,8 @@ Explanation:"""
     try:
         explanation = await ai_client.generate_text(prompt, max_tokens=1000)
         question.explanation = explanation
+        question.explanation_mode = request.ai_mode
+        question.explanation_output = request.output_format
         db.commit()
         db.refresh(question)
         return question
@@ -522,6 +532,8 @@ def bulk_update_questions(
             question.options = q_update.options
             question.order = q_update.order
             question.explanation = q_update.explanation
+            question.explanation_mode = q_update.explanation_mode
+            question.explanation_output = q_update.explanation_output
             updated_questions.append(question)
         else:
             # Handle new question if id is negative or similar (not implemented here but good practice)

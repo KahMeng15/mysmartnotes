@@ -16,6 +16,14 @@ let explainSettings = {
     conversation_id: null
 };
 
+// Global for modal state
+let modalQId = null;
+let modalSettings = {
+    scope: 'source',
+    mode: 'elaborate',
+    output: 'sentence'
+};
+
 /**
  * Convert inline enumerated lists to newline-separated Markdown lists.
  * Handles patterns like:
@@ -777,10 +785,22 @@ function createQuestionCard(q, index) {
         const answerBox = document.createElement('div');
         answerBox.className = 'q-answer-box';
 
+        const answerHeader = document.createElement('div');
+        answerHeader.className = 'q-answer-header';
+        
         const label = document.createElement('span');
         label.className = 'q-answer-label';
         label.textContent = 'Correct Answer';
-        answerBox.appendChild(label);
+        answerHeader.appendChild(label);
+
+        const explainBtn = document.createElement('button');
+        explainBtn.className = 'explain-btn-inline';
+        explainBtn.id = `btn-explain-${q.id}`;
+        explainBtn.innerHTML = '<i class="ph ph-sparkle"></i> Explain';
+        explainBtn.onclick = () => explainQuestion(q.id);
+        answerHeader.appendChild(explainBtn);
+
+        answerBox.appendChild(answerHeader);
 
         const answerContent = document.createElement('div');
         answerContent.style.fontWeight = "600";
@@ -800,30 +820,7 @@ function createQuestionCard(q, index) {
     const explanationBox = document.createElement('div');
     explanationBox.className = 'q-explanation-box';
     explanationBox.id = `explanation-${q.id}`;
-    // We NO LONGER add 'active' here even if q.explanation exists
-    // It will be shown when user clicks Explain
     card.appendChild(explanationBox);
-
-    // Action Row for Explain & Follow-up
-    const actionRow = document.createElement('div');
-    actionRow.className = 'q-action-row';
-
-    const explainBtn = document.createElement('button');
-    explainBtn.className = 'btn btn-outline btn-small';
-    explainBtn.id = `btn-explain-${q.id}`;
-    explainBtn.innerHTML = '<i class="ph ph-sparkle"></i> Explain';
-    explainBtn.onclick = () => explainQuestion(q.id);
-    actionRow.appendChild(explainBtn);
-
-    const followUpBtn = document.createElement('button');
-    followUpBtn.className = 'btn btn-outline btn-small';
-    followUpBtn.id = `btn-followup-${q.id}`;
-    followUpBtn.style.display = 'none'; // Always hide initially
-    followUpBtn.innerHTML = '<i class="ph ph-chat-circle-dots"></i> Follow-up';
-    followUpBtn.onclick = () => openChatDrawer(q.id);
-    actionRow.appendChild(followUpBtn);
-
-    card.appendChild(actionRow);
 
     return card;
 }
@@ -1169,28 +1166,25 @@ async function submitEditQuestion(qId) {
     }
 }
 
-async function explainQuestion(qId) {
+async function explainQuestion(qId, forceRegenerate = false) {
     const btn = document.getElementById(`btn-explain-${qId}`);
     const box = document.getElementById(`explanation-${qId}`);
-    const followUpBtn = document.getElementById(`btn-followup-${qId}`);
     const q = currentQuestions.find(q => q.id == qId);
 
-    // If explanation exists and box is NOT active, just show the cached version
-    if (q.explanation && !box.classList.contains('active')) {
+    // 1. Check if cached version exists and MATCHES current requested parameters
+    const matchesSettings = q.explanation && 
+                           q.explanation_mode === explainSettings.mode && 
+                           q.explanation_output === explainSettings.output;
+
+    if (q.explanation && matchesSettings && !forceRegenerate && !box.classList.contains('active')) {
+        renderExplanationBox(q, box);
         box.classList.add('active');
-        box.innerHTML = `
-            <div class="q-explanation-header">
-                <span class="q-explanation-title">AI Explanation (Cached)</span>
-            </div>
-            <div class="q-explanation-content">${formatQuizText(q.explanation)}</div>
-        `;
         box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        
-        if (followUpBtn) followUpBtn.style.display = 'flex';
         if (btn) btn.innerHTML = '<i class="ph ph-sparkle"></i> Re-explain';
         return;
     }
 
+    // 2. Otherwise, proceed with API call
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i> Explaining...';
@@ -1209,36 +1203,82 @@ async function explainQuestion(qId) {
 
         if (!response.ok) throw new Error('Explanation failed');
 
-        const data = await response.json();
+        const updatedQ = await response.json();
+        
+        // Update local state
+        const idx = currentQuestions.findIndex(x => x.id == qId);
+        if (idx !== -1) currentQuestions[idx] = updatedQ;
 
-        // Update local data
-        const qIdx = currentQuestions.findIndex(q => q.id == qId);
-        if (qIdx !== -1) currentQuestions[qIdx].explanation = data.explanation;
-
-        // Render in UI
+        renderExplanationBox(updatedQ, box);
         box.classList.add('active');
-        box.innerHTML = `
-            <div class="q-explanation-header">
-                <span class="q-explanation-title">AI Explanation</span>
-            </div>
-            <div class="q-explanation-content">${formatQuizText(data.explanation)}</div>
-        `;
         box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-        if (followUpBtn) followUpBtn.style.display = 'flex';
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Could not generate explanation: ' + error.message);
+    } finally {
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = '<i class="ph ph-sparkle"></i> Re-explain';
         }
-
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to generate explanation. Please try again.');
-        if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="ph ph-sparkle"></i> Explain';
-        }
     }
+}
+
+/**
+ * Helper to render the internal content and buttons of the explanation box.
+ */
+function renderExplanationBox(q, box) {
+    const modeIcons = {
+        'normal': 'ph ph-stack',
+        'quick': 'ph ph-lightning',
+        'simple': 'ph ph-text-a-underline',
+        'elaborate': 'ph ph-lightbulb',
+        'eli5': 'ph ph-smiley'
+    };
+    const formatIcons = {
+        'sentence': 'ph ph-text-t',
+        'pointform': 'ph ph-list-bullets',
+        'numbered_list': 'ph ph-list-numbers',
+        'table': 'ph ph-table'
+    };
+
+    const modeIcon = modeIcons[q.explanation_mode] || 'ph ph-sparkle';
+    const formatIcon = formatIcons[q.explanation_output] || 'ph ph-text-t';
+
+    box.innerHTML = `
+        <div class="q-explanation-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="q-explanation-title">AI Explanation</span>
+            <button class="btn-icon" onclick="closeExplanation(${q.id})" title="Close Explanation">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+        <div class="q-explanation-content">${formatQuizText(q.explanation)}</div>
+        <div class="q-explanation-footer">
+            <div class="ai-meta-badges">
+                <span class="ai-mode-badge" onclick="showExplainOptions(${q.id})" title="AI Mode used">
+                    <i class="${modeIcon}"></i> ${q.explanation_mode}
+                </span>
+                <span class="ai-mode-badge" onclick="showExplainOptions(${q.id})" title="Response style">
+                    <i class="${formatIcon}"></i> ${q.explanation_output.replace('_', ' ')}
+                </span>
+            </div>
+            <div class="explanation-actions">
+                <button class="btn-explanation-action" onclick="openChatDrawer(${q.id})">
+                    <i class="ph ph-chat-circle-dots"></i> Follow-up
+                </button>
+                <button class="btn-explanation-action danger-lite" onclick="explainQuestion(${q.id}, true)">
+                    <i class="ph ph-arrows-counter-clockwise"></i> Re-explain
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function closeExplanation(qId) {
+    const box = document.getElementById(`explanation-${qId}`);
+    const btn = document.getElementById(`btn-explain-${qId}`);
+    if (box) box.classList.remove('active');
+    if (btn) btn.innerHTML = '<i class="ph ph-sparkle"></i> Explain';
 }
 
 // Follow-up Chat Logic
@@ -1421,14 +1461,18 @@ async function saveBulkEdits() {
 
     rows.forEach((row, idx) => {
         const id = parseInt(row.dataset.id);
+        const existing = currentQuestions.find(q => q.id === id) || {};
+        
         questions.push({
-            id: id < 0 ? null : id, // null means new question
+            id: id < 0 ? null : id, 
             question_text: row.querySelector('.q-edit-text').value,
             answer_text: row.querySelector('.q-edit-answer').value,
             question_type: row.querySelector('.q-edit-type').value,
             order: idx,
-            options: null,
-            explanation: null
+            options: existing.options || null,
+            explanation: existing.explanation || null,
+            explanation_mode: existing.explanation_mode || null,
+            explanation_output: existing.explanation_output || null
         });
     });
 
@@ -1452,4 +1496,76 @@ async function saveBulkEdits() {
         console.error('Error:', error);
         alert('Failed to save changes.');
     }
+}
+function setExplainMode(mode) {
+    explainSettings.mode = mode;
+    document.querySelectorAll('#explainModeBar .mode-pill-xs').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+}
+
+function setExplainOutput(output) {
+    explainSettings.output = output;
+    document.querySelectorAll('#explainOutputBar .mode-pill-xs').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.format === output);
+    });
+}
+
+function updateExplainSettings() {
+    explainSettings.scope = document.getElementById('explainScope').value;
+}
+
+/** Modal AI Settings */
+function showExplainOptions(qId) {
+    modalQId = qId;
+    const q = currentQuestions.find(q => q.id == qId);
+    
+    // Default to question's current or global settings
+    modalSettings.mode = q.explanation_mode || explainSettings.mode;
+    modalSettings.output = q.explanation_output || explainSettings.output;
+    modalSettings.scope = explainSettings.scope;
+
+    // Sync UI
+    document.getElementById('modalExplainScope').value = modalSettings.scope;
+    setModalExplainMode(modalSettings.mode);
+    setModalExplainOutput(modalSettings.output);
+
+    document.getElementById('aiExplainOptionsModal').classList.add('active');
+}
+
+function setModalExplainMode(mode) {
+    modalSettings.mode = mode;
+    document.querySelectorAll('#modalExplainModeBar .mode-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+}
+
+function setModalExplainOutput(output) {
+    modalSettings.output = output;
+    document.querySelectorAll('#modalExplainOutputBar .mode-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.format === output);
+    });
+}
+
+function regenerateFromModal() {
+    // Update global settings briefly to trigger regeneration with these params
+    const oldSettings = { ...explainSettings };
+    explainSettings.scope = document.getElementById('modalExplainScope').value;
+    explainSettings.mode = modalSettings.mode;
+    explainSettings.output = modalSettings.output;
+
+    closeModal('aiExplainOptionsModal');
+    explainQuestion(modalQId, true); // Force regeneration
+
+    // We don't necessarily want to change global sidebar settings permanently?
+    // User might just want to change one question. 
+    // But usually consistency is good. Let's keep them changed or revert?
+    // Let's keep them changed to match user's latest preference.
+    syncSidebarWithModal();
+}
+
+function syncSidebarWithModal() {
+    document.getElementById('explainScope').value = explainSettings.scope;
+    setExplainMode(explainSettings.mode);
+    setExplainOutput(explainSettings.output);
 }

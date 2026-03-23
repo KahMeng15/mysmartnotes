@@ -850,13 +850,220 @@
     border-top: 1px solid var(--color-bg);
 }
 
-/* AI Settings Collapsible */
-.ai-settings-collapsible {
-    background: var(--color-white);
+/* AI Sidebar Settings */
+.ai-sidebar-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0 4px;
+}
+
+.form-group-sm {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.control-label-xs {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-gray);
+    letter-spacing: 0.5px;
+}
+
+.options-select-sm {
+    width: 100%;
+    height: 32px;
+    padding: 4px 8px;
     border: 1px solid var(--color-light-gray);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    background: var(--color-white);
+    transition: border-color 0.2s;
+}
+
+.ai-mode-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+}
+
+#explainOutputBar.ai-mode-grid {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.mode-pill-xs {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-light-gray);
+    background: var(--color-white);
+    color: var(--color-gray);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.mode-pill-xs i {
+    font-size: 16px;
+}
+
+.mode-pill-xs:hover {
+    border-color: var(--color-primary);
+    background: rgba(89, 60, 143, 0.04);
+    color: var(--color-primary);
+}
+
+.mode-pill-xs.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+/* Positioned AI Buttons */
+.q-answer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.explain-btn-inline {
+    background: white;
+    border: 1px solid var(--color-light-gray);
+    color: var(--color-primary);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.explain-btn-inline:hover {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.explain-btn-inline i {
+    font-size: 14px;
+}
+
+/* Explanation Box Metadata & Actions */
+.q-explanation-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dotted var(--color-light-gray);
+}
+
+.ai-meta-badges {
+    display: flex;
+    gap: 8px;
+}
+
+.ai-mode-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-light-gray);
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-dark-gray);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ai-mode-badge:hover {
+    background: white;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.ai-mode-badge i {
+    font-size: 14px;
+    color: var(--color-primary);
+}
+
+.explanation-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-explanation-action {
+    background: transparent;
+    border: 1px solid var(--color-light-gray);
+    color: var(--color-gray);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-explanation-action:hover {
+    background: var(--color-bg);
+    color: var(--color-dark);
+}
+
+.btn-explanation-action.danger-lite:hover {
+    color: var(--color-error);
+    border-color: var(--color-error);
+    background: rgba(231, 76, 60, 0.05);
+}
+
+/* Modal Enhancements for Summary Style */
+.options-group {
+    margin-bottom: 20px;
+}
+
+.options-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-gray);
+    margin-bottom: 8px;
+}
+
+.ai-mode-bar,
+.output-format-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.modal-icon-inline {
+    color: var(--color-primary);
+    margin-right: 8px;
+}
+
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .ai-settings-header {

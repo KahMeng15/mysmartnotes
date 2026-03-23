@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz View - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/styles/master.css">
     <link rel="stylesheet" href="/styles/note.css">
     <link rel="stylesheet" href="/styles/quiz.css">
@@ -14,6 +17,7 @@
     <script src="/js/auth.js"></script>
     <script src="/js/nav.js"></script>
 </head>
+
 <body class="note-page">
     <div class="app-layout">
         <!-- Content Card -->
@@ -25,7 +29,8 @@
                     <span class="note-nav-sep">›</span>
                     <span class="note-nav-crumb-link" id="breadcrumbTitle">Loading Quiz...</span>
                     <span class="note-nav-sep" id="breadcrumbViewSep" style="display: none;">›</span>
-                    <span class="note-nav-crumb-link active" id="breadcrumbViewMode" style="display: none;">Show Answers</span>
+                    <span class="note-nav-crumb-link active" id="breadcrumbViewMode" style="display: none;">Show
+                        Answers</span>
                 </div>
             </div>
 
@@ -34,7 +39,8 @@
                     <div class="page-header-row">
                         <div>
                             <h1 id="quizTitle">Loading Quiz...</h1>
-                            <p id="quizSubtitle" style="color: var(--color-gray); font-size: 14px;">Review and test your knowledge</p>
+                            <p id="quizSubtitle" style="color: var(--color-gray); font-size: 14px;">Review and test your
+                                knowledge</p>
                         </div>
                         <div id="practiceScore" class="practice-container">
                             <div class="practice-score-box">
@@ -52,7 +58,8 @@
                 <div id="quizSearchSection" class="quiz-search-section">
                     <div class="search-box">
                         <i class="ph ph-magnifying-glass search-icon"></i>
-                        <input type="text" id="qSearchInput" placeholder="Search your quiz..." onkeyup="if(event.key==='Enter') filterQuestions()">
+                        <input type="text" id="qSearchInput" placeholder="Search your quiz..."
+                            onkeyup="if(event.key==='Enter') filterQuestions()">
                     </div>
                     <select id="qSearchFilter" class="options-select search-filter-select">
                         <option value="both">Both</option>
@@ -86,9 +93,11 @@
                 <!-- Flashcard Controls (Hidden) -->
                 <div id="fcControls" class="flashcard-controls margin-top-lg">
                     <div class="fc-nav-buttons">
-                        <button class="btn btn-outline btn-icon" onclick="prevCard()" title="Previous Card"><i class="ph ph-caret-left"></i></button>
+                        <button class="btn btn-outline btn-icon" onclick="prevCard()" title="Previous Card"><i
+                                class="ph ph-caret-left"></i></button>
                         <span id="fcCounter" class="fc-counter">1 / 10</span>
-                        <button class="btn btn-outline btn-icon" onclick="nextCard()" title="Next Card"><i class="ph ph-caret-right"></i></button>
+                        <button class="btn btn-outline btn-icon" onclick="nextCard()" title="Next Card"><i
+                                class="ph ph-caret-right"></i></button>
                     </div>
                 </div>
             </div>
@@ -98,22 +107,26 @@
         <div class="note-action-panel">
             <h4 class="sidebar-section-title">View Mode</h4>
             <div class="action-grid" id="modeGrid">
-                <button class="action-btn active" data-mode="showanswers" onclick="setMode('showanswers')" title="Show All Answers">
+                <button class="action-btn active" data-mode="showanswers" onclick="setMode('showanswers')"
+                    title="Show All Answers">
                     <i class="ph ph-list-dashes"></i><span>Show Answers</span>
                 </button>
-                <button class="action-btn" data-mode="hideanswers" onclick="setMode('hideanswers')" title="Hide Answers">
+                <button class="action-btn" data-mode="hideanswers" onclick="setMode('hideanswers')"
+                    title="Hide Answers">
                     <i class="ph ph-eye-slash"></i><span>Hide Answers</span>
                 </button>
                 <button class="action-btn" data-mode="practice" onclick="setMode('practice')" title="Practice Mode">
                     <i class="ph ph-check-square-offset"></i><span>Practice</span>
                 </button>
-                <button class="action-btn" data-mode="flashcards" onclick="setMode('flashcards')" title="Flashcard Mode">
+                <button class="action-btn" data-mode="flashcards" onclick="setMode('flashcards')"
+                    title="Flashcard Mode">
                     <i class="ph ph-cards"></i><span>Flashcards</span>
                 </button>
                 <button class="action-btn" data-mode="tableview" onclick="setMode('tableview')" title="Table View">
                     <i class="ph ph-table"></i><span>Table View</span>
                 </button>
-                <button class="action-btn" data-mode="examsimulator" onclick="setMode('examsimulator')" title="Exam Simulator">
+                <button class="action-btn" data-mode="examsimulator" onclick="setMode('examsimulator')"
+                    title="Exam Simulator">
                     <i class="ph ph-timer"></i><span>Exam Simulator</span>
                 </button>
             </div>
@@ -133,47 +146,67 @@
                 </button>
             </div>
 
-            <button class="action-toggle" onclick="toggleActionPanel()" title="Collapse" id="actionToggleBtn">
-                <i class="ph ph-caret-right" id="actionToggleIcon"></i>
-            </button>
-
             <div class="sidebar-divider"></div>
 
-            <!-- AI Settings Quick Config -->
-            <div class="ai-settings-collapsible">
-                <div class="ai-settings-header" onclick="toggleAiSettings()">
-                    <span class="sidebar-section-title" style="margin: 0;"><i class="ph ph-sparkle"></i> AI Explain Config</span>
-                    <i class="ph ph-caret-down" id="aiSettingsIcon"></i>
+            <h4 class="sidebar-section-title">AI Explain Config</h4>
+            <div class="ai-sidebar-settings">
+                <div class="form-group-sm">
+                    <label class="control-label-xs">Knowledge Scope</label>
+                    <select id="explainScope" class="options-select-sm" onchange="updateExplainSettings()">
+                        <option value="source">📚 Source Material</option>
+                        <option value="web">🌐 Web Search</option>
+                        <option value="both">✨ Both (Mixed)</option>
+                    </select>
                 </div>
-                <div class="ai-settings-content" id="aiSettingsContent">
-                    <div class="ai-controls-minimal">
-                        <div>
-                            <div class="control-label-sm">Scope</div>
-                            <select id="explainScope" class="options-select" style="font-size: 12px; height: 32px; padding: 0 8px;">
-                                <option value="source">Source Material</option>
-                                <option value="web">Web Search</option>
-                                <option value="both">Both</option>
-                            </select>
-                        </div>
-                        <div>
-                            <div class="control-label-sm">Mode</div>
-                            <div class="mode-pill-container" id="explainModeBar">
-                                <button class="mode-pill mode-pill-sm active" data-mode="normal" onclick="setExplainMode('normal')">Normal</button>
-                                <button class="mode-pill mode-pill-sm" data-mode="simple" onclick="setExplainMode('simple')">Simple</button>
-                                <button class="mode-pill mode-pill-sm" data-mode="elaborate" onclick="setExplainMode('elaborate')">Elaborate</button>
-                                <button class="mode-pill mode-pill-sm" data-mode="eli5" onclick="setExplainMode('eli5')">ELI5</button>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="control-label-sm">Output</div>
-                            <div class="mode-pill-container" id="explainOutputBar">
-                                <button class="mode-pill mode-pill-sm active" data-format="sentence" onclick="setExplainOutput('sentence')">Sentence</button>
-                                <button class="mode-pill mode-pill-sm" data-format="pointform" onclick="setExplainOutput('pointform')">Points</button>
-                            </div>
-                        </div>
+                <div class="form-group-sm">
+                    <label class="control-label-xs">AI Mode</label>
+                    <div class="ai-mode-grid" id="explainModeBar">
+                        <button class="mode-pill-xs active" data-mode="normal" onclick="setExplainMode('normal')"
+                            title="Normal">
+                            <i class="ph ph-stack"></i>
+                        </button>
+                        <button class="mode-pill-xs" data-mode="quick" onclick="setExplainMode('quick')" title="Quick">
+                            <i class="ph ph-lightning"></i>
+                        </button>
+                        <button class="mode-pill-xs" data-mode="simple" onclick="setExplainMode('simple')"
+                            title="Simple">
+                            <i class="ph ph-text-a-underline"></i>
+                        </button>
+                        <button class="mode-pill-xs" data-mode="elaborate" onclick="setExplainMode('elaborate')"
+                            title="Detailed">
+                            <i class="ph ph-lightbulb"></i>
+                        </button>
+                        <button class="mode-pill-xs" data-mode="eli5" onclick="setExplainMode('eli5')" title="ELI5">
+                            <i class="ph ph-smiley"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group-sm">
+                    <label class="control-label-xs">Response Style</label>
+                    <div class="ai-mode-grid" id="explainOutputBar">
+                        <button class="mode-pill-xs active" data-format="sentence"
+                            onclick="setExplainOutput('sentence')" title="Sentence">
+                            <i class="ph ph-text-t"></i>
+                        </button>
+                        <button class="mode-pill-xs" data-format="pointform" onclick="setExplainOutput('pointform')"
+                            title="Points">
+                            <i class="ph ph-list-bullets"></i>
+                        </button>
+                        <button class="mode-pill-xs" data-format="numbered_list"
+                            onclick="setExplainOutput('numbered_list')" title="Numbered">
+                            <i class="ph ph-list-numbers"></i>
+                        </button>
+                        <button class="mode-pill-xs" data-format="table" onclick="setExplainOutput('table')"
+                            title="Table">
+                            <i class="ph ph-table"></i>
+                        </button>
                     </div>
                 </div>
             </div>
+
+            <button class="action-toggle" onclick="toggleActionPanel()" title="Collapse" id="actionToggleBtn">
+                <i class="ph ph-caret-right" id="actionToggleIcon"></i>
+            </button>
 
             <div class="sidebar-divider"></div>
 
@@ -212,8 +245,9 @@
                 <i class="ph ph-sparkle" style="font-size: 32px; color: var(--color-primary);"></i>
             </div>
             <h3 class="margin-bottom-sm">Choose Study Mode</h3>
-            <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 24px;">How would you like to review this quiz today?</p>
-            
+            <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 24px;">How would you like to review this
+                quiz today?</p>
+
             <div class="action-grid" style="grid-template-columns: repeat(3, 1fr);">
                 <button onclick="setMode('showanswers'); closeModal('initialModeModal')">
                     <i class="ph ph-list-dashes"></i>
@@ -247,17 +281,19 @@
     <div id="examSetupModal" class="modal">
         <div class="modal-content" style="max-width: 400px;">
             <h3>Exam Simulator Setup</h3>
-            <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 20px;">Set your desired time limit for this session.</p>
-            
+            <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 20px;">Set your desired time limit for
+                this session.</p>
+
             <div class="form-group">
                 <label>Time Limit (minutes)</label>
                 <input type="number" id="examTimeLimit" class="form-control" value="15" min="1" max="180">
                 <small style="color: var(--color-gray);">Recommended: <span id="recommendedTime">15</span> mins</small>
             </div>
-            
+
             <div class="modal-buttons margin-top-xl">
                 <button class="btn btn-primary" onclick="startExamSim()">Start Simulator</button>
-                <button class="btn btn-secondary" onclick="closeModal('examSetupModal'); setMode('showanswers')">Cancel</button>
+                <button class="btn btn-secondary"
+                    onclick="closeModal('examSetupModal'); setMode('showanswers')">Cancel</button>
             </div>
         </div>
     </div>
@@ -266,13 +302,16 @@
     <div id="exportModal" class="modal">
         <div class="modal-content modal-content-export">
             <h3><i class="ph ph-export"></i> Export Quiz</h3>
-            <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 20px;">Select format to download this quiz.</p>
-            
+            <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 20px;">Select format to download this
+                quiz.</p>
+
             <div class="export-options">
-                <button class="btn btn-outline btn-block" onclick="doExport('pdf')"><i class="ph ph-file-pdf"></i> PDF</button>
-                <button class="btn btn-outline btn-block" onclick="doExport('docx')"><i class="ph ph-file-doc"></i> Word</button>
+                <button class="btn btn-outline btn-block" onclick="doExport('pdf')"><i class="ph ph-file-pdf"></i>
+                    PDF</button>
+                <button class="btn btn-outline btn-block" onclick="doExport('docx')"><i class="ph ph-file-doc"></i>
+                    Word</button>
             </div>
-            
+
             <button class="btn btn-secondary btn-block" onclick="closeModal('exportModal')">Cancel</button>
         </div>
     </div>
@@ -282,7 +321,8 @@
         <div class="modal-content modal-content-quiz">
             <div class="flex-align-start margin-bottom-lg">
                 <div>
-                    <h3 class="margin-bottom-xs"><i class="ph ph-plus-circle" style="color: var(--color-primary); margin-right: 6px;"></i> Add New Question</h3>
+                    <h3 class="margin-bottom-xs"><i class="ph ph-plus-circle"
+                            style="color: var(--color-primary); margin-right: 6px;"></i> Add New Question</h3>
                     <p style="color: var(--color-gray); font-size: 14px;">Expand your quiz with more questions.</p>
                 </div>
                 <button class="btn-icon" onclick="closeModal('addQuestionModal')"><i class="ph ph-x"></i></button>
@@ -301,9 +341,10 @@
             <!-- AI Section -->
             <div id="addAiSection">
                 <div class="selection-steps">
-                    <p style="color: var(--color-gray); font-size: 14px; margin: 0;">AI will generate a new question based on the content of this quiz (Lecture, Subject, or Group).</p>
+                    <p style="color: var(--color-gray); font-size: 14px; margin: 0;">AI will generate a new question
+                        based on the content of this quiz (Lecture, Subject, or Group).</p>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Preferred Type</label>
                     <select id="aiQType" class="options-select">
@@ -312,9 +353,10 @@
                         <option value="fill_in_the_blank">Fill in the Blank</option>
                     </select>
                 </div>
-                
+
                 <div class="modal-buttons margin-top-xl">
-                    <button class="btn btn-primary btn-block" onclick="generateQuestionAi()" id="btnGenerateQ" style="padding: 12px;">
+                    <button class="btn btn-primary btn-block" onclick="generateQuestionAi()" id="btnGenerateQ"
+                        style="padding: 12px;">
                         <i class="ph ph-sparkle"></i> Generate Question
                     </button>
                 </div>
@@ -333,22 +375,27 @@
 
                 <div class="form-group">
                     <label>Question Text</label>
-                    <textarea id="newQText" rows="3" class="form-control" placeholder="Type your question here..."></textarea>
+                    <textarea id="newQText" rows="3" class="form-control"
+                        placeholder="Type your question here..."></textarea>
                 </div>
 
                 <div id="newQOptions" style="display: none;" class="form-group">
                     <label>Options (One per line, first is correct)</label>
-                    <textarea id="newQOptionsText" rows="4" class="form-control" placeholder="Correct option\nIncorrect option 1\nIncorrect option 2..."></textarea>
+                    <textarea id="newQOptionsText" rows="4" class="form-control"
+                        placeholder="Correct option\nIncorrect option 1\nIncorrect option 2..."></textarea>
                 </div>
 
                 <div class="form-group">
                     <label>Target Answer</label>
-                    <textarea id="newQAnswer" rows="2" class="form-control" placeholder="Ground truth answer for grading"></textarea>
+                    <textarea id="newQAnswer" rows="2" class="form-control"
+                        placeholder="Ground truth answer for grading"></textarea>
                 </div>
-                
+
                 <div class="modal-buttons margin-top-xl">
-                    <button class="btn btn-primary btn-block" onclick="addQuestion()" style="padding: 12px;">Add Question</button>
-                    <button class="btn btn-secondary btn-block" onclick="closeModal('addQuestionModal')" style="padding: 12px;">Cancel</button>
+                    <button class="btn btn-primary btn-block" onclick="addQuestion()" style="padding: 12px;">Add
+                        Question</button>
+                    <button class="btn btn-secondary btn-block" onclick="closeModal('addQuestionModal')"
+                        style="padding: 12px;">Cancel</button>
                 </div>
             </div>
         </div>
@@ -366,7 +413,7 @@
                     <button class="btn-icon" onclick="closeModal('editModeModal')"><i class="ph ph-x"></i></button>
                 </div>
             </div>
-            
+
             <p style="color: var(--color-gray); font-size: 14px; margin-bottom: 16px;">
                 You can edit question text, answers, and reorder them. Don't forget to save your changes.
             </p>
@@ -409,10 +456,75 @@
             </div>
         </div>
         <div class="chat-drawer-input">
-            <input type="text" id="chatDrawerInput" class="form-control" placeholder="Type your follow-up..." onkeyup="if(event.key==='Enter') sendFollowUp()">
+            <input type="text" id="chatDrawerInput" class="form-control" placeholder="Type your follow-up..."
+                onkeyup="if(event.key==='Enter') sendFollowUp()">
             <button class="btn btn-primary btn-icon" onclick="sendFollowUp()">
                 <i class="ph ph-paper-plane-right"></i>
             </button>
+        </div>
+    </div>
+
+    <!-- AI Explain Options Modal -->
+    <div id="aiExplainOptionsModal" class="modal">
+        <div class="modal-content modal-content-summary">
+            <h3 class="progress-title-main"><i class="ph ph-sparkle modal-icon-inline"></i> Explain Options</h3>
+            <p class="progress-subtitle-main">Customize how the AI should explain this question.</p>
+
+            <div class="options-group">
+                <label class="options-label">Knowledge Scope</label>
+                <select id="modalExplainScope" class="options-select">
+                    <option value="source">📚 Source Material Only</option>
+                    <option value="web">🌐 Web Search Only</option>
+                    <option value="both">✨ Both (Mixed Context)</option>
+                </select>
+            </div>
+
+            <div class="options-group">
+                <label class="options-label">AI Mode</label>
+                <div class="ai-mode-bar" id="modalExplainModeBar">
+                    <button class="mode-pill" data-mode="normal" onclick="setModalExplainMode('normal')">
+                        <i class="ph ph-stack"></i> Normal
+                    </button>
+                    <button class="mode-pill" data-mode="quick" onclick="setModalExplainMode('quick')">
+                        <i class="ph ph-lightning"></i> Quick
+                    </button>
+                    <button class="mode-pill" data-mode="simple" onclick="setModalExplainMode('simple')">
+                        <i class="ph ph-text-a-underline"></i> Simple
+                    </button>
+                    <button class="mode-pill active" data-mode="elaborate" onclick="setModalExplainMode('elaborate')">
+                        <i class="ph ph-lightbulb"></i> Elaborate
+                    </button>
+                    <button class="mode-pill" data-mode="eli5" onclick="setModalExplainMode('eli5')">
+                        <i class="ph ph-smiley"></i> ELI5
+                    </button>
+                </div>
+            </div>
+
+            <div class="options-group">
+                <label class="options-label">Output Format</label>
+                <div class="output-format-bar" id="modalExplainOutputBar">
+                    <button class="mode-pill active" data-format="sentence" onclick="setModalExplainOutput('sentence')">
+                        <i class="ph ph-text-t"></i> Sentence
+                    </button>
+                    <button class="mode-pill" data-format="pointform" onclick="setModalExplainOutput('pointform')">
+                        <i class="ph ph-list-bullets"></i> Pointform
+                    </button>
+                    <button class="mode-pill" data-format="numbered_list"
+                        onclick="setModalExplainOutput('numbered_list')">
+                        <i class="ph ph-list-numbers"></i> Numbered List
+                    </button>
+                    <button class="mode-pill" data-format="table" onclick="setModalExplainOutput('table')">
+                        <i class="ph ph-table"></i> Table
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-buttons modal-footer-spacing">
+                <button type="button" class="btn btn-primary" id="regenerateExplainBtn"
+                    onclick="regenerateFromModal()">Regenerate Explanation</button>
+                <button type="button" class="btn btn-secondary"
+                    onclick="closeModal('aiExplainOptionsModal')">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -434,4 +546,5 @@
         }
     </script>
 </body>
+
 </html>

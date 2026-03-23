@@ -9,6 +9,8 @@ class QuizQuestionBase(BaseModel):
     options: Optional[Any] = None
     order: int = 0
     explanation: Optional[str] = None
+    explanation_mode: Optional[str] = None
+    explanation_output: Optional[str] = None
 
 class QuizQuestionCreate(QuizQuestionBase):
     pass
@@ -20,6 +22,8 @@ class QuizQuestionUpdate(BaseModel):
     options: Optional[Any] = None
     order: Optional[int] = None
     explanation: Optional[str] = None
+    explanation_mode: Optional[str] = None
+    explanation_output: Optional[str] = None
 
 class QuizQuestionResponse(QuizQuestionBase):
     id: int
@@ -96,6 +100,7 @@ class QuizExplainRequest(BaseModel):
     scope: str = "source" # source, web, both
     ai_mode: str = "elaborate"
     output_format: str = "sentence"
+    user_answer: Optional[str] = None
 
 class BulkQuizQuestionUpdate(BaseModel):
     id: int
@@ -105,6 +110,8 @@ class BulkQuizQuestionUpdate(BaseModel):
     options: Optional[Any] = None
     order: int
     explanation: Optional[str] = None
+    explanation_mode: Optional[str] = None
+    explanation_output: Optional[str] = None
 
 class BulkQuizUpdate(BaseModel):
     questions: List[BulkQuizQuestionUpdate]
