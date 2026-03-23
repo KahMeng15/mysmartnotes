@@ -67,10 +67,102 @@ def get_db() -> Session:
 
 
 def init_db():
-    """Initialize database with tables"""
+    """Initialize database with tables and apply simple migrations"""
     logger.info("Initializing database...")
     Base.metadata.create_all(bind=engine)
+    
+    # Apply SQLite auto-migrations for missing columns
+    if "sqlite" in settings.DATABASE_URL:
+        try:
+            apply_sqlite_migrations()
+        except Exception as e:
+            logger.error(f"Failed to apply SQLite migrations: {e}")
+            
     logger.info("Database initialized successfully")
+
+
+def apply_sqlite_migrations():
+    """Add missing columns to existing SQLite tables based on models"""
+    import sqlite3
+    import os
+    
+    # Extract path from DATABASE_URL: sqlite:///./data/app.db -> ./data/app.db
+    db_path = settings.DATABASE_URL.replace("sqlite:///", "")
+    if not os.path.exists(db_path):
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Consolidated list of expected columns across major tables
+    migrations = [
+        ("system_settings", [
+            ("session_length", "INTEGER DEFAULT 24"),
+            ("session_unit", "TEXT DEFAULT 'hours'"),
+            ("session_reset_on_activity", "BOOLEAN DEFAULT 1"),
+            ("max_quiz_questions", "INTEGER DEFAULT 500"),
+            ("unnecessary_logins_enabled", "BOOLEAN DEFAULT 0"),
+            ("footer_text", "TEXT"),
+            ("domain_url", "TEXT"),
+            ("ai_limit_per_user", "VARCHAR(50) DEFAULT 'unlimited'"),
+            ("created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+            ("updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
+        ]),
+        ("summaries", [
+            ("processing_time", "REAL"),
+            ("processing_time_ms", "INTEGER"),
+            ("split_level", "VARCHAR(10)"),
+            ("quickread", "TEXT"),
+            ("mode", "VARCHAR(50)"),
+            ("output_format", "VARCHAR(50)"),
+            ("processing_method", "VARCHAR(50)"),
+            ("model", "VARCHAR(100)"),
+            ("is_user_edited", "BOOLEAN DEFAULT 0")
+        ]),
+        ("lectures", [
+            ("processing_time_ms", "INTEGER"),
+            ("page_count", "INTEGER DEFAULT 0"),
+            ("output_pdf_path", "VARCHAR(512)")
+        ]),
+        ("quizzes", [
+            ("group_id", "VARCHAR(16)"),
+            ("quiz_group_id", "VARCHAR(16)"),
+            ("model", "VARCHAR(100)"),
+            ("processing_time_ms", "INTEGER")
+        ]),
+        ("quiz_questions", [
+            ("explanation", "TEXT"),
+            ("explanation_mode", "VARCHAR(50)"),
+            ("explanation_output", "VARCHAR(50)")
+        ]),
+        ("quiz_progress", [
+            ("last_reviewed_at", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+            ("interval_days", "INTEGER DEFAULT 0"),
+            ("ease_factor", "REAL DEFAULT 2.5"),
+            ("consecutive_correct", "INTEGER DEFAULT 0")
+        ])
+    ]
+
+    for table_name, columns in migrations:
+        # Check if table exists
+        cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';")
+        if not cursor.fetchone():
+            continue
+
+        # Get existing columns
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        existing_cols = [row[1] for row in cursor.fetchall()]
+
+        for col_name, col_def in columns:
+            if col_name not in existing_cols:
+                logger.info(f"Adding column {col_name} to table {table_name}")
+                try:
+                    cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def}")
+                except sqlite3.OperationalError as e:
+                    logger.error(f"Error adding column {col_name} to {table_name}: {e}")
+    
+    conn.commit()
+    conn.close()
 
 
 def drop_all_tables():
