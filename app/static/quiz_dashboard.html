@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz Dashboard - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="/styles/master.css">
     <link rel="stylesheet" href="/styles/mynotes.css">
     <link rel="stylesheet" href="/styles/quiz.css">
@@ -14,6 +17,7 @@
     <script src="/js/auth.js"></script>
     <script src="/js/nav.js"></script>
 </head>
+
 <body>
     <div class="page-card">
         <!-- Sticky Navigation Header -->
@@ -33,9 +37,11 @@
             <div class="page-header-row">
                 <div>
                     <h1>My Quizzes</h1>
-                    <div id="activeGroupLabel" style="font-size: 14px; color: var(--color-primary); font-weight: 600; margin-top: 4px; display: none;">
+                    <div id="activeGroupLabel"
+                        style="font-size: 14px; color: var(--color-primary); font-weight: 600; margin-top: 4px; display: none;">
                         <i class="ph ph-folder-open"></i> Group: <span id="currentGroupName">None</span>
-                        <button class="btn btn-outline btn-small" onclick="clearGroupFilter()" title="Clear Group Filter"><i class="ph ph-x"></i> Clear</button>
+                        <button class="btn btn-outline btn-small" onclick="clearGroupFilter()"
+                            title="Clear Group Filter"><i class="ph ph-x"></i> Clear</button>
                     </div>
                 </div>
                 <div class="flex-align-center gap-md">
@@ -52,7 +58,8 @@
             <div class="controls-bar">
                 <div class="search-box">
                     <i class="ph ph-magnifying-glass search-icon"></i>
-                    <input type="text" id="quizSearch" placeholder="Search name, questions, notes..." onkeyup="debounceSearch()">
+                    <input type="text" id="quizSearch" placeholder="Search name, questions, notes..."
+                        onkeyup="debounceSearch()">
                 </div>
                 <div class="flex-align-center gap-sm">
                     <select id="quizSort" class="form-control" onchange="renderQuizzes()">
@@ -79,15 +86,17 @@
         <div class="modal-content modal-content-quiz">
             <div class="flex-align-start margin-bottom-lg">
                 <div>
-                    <h3 class="margin-bottom-xs"><i class="ph ph-exam" style="color: var(--color-primary); margin-right: 6px;"></i> Create New Quiz</h3>
-                    <p style="color: var(--color-gray); font-size: 14px;">Test your knowledge with AI-generated questions.</p>
+                    <h3 class="margin-bottom-xs"><i class="ph ph-exam"
+                            style="color: var(--color-primary); margin-right: 6px;"></i> Create New Quiz</h3>
+                    <p style="color: var(--color-gray); font-size: 14px;">Test your knowledge with AI-generated
+                        questions.</p>
                 </div>
                 <button class="btn-icon" onclick="closeModal('createQuizModal')"><i class="ph ph-x"></i></button>
             </div>
 
             <div class="modal-body">
                 <div class="options-group margin-bottom-lg">
-                    <label class="options-label">AI Generation or Import</label>
+                    <label class="options-label">Mode</label>
                     <div class="mode-pill-bar">
                         <button class="mode-pill active" id="btnMethodAi" onclick="setMethod('ai')">
                             <i class="ph ph-magic-wand"></i> AI Generate
@@ -102,7 +111,8 @@
                 <div class="form-group">
                     <label>Quiz Title</label>
                     <input type="text" id="quizTitle" placeholder="e.g. Final Exam Practice" class="form-control">
-                    <small style="color: var(--color-gray); font-size: 11px;">Leave blank to auto-generate based on selection</small>
+                    <small style="color: var(--color-gray); font-size: 11px;">Leave blank to auto-generate based on
+                        selection</small>
                 </div>
 
                 <div class="form-group">
@@ -166,40 +176,48 @@
                 <!-- Import Section -->
                 <div id="importSection" style="display: none;">
                     <div class="options-group margin-bottom-md">
-                        <div class="import-tabs">
-                            <button class="import-tab active" id="tabImportPaste" onclick="setImportTab('paste')">Paste Text</button>
-                            <button class="import-tab" id="tabImportFile" onclick="setImportTab('file')">Upload File</button>
+                        <label class="options-label">Input Method</label>
+                        <div class="mode-pill-bar">
+                            <button class="mode-pill active" id="tabImportPaste" onclick="setImportTab('paste')">
+                                <i class="ph ph-text-aa"></i> Paste Text
+                            </button>
+                            <button class="mode-pill" id="tabImportFile" onclick="setImportTab('file')">
+                                <i class="ph ph-file-arrow-up"></i> Upload File
+                            </button>
                         </div>
                     </div>
 
                     <div id="importPasteArea">
                         <div class="form-group">
                             <label>Paste Questions/Content</label>
-                            <textarea id="importText" rows="10" placeholder="Paste your quiz text, exercises, or document content here..." class="form-control"></textarea>
+                            <textarea id="importText" rows="10"
+                                placeholder="Paste your quiz text, exercises, or document content here..."
+                                class="form-control"></textarea>
                         </div>
                     </div>
 
                     <div id="importFileArea" style="display: none;">
                         <div class="form-group">
                             <label>Upload Documents</label>
-                            <div class="upload-area" id="importUploadArea" 
-                                 ondrop="handleImportDrop(event)" 
-                                 ondragover="handleImportDragOver(event)" 
-                                 ondragleave="handleImportDragLeave(event)"
-                                 onclick="document.getElementById('importFileInput').click()">
-                                
+                            <div class="upload-area" id="importUploadArea" ondrop="handleImportDrop(event)"
+                                ondragover="handleImportDragOver(event)" ondragleave="handleImportDragLeave(event)"
+                                onclick="document.getElementById('importFileInput').click()">
+
                                 <div id="importUploadPlaceholder">
                                     <div class="upload-icon"><i class="ph ph-cloud-arrow-up"></i></div>
                                     <div style="font-weight: 600;">Drag contents here or</div>
-                                    <button type="button" class="btn btn-primary btn-small margin-top-xs">Browse Files</button>
-                                    <div style="color: var(--color-gray); font-size: 12px; margin-top: 8px;">PDF, PPTX, DOCX, TXT (Max 20MB)</div>
+                                    <button type="button" class="btn btn-primary btn-small margin-top-xs">Browse
+                                        Files</button>
+                                    <div style="color: var(--color-gray); font-size: 12px; margin-top: 8px;">PDF, PPTX,
+                                        DOCX, TXT (Max 20MB)</div>
                                 </div>
                                 <div id="importFileDisplay" style="display: none; width: 100%;"></div>
-                                <input type="file" id="importFileInput" style="display: none;" accept=".pdf,.pptx,.docx,.txt" onchange="handleImportFileSelect(event)" multiple>
+                                <input type="file" id="importFileInput" style="display: none;"
+                                    accept=".pdf,.pptx,.docx,.txt" onchange="handleImportFileSelect(event)" multiple>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="form-group margin-top-md">
                         <label class="q-type-option">
                             <input type="checkbox" id="importGenerateAnswers" checked>
@@ -210,11 +228,15 @@
             </div>
 
             <div class="modal-footer">
-                <button class="btn btn-primary btn-block" id="modalCreateBtn" onclick="submitCreateQuiz()" style="padding: 12px;">Create Quiz</button>
-                <button class="btn btn-secondary btn-block" onclick="closeModal('createQuizModal')" style="padding: 12px;">Cancel</button>
+                <button class="btn btn-primary" id="modalCreateBtn" onclick="submitCreateQuiz()"
+                    style="padding: 12px 24px; flex: 1;">Create Quiz</button>
+                <button class="btn btn-secondary" onclick="closeModal('createQuizModal')"
+                    style="padding: 12px 24px; flex: 1;">Cancel</button>
             </div>
-            
-            <div id="createError" style="color: var(--color-error); font-size: 13px; margin-top: 12px; display: none; text-align: center; background: rgba(231, 76, 60, 0.05); padding: 8px; border-radius: 4px;"></div>
+
+            <div id="createError"
+                style="color: var(--color-error); font-size: 13px; margin-top: 12px; display: none; text-align: center; background: rgba(231, 76, 60, 0.05); padding: 8px; border-radius: 4px;">
+            </div>
         </div>
     </div>
 
@@ -228,7 +250,7 @@
                 <h3 class="progress-title-main">Generating Quiz</h3>
                 <p class="progress-subtitle-main" id="quizProgressMessage">Initializing AI model...</p>
             </div>
-            
+
             <div class="progress-wrapper-alt">
                 <div class="progress-info-labels">
                     <span id="quizProgressLabel" class="progress-status-text">Working...</span>
@@ -250,11 +272,12 @@
                 <h3><i class="ph ph-folder-plus"></i> Create New Group</h3>
                 <button class="btn-icon" onclick="closeModal('groupModal')"><i class="ph ph-x"></i></button>
             </div>
-            
+
             <form onsubmit="handleCreateGroup(event)">
                 <div class="form-group">
                     <label>Group Name</label>
-                    <input type="text" id="groupNameInput" class="form-control" placeholder="e.g. Finals Prep, Biology" required>
+                    <input type="text" id="groupNameInput" class="form-control" placeholder="e.g. Finals Prep, Biology"
+                        required>
                 </div>
                 <div class="modal-buttons margin-top-lg">
                     <button type="submit" class="btn btn-primary btn-block">Create Group</button>
@@ -270,7 +293,7 @@
                 <h3><i class="ph ph-pencil-simple"></i> Edit Group</h3>
                 <button class="btn-icon" onclick="closeModal('editGroupModal')"><i class="ph ph-x"></i></button>
             </div>
-            
+
             <form onsubmit="handleEditGroup(event)">
                 <input type="hidden" id="editGroupId">
                 <div class="form-group">
@@ -291,7 +314,7 @@
                 <h3><i class="ph ph-arrows-out-simple"></i> Move to Group</h3>
                 <button class="btn-icon" onclick="closeModal('moveQuizModal')"><i class="ph ph-x"></i></button>
             </div>
-            
+
             <input type="hidden" id="moveQuizId">
             <div class="form-group">
                 <label>Select Destination Group</label>
@@ -299,7 +322,7 @@
                     <option value="">None (Ungrouped)</option>
                 </select>
             </div>
-            
+
             <div class="modal-buttons margin-top-lg">
                 <button class="btn btn-primary btn-block" onclick="submitMoveQuiz()">Move Quiz</button>
             </div>
@@ -313,7 +336,7 @@
                 <h3><i class="ph ph-pencil-simple"></i> Edit Quiz Title</h3>
                 <button class="btn-icon" onclick="closeModal('editQuizTitleModal')"><i class="ph ph-x"></i></button>
             </div>
-            
+
             <form onsubmit="handleEditQuizTitle(event)">
                 <input type="hidden" id="editQuizId">
                 <div class="form-group">
@@ -327,4 +350,5 @@
         </div>
     </div>
 </body>
+
 </html>

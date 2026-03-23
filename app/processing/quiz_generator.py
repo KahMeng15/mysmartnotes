@@ -272,17 +272,23 @@ Text to process:
 Rules:
 1. Identify all questions and their corresponding answers (if present).
 2. If 'generate_missing_answers' is true, generate accurate answers for any questions that are missing them based on the context.
-3. Remove irrelevant fragments like page numbers, headers, or footers.
-4. Format the output as a strict JSON array of objects. Do not use markdown blocks.
-5. Each object must have:
-   - "question_text": The question.
-   - "answer_text": The answer.
-   - "question_type": One of "objective", "subjective", "fill_in_the_blank".
-   - "options": For "objective", a list of 4 options (including the correct one). null for others.
+3. **Preserve Rich Text**: Keep lists (bulleted or numbered), tables, and formatting like **bold** or *italic* in the 'question_text' and 'answer_text'. 
+   - Use Markdown for bold/italic/lists.
+   - Use simple HTML for tables if encountered.
+4. **No Word Squishing**: Ensure all words are separated by proper spaces and punctuation. Do not merge words together.
+5. Remove irrelevant fragments like page numbers, headers, or footers.
+6. Format the output as a strict JSON object (not an array). Do not use markdown blocks for the JSON itself.
+7. The JSON object must have:
+   - "suggested_title": A short, descriptive title for the quiz based on the content (e.g., "Intro to Operating Systems").
+   - "questions": An array of objects, where each object has:
+      - "question_text": The question (with formatting preserved).
+      - "answer_text": The answer (with formatting preserved).
+      - "question_type": One of "objective", "subjective", "fill_in_the_blank".
+      - "options": For "objective", a list of 4 options (including the correct one). null for others.
 
 Generate_missing_answers: {generate_missing_answers}
 
-Respond with ONLY the JSON array.
+Respond with ONLY the JSON object.
 """
 
     import time
@@ -297,7 +303,16 @@ Respond with ONLY the JSON array.
         elif clean_response.startswith("```"):
             clean_response = clean_response[3:-3].strip()
             
-        questions_data = json.loads(clean_response)
+        data = json.loads(clean_response)
+        
+        # Handle both old array format and new object format for robustness
+        if isinstance(data, list):
+            questions_data = data
+            suggested_title = "Imported Quiz"
+        else:
+            questions_data = data.get("questions", [])
+            suggested_title = data.get("suggested_title", "Imported Quiz")
+            
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse imported quiz JSON: {response}")
         raise ValueError("AI failed to structure the imported content properly. Please check your input.") from e
@@ -306,7 +321,7 @@ Respond with ONLY the JSON array.
     quiz = Quiz(
         id=generate_random_id(db, Quiz),
         user_id=user.id,
-        title=title,
+        title=title if title else suggested_title,
         scope_type="import",
         quiz_group_id=quiz_group_id,
         model=ai_client.ai_model_name or ai_client.provider,

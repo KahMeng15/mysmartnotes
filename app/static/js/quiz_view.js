@@ -10,6 +10,88 @@ let timeRemaining = 15 * 60; // Default
 let examAnswers = {};
 let practiceResults = {}; // {qId: is_correct}
 
+/**
+ * Format quiz text supporting basic markdown and HTML tables.
+ */
+function formatQuizText(text) {
+    if (!text) return "";
+    
+    // 1. Escape basic HTML to prevent XSS (but allow our specific tags later)
+    let formatted = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    
+    // 2. Handle Bold & Italic
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    
+    // 3. Handle Lists (starting with - or *)
+    // We do this line by line if possible or use a regex
+    const lines = formatted.split('\n');
+    let inList = false;
+    let listFormatted = [];
+    
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            if (!inList) {
+                listFormatted.push('<ul class="quiz-rich-list">');
+                inList = true;
+            }
+            listFormatted.push(`<li>${trimmed.substring(2)}</li>`);
+        } else if (/^\d+\.\s/.test(trimmed)) {
+             if (!inList) {
+                listFormatted.push('<ol class="quiz-rich-list">');
+                inList = true;
+            }
+            listFormatted.push(`<li>${trimmed.replace(/^\d+\.\s/, '')}</li>`);
+        } else {
+            if (inList) {
+                const listTag = listFormatted[listFormatted.length - 1].includes('<ul>') ? '</ul>' : '</ol>'; // Simplistic check
+                // Actually need to track what kind of list we started
+                const lastOpen = listFormatted.reverse().find(l => l.includes('<ul') || l.includes('<ol'));
+                listFormatted.reverse(); // back to normal
+                const closeTag = lastOpen.includes('<ul') ? '</ul>' : '</ol>';
+                listFormatted.push(closeTag);
+                inList = false;
+            }
+            listFormatted.push(line);
+        }
+    });
+    if (inList) {
+        const lastOpen = listFormatted.reverse().find(l => l.includes('<ul') || l.includes('<ol'));
+        listFormatted.reverse();
+        listFormatted.push(lastOpen.includes('<ul') ? '</ul>' : '</ol>');
+    }
+    formatted = listFormatted.join('\n');
+    
+    // 4. Transform newlines to <br> (but only if not inside a table or list to keep it clean)
+    // Actually, simple way is to replace \n with <br> then clean up list tags
+    formatted = formatted.replace(/\n/g, '<br>');
+    formatted = formatted.replace(/<\/li><br>/g, '</li>');
+    formatted = formatted.replace(/<ul(.*?)><br>/g, '<ul$1>');
+    formatted = formatted.replace(/<ol(.*?)><br>/g, '<ol$1>');
+    formatted = formatted.replace(/<\/ul><br>/g, '</ul>');
+    formatted = formatted.replace(/<\/ol><br>/g, '</ol>');
+
+    // 5. Restore tables (if AI outputs them as &lt;table&gt; due to our escaping)
+    formatted = formatted.replace(/&lt;table(.*?)&gt;/g, '<table$1 class="quiz-rich-table">');
+    formatted = formatted.replace(/&lt;\/table&gt;/g, '</table>');
+    formatted = formatted.replace(/&lt;thead(.*?)&gt;/g, '<thead$1>');
+    formatted = formatted.replace(/&lt;\/thead&gt;/g, '</thead>');
+    formatted = formatted.replace(/&lt;tbody(.*?)&gt;/g, '<tbody$1>');
+    formatted = formatted.replace(/&lt;\/tbody&gt;/g, '</tbody>');
+    formatted = formatted.replace(/&lt;tr(.*?)&gt;/g, '<tr$1>');
+    formatted = formatted.replace(/&lt;\/tr&gt;/g, '</tr>');
+    formatted = formatted.replace(/&lt;th(.*?)&gt;/g, '<th$1>');
+    formatted = formatted.replace(/&lt;\/th&gt;/g, '</th>');
+    formatted = formatted.replace(/&lt;td(.*?)&gt;/g, '<td$1>');
+    formatted = formatted.replace(/&lt;\/td&gt;/g, '</td>');
+
+    return formatted;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // URL format: /quiz/{id} or /quiz/{id}/{mode}
     const pathParts = window.location.pathname.split('/');
@@ -293,8 +375,8 @@ function renderTableMode(container, questions) {
                         <tr>
                             <td style="font-weight: 700; color: var(--color-primary);">${actualIndex + 1}</td>
                             <td><span class="q-type-badge">${q.question_type.replace(/_/g, ' ')}</span></td>
-                            <td style="font-weight: 500;">${q.question_text}</td>
-                            <td style="color: var(--color-success); font-weight: 600;">${q.answer_text}</td>
+                            <td style="font-weight: 500;">${formatQuizText(q.question_text)}</td>
+                            <td style="color: var(--color-success); font-weight: 600;">${formatQuizText(q.answer_text)}</td>
                         </tr>
                     `;
                 }).join('')}
@@ -343,7 +425,7 @@ function renderFlashcardMode(container) {
     card.innerHTML = `
         <div class="flashcard-face flashcard-question">
             <span class="q-type-badge flashcard-label">Question ${currentCardIndex + 1}</span>
-            <div class="fc-content fc-question-text">${q.question_text}</div>
+            <div class="fc-content fc-question-text">${formatQuizText(q.question_text)}</div>
             <p class="flashcard-instruction">
                 <i class="ph ph-hand-pointing"></i>
                 Click to reveal, or press <kbd>Space</kbd> | <kbd>←</kbd> <kbd>→</kbd> on keyboard
@@ -351,7 +433,7 @@ function renderFlashcardMode(container) {
         </div>
         <div class="flashcard-face flashcard-answer">
             <span class="q-type-badge flashcard-label flashcard-answer-label">Answer</span>
-            <div class="fc-content fc-answer-text">${q.answer_text}</div>
+            <div class="fc-content fc-answer-text">${formatQuizText(q.answer_text)}</div>
             <p class="flashcard-instruction">
                 <i class="ph ph-hand-pointing"></i>
                 Click to reveal question, or press <kbd>Space</kbd> to flip
@@ -422,7 +504,7 @@ function createQuestionCard(q, index) {
     
     const text = document.createElement('div');
     text.className = 'q-text';
-    text.textContent = q.question_text;
+    text.innerHTML = formatQuizText(q.question_text);
     card.appendChild(text);
     
     // Practice & Exam mode inputs
@@ -444,7 +526,7 @@ function createQuestionCard(q, index) {
                     else if (examAnswers[q.id] === opt) optEl.classList.add('incorrect');
                 }
 
-                optEl.innerHTML = `<span style="opacity: 0.5; font-weight: 700;">${String.fromCharCode(65 + optIdx)}</span> <span>${opt}</span>`;
+                optEl.innerHTML = `<span style="opacity: 0.5; font-weight: 700;">${String.fromCharCode(65 + optIdx)}</span> <span>${formatQuizText(opt)}</span>`;
                 optEl.onclick = () => {
                     if (currentMode === 'practice' && practiceResults[q.id] !== undefined) return;
                     selectOption(q.id, optEl, opt);
@@ -501,7 +583,7 @@ function createQuestionCard(q, index) {
         
         const answerContent = document.createElement('div');
         answerContent.style.fontWeight = "600";
-        answerContent.textContent = q.answer_text;
+        answerContent.innerHTML = formatQuizText(q.answer_text);
         
         if (currentMode === 'hideanswers') {
             answerContent.className = 'hidden-content';
