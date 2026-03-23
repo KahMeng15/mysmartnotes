@@ -23,6 +23,7 @@ let selectedExportFormat = 'pdf';
 const MODE_META = {
     quick: { label: 'Quick', icon: 'ph-lightning' },
     simple: { label: 'Simple', icon: 'ph-text-a-underline' },
+    normal: { label: 'Normal', icon: 'ph-stack' },
     elaborate: { label: 'Elaborate', icon: 'ph-lightbulb' },
     eli5: { label: 'ELI5', icon: 'ph-smiley' }
 };

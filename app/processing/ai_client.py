@@ -208,6 +208,7 @@ Format as JSON array with objects containing: question, options (array of 4), co
         mode_prompts = {
             "quick": "Give me a quick, high-level summary.",
             "simple": "Summarize this in simple, easy-to-understand terms.",
+            "normal": "Summarize this in a balanced way, with a moderate level of detail.",
             "elaborate": "Provide a thorough and detailed summary covering all key points.",
             "eli5": "Explain this to me like I'm five years old."
         }

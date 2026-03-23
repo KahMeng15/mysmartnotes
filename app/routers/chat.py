@@ -87,6 +87,7 @@ class ChatResponse(BaseModel):
 AI_MODES = {
     "quick":       {"label": "Quick",      "icon": "ph-lightning",         "description": "Use less processing to get answer"},
     "simple":      {"label": "Simple",     "icon": "ph-text-a-underline",  "description": "Answer in simple terms"},
+    "normal":      {"label": "Normal",     "icon": "ph-stack",             "description": "A balanced response with standard detail"},
     "elaborate":   {"label": "Elaborate",  "icon": "ph-lightbulb",         "description": "Provide thorough explanation"},
     "eli5":        {"label": "ELI5",       "icon": "ph-smiley",            "description": "Explain like I'm 5"},
 }
@@ -115,6 +116,7 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
     mode_instructions = {
         "quick": "You are a concise assistant. Extract the most important facts from the context. Be specific and factual. If context lacks details, say 'I am unable to find any information based on your question.'",
         "simple": "Explain using ONLY the provided context. Use plain, everyday language. Avoid jargon. If unclear in context, say 'I am unable to find any information based on your question.'",
+        "normal": "Provide a balanced response using ONLY the provided context. Be clear and informative without being overly brief or excessively detailed.",
         "elaborate": "Provide thorough, well-structured explanations grounded in the context. Be detailed but accurate. Never assume facts not in context.",
         "eli5": "Explain like to a 5-year-old using ONLY context material. Use short sentences and relatable analogies from the context only.",
     }
