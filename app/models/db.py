@@ -222,6 +222,7 @@ class QuizQuestion(Base):
     options = Column(JSON, nullable=True)  # Store options for objective questions
     original_number = Column(String(20), nullable=True)  # e.g. "1.1", "Q5"
     order = Column(Integer, default=0)
+    explanation = Column(Text, nullable=True)
     
     # Relationships
     quiz = relationship("Quiz", back_populates="questions")

@@ -8,6 +8,7 @@ class QuizQuestionBase(BaseModel):
     question_type: str = "subjective"
     options: Optional[Any] = None
     order: int = 0
+    explanation: Optional[str] = None
 
 class QuizQuestionCreate(QuizQuestionBase):
     pass
@@ -18,6 +19,7 @@ class QuizQuestionUpdate(BaseModel):
     question_type: Optional[str] = None
     options: Optional[Any] = None
     order: Optional[int] = None
+    explanation: Optional[str] = None
 
 class QuizQuestionResponse(QuizQuestionBase):
     id: int
@@ -89,3 +91,20 @@ class QuizCheckResponse(BaseModel):
 
 class SingleQuestionGenerateRequest(BaseModel):
     question_type: str = "subjective" # objective, subjective, fill_in_the_blank
+
+class QuizExplainRequest(BaseModel):
+    scope: str = "source" # source, web, both
+    ai_mode: str = "elaborate"
+    output_format: str = "sentence"
+
+class BulkQuizQuestionUpdate(BaseModel):
+    id: int
+    question_text: str
+    answer_text: str
+    question_type: str
+    options: Optional[Any] = None
+    order: int
+    explanation: Optional[str] = None
+
+class BulkQuizUpdate(BaseModel):
+    questions: List[BulkQuizQuestionUpdate]

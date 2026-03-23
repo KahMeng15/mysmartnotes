@@ -9,6 +9,12 @@ let examTimerInterval = null;
 let timeRemaining = 15 * 60; // Default
 let examAnswers = {};
 let practiceResults = {}; // {qId: is_correct}
+let explainSettings = {
+    scope: 'source',
+    mode: 'normal',
+    output: 'sentence',
+    conversation_id: null
+};
 
 /**
  * Convert inline enumerated lists to newline-separated Markdown lists.
@@ -33,7 +39,7 @@ function convertInlineLists(text) {
             const cleanedRest = restWithMarker
                 .replace(/,?\s+and\s+\((\d+)\)/g, ' ($1)') // normalize "and (N)"
                 .replace(/,\s+\((\d+)\)/g, ' ($1)'); // normalize ", (N)"
-            
+
             const splitParts = cleanedRest.split(/\s*\((\d+)\)\s*/);
             // splitParts: ['', '1', 'item1 text', '2', 'item2 text', '3', 'item3 text']
             const lines = [];
@@ -48,7 +54,7 @@ function convertInlineLists(text) {
             return match;
         }
     );
-    
+
     // Pattern 2: Letter parens — "...: (a) text (b) text (c) text"
     text = text.replace(
         /([^(]{5,}?[,:]\s*)\(a\)([\s\S]+?)(?=\n\n|\n[A-Z]|$)/g,
@@ -81,7 +87,7 @@ function convertInlineLists(text) {
             return match;
         }
     );
-    
+
     return text;
 }
 
@@ -90,7 +96,7 @@ function convertInlineLists(text) {
  */
 function formatQuizText(text) {
     if (!text) return "";
-    
+
     // PRE-PROCESSING: Convert special formats before HTML escaping
     // 1. Convert bullet/special characters to markdown dashes
     let preformatted = text
@@ -100,20 +106,20 @@ function formatQuizText(text) {
         .replace(/\u2019/g, "'")        // Smart quote
         .replace(/\u201c|\u201d/g, '"') // Smart double quotes
         .trim();
-    
+
     // 2. Convert inline enumerated lists to proper newline-separated lists
     preformatted = convertInlineLists(preformatted);
-    
+
     // 1. Escape basic HTML to prevent XSS (but allow our specific tags later)
     let formatted = preformatted
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
-    
+
     // 2. Handle Bold & Italic
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    
+
     // 3. Context-aware list renderer:
     //    - "-" / "*" → unordered list
     //    - "1." → ordered list; if last UL bullet ended with ":", nest inside it
@@ -124,7 +130,7 @@ function formatQuizText(text) {
     let inOL = false;
     let inNestedOL = false;   // nested <ol> inside last <li> of a <ul>
     let lastBulletText = '';  // track text of last bullet to detect colon endings
-    
+
     function closeNestedOL() {
         if (inNestedOL) { html += '</ol></li>'; inNestedOL = false; }
     }
@@ -141,13 +147,13 @@ function formatQuizText(text) {
     function closeOL() {
         if (inOL) { html += '</ol>'; inOL = false; }
     }
-    
+
     lines.forEach(line => {
         const trimmed = line.trim();
         const isULItem = /^[-*]\s/.test(trimmed);
         // Only numeric ordered lists — preserve "a." style as-is
         const isOLItem = /^\d+\.\s/.test(trimmed);
-        
+
         if (isULItem) {
             closeNestedOL();
             if (inOL) closeOL();
@@ -160,7 +166,7 @@ function formatQuizText(text) {
         } else if (isOLItem) {
             const item = trimmed.replace(/^\d+\.\s/, '');
             const parentEndsColon = lastBulletText.trimEnd().endsWith(':');
-            
+
             if (inUL && parentEndsColon) {
                 // Nest inside the last open <li> of the ul
                 if (!inNestedOL) {
@@ -184,14 +190,14 @@ function formatQuizText(text) {
             html += line + '\n';
         }
     });
-    
+
     // Close anything still open
     closeNestedOL();
     if (inUL) { html += '</li></ul>'; }
     if (inOL) { html += '</ol>'; }
-    
+
     formatted = html;
-    
+
     // 4. Transform newlines to <br> (but only if not inside a table or list to keep it clean)
     // Actually, simple way is to replace \n with <br> then clean up list tags
     formatted = formatted.replace(/\n/g, '<br>');
@@ -223,14 +229,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const pathParts = window.location.pathname.split('/');
     const quizId = pathParts[2];
     const initialMode = pathParts[3] || null;
-    
+
     if (!quizId) {
         window.location.href = '/quiz';
         return;
     }
-    
+
     loadQuiz(quizId, initialMode);
-    
+
     // Setup sidebar mode buttons
     document.querySelectorAll('#modeGrid .action-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -238,11 +244,11 @@ document.addEventListener('DOMContentLoaded', () => {
             setMode(mode);
         });
     });
-    
+
     // Setup keyboard navigation for flashcards
     document.addEventListener('keydown', (event) => {
         if (currentMode !== 'flashcards') return;
-        
+
         if (event.code === 'Space') {
             event.preventDefault();
             toggleFlashcardReveal();
@@ -260,21 +266,21 @@ async function loadQuiz(quizId, initialMode) {
     try {
         const response = await fetch(`/quizzes/${quizId}`);
         if (!response.ok) throw new Error('Failed to load quiz');
-        
+
         const data = await response.json();
         currentQuiz = data;
         currentQuestions = data.questions || [];
-        
+
         // Update Header & Breadcrumbs
         document.getElementById('quizTitle').textContent = currentQuiz.title;
         document.getElementById('breadcrumbTitle').textContent = currentQuiz.title;
-        
+
         // Update Info Grid
         document.getElementById('infoCount').textContent = currentQuestions.length;
         document.getElementById('infoScope').textContent = currentQuiz.scope_type.charAt(0).toUpperCase() + currentQuiz.scope_type.slice(1);
         const dateStr = new Date(currentQuiz.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
         document.getElementById('infoDate').textContent = dateStr;
-        
+
         // AI Metadata
         document.getElementById('infoModel').textContent = currentQuiz.model || 'Manual';
         document.getElementById('infoProcessing').textContent = currentQuiz.processing_time_ms ? `${currentQuiz.processing_time_ms}ms` : '—';
@@ -288,7 +294,7 @@ async function loadQuiz(quizId, initialMode) {
             document.getElementById('quizMainContent').style.filter = 'blur(8px)';
             document.getElementById('quizMainContent').style.pointerEvents = 'none';
         }
-        
+
     } catch (error) {
         console.error('Error:', error);
         document.getElementById('quizContainer').innerHTML = `
@@ -304,11 +310,11 @@ function setMode(mode, updateUrl = true) {
     if (mode !== 'flashcards') {
         isFlashcardRevealed = false;
     }
-    
+
     // UI state reset
     document.getElementById('quizMainContent').style.filter = 'none';
     document.getElementById('quizMainContent').style.pointerEvents = 'all';
-    
+
     // Update breadcrumb with view mode
     const modeLabels = {
         'showanswers': 'Show Answers',
@@ -322,7 +328,7 @@ function setMode(mode, updateUrl = true) {
     document.getElementById('breadcrumbViewMode').textContent = modeLabel;
     document.getElementById('breadcrumbViewMode').style.display = 'inline';
     document.getElementById('breadcrumbViewSep').style.display = 'inline';
-    
+
     // Update sidebar active state
     document.querySelectorAll('#modeGrid .action-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.mode === mode);
@@ -333,11 +339,11 @@ function setMode(mode, updateUrl = true) {
         clearInterval(examTimerInterval);
         document.getElementById('examStatsBar').style.display = 'none';
     }
-    
+
     // Toggle displays
     document.getElementById('fcControls').style.display = (mode === 'flashcards') ? 'flex' : 'none';
     document.getElementById('practiceScore').style.display = (mode === 'practice') ? 'flex' : 'none';
-    
+
     if (updateUrl) {
         history.pushState(null, '', `/quiz/${currentQuiz.id}/${mode}`);
     }
@@ -347,7 +353,7 @@ function setMode(mode, updateUrl = true) {
         openExamSetup();
         return; // Don't render yet, wait for setup
     }
-    
+
     updateScore();
     renderQuestions();
 }
@@ -376,10 +382,10 @@ function startExamSim() {
     const mins = parseInt(document.getElementById('examTimeLimit').value) || 15;
     timeRemaining = mins * 60;
     examAnswers = {};
-    
+
     closeModal('examSetupModal');
     document.getElementById('examStatsBar').style.display = 'flex';
-    
+
     updateTimerDisplay();
     examTimerInterval = setInterval(() => {
         timeRemaining--;
@@ -389,7 +395,7 @@ function startExamSim() {
             submitExam();
         }
     }, 1000);
-    
+
     renderQuestions();
 }
 
@@ -410,7 +416,7 @@ function renderQuestions() {
     const container = document.getElementById('quizContainer');
     const query = document.getElementById('qSearchInput')?.value.toLowerCase() || '';
     const filter = document.getElementById('qSearchFilter')?.value || 'both';
-    
+
     if (!currentQuestions || currentQuestions.length === 0) {
         isFlashcardRevealed = false;
         const counterEl = document.getElementById('fcCounter');
@@ -431,23 +437,23 @@ function renderQuestions() {
     // Filter questions based on search query and filter type
     const filteredQuestions = currentQuestions.filter(q => {
         if (!query) return true;
-        
+
         const textMatch = q.question_text.toLowerCase().includes(query);
         const answerMatch = q.answer_text.toLowerCase().includes(query);
-        
+
         let optionsMatch = false;
         if (q.options) {
             try {
                 const opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
                 optionsMatch = opts.some(opt => opt.toLowerCase().includes(query));
-            } catch(e) {}
+            } catch (e) { }
         }
 
         if (filter === 'question') return textMatch || optionsMatch;
         if (filter === 'answer') return answerMatch;
         return textMatch || answerMatch || optionsMatch;
     });
-    
+
     // Hide search in modes where it doesn't make sense (flashcards, exam)
     const searchSection = document.getElementById('quizSearchSection');
     if (searchSection) {
@@ -466,7 +472,7 @@ function renderQuestions() {
     }
 
     container.innerHTML = '';
-    
+
     if (currentMode === 'tableview') {
         renderTableMode(container, filteredQuestions);
     } else if (currentMode === 'flashcards') {
@@ -483,7 +489,7 @@ function renderQuestions() {
 function renderTableMode(container, questions) {
     const tableWrap = document.createElement('div');
     tableWrap.className = 'quiz-table-container';
-    
+
     tableWrap.innerHTML = `
         <table class="quiz-table">
             <thead>
@@ -496,8 +502,8 @@ function renderTableMode(container, questions) {
             </thead>
             <tbody>
                 ${questions.map((q) => {
-                    const actualIndex = currentQuestions.indexOf(q);
-                    return `
+        const actualIndex = currentQuestions.indexOf(q);
+        return `
                         <tr>
                             <td style="font-weight: 700; color: var(--color-primary);">${actualIndex + 1}</td>
                             <td><span class="q-type-badge">${q.question_type.replace(/_/g, ' ')}</span></td>
@@ -505,7 +511,7 @@ function renderTableMode(container, questions) {
                             <td style="color: var(--color-success); font-weight: 600;">${formatQuizText(q.answer_text)}</td>
                         </tr>
                     `;
-                }).join('')}
+    }).join('')}
             </tbody>
         </table>
     `;
@@ -521,7 +527,7 @@ function renderFlashcardMode(container) {
         currentCardIndex = currentQuestions.length - 1;
         isFlashcardRevealed = false;
     }
-    
+
     const q = currentQuestions[currentCardIndex];
     const counterEl = document.getElementById('fcCounter');
     if (counterEl) {
@@ -530,7 +536,7 @@ function renderFlashcardMode(container) {
 
     const fcContainer = document.createElement('div');
     fcContainer.className = 'flashcard-container';
-    
+
     const card = document.createElement('div');
     card.className = 'flashcard';
     card.tabIndex = 0;
@@ -568,7 +574,7 @@ function renderFlashcardMode(container) {
             </p>
         </div>
     `;
-    
+
     fcContainer.appendChild(card);
     container.appendChild(fcContainer);
 
@@ -600,7 +606,7 @@ function adjustFlashcardFontSize(cardElement) {
 
         const label = face.querySelector('.flashcard-label');
         const instruction = face.querySelector('.flashcard-instruction');
-        
+
         // Gradually shrink font size until everything fits within the card height
         let iterations = 0;
         const minFontSize = 0.5; // rem
@@ -610,7 +616,7 @@ function adjustFlashcardFontSize(cardElement) {
             const faceRect = face.getBoundingClientRect();
             const labelRect = label ? label.getBoundingClientRect() : null;
             const instrRect = instruction ? instruction.getBoundingClientRect() : null;
-            
+
             // 1. Check if the top label is being pushed off the top (occurs during vertical centering overflow)
             if (labelRect && labelRect.top < faceRect.top + 12) {
                 return false;
@@ -620,15 +626,15 @@ function adjustFlashcardFontSize(cardElement) {
             if (instrRect && instrRect.bottom > faceRect.bottom - 12) {
                 return false;
             }
-            
+
             // 3. Double check if the content itself is overflowing its own container
             if (content.scrollHeight > content.clientHeight + 2) {
                 return false;
             }
-            
+
             return true;
         };
-        
+
         // Reset scale loop
         while (!checkFits() && fontSize > minFontSize && iterations < 35) {
             fontSize -= 0.04;
@@ -664,7 +670,7 @@ function createQuestionCard(q, index) {
     const card = document.createElement('div');
     card.className = 'q-card';
     card.id = `q-${q.id}`;
-    
+
     const header = document.createElement('div');
     header.className = 'q-header';
     header.style.display = 'flex';
@@ -673,7 +679,7 @@ function createQuestionCard(q, index) {
     header.style.marginBottom = 'var(--spacing-md)';
     header.style.paddingBottom = 'var(--spacing-sm)';
     header.style.borderBottom = '1px solid var(--color-bg)';
-    
+
     header.innerHTML = `
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
             <div class="q-number">
@@ -683,7 +689,7 @@ function createQuestionCard(q, index) {
         </div>
         <div class="quiz-actions-menu">
             <button class="btn btn-outline btn-small" onclick="event.stopPropagation(); toggleQuestionActionMenu(event, '${q.id}')" title="Actions">
-                <i class="ph ph-dots-three-vertical"></i> More
+                <i class="ph ph-dots-three-vertical"></i>
             </button>
             <div id="q-menu-${q.id}" class="quiz-dropdown-menu">
                 <button onclick="event.stopPropagation(); openEditQuestionModal('${q.id}')">
@@ -696,24 +702,24 @@ function createQuestionCard(q, index) {
         </div>
     `;
     card.appendChild(header);
-    
+
     const text = document.createElement('div');
     text.className = 'q-text';
     text.innerHTML = formatQuizText(q.question_text);
     card.appendChild(text);
-    
+
     // Practice & Exam mode inputs
     if (currentMode === 'practice' || currentMode === 'examsimulator') {
         if (q.question_type === 'objective' && q.options) {
             const optsContainer = document.createElement('div');
             optsContainer.className = 'q-options';
             let options = [];
-            try { options = typeof q.options === 'string' ? JSON.parse(q.options) : q.options; } catch(e){}
-            
+            try { options = typeof q.options === 'string' ? JSON.parse(q.options) : q.options; } catch (e) { }
+
             options.forEach((opt, optIdx) => {
                 const optEl = document.createElement('div');
                 optEl.className = 'q-option';
-                
+
                 // Restore state
                 if (currentMode === 'examsimulator' && examAnswers[q.id] === opt) optEl.classList.add('selected');
                 if (currentMode === 'practice' && practiceResults[q.id] !== undefined) {
@@ -726,7 +732,7 @@ function createQuestionCard(q, index) {
                     if (currentMode === 'practice' && practiceResults[q.id] !== undefined) return;
                     selectOption(q.id, optEl, opt);
                 };
-                
+
                 optsContainer.appendChild(optEl);
             });
             card.appendChild(optsContainer);
@@ -737,25 +743,25 @@ function createQuestionCard(q, index) {
             input.rows = 3;
             input.oninput = (e) => { examAnswers[q.id] = e.target.value; };
             if (examAnswers[q.id]) input.value = examAnswers[q.id];
-            
+
             if (currentMode === 'practice' && practiceResults[q.id] !== undefined) {
                 input.disabled = true;
             }
             card.appendChild(input);
         }
-        
+
         if (currentMode === 'practice') {
             const checkBtn = document.createElement('button');
             checkBtn.className = 'btn btn-primary';
             checkBtn.style.marginTop = '20px';
             checkBtn.innerHTML = '<i class="ph ph-check-circle"></i> Check Answer';
             checkBtn.onclick = () => submitAnswerForCheck(q.id, card);
-            
+
             if (practiceResults[q.id] !== undefined) {
                 checkBtn.style.display = 'none';
             }
             card.appendChild(checkBtn);
-            
+
             const feedback = document.createElement('div');
             feedback.className = 'feedback-box';
             feedback.id = `fb-${q.id}`;
@@ -765,31 +771,60 @@ function createQuestionCard(q, index) {
             }
             card.appendChild(feedback);
         }
-    } 
+    }
     // Standard / Hidden modes
     else {
         const answerBox = document.createElement('div');
         answerBox.className = 'q-answer-box';
-        
+
         const label = document.createElement('span');
         label.className = 'q-answer-label';
         label.textContent = 'Correct Answer';
         answerBox.appendChild(label);
-        
+
         const answerContent = document.createElement('div');
         answerContent.style.fontWeight = "600";
         answerContent.innerHTML = formatQuizText(q.answer_text);
-        
+
         if (currentMode === 'hideanswers') {
             answerContent.className = 'hidden-content';
             answerContent.onclick = () => answerContent.classList.toggle('revealed');
             answerContent.title = "Click to reveal answer";
         }
-        
+
         answerBox.appendChild(answerContent);
         card.appendChild(answerBox);
     }
-    
+
+    // Explanation Box
+    const explanationBox = document.createElement('div');
+    explanationBox.className = 'q-explanation-box';
+    explanationBox.id = `explanation-${q.id}`;
+    // We NO LONGER add 'active' here even if q.explanation exists
+    // It will be shown when user clicks Explain
+    card.appendChild(explanationBox);
+
+    // Action Row for Explain & Follow-up
+    const actionRow = document.createElement('div');
+    actionRow.className = 'q-action-row';
+
+    const explainBtn = document.createElement('button');
+    explainBtn.className = 'btn btn-outline btn-small';
+    explainBtn.id = `btn-explain-${q.id}`;
+    explainBtn.innerHTML = '<i class="ph ph-sparkle"></i> Explain';
+    explainBtn.onclick = () => explainQuestion(q.id);
+    actionRow.appendChild(explainBtn);
+
+    const followUpBtn = document.createElement('button');
+    followUpBtn.className = 'btn btn-outline btn-small';
+    followUpBtn.id = `btn-followup-${q.id}`;
+    followUpBtn.style.display = 'none'; // Always hide initially
+    followUpBtn.innerHTML = '<i class="ph ph-chat-circle-dots"></i> Follow-up';
+    followUpBtn.onclick = () => openChatDrawer(q.id);
+    actionRow.appendChild(followUpBtn);
+
+    card.appendChild(actionRow);
+
     return card;
 }
 
@@ -803,33 +838,33 @@ function selectOption(qId, el, value) {
 async function submitAnswerForCheck(qId, cardEl) {
     const q = currentQuestions.find(x => x.id === qId);
     let userAns = examAnswers[qId] || '';
-    
+
     if (q.question_type !== 'objective') {
         const input = cardEl.querySelector('.form-control');
         if (input) userAns = input.value;
     }
-    
+
     if (!userAns) {
         showErrorModal('Answer Required', 'Please provide an answer first.');
         return;
     }
-    
+
     const checkBtn = cardEl.querySelector('.btn-primary');
     const originalText = checkBtn.innerHTML;
     checkBtn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i> Checking...';
     checkBtn.disabled = true;
-    
+
     try {
         const response = await fetch(`/quizzes/${currentQuiz.id}/check?question_id=${qId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ user_answer: userAns })
         });
-        
+
         const result = await response.json();
         practiceResults[qId] = result.is_correct;
         updateScore();
-        
+
         const fbEl = document.getElementById(`fb-${qId}`);
         fbEl.className = 'feedback-box ' + (result.is_correct ? 'correct' : 'incorrect');
         fbEl.style.display = 'block';
@@ -843,9 +878,9 @@ async function submitAnswerForCheck(qId, cardEl) {
                 ${result.correct_answer}
             </div>
         `;
-        
+
         checkBtn.style.display = 'none';
-        
+
         if (q.question_type === 'objective') {
             const opts = cardEl.querySelectorAll('.q-option');
             opts.forEach(opt => {
@@ -859,7 +894,7 @@ async function submitAnswerForCheck(qId, cardEl) {
         } else {
             cardEl.querySelector('.form-control').disabled = true;
         }
-        
+
     } catch (error) {
         console.error("Check failed", error);
         showErrorModal('Grading Failed', 'Failed to grade your answer. Please try again.');
@@ -890,7 +925,7 @@ async function doExport(format) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ format: format })
         });
-        
+
         if (!res.ok) throw new Error('Export failed');
         const data = await res.json();
         window.location.href = data.download_url;
@@ -925,27 +960,27 @@ async function generateQuestionAi() {
     const qType = document.getElementById('aiQType').value;
     const btn = document.getElementById('btnGenerateQ');
     const originalText = btn.innerHTML;
-    
+
     btn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i> Generating...';
     btn.disabled = true;
-    
+
     try {
         const response = await fetch(`/quizzes/${currentQuiz.id}/generate_single`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ question_type: qType })
         });
-        
+
         if (!response.ok) throw new Error('Failed to generate question');
-        
+
         const newQ = await response.json();
         currentQuestions.push(newQ);
         closeModal('addQuestionModal');
-        
+
         // Refresh UI
         document.getElementById('infoCount').textContent = currentQuestions.length;
         renderQuestions();
-        
+
     } catch (e) {
         alert("Generation failed: " + e.message);
     } finally {
@@ -967,12 +1002,12 @@ async function addQuestion() {
     const qtype = document.getElementById('newQType').value;
     const text = document.getElementById('newQText').value.trim();
     const answer = document.getElementById('newQAnswer').value.trim();
-    
+
     if (!text || !answer) {
         alert("Question and Answer are required.");
         return;
     }
-    
+
     let optionsList = null;
     if (qtype === 'objective') {
         const optsRaw = document.getElementById('newQOptionsText').value.trim();
@@ -982,7 +1017,7 @@ async function addQuestion() {
         }
         optionsList = optsRaw.split('\n').map(s => s.trim()).filter(s => s.length > 0);
     }
-    
+
     try {
         const response = await fetch(`/quizzes/${currentQuiz.id}/questions`, {
             method: 'POST',
@@ -995,16 +1030,16 @@ async function addQuestion() {
                 order: currentQuestions.length
             })
         });
-        
+
         if (!response.ok) throw new Error('Failed to add question');
-        
+
         const newQ = await response.json();
         currentQuestions.push(newQ);
         closeModal('addQuestionModal');
-        
+
         document.getElementById('infoCount').textContent = currentQuestions.length;
         renderQuestions();
-        
+
     } catch (e) {
         alert(e.message);
     }
@@ -1017,10 +1052,10 @@ function toggleQuestionActionMenu(event, qId) {
             menu.classList.remove('active');
         }
     });
-    
+
     const menu = document.getElementById(`q-menu-${qId}`);
     menu.classList.toggle('active');
-    
+
     // Close on click outside
     const closeMenu = (e) => {
         if (!menu.contains(e.target) && !event.target.contains(e.target)) {
@@ -1037,7 +1072,7 @@ function deleteQuestion(qId) {
             const response = await fetch(`/quizzes/${currentQuiz.id}/questions/${qId}`, {
                 method: 'DELETE'
             });
-            
+
             if (response.ok) {
                 currentQuestions = currentQuestions.filter(q => q.id !== qId);
                 renderQuestions();
@@ -1059,20 +1094,20 @@ function openEditQuestionModal(qId) {
 
     setAddMethod('manual');
     document.querySelector('.method-toggle').style.display = 'none';
-    
+
     document.getElementById('newQType').value = q.question_type;
     document.getElementById('newQText').value = q.question_text;
     document.getElementById('newQAnswer').value = q.answer_text;
-    
+
     if (q.question_type === 'objective' && q.options) {
         let opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
         document.getElementById('newQOptionsText').value = opts.join('\n');
     }
-    
+
     toggleOptionInputs();
-    
+
     document.getElementById('addQuestionModal').classList.add('active');
-    
+
     const submitBtn = document.querySelector('#addManualSection .btn-primary');
     submitBtn.textContent = 'Save Changes';
     submitBtn.onclick = (e) => {
@@ -1085,12 +1120,12 @@ async function submitEditQuestion(qId) {
     const qtype = document.getElementById('newQType').value;
     const text = document.getElementById('newQText').value.trim();
     const answer = document.getElementById('newQAnswer').value.trim();
-    
+
     if (!text || !answer) {
         showErrorModal('Required Fields', "Question and Answer are required.");
         return;
     }
-    
+
     let optionsList = null;
     if (qtype === 'objective') {
         const optsRaw = document.getElementById('newQOptionsText').value.trim();
@@ -1100,7 +1135,7 @@ async function submitEditQuestion(qId) {
         }
         optionsList = optsRaw.split('\n').map(s => s.trim()).filter(s => s.length > 0);
     }
-    
+
     try {
         const response = await fetch(`/quizzes/${currentQuiz.id}/questions/${qId}`, {
             method: 'PUT',
@@ -1112,17 +1147,17 @@ async function submitEditQuestion(qId) {
                 options: optionsList
             })
         });
-        
+
         if (!response.ok) throw new Error('Failed to update question');
-        
+
         const updatedQ = await response.json();
         const idx = currentQuestions.findIndex(x => x.id === qId);
         currentQuestions[idx] = updatedQ;
-        
+
         closeModal('addQuestionModal');
         renderQuestions();
         showSuccessModal('Question Updated', 'Changes saved successfully.');
-        
+
         // Reset modal for next use
         document.querySelector('.method-toggle').style.display = 'flex';
         const addBtn = document.querySelector('#addManualSection .btn-primary');
@@ -1131,5 +1166,290 @@ async function submitEditQuestion(qId) {
 
     } catch (e) {
         showErrorModal('Update Failed', e.message);
+    }
+}
+
+async function explainQuestion(qId) {
+    const btn = document.getElementById(`btn-explain-${qId}`);
+    const box = document.getElementById(`explanation-${qId}`);
+    const followUpBtn = document.getElementById(`btn-followup-${qId}`);
+    const q = currentQuestions.find(q => q.id == qId);
+
+    // If explanation exists and box is NOT active, just show the cached version
+    if (q.explanation && !box.classList.contains('active')) {
+        box.classList.add('active');
+        box.innerHTML = `
+            <div class="q-explanation-header">
+                <span class="q-explanation-title">AI Explanation (Cached)</span>
+            </div>
+            <div class="q-explanation-content">${formatQuizText(q.explanation)}</div>
+        `;
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        if (followUpBtn) followUpBtn.style.display = 'flex';
+        if (btn) btn.innerHTML = '<i class="ph ph-sparkle"></i> Re-explain';
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i> Explaining...';
+    }
+
+    try {
+        const response = await fetch(`/quizzes/${currentQuiz.id}/questions/${qId}/explain`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                scope: explainSettings.scope,
+                ai_mode: explainSettings.mode,
+                output_format: explainSettings.output
+            })
+        });
+
+        if (!response.ok) throw new Error('Explanation failed');
+
+        const data = await response.json();
+
+        // Update local data
+        const qIdx = currentQuestions.findIndex(q => q.id == qId);
+        if (qIdx !== -1) currentQuestions[qIdx].explanation = data.explanation;
+
+        // Render in UI
+        box.classList.add('active');
+        box.innerHTML = `
+            <div class="q-explanation-header">
+                <span class="q-explanation-title">AI Explanation</span>
+            </div>
+            <div class="q-explanation-content">${formatQuizText(data.explanation)}</div>
+        `;
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        if (followUpBtn) followUpBtn.style.display = 'flex';
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ph ph-sparkle"></i> Re-explain';
+        }
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to generate explanation. Please try again.');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ph ph-sparkle"></i> Explain';
+        }
+    }
+}
+
+// Follow-up Chat Logic
+let currentChatQuestionId = null;
+
+function openChatDrawer(qId) {
+    currentChatQuestionId = qId;
+    const q = currentQuestions.find(q => q.id == qId);
+
+    document.getElementById('drawerOverlay').classList.add('active');
+    document.getElementById('chatDrawer').classList.add('active');
+
+    // Clear previous messages if it's a new context (optional)
+    const container = document.getElementById('chatDrawerMessages');
+    container.innerHTML = `
+        <div class="chat-mention">
+            Referencing Question: "${q.question_text.substring(0, 50)}${q.question_text.length > 50 ? '...' : ''}"
+        </div>
+        <div class="chat-message-bubble ai">
+            I've loaded the context for this question. What else would you like to know about it?
+        </div>
+    `;
+
+    // Reset conversation ID for fresh start on each question unless you want continuity
+    explainSettings.conversation_id = 'quiz-' + qId + '-' + Date.now();
+
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+function closeChatDrawer() {
+    document.getElementById('drawerOverlay').classList.remove('active');
+    document.getElementById('chatDrawer').classList.remove('active');
+    currentChatQuestionId = null;
+}
+
+async function sendFollowUp() {
+    const input = document.getElementById('chatDrawerInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const container = document.getElementById('chatDrawerMessages');
+
+    // User message
+    const userMsg = document.createElement('div');
+    userMsg.className = 'chat-message-bubble user';
+    userMsg.textContent = text;
+    container.appendChild(userMsg);
+
+    input.value = '';
+    container.scrollTop = container.scrollHeight;
+
+    // Loading indicator
+    const loadingMsgId = 'loading-' + Date.now();
+    const loadingMsg = document.createElement('div');
+    loadingMsg.className = 'chat-message-bubble ai';
+    loadingMsg.id = loadingMsgId;
+    loadingMsg.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i> AI is thinking...';
+    container.appendChild(loadingMsg);
+    container.scrollTop = container.scrollHeight;
+
+    try {
+        const q = currentQuestions.find(q => q.id == currentChatQuestionId);
+
+        // We reuse the main chat endpoint but with the quiz context
+        const response = await fetch('/chat/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                lecture_id: currentQuiz.lecture_id,
+                subject_id: currentQuiz.subject_id,
+                group_id: currentQuiz.group_id,
+                message: `[Context: Q: ${q.question_text} | A: ${q.answer_text}] Follow-up: ${text}`,
+                ai_mode: explainSettings.mode,
+                output_format: explainSettings.output,
+                conversation_id: explainSettings.conversation_id,
+                auto_detect_conversation: false
+            })
+        });
+
+        if (!response.ok) throw new Error('Chat failed');
+        const data = await response.json();
+
+        const finalMsg = document.getElementById(loadingMsgId);
+        finalMsg.innerHTML = formatQuizText(data.response);
+        container.scrollTop = container.scrollHeight;
+
+    } catch (error) {
+        console.error('Error:', error);
+        const finalMsg = document.getElementById(loadingMsgId);
+        finalMsg.textContent = 'Sorry, I encountered an error answering that.';
+    }
+}
+
+// Bulk Edit Mode Logic
+function enterEditMode() {
+    renderEditTable();
+    document.getElementById('editModeModal').classList.add('active');
+}
+
+function renderEditTable() {
+    const tbody = document.getElementById('editTableBody');
+    tbody.innerHTML = '';
+
+    [...currentQuestions].sort((a, b) => (a.order || 0) - (b.order || 0)).forEach((q, idx) => {
+        const row = document.createElement('tr');
+        row.dataset.id = q.id;
+        row.innerHTML = `
+            <td class="drag-handle"><i class="ph ph-dots-six-vertical"></i></td>
+            <td style="color: var(--color-gray); font-size: 11px;">${q.id}</td>
+            <td><textarea class="form-control q-edit-text" rows="2">${q.question_text}</textarea></td>
+            <td><textarea class="form-control q-edit-answer" rows="2">${q.answer_text}</textarea></td>
+            <td>
+                <select class="options-select q-edit-type" style="font-size: 12px; height: 32px;">
+                    <option value="subjective" ${q.question_type == 'subjective' ? 'selected' : ''}>Subjective</option>
+                    <option value="objective" ${q.question_type == 'objective' ? 'selected' : ''}>Objective</option>
+                    <option value="fill_in_the_blank" ${q.question_type == 'fill_in_the_blank' ? 'selected' : ''}>Fill-blank</option>
+                </select>
+            </td>
+            <td>
+                <div class="flex-align-center gap-sm">
+                    <button class="btn-icon" onclick="moveRow(this, -1)" title="Move Up"><i class="ph ph-caret-up"></i></button>
+                    <button class="btn-icon" onclick="moveRow(this, 1)" title="Move Down"><i class="ph ph-caret-down"></i></button>
+                    <button class="btn-icon" onclick="deleteRow(this)" style="color: var(--color-error);"><i class="ph ph-trash"></i></button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function moveRow(btn, direction) {
+    const row = btn.closest('tr');
+    const parent = row.parentElement;
+    if (direction === -1 && row.previousElementSibling) {
+        parent.insertBefore(row, row.previousElementSibling);
+    } else if (direction === 1 && row.nextElementSibling) {
+        parent.insertBefore(row.nextElementSibling, row);
+    }
+}
+
+function deleteRow(btn) {
+    if (confirm('Delete this question?')) {
+        btn.closest('tr').remove();
+    }
+}
+
+function addNewEmptyQuestion() {
+    const tbody = document.getElementById('editTableBody');
+    const row = document.createElement('tr');
+    const tempId = -Math.floor(Math.random() * 100000);
+    row.dataset.id = tempId;
+    row.innerHTML = `
+        <td class="drag-handle"><i class="ph ph-dots-six-vertical"></i></td>
+        <td style="color: var(--color-primary); font-size: 11px;">NEW</td>
+        <td><textarea class="form-control q-edit-text" rows="2" placeholder="Question text..."></textarea></td>
+        <td><textarea class="form-control q-edit-answer" rows="2" placeholder="Answer text..."></textarea></td>
+        <td>
+            <select class="options-select q-edit-type" style="font-size: 12px; height: 32px;">
+                <option value="subjective">Subjective</option>
+                <option value="objective">Objective</option>
+                <option value="fill_in_the_blank">Fill-blank</option>
+            </select>
+        </td>
+        <td>
+            <div class="flex-align-center gap-sm">
+                <button class="btn-icon" onclick="moveRow(this, -1)"><i class="ph ph-caret-up"></i></button>
+                <button class="btn-icon" onclick="moveRow(this, 1)"><i class="ph ph-caret-down"></i></button>
+                <button class="btn-icon" onclick="deleteRow(this)" style="color: var(--color-error);"><i class="ph ph-trash"></i></button>
+            </div>
+        </td>
+    `;
+    tbody.appendChild(row);
+    row.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function saveBulkEdits() {
+    const rows = document.querySelectorAll('#editTableBody tr');
+    const questions = [];
+
+    rows.forEach((row, idx) => {
+        const id = parseInt(row.dataset.id);
+        questions.push({
+            id: id < 0 ? null : id, // null means new question
+            question_text: row.querySelector('.q-edit-text').value,
+            answer_text: row.querySelector('.q-edit-answer').value,
+            question_type: row.querySelector('.q-edit-type').value,
+            order: idx,
+            options: null,
+            explanation: null
+        });
+    });
+
+    try {
+        const response = await fetch(`/quizzes/${currentQuiz.id}/questions/bulk`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questions })
+        });
+
+        if (!response.ok) throw new Error('Bulk update failed');
+
+        const data = await response.json();
+        currentQuestions = data;
+
+        document.getElementById('editModeModal').classList.remove('active');
+        renderQuestions();
+        alert('Quiz updated successfully!');
+
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to save changes.');
     }
 }

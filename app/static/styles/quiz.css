@@ -387,7 +387,8 @@
 
 .flashcard {
     width: 100%;
-    height: 480px !important; /* Strictly enforce height for scaling logic */
+    height: 480px !important;
+    /* Strictly enforce height for scaling logic */
     padding: var(--spacing-xl) !important;
     border: 2px solid var(--color-border);
     border-radius: var(--radius-xl);
@@ -395,11 +396,13 @@
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
-    justify-content: center; /* Restored for vertical centering */
+    justify-content: center;
+    /* Restored for vertical centering */
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
-    overflow: hidden; /* Ensure content is visually clipped if JS fails or loading */
+    overflow: hidden;
+    /* Ensure content is visually clipped if JS fails or loading */
 }
 
 .flashcard:hover {
@@ -418,7 +421,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center; /* Restored for vertical centering */
+    justify-content: center;
+    /* Restored for vertical centering */
     gap: var(--spacing-sm);
     text-align: center;
     padding: var(--spacing-xl);
@@ -483,7 +487,8 @@
 .flashcard-face.has-list {
     text-align: left;
     align-items: flex-start;
-    justify-content: center; /* Still center vertically, even if left-aligned horizontally */
+    justify-content: center;
+    /* Still center vertically, even if left-aligned horizontally */
 }
 
 .flashcard-face.has-list .fc-content {
@@ -491,12 +496,14 @@
 }
 
 .flashcard-face.has-list .flashcard-label {
-    align-self: center; /* Keep the badge centered */
+    align-self: center;
+    /* Keep the badge centered */
     margin-bottom: var(--spacing-sm);
 }
 
 .flashcard-face.has-list .flashcard-instruction {
-    align-self: center; /* Keep instruction centered */
+    align-self: center;
+    /* Keep instruction centered */
     margin-top: auto;
 }
 
@@ -524,7 +531,8 @@
     word-break: break-word;
     max-height: 100%;
     width: 100%;
-    overflow: hidden; /* Required for scrollHeight > clientHeight detection */
+    overflow: hidden;
+    /* Required for scrollHeight > clientHeight detection */
 }
 
 /* Exam Mode Styles */
@@ -801,6 +809,265 @@
     margin-bottom: var(--spacing-md);
 }
 
+/* Explain & Follow-up Styles */
+.q-explanation-box {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: rgba(89, 60, 143, 0.03);
+    border-radius: var(--radius-md);
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.q-explanation-box.active {
+    display: block;
+}
+
+.q-explanation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.q-explanation-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-primary);
+    text-transform: uppercase;
+}
+
+.q-explanation-content {
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    color: var(--color-dark);
+}
+
+.q-action-row {
+    display: flex;
+    gap: 12px;
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-bg);
+}
+
+/* AI Settings Collapsible */
+.ai-settings-collapsible {
+    background: var(--color-white);
+    border: 1px solid var(--color-light-gray);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.ai-settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.ai-settings-content {
+    display: none;
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-bg);
+    animation: slideDown 0.3s ease;
+}
+
+.ai-settings-content.active {
+    display: block;
+}
+
+/* Bulk Edit Table Styles */
+.edit-table-container {
+    max-height: 60vh;
+    overflow-y: auto;
+    margin-top: var(--spacing-md);
+    border: 1px solid var(--color-light-gray);
+    border-radius: var(--radius-md);
+}
+
+.edit-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.edit-table th {
+    position: sticky;
+    top: 0;
+    background: var(--color-bg);
+    z-index: 10;
+    padding: 12px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-gray);
+    text-transform: uppercase;
+}
+
+.edit-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--color-bg);
+}
+
+.edit-table .form-control {
+    width: 100%;
+    font-size: 14px;
+}
+
+.drag-handle {
+    cursor: grab;
+    color: var(--color-gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* Follow-up Chat Sidepanel */
+.chat-drawer {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 400px;
+    height: 100%;
+    background: var(--color-white);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+    z-index: 2000;
+    transition: right 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-drawer.active {
+    right: 0;
+}
+
+.chat-drawer-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-drawer-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.chat-drawer-input {
+    padding: var(--spacing-lg);
+    border-top: 1px solid var(--color-bg);
+    display: flex;
+    gap: 10px;
+}
+
+.chat-message-bubble {
+    max-width: 85%;
+    padding: var(--spacing-md);
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.chat-message-bubble.user {
+    background: var(--color-primary);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-message-bubble.ai {
+    background: var(--color-bg);
+    color: var(--color-dark);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+}
+
+.chat-mention {
+    background: rgba(89, 60, 143, 0.1);
+    color: var(--color-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 8px;
+    display: inline-block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Reusing chat.html AI control styles */
+.ai-controls-minimal {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.control-label-sm {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-gray);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.mode-pill-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.mode-pill-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    z-index: 1999;
+    display: none;
+    animation: fadeIn 0.2s ease;
+}
+
+.drawer-overlay.active {
+    display: block;
+}
+
 .margin-bottom-lg {
     margin-bottom: var(--spacing-lg);
 }
@@ -931,7 +1198,8 @@
     list-style-type: decimal;
 }
 
-.quiz-rich-list li, .quiz-rich-list-ordered li {
+.quiz-rich-list li,
+.quiz-rich-list-ordered li {
     margin-bottom: 8px;
     line-height: 1.5;
 }

@@ -17,7 +17,7 @@ from app.schemas.quiz import (
     QuizCreate, QuizUpdate, QuizResponse, QuizQuestionCreate, QuizQuestionResponse,
     QuizQuestionUpdate,
     QuizGenerateRequest, QuizCheckRequest, QuizCheckResponse, SingleQuestionGenerateRequest,
-    QuizGroupCreate, QuizGroupResponse
+    QuizGroupCreate, QuizGroupResponse, QuizExplainRequest, BulkQuizUpdate
 )
 from app.processing.ai_client import AIClient, get_ai_client
 from app.processing.quiz_generator import (
@@ -407,6 +407,130 @@ def delete_question(
     db.delete(question)
     db.commit()
     return {"success": True}
+
+@router.post("/{quiz_id}/questions/{question_id}/explain", response_model=QuizQuestionResponse)
+async def explain_question_endpoint(
+    quiz_id: str,
+    question_id: int,
+    request: QuizExplainRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Explain a question using AI based on source or web."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    question = db.query(QuizQuestion).filter(QuizQuestion.id == question_id, QuizQuestion.quiz_id == quiz.id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    
+    # Check if cached explanation exists and ignore if we want a fresh one (optional, but requested to cache)
+    if question.explanation and request.scope != "web": # If it's already explained and not web-specific, return it
+         return question
+
+    ai_client = get_ai_client(user=current_user, db=db)
+    context = ""
+    
+    # 1. Get Context from Source
+    if request.scope in ["source", "both"]:
+        lecture_ids = []
+        if quiz.lecture_id:
+            lecture_ids = [quiz.lecture_id]
+        elif quiz.subject_id:
+            lectures = db.query(Lecture).filter(Lecture.subject_id == quiz.subject_id).all()
+            lecture_ids = [l.id for l in lectures]
+        elif quiz.group_id:
+            subjects = db.query(Subject).filter(Subject.group_id == quiz.group_id).all()
+            for s in subjects:
+                lectures = db.query(Lecture).filter(Lecture.subject_id == s.id).all()
+                lecture_ids.extend([l.id for l in lectures])
+        
+        if lecture_ids:
+            try:
+                from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
+                chunks = retrieve_relevant_chunks(
+                    query=f"{question.question_text} {question.answer_text}",
+                    lecture_ids=lecture_ids,
+                    db=db,
+                    top_k=5
+                )
+                if chunks:
+                    snippets = [{"text": chunk["text"], "position": chunk["position"], "score": chunk["score"]} for chunk in chunks]
+                    context = combine_snippets(snippets, max_chars=3000)
+            except Exception as e:
+                logger.error(f"Error retrieving source context for explanation: {e}")
+
+    # 2. Get Context from Web if source is empty or scope is web/both
+    if (not context or request.scope in ["web", "both"]) and request.scope != "source":
+        try:
+            from app.routers.chat import web_search
+            web_snippet, web_sources, web_error = await web_search(f"Explain this question and answer: {question.question_text} - {question.answer_text}")
+            if web_snippet:
+                context = (context + "\n\nWeb Search Info:\n" + web_snippet).strip()
+        except Exception as e:
+            logger.error(f"Error retrieving web context for explanation: {e}")
+
+    # 3. Generate Explanation
+    mode_prompt = f"Provide a thorough explanation for the following question and answer. Use the context provided if available."
+    if request.ai_mode == "simple": mode_prompt = "Explain this simply for a beginner."
+    elif request.ai_mode == "eli5": mode_prompt = "Explain this like I'm five."
+    
+    format_prompt = "Respond in clear sentences."
+    if request.output_format == "pointform": format_prompt = "Respond in bullet points."
+    
+    prompt = f"""{mode_prompt}
+{format_prompt}
+
+Question: {question.question_text}
+Answer: {question.answer_text}
+
+Context:
+{context or 'No additional context available.'}
+
+Explanation:"""
+
+    try:
+        explanation = await ai_client.generate_text(prompt, max_tokens=1000)
+        question.explanation = explanation
+        db.commit()
+        db.refresh(question)
+        return question
+    except Exception as e:
+        logger.error(f"Error generating explanation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate explanation")
+
+@router.put("/{quiz_id}/questions/bulk", response_model=List[QuizQuestionResponse])
+def bulk_update_questions(
+    quiz_id: str,
+    bulk_in: BulkQuizUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Bulk update quiz questions including order."""
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id, Quiz.user_id == current_user.id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+        
+    updated_questions = []
+    for q_update in bulk_in.questions:
+        question = db.query(QuizQuestion).filter(QuizQuestion.id == q_update.id, QuizQuestion.quiz_id == quiz.id).first()
+        if question:
+            question.question_text = q_update.question_text
+            question.answer_text = q_update.answer_text
+            question.question_type = q_update.question_type
+            question.options = q_update.options
+            question.order = q_update.order
+            question.explanation = q_update.explanation
+            updated_questions.append(question)
+        else:
+            # Handle new question if id is negative or similar (not implemented here but good practice)
+            pass
+            
+    db.commit()
+    for q in updated_questions:
+        db.refresh(q)
+    return updated_questions
 
 @router.post("/{quiz_id}/check", response_model=QuizCheckResponse)
 async def check_answer_ai(
