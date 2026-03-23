@@ -11,13 +11,101 @@ let examAnswers = {};
 let practiceResults = {}; // {qId: is_correct}
 
 /**
+ * Convert inline enumerated lists to newline-separated Markdown lists.
+ * Handles patterns like:
+ *   "however: (1) item, (2) item, (3) item"
+ *   "if: (a) item and (b) item"
+ *   "a. Set value. b. Read clock. c. Clear memory."
+ */
+function convertInlineLists(text) {
+    // Pattern 1: Numeric parens — "...: (1) text, (2) text, (3) text"
+    // or "..., however: (1) text (2) text and (3) text"
+    text = text.replace(
+        /([^(]{5,}?[,:]\s*)\(1\)([\s\S]+?)(?=\n\n|\n[A-Z]|$)/g,
+        (match, intro, rest) => {
+            // Extract all (N) items from the rest
+            const itemRegex = /\((\d+)\)\s*(.*?)(?=\s*\(\d+\)|$)/gs;
+            const items = [];
+            let m;
+            // We need to get the first item text (after (1)) and all subsequent
+            // The `rest` starts right after `(1)`, so prepend a fake (1) marker
+            const restWithMarker = '(1)' + rest;
+            const cleanedRest = restWithMarker
+                .replace(/,?\s+and\s+\((\d+)\)/g, ' ($1)') // normalize "and (N)"
+                .replace(/,\s+\((\d+)\)/g, ' ($1)'); // normalize ", (N)"
+            
+            const splitParts = cleanedRest.split(/\s*\((\d+)\)\s*/);
+            // splitParts: ['', '1', 'item1 text', '2', 'item2 text', '3', 'item3 text']
+            const lines = [];
+            for (let i = 1; i < splitParts.length; i += 2) {
+                const num = splitParts[i];
+                const itemText = (splitParts[i + 1] || '').replace(/[,;]\s*$/, '').trim();
+                if (itemText) lines.push(`${num}. ${itemText}`);
+            }
+            if (lines.length > 1) {
+                return intro.replace(/\s+$/, '') + '\n' + lines.join('\n');
+            }
+            return match;
+        }
+    );
+    
+    // Pattern 2: Letter parens — "...: (a) text (b) text (c) text"
+    text = text.replace(
+        /([^(]{5,}?[,:]\s*)\(a\)([\s\S]+?)(?=\n\n|\n[A-Z]|$)/g,
+        (match, intro, rest) => {
+            const restWithMarker = '(a)' + rest;
+            const splitParts = restWithMarker.split(/\s*\(([a-z])\)\s*/);
+            const lines = [];
+            for (let i = 1; i < splitParts.length; i += 2) {
+                const letter = splitParts[i];
+                const itemText = (splitParts[i + 1] || '').replace(/[,;]\s*$/, '').replace(/\s+and\s*$/, '').trim();
+                if (itemText) lines.push(`- ${itemText}`);
+            }
+            if (lines.length > 1) {
+                return intro.replace(/\s+$/, '') + '\n' + lines.join('\n');
+            }
+            return match;
+        }
+    );
+
+    // Pattern 3: Single-line alphabetic list — "a. Item. b. Item. c. Item."
+    // Only apply if we see two or more consecutive "letter. text." patterns on one line
+    text = text.replace(
+        /^([a-h])\.\s+(.+?)(?:\s+([b-i])\.\s+(.+?))+$/gm,
+        (match) => {
+            // Split the whole match by "letter. " boundaries
+            const parts = match.split(/\s+(?=[a-h]\.\s)/);
+            if (parts.length > 1) {
+                return parts.map(p => `- ${p.replace(/^[a-h]\.\s+/, '')}`).join('\n');
+            }
+            return match;
+        }
+    );
+    
+    return text;
+}
+
+/**
  * Format quiz text supporting basic markdown and HTML tables.
  */
 function formatQuizText(text) {
     if (!text) return "";
     
+    // PRE-PROCESSING: Convert special formats before HTML escaping
+    // 1. Convert bullet/special characters to markdown dashes
+    let preformatted = text
+        .replace(/•\s*/g, '- ')        // Bullet points
+        .replace(/\u2022\s*/g, '- ')    // Unicode bullet
+        .replace(/\u2013/g, '—')        // En dash to em dash
+        .replace(/\u2019/g, "'")        // Smart quote
+        .replace(/\u201c|\u201d/g, '"') // Smart double quotes
+        .trim();
+    
+    // 2. Convert inline enumerated lists to proper newline-separated lists
+    preformatted = convertInlineLists(preformatted);
+    
     // 1. Escape basic HTML to prevent XSS (but allow our specific tags later)
-    let formatted = text
+    let formatted = preformatted
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
@@ -26,45 +114,83 @@ function formatQuizText(text) {
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
     
-    // 3. Handle Lists (starting with - or *)
-    // We do this line by line if possible or use a regex
+    // 3. Context-aware list renderer:
+    //    - "-" / "*" → unordered list
+    //    - "1." → ordered list; if last UL bullet ended with ":", nest inside it
+    //    - "a." style items are NOT converted; they stay as plain text with their prefix
     const lines = formatted.split('\n');
-    let inList = false;
-    let listFormatted = [];
+    let html = '';
+    let inUL = false;
+    let inOL = false;
+    let inNestedOL = false;   // nested <ol> inside last <li> of a <ul>
+    let lastBulletText = '';  // track text of last bullet to detect colon endings
+    
+    function closeNestedOL() {
+        if (inNestedOL) { html += '</ol></li>'; inNestedOL = false; }
+    }
+    function closeUL() {
+        closeNestedOL();
+        if (inUL) {
+            // Close last li if it was never closed (it has no nested list)
+            if (!inNestedOL) html += '</li>';
+            html += '</ul>';
+            inUL = false;
+        }
+        lastBulletText = '';
+    }
+    function closeOL() {
+        if (inOL) { html += '</ol>'; inOL = false; }
+    }
     
     lines.forEach(line => {
         const trimmed = line.trim();
-        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-            if (!inList) {
-                listFormatted.push('<ul class="quiz-rich-list">');
-                inList = true;
+        const isULItem = /^[-*]\s/.test(trimmed);
+        // Only numeric ordered lists — preserve "a." style as-is
+        const isOLItem = /^\d+\.\s/.test(trimmed);
+        
+        if (isULItem) {
+            closeNestedOL();
+            if (inOL) closeOL();
+            // Open ul if needed; close previous li if already in ul
+            if (!inUL) { html += '<ul class="quiz-rich-list">'; inUL = true; }
+            else { html += '</li>'; }
+            const content = trimmed.substring(2);  // strip "- " or "* "
+            lastBulletText = content;
+            html += `<li>${content}`;  // leave li open — might receive nested ol
+        } else if (isOLItem) {
+            const item = trimmed.replace(/^\d+\.\s/, '');
+            const parentEndsColon = lastBulletText.trimEnd().endsWith(':');
+            
+            if (inUL && parentEndsColon) {
+                // Nest inside the last open <li> of the ul
+                if (!inNestedOL) {
+                    html += '<ol class="quiz-rich-list-nested">';
+                    inNestedOL = true;
+                }
+                html += `<li>${item}</li>`;
+            } else {
+                // Top-level ordered list
+                closeNestedOL();
+                if (inUL) { html += '</li>'; inUL = false; html += '</ul>'; lastBulletText = ''; }
+                if (!inOL) { html += '<ol class="quiz-rich-list-ordered">'; inOL = true; }
+                html += `<li>${item}</li>`;
+                lastBulletText = '';
             }
-            listFormatted.push(`<li>${trimmed.substring(2)}</li>`);
-        } else if (/^\d+\.\s/.test(trimmed)) {
-             if (!inList) {
-                listFormatted.push('<ol class="quiz-rich-list">');
-                inList = true;
-            }
-            listFormatted.push(`<li>${trimmed.replace(/^\d+\.\s/, '')}</li>`);
         } else {
-            if (inList) {
-                const listTag = listFormatted[listFormatted.length - 1].includes('<ul>') ? '</ul>' : '</ol>'; // Simplistic check
-                // Actually need to track what kind of list we started
-                const lastOpen = listFormatted.reverse().find(l => l.includes('<ul') || l.includes('<ol'));
-                listFormatted.reverse(); // back to normal
-                const closeTag = lastOpen.includes('<ul') ? '</ul>' : '</ol>';
-                listFormatted.push(closeTag);
-                inList = false;
-            }
-            listFormatted.push(line);
+            // Regular text — close any open lists
+            closeNestedOL();
+            if (inUL) { html += '</li></ul>'; inUL = false; lastBulletText = ''; }
+            if (inOL) { html += '</ol>'; inOL = false; }
+            html += line + '\n';
         }
     });
-    if (inList) {
-        const lastOpen = listFormatted.reverse().find(l => l.includes('<ul') || l.includes('<ol'));
-        listFormatted.reverse();
-        listFormatted.push(lastOpen.includes('<ul') ? '</ul>' : '</ol>');
-    }
-    formatted = listFormatted.join('\n');
+    
+    // Close anything still open
+    closeNestedOL();
+    if (inUL) { html += '</li></ul>'; }
+    if (inOL) { html += '</ol>'; }
+    
+    formatted = html;
     
     // 4. Transform newlines to <br> (but only if not inside a table or list to keep it clean)
     // Actually, simple way is to replace \n with <br> then clean up list tags
@@ -424,7 +550,9 @@ function renderFlashcardMode(container) {
 
     card.innerHTML = `
         <div class="flashcard-face flashcard-question">
-            <span class="q-type-badge flashcard-label">Question ${currentCardIndex + 1}</span>
+            <span class="q-type-badge flashcard-label">
+                ${q.original_number ? `<span class="q-orig-num">${q.original_number}</span> ` : ''}Question ${currentCardIndex + 1}
+            </span>
             <div class="fc-content fc-question-text">${formatQuizText(q.question_text)}</div>
             <p class="flashcard-instruction">
                 <i class="ph ph-hand-pointing"></i>
@@ -483,7 +611,9 @@ function createQuestionCard(q, index) {
     
     header.innerHTML = `
         <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-            <div class="q-number">Question ${index + 1}</div>
+            <div class="q-number">
+                ${q.original_number ? `<span class="q-orig-num">${q.original_number}</span> ` : ''}Question ${index + 1}
+            </div>
             <div class="q-type-badge">${q.question_type.replace(/_/g, ' ')}</div>
         </div>
         <div class="quiz-actions-menu">

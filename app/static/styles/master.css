@@ -3195,3 +3195,32 @@ body.auth-page {
     border-radius: 5px;
     transition: width 0.4s ease;
 }
+/* ===== IMPORT PROGRESS STEP HINT ===== */
+.progress-step-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: var(--spacing-lg);
+    padding: 10px 14px;
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    color: var(--color-dark-gray);
+}
+
+.progress-step-hint i {
+    font-size: 1rem;
+    color: var(--color-primary);
+    flex-shrink: 0;
+}
+
+.progress-step-hint span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Smoother progress fill transition */
+.modal-content-progress .progress-fill {
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}

@@ -228,10 +228,10 @@
             </div>
 
             <div class="modal-footer">
-                <button class="btn btn-primary" id="modalCreateBtn" onclick="submitCreateQuiz()"
-                    style="padding: 12px 24px; flex: 1;">Create Quiz</button>
                 <button class="btn btn-secondary" onclick="closeModal('createQuizModal')"
                     style="padding: 12px 24px; flex: 1;">Cancel</button>
+                <button class="btn btn-primary" id="modalCreateBtn" onclick="submitCreateQuiz()"
+                    style="padding: 12px 24px; flex: 1;">Create Quiz</button>
             </div>
 
             <div id="createError"
@@ -247,8 +247,8 @@
                 <div class="progress-icon-sparkle">
                     <i class="ph ph-sparkle"></i>
                 </div>
-                <h3 class="progress-title-main">Generating Quiz</h3>
-                <p class="progress-subtitle-main" id="quizProgressMessage">Initializing AI model...</p>
+                <h3 class="progress-title-main" id="quizProgressTitle">Processing Import</h3>
+                <p class="progress-subtitle-main" id="quizProgressMessage">Initializing...</p>
             </div>
 
             <div class="progress-wrapper-alt">
@@ -259,6 +259,11 @@
                 <div class="progress-bar-alt">
                     <div id="quizProgressFill" class="progress-fill"></div>
                 </div>
+            </div>
+
+            <div id="quizProgressStepHint" class="progress-step-hint">
+                <i class="ph ph-circle-dashed ph-spin"></i>
+                <span id="quizProgressStepText">This may take a moment for large files...</span>
             </div>
         </div>
     </div>

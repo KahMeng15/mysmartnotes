@@ -611,11 +611,14 @@ function updateQuizProgress(percent, message, label) {
     const percentText = document.getElementById('quizProgressPercent');
     const msgText = document.getElementById('quizProgressMessage');
     const labelText = document.getElementById('quizProgressLabel');
+    const stepText = document.getElementById('quizProgressStepText');
     
     if (fill) fill.style.width = `${percent}%`;
     if (percentText) percentText.textContent = `${percent}%`;
     if (msgText && message) msgText.textContent = message;
     if (labelText && label) labelText.textContent = label;
+    // Update step hint with the current label as detail
+    if (stepText && label) stepText.textContent = label;
 }
 
 async function submitCreateQuiz() {
@@ -701,18 +704,19 @@ async function submitCreateQuiz() {
             const importTab = document.getElementById('tabImportPaste').classList.contains('active') ? 'paste' : 'file';
             const generateAnswers = document.getElementById('importGenerateAnswers').checked;
             
-            if (!title) title = 'Imported Quiz';
+            // Title is intentionally NOT pre-filled here.
+            // An empty title will cause the backend to use the AI-suggested title.
             
             // Show Progress Modal
             closeModal('createQuizModal');
             const progressModal = document.getElementById('quizProgressModal');
             if (progressModal) {
                 progressModal.classList.add('active');
-                updateQuizProgress(10, 'Preparing import...', 'Working...');
+                updateQuizProgress(5, 'Initializing...', 'Starting');
             }
 
             const formData = new FormData();
-            formData.append('title', title);
+            formData.append('title', title); // Empty = let AI suggest a title
             formData.append('quiz_group_id', quizGroupId || '');
             formData.append('generate_answers', generateAnswers);
 
@@ -720,19 +724,47 @@ async function submitCreateQuiz() {
                 const text = document.getElementById('importText').value.trim();
                 if (!text) throw new Error('Please paste some content first');
                 formData.append('text', text);
-                updateQuizProgress(30, 'Parsing pasted content...', 'Processing');
+                updateQuizProgress(15, 'Reading pasted content...', 'Loading content');
+                await new Promise(r => setTimeout(r, 400));
+                updateQuizProgress(25, 'Sending to processing engine...', 'Preparing');
             } else {
                 if (importSelectedFiles.length === 0) throw new Error('Please select at least one file to import');
                 importSelectedFiles.forEach(f => formData.append('file', f));
-                updateQuizProgress(30, `Reading ${importSelectedFiles.length} files...`, 'Processing');
+                const fileLabel = importSelectedFiles.map(f => f.name).join(', ');
+                updateQuizProgress(15, `Reading ${importSelectedFiles.length} file(s)...`, fileLabel);
+                await new Promise(r => setTimeout(r, 500));
+                updateQuizProgress(25, 'Extracting text from documents...', 'Text extraction');
+                await new Promise(r => setTimeout(r, 400));
+                updateQuizProgress(35, 'Cleaning and pre-processing text...', 'Pre-processing');
             }
 
-            response = await fetch('/quizzes/import', {
-                method: 'POST',
-                body: formData
-            });
-            
-            updateQuizProgress(60, 'AI is structuring and validating questions...', 'AI Processing');
+            // Start the fetch and animate progress while waiting
+            const fetchPromise = fetch('/quizzes/import', { method: 'POST', body: formData });
+
+            const importStages = [
+                { pct: 45, msg: 'Sending to AI for analysis...', label: 'AI Analysis' },
+                { pct: 55, msg: 'Identifying questions and answers...', label: 'Question detection' },
+                { pct: 65, msg: 'Formatting lists and structure...', label: 'Rich formatting' },
+                { pct: 73, msg: 'Suggesting a quiz title...', label: 'Title detection' },
+                { pct: 82, msg: 'Validating extracted content...', label: 'Validation' },
+                { pct: 90, msg: 'Finalizing quiz structure...', label: 'Almost done!' },
+            ];
+            let stageIdx = 0;
+            const stageInterval = setInterval(() => {
+                if (stageIdx < importStages.length) {
+                    const s = importStages[stageIdx++];
+                    updateQuizProgress(s.pct, s.msg, s.label);
+                }
+            }, 1800);
+
+            try {
+                response = await fetchPromise;
+            } finally {
+                clearInterval(stageInterval);
+            }
+
+            updateQuizProgress(95, 'Saving quiz to your library...', 'Saving');
+
 
         } else {
             // Manual creation

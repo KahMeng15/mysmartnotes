@@ -239,7 +239,7 @@ async def generate_quiz_ai(
 
 @router.post("/import", response_model=QuizResponse)
 async def import_quiz_endpoint(
-    title: str = Form(...),
+    title: Optional[str] = Form(default=None),
     text: Optional[str] = Form(None),
     file: List[UploadFile] = File(None),
     quiz_group_id: Optional[str] = Form(None),
@@ -285,7 +285,7 @@ async def import_quiz_endpoint(
             db=db,
             user=current_user,
             ai_client=ai_client,
-            title=title,
+            title=title or "",  # Pass empty string → backend uses AI suggested title
             text=import_text,
             quiz_group_id=quiz_group_id,
             generate_missing_answers=generate_answers

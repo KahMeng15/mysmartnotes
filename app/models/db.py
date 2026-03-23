@@ -220,6 +220,7 @@ class QuizQuestion(Base):
     answer_text = Column(Text, nullable=False)
     question_type = Column(String(50), default="subjective")  # objective, subjective, fill_in_the_blank
     options = Column(JSON, nullable=True)  # Store options for objective questions
+    original_number = Column(String(20), nullable=True)  # e.g. "1.1", "Q5"
     order = Column(Integer, default=0)
     
     # Relationships
