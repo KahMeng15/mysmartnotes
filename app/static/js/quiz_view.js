@@ -1191,14 +1191,21 @@ async function explainQuestion(qId, forceRegenerate = false) {
     }
 
     try {
+        const payload = {
+            scope: explainSettings.scope,
+            ai_mode: explainSettings.mode,
+            output_format: explainSettings.output
+        };
+
+        // Add user answer context for personalized feedback if available
+        if ((currentMode === 'practice' || currentMode === 'examsimulator') && examAnswers[qId]) {
+            payload.user_answer = examAnswers[qId];
+        }
+
         const response = await fetch(`/quizzes/${currentQuiz.id}/questions/${qId}/explain`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                scope: explainSettings.scope,
-                ai_mode: explainSettings.mode,
-                output_format: explainSettings.output
-            })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) throw new Error('Explanation failed');
