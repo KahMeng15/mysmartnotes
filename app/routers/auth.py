@@ -96,6 +96,25 @@ def get_firebase_config():
     }
 
 
+@router.get("/public-settings")
+def get_public_settings(db: Session = Depends(get_db)):
+    """Return public-safe system settings"""
+    settings = db.query(SystemSettings).first()
+    if not settings:
+        return {
+            "signup_config": "open",
+            "maintenance_mode": False,
+            "footer_text": "",
+            "unnecessary_logins_enabled": False
+        }
+    return {
+        "signup_config": settings.signup_config,
+        "maintenance_mode": settings.maintenance_mode,
+        "footer_text": settings.footer_text,
+        "unnecessary_logins_enabled": settings.unnecessary_logins_enabled
+    }
+
+
 @router.post("/register", response_model=UserSchema)
 def register(user_data: UserCreate, request: Request, token: Optional[str] = None, db: Session = Depends(get_db)):
     """Register a new user"""
@@ -145,27 +164,40 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
     # Check if user exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     
-    if existing_user:
+    # Special handling for Admin Email: allow "re-claiming" via signup if password is lost
+    is_admin_signup = settings.ADMIN_EMAIL and user_data.email.lower() == settings.ADMIN_EMAIL.lower()
+    
+    if existing_user and not is_admin_signup:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
     
-    # Create new user
-    is_admin = True if settings.ADMIN_EMAIL and user_data.email.lower() == settings.ADMIN_EMAIL.lower() else False
-    is_approved = True if signup_config != "approval" or is_admin else False
-    
-    user = User(
-        username=user_data.email,  # Use email as username
-        email=user_data.email,
-        full_name=user_data.full_name,
-        nickname=user_data.nickname,
-        hashed_password=hash_password(user_data.password),
-        is_admin=is_admin,
-        is_approved=is_approved,
-        tier=invitation.tier if invitation else "free"
-    )
-    db.add(user)
+    if is_admin_signup and existing_user:
+        # Update existing admin user
+        existing_user.nickname = user_data.nickname
+        existing_user.full_name = user_data.full_name
+        existing_user.hashed_password = hash_password(user_data.password)
+        existing_user.is_admin = True
+        existing_user.is_active = True
+        existing_user.is_approved = True
+        user = existing_user
+    else:
+        # Create new user
+        is_admin = is_admin_signup
+        is_approved = True if signup_config != "approval" or is_admin else False
+        
+        user = User(
+            username=user_data.email,  # Use email as username
+            email=user_data.email,
+            full_name=user_data.full_name,
+            nickname=user_data.nickname,
+            hashed_password=hash_password(user_data.password),
+            is_admin=is_admin,
+            is_approved=is_approved,
+            tier=invitation.tier if invitation else "free"
+        )
+        db.add(user)
     
     if invitation:
         invitation.is_used = True
@@ -182,31 +214,39 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
     return user
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(credentials: UserLogin, request: Request, db: Session = Depends(get_db)):
+@router.post("/login")
+async def login(request: Request, db: Session = Depends(get_db)):
     """Login user and return access token"""
+    try:
+        credentials = await request.json()
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid JSON body")
+        
+    email = credentials.get("email")
+    password = credentials.get("password")
+    
+    if not email or not password:
+         raise HTTPException(status_code=400, detail="Missing email or password")
+
     # Check maintenance mode
     sys_settings = db.query(SystemSettings).first()
     if sys_settings and sys_settings.maintenance_mode:
-        if not settings.ADMIN_EMAIL or credentials.email.lower() != settings.ADMIN_EMAIL.lower():
+        if not settings.ADMIN_EMAIL or email.lower() != settings.ADMIN_EMAIL.lower():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="System is undergoing maintenance. Only administrators can log in at this time."
             )
 
-    user = db.query(User).filter(User.email == credentials.email).first()
+    user = db.query(User).filter(User.email == email).first()
     
     try:
-        if not user or not verify_password(credentials.password, user.hashed_password):
+        if not user or not verify_password(password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid username or password"
             )
     except ValueError as e:
-        # This can happen with bcrypt's 72-byte limit if a long password was used
-        # during registration on a system without the fix, and now is being verified
-        # with the fix. We treat it as an invalid password.
-        print(f"Password verification error for user {credentials.email}: {e}")
+        print(f"Password verification error for user {email}: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
@@ -230,7 +270,6 @@ def login(credentials: UserLogin, request: Request, db: Session = Depends(get_db
         db.commit()
     
     # Create token
-    sys_settings = db.query(SystemSettings).first()
     expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
     if sys_settings and sys_settings.session_length:
         length = sys_settings.session_length
@@ -251,7 +290,17 @@ def login(credentials: UserLogin, request: Request, db: Session = Depends(get_db
     db.add(UserLog(user_id=user.id, action="login", ip_address=ip_address, device_info=user_agent))
     db.commit()
     
-    return {"access_token": access_token, "token_type": "bearer", "user": user}
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer", 
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "username": user.username,
+            "nickname": user.nickname,
+            "is_admin": user.is_admin
+        }
+    }
 
 
 @router.post("/google-login")

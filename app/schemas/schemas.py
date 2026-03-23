@@ -6,14 +6,14 @@ from typing import Optional, List, Any
 
 # ========== User Schemas ==========
 class UserBase(BaseModel):
-    username: str
-    email: EmailStr
+    username: Optional[str] = None
+    email: Optional[str] = None
     full_name: Optional[str] = None
     nickname: Optional[str] = None
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: str
     password: str
     nickname: str
     full_name: Optional[str] = None
@@ -23,7 +23,7 @@ class UserCreate(BaseModel):
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -39,7 +39,7 @@ class UserUpdate(BaseModel):
 
 class User(UserBase):
     id: int
-    is_active: bool
+    is_active: Optional[bool] = True
     is_admin: bool = False
     is_approved: bool = True
     tier: str = "free"
@@ -48,7 +48,7 @@ class User(UserBase):
     ai_base_url: Optional[str] = None
     ai_api_key: Optional[str] = None
     use_global_ai_config: bool = False
-    created_at: datetime
+    created_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True

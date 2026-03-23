@@ -1,15 +1,56 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>Fair Use Policy - MySmartNotes</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles/master.css">
     <link rel="stylesheet" href="/styles/support.css">
+    <style>
+        .support-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: var(--spacing-md);
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            border-radius: 4px;
+        }
+
+        .close-button:hover {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        @media (max-width: 768px) {
+            .close-button {
+                font-size: 20px;
+            }
+        }
+    </style>
 </head>
 <body class="support-document">
     <div class="support-document-container">
-        <h1>Fair Use Policy</h1>
+        <div class="support-header">
+            <h1 style="margin: 0;">Fair Use Policy</h1>
+            <button class="close-button" onclick="window.close();" title="Close">✕</button>
+        </div>
         <p class="last-updated">Last Updated: March 23, 2026</p>
 
         <div class="section">

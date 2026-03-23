@@ -366,6 +366,7 @@ class SystemSettings(Base):
     session_unit = Column(String(20), default="hours") # hours, days
     session_reset_on_activity = Column(Boolean, default=True)
     max_quiz_questions = Column(Integer, default=500)
+    unnecessary_logins_enabled = Column(Boolean, default=False)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

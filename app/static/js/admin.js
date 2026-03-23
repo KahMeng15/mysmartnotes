@@ -257,6 +257,10 @@ async function loadSystemSettings() {
 
         // Quiz Config
         document.getElementById('maxQuizQuestions').value = s.max_quiz_questions || 500;
+
+        // Unnecessary Logins
+        if (s.unnecessary_logins_enabled) document.getElementById('unnecessaryLoginsToggle').classList.add('active');
+        else document.getElementById('unnecessaryLoginsToggle').classList.remove('active');
     } catch(e) { console.error('Error loading config', e); }
 }
 
@@ -275,7 +279,8 @@ async function saveSystemSettings(e) {
         session_length: parseInt(document.getElementById('sessionLength').value),
         session_unit: document.getElementById('sessionUnit').value,
         session_reset_on_activity: document.getElementById('sessionResetToggle').classList.contains('active'),
-        max_quiz_questions: parseInt(document.getElementById('maxQuizQuestions').value)
+        max_quiz_questions: parseInt(document.getElementById('maxQuizQuestions').value),
+        unnecessary_logins_enabled: document.getElementById('unnecessaryLoginsToggle').classList.contains('active')
     };
     const key = document.getElementById('globalAiKey').value;
     if (key && key !== '********') payload.global_ai_api_key = key;
