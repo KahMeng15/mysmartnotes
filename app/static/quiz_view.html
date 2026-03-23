@@ -150,55 +150,48 @@
 
             <h4 class="sidebar-section-title">AI Explain Config</h4>
             <div class="ai-sidebar-settings">
-                <div class="form-group-sm">
-                    <label class="control-label-xs">Knowledge Scope</label>
-                    <select id="explainScope" class="options-select-sm" onchange="updateExplainSettings()">
-                        <option value="source">📚 Source Material</option>
-                        <option value="web">🌐 Web Search</option>
-                        <option value="both">✨ Both (Mixed)</option>
+                <div class="options-group" style="margin-bottom: 12px;">
+                    <label class="options-label">Knowledge Scope</label>
+                    <select id="explainScope" class="options-select" onchange="updateExplainSettings()">
+                        <option value="source">Source Material</option>
+                        <option value="web">Web Search</option>
+                        <option value="both">Both (Mixed)</option>
                     </select>
                 </div>
-                <div class="form-group-sm">
-                    <label class="control-label-xs">AI Mode</label>
-                    <div class="ai-mode-grid" id="explainModeBar">
-                        <button class="mode-pill-xs active" data-mode="normal" onclick="setExplainMode('normal')"
-                            title="Normal">
-                            <i class="ph ph-stack"></i>
+                <div class="options-group" style="margin-bottom: 12px;">
+                    <label class="options-label">AI Mode</label>
+                    <div class="ai-mode-bar" id="explainModeBar">
+                        <button class="mode-pill active" data-mode="normal" onclick="setExplainMode('normal')">
+                            <i class="ph ph-stack"></i> Normal
                         </button>
-                        <button class="mode-pill-xs" data-mode="quick" onclick="setExplainMode('quick')" title="Quick">
-                            <i class="ph ph-lightning"></i>
+                        <button class="mode-pill" data-mode="quick" onclick="setExplainMode('quick')">
+                            <i class="ph ph-lightning"></i> Quick
                         </button>
-                        <button class="mode-pill-xs" data-mode="simple" onclick="setExplainMode('simple')"
-                            title="Simple">
-                            <i class="ph ph-text-a-underline"></i>
+                        <button class="mode-pill" data-mode="simple" onclick="setExplainMode('simple')">
+                            <i class="ph ph-text-a-underline"></i> Simple
                         </button>
-                        <button class="mode-pill-xs" data-mode="elaborate" onclick="setExplainMode('elaborate')"
-                            title="Detailed">
-                            <i class="ph ph-lightbulb"></i>
+                        <button class="mode-pill" data-mode="elaborate" onclick="setExplainMode('elaborate')">
+                            <i class="ph ph-lightbulb"></i> Elaborate
                         </button>
-                        <button class="mode-pill-xs" data-mode="eli5" onclick="setExplainMode('eli5')" title="ELI5">
-                            <i class="ph ph-smiley"></i>
+                        <button class="mode-pill" data-mode="eli5" onclick="setExplainMode('eli5')">
+                            <i class="ph ph-smiley"></i> ELI5
                         </button>
                     </div>
                 </div>
-                <div class="form-group-sm">
-                    <label class="control-label-xs">Response Style</label>
-                    <div class="ai-mode-grid" id="explainOutputBar">
-                        <button class="mode-pill-xs active" data-format="sentence"
-                            onclick="setExplainOutput('sentence')" title="Sentence">
-                            <i class="ph ph-text-t"></i>
+                <div class="options-group" style="margin-bottom: 12px;">
+                    <label class="options-label">Response Style</label>
+                    <div class="output-format-bar" id="explainOutputBar">
+                        <button class="mode-pill active" data-format="sentence" onclick="setExplainOutput('sentence')">
+                            <i class="ph ph-text-t"></i> Sentence
                         </button>
-                        <button class="mode-pill-xs" data-format="pointform" onclick="setExplainOutput('pointform')"
-                            title="Points">
-                            <i class="ph ph-list-bullets"></i>
+                        <button class="mode-pill" data-format="pointform" onclick="setExplainOutput('pointform')">
+                            <i class="ph ph-list-bullets"></i> Pointform
                         </button>
-                        <button class="mode-pill-xs" data-format="numbered_list"
-                            onclick="setExplainOutput('numbered_list')" title="Numbered">
-                            <i class="ph ph-list-numbers"></i>
+                        <button class="mode-pill" data-format="numbered_list" onclick="setExplainOutput('numbered_list')">
+                            <i class="ph ph-list-numbers"></i> Numbered List
                         </button>
-                        <button class="mode-pill-xs" data-format="table" onclick="setExplainOutput('table')"
-                            title="Table">
-                            <i class="ph ph-table"></i>
+                        <button class="mode-pill" data-format="table" onclick="setExplainOutput('table')">
+                            <i class="ph ph-table"></i> Table
                         </button>
                     </div>
                 </div>
@@ -473,9 +466,9 @@
             <div class="options-group">
                 <label class="options-label">Knowledge Scope</label>
                 <select id="modalExplainScope" class="options-select">
-                    <option value="source">📚 Source Material Only</option>
-                    <option value="web">🌐 Web Search Only</option>
-                    <option value="both">✨ Both (Mixed Context)</option>
+                    <option value="source">Source Material Only</option>
+                    <option value="web">Web Search Only</option>
+                    <option value="both">Both (Mixed Context)</option>
                 </select>
             </div>
 
@@ -521,7 +514,7 @@
 
             <div class="modal-buttons modal-footer-spacing">
                 <button type="button" class="btn btn-primary" id="regenerateExplainBtn"
-                    onclick="regenerateFromModal()">Regenerate Explanation</button>
+                    onclick="regenerateFromModal()">Re-explain</button>
                 <button type="button" class="btn btn-secondary"
                     onclick="closeModal('aiExplainOptionsModal')">Cancel</button>
             </div>

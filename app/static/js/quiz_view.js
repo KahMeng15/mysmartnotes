@@ -1190,6 +1190,34 @@ async function explainQuestion(qId, forceRegenerate = false) {
         btn.innerHTML = '<i class="ph ph-spinner-gap ph-spin"></i> Explaining...';
     }
 
+    // Show loading bar
+    box.classList.add('active');
+    box.innerHTML = `
+        <div class="progress-container margin-top-sm" style="background: rgba(89, 60, 143, 0.03); padding: var(--spacing-lg); border-radius: var(--radius-md);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                <span style="font-weight: 600; font-size: var(--font-size-sm);">Generating Explanation...</span>
+                <span id="explainProgressPercent-${qId}" style="font-size: var(--font-size-sm); color: var(--color-gray);">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div id="explainProgressFill-${qId}" class="progress-fill" style="width: 0%; transition: width 0.5s ease;"></div>
+            </div>
+            <p id="explainProgressMessage-${qId}" style="font-size: var(--font-size-xs); color: var(--color-gray); margin: 0;">Analyzing question context...</p>
+        </div>
+    `;
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 90) progress = 90;
+        const pFill = document.getElementById(`explainProgressFill-${qId}`);
+        const pPercent = document.getElementById(`explainProgressPercent-${qId}`);
+        const pMsg = document.getElementById(`explainProgressMessage-${qId}`);
+        if (pFill) pFill.style.width = `${Math.round(progress)}%`;
+        if (pPercent) pPercent.innerText = `${Math.round(progress)}%`;
+        if (pMsg && progress > 50) pMsg.innerText = "Synthesizing AI response...";
+    }, 800);
+
     try {
         const payload = {
             scope: explainSettings.scope,
@@ -1223,7 +1251,9 @@ async function explainQuestion(qId, forceRegenerate = false) {
     } catch (error) {
         console.error('Error:', error);
         alert('Could not generate explanation: ' + error.message);
+        closeExplanation(qId);
     } finally {
+        clearInterval(progressInterval);
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = '<i class="ph ph-sparkle"></i> Re-explain';
@@ -1262,10 +1292,10 @@ function renderExplanationBox(q, box) {
         <div class="q-explanation-content">${formatQuizText(q.explanation)}</div>
         <div class="q-explanation-footer">
             <div class="ai-meta-badges">
-                <span class="ai-mode-badge" onclick="showExplainOptions(${q.id})" title="AI Mode used">
+                <span class="ai-mode-badge" onclick="showExplainOptions(${q.id})" title="AI Mode used" style="text-transform: capitalize;">
                     <i class="${modeIcon}"></i> ${q.explanation_mode}
                 </span>
-                <span class="ai-mode-badge" onclick="showExplainOptions(${q.id})" title="Response style">
+                <span class="ai-mode-badge" onclick="showExplainOptions(${q.id})" title="Response style" style="text-transform: capitalize;">
                     <i class="${formatIcon}"></i> ${q.explanation_output.replace('_', ' ')}
                 </span>
             </div>
