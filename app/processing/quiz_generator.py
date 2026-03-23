@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import List, Dict, Any
+import os
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from app.models.db import User, Quiz, QuizQuestion, Subject, Lecture, SubjectGroup
 from app.processing.ai_client import AIClient
@@ -223,3 +224,110 @@ Do not wrap it in markdown block. Just the JSON object.
     except json.JSONDecodeError:
         logger.error(f"Failed to parse semantic check JSON: {response}")
         return {"is_correct": False, "feedback": "Could not determine correctness due to AI parsing error. Please compare your answer manually."}
+
+def extract_text_from_upload(file_path: str) -> str:
+    """Extract text from various file formats for quiz import."""
+    ext = os.path.splitext(file_path)[1].lower()
+    
+    if ext == ".txt":
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            return f.read()
+            
+    if ext in (".pdf", ".pptx"):
+        from app.processing.smart_pipeline import SmartPipeline
+        pipeline = SmartPipeline()
+        return pipeline.process(file_path)
+        
+    if ext == ".docx":
+        from docx import Document
+        doc = Document(file_path)
+        return "\n".join([p.text for p in doc.paragraphs])
+        
+    raise ValueError(f"Unsupported file format for extraction: {ext}")
+
+async def import_quiz_from_content(
+    db: Session,
+    user: User,
+    ai_client: AIClient,
+    title: str,
+    text: str,
+    quiz_group_id: Optional[str] = None,
+    generate_missing_answers: bool = True
+) -> Quiz:
+    """Parse questions from raw text and create a quiz."""
+    
+    # Truncate if too long (25k chars is usually enough for a quiz)
+    if len(text) > 25000:
+        text = text[:25000] + "... [truncated]"
+
+    system_instruction = "You are an expert educational content extractor."
+    
+    prompt = f"""Extract and structure all quiz questions from the following text. 
+
+Text to process:
+---
+{text}
+---
+
+Rules:
+1. Identify all questions and their corresponding answers (if present).
+2. If 'generate_missing_answers' is true, generate accurate answers for any questions that are missing them based on the context.
+3. Remove irrelevant fragments like page numbers, headers, or footers.
+4. Format the output as a strict JSON array of objects. Do not use markdown blocks.
+5. Each object must have:
+   - "question_text": The question.
+   - "answer_text": The answer.
+   - "question_type": One of "objective", "subjective", "fill_in_the_blank".
+   - "options": For "objective", a list of 4 options (including the correct one). null for others.
+
+Generate_missing_answers: {generate_missing_answers}
+
+Respond with ONLY the JSON array.
+"""
+
+    import time
+    start_time = time.time()
+    response = await ai_client.generate_text(prompt, max_tokens=3500)
+    processing_time_ms = int((time.time() - start_time) * 1000)
+    
+    try:
+        clean_response = response.strip()
+        if clean_response.startswith("```json"):
+            clean_response = clean_response[7:-3].strip()
+        elif clean_response.startswith("```"):
+            clean_response = clean_response[3:-3].strip()
+            
+        questions_data = json.loads(clean_response)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse imported quiz JSON: {response}")
+        raise ValueError("AI failed to structure the imported content properly. Please check your input.") from e
+
+    # Create the Quiz
+    quiz = Quiz(
+        id=generate_random_id(db, Quiz),
+        user_id=user.id,
+        title=title,
+        scope_type="import",
+        quiz_group_id=quiz_group_id,
+        model=ai_client.ai_model_name or ai_client.provider,
+        processing_time_ms=processing_time_ms
+    )
+    db.add(quiz)
+    db.flush()
+    
+    # Create the Questions
+    for idx, q_data in enumerate(questions_data):
+        q = QuizQuestion(
+            quiz_id=quiz.id,
+            question_text=q_data.get("question_text", ""),
+            answer_text=str(q_data.get("answer_text", "")),
+            question_type=q_data.get("question_type", "subjective"),
+            options=json.dumps(q_data.get("options")) if q_data.get("options") else None,
+            order=idx
+        )
+        db.add(q)
+        
+    db.commit()
+    db.refresh(quiz)
+    
+    return quiz

@@ -85,92 +85,131 @@
                 <button class="btn-icon" onclick="closeModal('createQuizModal')"><i class="ph ph-x"></i></button>
             </div>
 
-            <div class="options-group margin-bottom-lg">
-                <label class="options-label">AI Generation or Import</label>
-                <div class="mode-pill-bar">
-                    <button class="mode-pill active" id="btnMethodAi" onclick="setMethod('ai')">
-                        <i class="ph ph-magic-wand"></i> AI Generate
-                    </button>
-                    <button class="mode-pill" id="btnMethodManual" onclick="setMethod('manual')">
-                        <i class="ph ph-keyboard"></i> Manual Setup
-                    </button>
-                    <input type="hidden" id="creationMethodInput" value="ai">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>Quiz Title</label>
-                <input type="text" id="quizTitle" placeholder="e.g. Final Exam Practice" class="form-control">
-                <small style="color: var(--color-gray); font-size: 11px;">Leave blank to auto-generate based on selection</small>
-            </div>
-
-            <div class="form-group">
-                <label>Assign to Group (Optional)</label>
-                <select id="assignToGroupSelect" class="form-control">
-                    <option value="">None (Ungrouped)</option>
-                </select>
-            </div>
-
-            <!-- AI Section -->
-            <div id="aiSection">
-                <div class="selection-steps">
-                    <div class="step-item">
-                        <label class="step-label">1. Select Group</label>
-                        <select id="groupSelect" class="options-select" onchange="onGroupChange()">
-                            <option value="">Loading groups...</option>
-                        </select>
-                    </div>
-
-                    <div class="step-item">
-                        <label class="step-label">2. Select Subject (Optional)</label>
-                        <select id="subjectSelect" class="options-select" onchange="onSubjectChange()">
-                            <option value="all">All Subjects in Group</option>
-                        </select>
-                    </div>
-
-                    <div class="step-item">
-                        <label class="step-label">3. Select Note (Optional)</label>
-                        <select id="lectureSelect" class="options-select">
-                            <option value="all">All Notes in Subject</option>
-                        </select>
+            <div class="modal-body">
+                <div class="options-group margin-bottom-lg">
+                    <label class="options-label">AI Generation or Import</label>
+                    <div class="mode-pill-bar">
+                        <button class="mode-pill active" id="btnMethodAi" onclick="setMethod('ai')">
+                            <i class="ph ph-magic-wand"></i> AI Generate
+                        </button>
+                        <button class="mode-pill" id="btnMethodImport" onclick="setMethod('import')">
+                            <i class="ph ph-file-arrow-up"></i> Import Content
+                        </button>
+                        <input type="hidden" id="creationMethodInput" value="ai">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>Question Types</label>
-                    <div class="q-type-grid">
-                        <label class="q-type-option">
-                            <input type="checkbox" name="qType" value="objective" checked>
-                            <span>Multiple Choice</span>
-                        </label>
-                        <label class="q-type-option">
-                            <input type="checkbox" name="qType" value="subjective" checked>
-                            <span>Short Answer</span>
-                        </label>
-                        <label class="q-type-option">
-                            <input type="checkbox" name="qType" value="fill_in_the_blank">
-                            <span>Fill in the Blank</span>
-                        </label>
-                    </div>
+                    <label>Quiz Title</label>
+                    <input type="text" id="quizTitle" placeholder="e.g. Final Exam Practice" class="form-control">
+                    <small style="color: var(--color-gray); font-size: 11px;">Leave blank to auto-generate based on selection</small>
                 </div>
 
-                <div class="form-group margin-top-lg">
-                    <label class="margin-bottom-sm">Number of Questions</label>
-                    <div class="flex-align-center gap-md">
-                        <input type="number" id="numQuestions" value="5" min="1" max="500"">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Manual Section -->
-            <div id="manualSection" style="display: none;">
                 <div class="form-group">
-                    <label>Import Data (JSON or Raw Text)</label>
-                    <textarea id="manualImport" rows="8" placeholder="Paste your questions here or leave empty to start from scratch..." class="form-control"></textarea>
+                    <label>Assign to Group (Optional)</label>
+                    <select id="assignToGroupSelect" class="form-control">
+                        <option value="">None (Ungrouped)</option>
+                    </select>
+                </div>
+
+                <!-- AI Section -->
+                <div id="aiSection">
+                    <div class="selection-steps">
+                        <div class="step-item">
+                            <label class="step-label">1. Select Group</label>
+                            <select id="groupSelect" class="options-select" onchange="onGroupChange()">
+                                <option value="">Loading groups...</option>
+                            </select>
+                        </div>
+
+                        <div class="step-item">
+                            <label class="step-label">2. Select Subject (Optional)</label>
+                            <select id="subjectSelect" class="options-select" onchange="onSubjectChange()">
+                                <option value="all">All Subjects in Group</option>
+                            </select>
+                        </div>
+
+                        <div class="step-item">
+                            <label class="step-label">3. Select Note (Optional)</label>
+                            <select id="lectureSelect" class="options-select">
+                                <option value="all">All Notes in Subject</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Question Types</label>
+                        <div class="q-type-grid">
+                            <label class="q-type-option">
+                                <input type="checkbox" name="qType" value="objective" checked>
+                                <span>Multiple Choice</span>
+                            </label>
+                            <label class="q-type-option">
+                                <input type="checkbox" name="qType" value="subjective" checked>
+                                <span>Short Answer</span>
+                            </label>
+                            <label class="q-type-option">
+                                <input type="checkbox" name="qType" value="fill_in_the_blank">
+                                <span>Fill in the Blank</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group margin-top-lg">
+                        <label class="margin-bottom-sm">Number of Questions</label>
+                        <div class="flex-align-center gap-md">
+                            <input type="number" id="numQuestions" value="5" min="1" max="500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Import Section -->
+                <div id="importSection" style="display: none;">
+                    <div class="options-group margin-bottom-md">
+                        <div class="import-tabs">
+                            <button class="import-tab active" id="tabImportPaste" onclick="setImportTab('paste')">Paste Text</button>
+                            <button class="import-tab" id="tabImportFile" onclick="setImportTab('file')">Upload File</button>
+                        </div>
+                    </div>
+
+                    <div id="importPasteArea">
+                        <div class="form-group">
+                            <label>Paste Questions/Content</label>
+                            <textarea id="importText" rows="10" placeholder="Paste your quiz text, exercises, or document content here..." class="form-control"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="importFileArea" style="display: none;">
+                        <div class="form-group">
+                            <label>Upload Documents</label>
+                            <div class="upload-area" id="importUploadArea" 
+                                 ondrop="handleImportDrop(event)" 
+                                 ondragover="handleImportDragOver(event)" 
+                                 ondragleave="handleImportDragLeave(event)"
+                                 onclick="document.getElementById('importFileInput').click()">
+                                
+                                <div id="importUploadPlaceholder">
+                                    <div class="upload-icon"><i class="ph ph-cloud-arrow-up"></i></div>
+                                    <div style="font-weight: 600;">Drag contents here or</div>
+                                    <button type="button" class="btn btn-primary btn-small margin-top-xs">Browse Files</button>
+                                    <div style="color: var(--color-gray); font-size: 12px; margin-top: 8px;">PDF, PPTX, DOCX, TXT (Max 20MB)</div>
+                                </div>
+                                <div id="importFileDisplay" style="display: none; width: 100%;"></div>
+                                <input type="file" id="importFileInput" style="display: none;" accept=".pdf,.pptx,.docx,.txt" onchange="handleImportFileSelect(event)" multiple>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group margin-top-md">
+                        <label class="q-type-option">
+                            <input type="checkbox" id="importGenerateAnswers" checked>
+                            <span>Automatically identify/generate missing answers</span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
-            <div class="modal-buttons margin-top-xl">
+            <div class="modal-footer">
                 <button class="btn btn-primary btn-block" id="modalCreateBtn" onclick="submitCreateQuiz()" style="padding: 12px;">Create Quiz</button>
                 <button class="btn btn-secondary btn-block" onclick="closeModal('createQuizModal')" style="padding: 12px;">Cancel</button>
             </div>

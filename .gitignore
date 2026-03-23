@@ -79,3 +79,4 @@ output/*
 ProcessingAlgorithmTest/output/OUTPUT_smart.md
 .github/copilot-instructions.md
 generated/*
+test/*

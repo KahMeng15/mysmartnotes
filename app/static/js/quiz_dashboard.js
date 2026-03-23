@@ -436,9 +436,91 @@ function closeModal(id) {
 function setMethod(method) {
     document.getElementById('creationMethodInput').value = method;
     document.getElementById('btnMethodAi').classList.toggle('active', method === 'ai');
-    document.getElementById('btnMethodManual').classList.toggle('active', method === 'manual');
+    document.getElementById('btnMethodImport').classList.toggle('active', method === 'import');
+    
     document.getElementById('aiSection').style.display = method === 'ai' ? 'block' : 'none';
-    document.getElementById('manualSection').style.display = method === 'ai' ? 'none' : 'block';
+    document.getElementById('importSection').style.display = method === 'import' ? 'block' : 'none';
+}
+
+function setImportTab(tab) {
+    document.getElementById('tabImportPaste').classList.toggle('active', tab === 'paste');
+    document.getElementById('tabImportFile').classList.toggle('active', tab === 'file');
+    document.getElementById('importPasteArea').style.display = tab === 'paste' ? 'block' : 'none';
+    document.getElementById('importFileArea').style.display = tab === 'file' ? 'block' : 'none';
+}
+
+let importSelectedFiles = [];
+
+function handleImportDragOver(e) {
+    e.preventDefault();
+    document.getElementById('importUploadArea').classList.add('drag-over');
+}
+
+function handleImportDragLeave(e) {
+    e.preventDefault();
+    document.getElementById('importUploadArea').classList.remove('drag-over');
+}
+
+function handleImportDrop(e) {
+    e.preventDefault();
+    document.getElementById('importUploadArea').classList.remove('drag-over');
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+        Array.from(files).forEach(f => importSelectedFiles.push(f));
+        displayImportFiles();
+    }
+}
+
+function handleImportFileSelect(e) {
+    const files = e.target.files;
+    if (files.length > 0) {
+        Array.from(files).forEach(f => importSelectedFiles.push(f));
+        displayImportFiles();
+    }
+}
+
+function displayImportFiles() {
+    const placeholder = document.getElementById('importUploadPlaceholder');
+    const display = document.getElementById('importFileDisplay');
+    
+    if (importSelectedFiles.length === 0) {
+        placeholder.style.display = 'block';
+        display.style.display = 'none';
+        return;
+    }
+
+    placeholder.style.display = 'none';
+    display.style.display = 'flex';
+    display.style.flexDirection = 'column';
+    display.style.gap = '8px';
+    
+    display.innerHTML = importSelectedFiles.map((file, index) => `
+        <div class="file-item">
+            <div class="flex-align-center gap-sm">
+                <i class="ph ph-file-text" style="font-size: 24px; color: var(--color-primary);"></i>
+                <div style="text-align: left;">
+                    <div style="font-weight: 600; font-size: 14px;">${file.name}</div>
+                    <div style="font-size: 11px; color: var(--color-gray);">${(file.size / 1024).toFixed(1)} KB</div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-outline btn-small" onclick="event.stopPropagation(); removeImportFile(${index})">Remove</button>
+        </div>
+    `).join('') + `
+        <div class="margin-top-sm" style="text-align: right;">
+            <button type="button" class="btn btn-outline btn-small" onclick="event.stopPropagation(); document.getElementById('importFileInput').click()">+ Add More Files</button>
+        </div>
+    `;
+}
+
+function removeImportFile(index) {
+    importSelectedFiles.splice(index, 1);
+    displayImportFiles();
+}
+
+function clearImportFile() {
+    importSelectedFiles = [];
+    document.getElementById('importFileInput').value = '';
+    displayImportFiles();
 }
 
 async function loadSelectionData() {
@@ -615,6 +697,43 @@ async function submitCreateQuiz() {
                 clearInterval(progressInterval);
             }
             
+        } else if (method === 'import') {
+            const importTab = document.getElementById('tabImportPaste').classList.contains('active') ? 'paste' : 'file';
+            const generateAnswers = document.getElementById('importGenerateAnswers').checked;
+            
+            if (!title) title = 'Imported Quiz';
+            
+            // Show Progress Modal
+            closeModal('createQuizModal');
+            const progressModal = document.getElementById('quizProgressModal');
+            if (progressModal) {
+                progressModal.classList.add('active');
+                updateQuizProgress(10, 'Preparing import...', 'Working...');
+            }
+
+            const formData = new FormData();
+            formData.append('title', title);
+            formData.append('quiz_group_id', quizGroupId || '');
+            formData.append('generate_answers', generateAnswers);
+
+            if (importTab === 'paste') {
+                const text = document.getElementById('importText').value.trim();
+                if (!text) throw new Error('Please paste some content first');
+                formData.append('text', text);
+                updateQuizProgress(30, 'Parsing pasted content...', 'Processing');
+            } else {
+                if (importSelectedFiles.length === 0) throw new Error('Please select at least one file to import');
+                importSelectedFiles.forEach(f => formData.append('file', f));
+                updateQuizProgress(30, `Reading ${importSelectedFiles.length} files...`, 'Processing');
+            }
+
+            response = await fetch('/quizzes/import', {
+                method: 'POST',
+                body: formData
+            });
+            
+            updateQuizProgress(60, 'AI is structuring and validating questions...', 'AI Processing');
+
         } else {
             // Manual creation
             if (!title) title = 'Manual Quiz';
@@ -666,7 +785,7 @@ async function submitCreateQuiz() {
             throw new Error('Failed to parse server response: ' + e.message);
         }
         
-        if (method === 'ai') {
+        if (method === 'ai' || method === 'import') {
             updateQuizProgress(100, 'Quiz generated successfully!', 'Complete');
             setTimeout(() => {
                 closeModal('quizProgressModal');

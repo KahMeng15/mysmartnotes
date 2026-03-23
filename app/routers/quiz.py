@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import List, Optional
@@ -20,7 +20,10 @@ from app.schemas.quiz import (
     QuizGroupCreate, QuizGroupResponse
 )
 from app.processing.ai_client import AIClient, get_ai_client
-from app.processing.quiz_generator import generate_advanced_quiz, check_semantic_answer, generate_single_question
+from app.processing.quiz_generator import (
+    generate_advanced_quiz, check_semantic_answer, generate_single_question,
+    import_quiz_from_content, extract_text_from_upload
+)
 from app.processing.text_processor import ContentSegment, ContentType
 
 router = APIRouter(
@@ -233,6 +236,66 @@ async def generate_quiz_ai(
         return quiz
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/import", response_model=QuizResponse)
+async def import_quiz_endpoint(
+    title: str = Form(...),
+    text: Optional[str] = Form(None),
+    file: List[UploadFile] = File(None),
+    quiz_group_id: Optional[str] = Form(None),
+    generate_answers: bool = Form(True),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Import a quiz from pasted text or multiple files."""
+    ai_client = get_ai_client(user=current_user, db=db)
+    
+    import_text = text or ""
+    
+    if file:
+        temp_dir = "uploads/temp"
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        extracted_texts = []
+        for upload_file in file:
+            file_path = os.path.join(temp_dir, f"{uuid.uuid4()}_{upload_file.filename}")
+            
+            with open(file_path, "wb") as buffer:
+                content = await upload_file.read()
+                buffer.write(content)
+                
+            try:
+                # Extract text from file
+                text_content = extract_text_from_upload(file_path)
+                if text_content:
+                    extracted_texts.append(f"--- Content from {upload_file.filename} ---\n{text_content}")
+            finally:
+                # Clean up temp file
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+        
+        if extracted_texts:
+            import_text = (import_text + "\n\n" + "\n\n".join(extracted_texts)).strip()
+                
+    if not import_text:
+        raise HTTPException(status_code=400, detail="No text content provided for import.")
+        
+    try:
+        quiz = await import_quiz_from_content(
+            db=db,
+            user=current_user,
+            ai_client=ai_client,
+            title=title,
+            text=import_text,
+            quiz_group_id=quiz_group_id,
+            generate_missing_answers=generate_answers
+        )
+        return quiz
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error importing quiz: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An error occurred during quiz import.")
 
 @router.post("/{quiz_id}/generate_single", response_model=QuizQuestionResponse)
 async def generate_single_question_endpoint(
