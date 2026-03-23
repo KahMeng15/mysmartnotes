@@ -3,8 +3,8 @@ let lectureId = null;
 let token = localStorage.getItem('token');
 let summaryData = null;
 let quickreadData = null;
-let currentSummaryMode = 'elaborate';
-let currentSummaryFormat = 'sentence';
+let currentSummaryMode = localStorage.getItem('globalAiMode') || 'normal';
+let currentSummaryFormat = localStorage.getItem('globalOutputFormat') || 'sentence';
 let isRegeneratingSummary = false;
 let currentProcessingMethod = 'whole';
 let currentVersionId = null;
@@ -559,6 +559,7 @@ function setSummaryMode(mode) {
     document.querySelectorAll('#summaryModeBar .mode-pill').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.mode === mode);
     });
+    localStorage.setItem('globalAiMode', mode);
 }
 
 function setSummaryFormat(format) {
@@ -566,6 +567,7 @@ function setSummaryFormat(format) {
     document.querySelectorAll('#summaryOutputBar .mode-pill').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.format === format);
     });
+    localStorage.setItem('globalOutputFormat', format);
 }
 
 function onSummaryMethodChange() {

@@ -243,6 +243,10 @@
                         <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">
                             Select Mode</div>
                         <div class="ai-mode-bar" style="flex-direction: row; gap: 6px;">
+                            <button class="mode-pill active" data-mode="normal"
+                                onclick="setNoteChatMode('normal')" title="A balanced response with standard detail">
+                                <i class="ph ph-stack"></i> Normal
+                            </button>
                             <button class="mode-pill" data-mode="quick" onclick="setNoteChatMode('quick')"
                                 title="Use less processing to get answer">
                                 <i class="ph ph-lightning"></i> Quick
@@ -250,10 +254,6 @@
                             <button class="mode-pill" data-mode="simple" onclick="setNoteChatMode('simple')"
                                 title="Answer in simple terms">
                                 <i class="ph ph-text-a-underline"></i> Simple
-                            </button>
-                            <button class="mode-pill active" data-mode="normal"
-                                onclick="setNoteChatMode('normal')" title="A balanced response with standard detail">
-                                <i class="ph ph-stack"></i> Normal
                             </button>
                             <button class="mode-pill" data-mode="elaborate"
                                 onclick="setNoteChatMode('elaborate')" title="Provide thorough explanation">

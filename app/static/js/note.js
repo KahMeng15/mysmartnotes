@@ -8,8 +8,8 @@ let isEditing = false;
 // ===== INLINE CHAT STATE =====
 let chatMessages = [];
 let chatConversationId = null;
-let chatAiMode = localStorage.getItem('noteChatAiMode') || 'elaborate';
-let chatOutputFormat = localStorage.getItem('noteChatOutputFormat') || 'sentence';
+let chatAiMode = localStorage.getItem('globalAiMode') || 'normal';
+let chatOutputFormat = localStorage.getItem('globalOutputFormat') || 'sentence';
 window.replyingToMessageId = null;
 window.replyingToMessageContent = null;
 
@@ -1684,7 +1684,7 @@ function initInlineChat() {
 
 function setNoteChatMode(mode) {
     chatAiMode = mode;
-    localStorage.setItem('noteChatAiMode', mode);
+    localStorage.setItem('globalAiMode', mode);
     updateNoteChatModeButtons();
     updateNoteChatCompactDisplay();
     // Close expanded view after selection
@@ -1696,7 +1696,7 @@ function setNoteChatMode(mode) {
 
 function setNoteChatOutputFormat(format) {
     chatOutputFormat = format;
-    localStorage.setItem('noteChatOutputFormat', format);
+    localStorage.setItem('globalOutputFormat', format);
     updateNoteChatOutputButtons();
     updateNoteChatCompactDisplay();
     // Close expanded view after selection

@@ -14,8 +14,8 @@ let allSubjects = [];
 let allLectures = [];
 
 let currentScope = { type: null, id: null, title: 'Select a scope to start' };
-let currentAiMode = localStorage.getItem('chatAiMode') || 'elaborate';
-let currentOutputFormat = localStorage.getItem('chatOutputFormat') || 'sentence';
+let currentAiMode = localStorage.getItem('globalAiMode') || 'normal';
+let currentOutputFormat = localStorage.getItem('globalOutputFormat') || 'sentence';
 
 // Modal state
 let tempGroupId = null;
@@ -103,7 +103,7 @@ function setAiMode(mode) {
     document.querySelectorAll('.ai-mode-bar .mode-pill').forEach(p => {
         p.classList.toggle('active', p.dataset.mode === mode);
     });
-    localStorage.setItem('chatAiMode', mode);
+    localStorage.setItem('globalAiMode', mode);
 }
 
 function setOutputFormat(format) {
@@ -111,7 +111,7 @@ function setOutputFormat(format) {
     document.querySelectorAll('.output-format-bar .mode-pill').forEach(p => {
         p.classList.toggle('active', p.dataset.format === format);
     });
-    localStorage.setItem('chatOutputFormat', format);
+    localStorage.setItem('globalOutputFormat', format);
 }
 
 // Apply saved mode and output format on load
