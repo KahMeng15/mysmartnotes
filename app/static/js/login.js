@@ -4,12 +4,29 @@ window.addEventListener('load', async () => {
         const res = await fetch('/auth/public-settings');
         if (res.ok) {
             const settings = await res.json();
+            
+            // Update signup link based on signup config
+            updateSignupLink(settings.signup_config);
+            
             if (settings.unnecessary_logins_enabled) {
                 initUnnecessaryLogins();
             }
         }
     } catch (e) { console.error('Error loading public settings', e); }
 });
+
+function updateSignupLink(signupConfig) {
+    const signupLink = document.getElementById('signupLink');
+    if (!signupLink) return;
+    
+    if (signupConfig === 'invite') {
+        signupLink.innerHTML = 'Signup is disabled. Contact the system administrator to create an account and gain access';
+        signupLink.style.cursor = 'default';
+    } else {
+        signupLink.innerHTML = 'Don\'t have an account? <a onclick="switchPanel(\'register\')">Sign up</a>';
+    }
+}
+
 
 const UNNECESSARY_SERVICES = [
     { name: 'Microsoft', icon: 'https://cdn-icons-png.flaticon.com/512/732/732221.png' },
