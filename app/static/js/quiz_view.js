@@ -571,6 +571,71 @@ function renderFlashcardMode(container) {
     
     fcContainer.appendChild(card);
     container.appendChild(fcContainer);
+
+    // Adjust font size to ensure content fits without scrolling
+    // Use requestAnimationFrame to ensure the card is rendered and dimensions are available
+    requestAnimationFrame(() => {
+        adjustFlashcardFontSize(card);
+    });
+}
+
+/**
+ * Dynamically shrinks font size of flashcard content if it overflows the card area.
+ * @param {HTMLElement} cardElement The .flashcard element
+ */
+function adjustFlashcardFontSize(cardElement) {
+    const faces = cardElement.querySelectorAll('.flashcard-face');
+    faces.forEach(face => {
+        const content = face.querySelector('.fc-content');
+        if (!content) return;
+
+        // Detect if content contains a list and apply left-alignment if so
+        const hasList = content.querySelector('ul, ol') !== null;
+        face.classList.toggle('has-list', hasList);
+
+        // Reset to base font size defined in CSS
+        const isQuestion = face.classList.contains('flashcard-question');
+        let fontSize = isQuestion ? 1.6 : 1.5; // rem
+        content.style.fontSize = fontSize + 'rem';
+
+        const label = face.querySelector('.flashcard-label');
+        const instruction = face.querySelector('.flashcard-instruction');
+        
+        // Gradually shrink font size until everything fits within the card height
+        let iterations = 0;
+        const minFontSize = 0.5; // rem
+
+        // Function to calculate if total layout fits precisely in face (handles vertical centering)
+        const checkFits = () => {
+            const faceRect = face.getBoundingClientRect();
+            const labelRect = label ? label.getBoundingClientRect() : null;
+            const instrRect = instruction ? instruction.getBoundingClientRect() : null;
+            
+            // 1. Check if the top label is being pushed off the top (occurs during vertical centering overflow)
+            if (labelRect && labelRect.top < faceRect.top + 12) {
+                return false;
+            }
+
+            // 2. Check if the instruction (footer) is being pushed out of the bottom
+            if (instrRect && instrRect.bottom > faceRect.bottom - 12) {
+                return false;
+            }
+            
+            // 3. Double check if the content itself is overflowing its own container
+            if (content.scrollHeight > content.clientHeight + 2) {
+                return false;
+            }
+            
+            return true;
+        };
+        
+        // Reset scale loop
+        while (!checkFits() && fontSize > minFontSize && iterations < 35) {
+            fontSize -= 0.04;
+            content.style.fontSize = fontSize.toFixed(2) + 'rem';
+            iterations++;
+        }
+    });
 }
 
 function toggleFlashcardReveal(forceState = null) {

@@ -381,24 +381,25 @@
 /* Flashcard Styles */
 .flashcard-container {
     margin: var(--spacing-xl) auto;
-    max-width: 640px;
+    max-width: 800px;
     width: 100%;
 }
 
 .flashcard {
     width: 100%;
-    min-height: 320px;
-    padding: var(--spacing-2xl);
+    height: 480px !important; /* Strictly enforce height for scaling logic */
+    padding: var(--spacing-xl) !important;
     border: 2px solid var(--color-border);
     border-radius: var(--radius-xl);
     background: var(--color-white);
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.06);
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: center; /* Restored for vertical centering */
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
+    overflow: hidden; /* Ensure content is visually clipped if JS fails or loading */
 }
 
 .flashcard:hover {
@@ -417,10 +418,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: var(--spacing-md);
+    justify-content: center; /* Restored for vertical centering */
+    gap: var(--spacing-sm);
     text-align: center;
-    padding: var(--spacing-2xl);
+    padding: var(--spacing-xl);
     opacity: 1;
     transition: opacity 0.4s ease-in-out;
 }
@@ -459,17 +460,17 @@
 }
 
 .fc-question-text {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
     font-weight: 600;
-    line-height: 1.5;
+    line-height: 1.4;
     color: var(--color-dark);
 }
 
 .fc-answer-text {
-    font-size: 1.3rem;
+    font-size: 1.5rem;
     font-weight: 600;
     color: var(--color-primary);
-    line-height: 1.5;
+    line-height: 1.4;
 }
 
 .flashcard-instruction {
@@ -478,6 +479,27 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
+
+.flashcard-face.has-list {
+    text-align: left;
+    align-items: flex-start;
+    justify-content: center; /* Still center vertically, even if left-aligned horizontally */
+}
+
+.flashcard-face.has-list .fc-content {
+    text-align: left;
+}
+
+.flashcard-face.has-list .flashcard-label {
+    align-self: center; /* Keep the badge centered */
+    margin-bottom: var(--spacing-sm);
+}
+
+.flashcard-face.has-list .flashcard-instruction {
+    align-self: center; /* Keep instruction centered */
+    margin-top: auto;
+}
+
 
 .flashcard-instruction kbd {
     display: inline-block;
@@ -500,8 +522,9 @@
 
 .fc-content {
     word-break: break-word;
-    overflow-y: auto;
     max-height: 100%;
+    width: 100%;
+    overflow: hidden; /* Required for scrollHeight > clientHeight detection */
 }
 
 /* Exam Mode Styles */
