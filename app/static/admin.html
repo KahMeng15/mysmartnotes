@@ -31,21 +31,28 @@
 </head>
 
 <body>
-    <!-- Content -->
-    <div class="page-card" style="max-width: 1200px; margin: 0 auto; padding: 20px;">
-        <h1 style="margin-bottom: var(--spacing-md);"><i class="ph ph-shield-star"></i> Admin Dashboard</h1>
-        
-        <div style="margin-bottom: 20px; border-bottom: 1px solid var(--color-light-gray); padding-bottom: 10px;">
-            <button class="tab-btn active" onclick="switchTab('tab-users')">Users</button>
-            <button class="tab-btn" onclick="switchTab('tab-invitations')">Invitations</button>
-            <button class="tab-btn" onclick="switchTab('tab-tiers')">Tiers</button>
-            <button class="tab-btn" onclick="switchTab('tab-settings')">System Settings</button>
-            <button class="tab-btn" onclick="switchTab('tab-rate-limits')">Rate Limits</button>
-            <button class="tab-btn" onclick="switchTab('tab-email')">Email Config</button>
-            <button class="tab-btn" onclick="switchTab('tab-ip')">IP Filters</button>
-            <button class="tab-btn" onclick="switchTab('tab-logs')">System Logs</button>
-            <button class="tab-btn" onclick="switchTab('tab-database')">Database</button>
+    <div class="page-card">
+        <!-- Sticky Header Section -->
+        <div class="page-card-header">
+            <div class="page-header-row" style="margin: 0;">
+                <h1><i class="ph ph-shield-star"></i> Admin Dashboard</h1>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls-bar" style="padding: 0; margin-top: var(--spacing-md);">
+                <button class="tab-btn active" onclick="switchTab('tab-users')">Users</button>
+                <button class="tab-btn" onclick="switchTab('tab-invitations')">Invitations</button>
+                <button class="tab-btn" onclick="switchTab('tab-tiers')">Tiers</button>
+                <button class="tab-btn" onclick="switchTab('tab-settings')">System Settings</button>
+                <button class="tab-btn" onclick="switchTab('tab-rate-limits')">Rate Limits</button>
+                <button class="tab-btn" onclick="switchTab('tab-email')">Email Config</button>
+                <button class="tab-btn" onclick="switchTab('tab-ip')">IP Filters</button>
+                <button class="tab-btn" onclick="switchTab('tab-logs')">System Logs</button>
+                <button class="tab-btn" onclick="switchTab('tab-database')">Database</button>
+            </div>
         </div>
+
+        <div class="page-card-content" style="padding-top: var(--spacing-md);">
 
         <!-- USERS TAB -->
         <div id="tab-users" class="admin-section active">
@@ -530,6 +537,7 @@
             </div>
         </div>
 
+        </div>
     </div>
 </body>
 </html>
