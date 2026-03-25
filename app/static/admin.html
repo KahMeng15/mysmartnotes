@@ -19,6 +19,10 @@
         .admin-section { display: none; }
         .admin-section.active { display: block; }
         .action-btn { padding: 4px 8px; font-size: 12px; margin-right: 4px; cursor: pointer; }
+        .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge.free { background-color: #dbeafe; color: #1e40af; }
+        .badge.pro { background-color: #fecaca; color: #991b1b; }
+        .badge.unlimited { background-color: #c4b5fd; color: #5b21b6; }
     </style>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
@@ -34,6 +38,7 @@
         <div style="margin-bottom: 20px; border-bottom: 1px solid var(--color-light-gray); padding-bottom: 10px;">
             <button class="tab-btn active" onclick="switchTab('tab-users')">Users</button>
             <button class="tab-btn" onclick="switchTab('tab-invitations')">Invitations</button>
+            <button class="tab-btn" onclick="switchTab('tab-tiers')">Tiers</button>
             <button class="tab-btn" onclick="switchTab('tab-settings')">System Settings</button>
             <button class="tab-btn" onclick="switchTab('tab-rate-limits')">Rate Limits</button>
             <button class="tab-btn" onclick="switchTab('tab-email')">Email Config</button>
@@ -101,6 +106,7 @@
                     <div class="form-group" style="margin-bottom:20px;">
                         <label>User Tier</label>
                         <select id="inviteTier" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="unlimited">Unlimited</option>
                             <option value="free">Free</option>
                             <option value="pro">Pro</option>
                         </select>
@@ -108,6 +114,167 @@
                     <div style="display:flex; gap:10px;">
                         <button type="submit" class="btn btn-primary" style="flex:1;">Send Invitation</button>
                         <button type="button" class="btn btn-outline" onclick="closeInviteModal()" style="flex:1;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal for Changing User Tier -->
+        <div id="changeTierModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:12px; width:400px; position:relative;">
+                <h3>Change User Tier</h3>
+                <form onsubmit="submitTierChange(event)">
+                    <div class="form-group" style="margin-bottom:15px;">
+                        <label>User Email</label>
+                        <input type="text" id="changeTierUserEmail" disabled style="width:100%; padding:8px; margin-top:5px; background:#f0f0f0;">
+                    </div>
+                    <div class="form-group" style="margin-bottom:20px;">
+                        <label>New Tier</label>
+                        <select id="changeTierSelect" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">-- Select Tier --</option>
+                            <option value="unlimited">Unlimited</option>
+                            <option value="free">Free</option>
+                            <option value="pro">Pro</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button type="submit" class="btn btn-primary" style="flex:1;">Change Tier</button>
+                        <button type="button" class="btn btn-outline" onclick="closeTierModal()" style="flex:1;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- TIERS TAB -->
+        <div id="tab-tiers" class="admin-section">
+            <h3>Tier Configuration</h3>
+            <p style="color: var(--color-gray); margin-bottom: 20px;">Manage storage limits and quota for each subscription tier. Use -1 for unlimited.</p>
+            
+            <!-- Unlimited Tier Card -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
+                <h4 style="margin-top: 0; color: white;">Unlimited Tier</h4>
+                <p style="font-size: 13px; margin: 10px 0;">This app is an early closed release, so for now the storage is unlimited. May change in the future.</p>
+                <form id="tierFormUnlimited" onsubmit="saveTierConfig(event, 'unlimited')" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Notes</label>
+                        <input type="number" id="tierMaxNotesUnlimited" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Subjects</label>
+                        <input type="number" id="tierMaxSubjectsUnlimited" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Groups</label>
+                        <input type="number" id="tierMaxGroupsUnlimited" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Conversations</label>
+                        <input type="number" id="tierMaxConversationsUnlimited" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Messages</label>
+                        <input type="number" id="tierMaxMessagesUnlimited" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Storage (GB)</label>
+                        <input type="number" id="tierMaxStorageUnlimited" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Quizzes</label>
+                        <input type="number" id="tierMaxQuizzesUnlimited" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Summaries</label>
+                        <input type="number" id="tierMaxSummariesUnlimited" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div style="grid-column: 1/-1; margin-top: 10px;">
+                        <button type="submit" class="btn btn-primary" style="background: white; color: #667eea;">Save Unlimited Tier</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Free Tier Card -->
+            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
+                <h4 style="margin-top: 0; color: white;">Free Tier</h4>
+                <p style="font-size: 13px; margin: 10px 0;">Base plan with essential features - 5GB Storage</p>
+                <form id="tierFormFree" onsubmit="saveTierConfig(event, 'free')" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Notes</label>
+                        <input type="number" id="tierMaxNotesFree" value="50" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Subjects</label>
+                        <input type="number" id="tierMaxSubjectsFree" value="10" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Groups</label>
+                        <input type="number" id="tierMaxGroupsFree" value="5" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Conversations</label>
+                        <input type="number" id="tierMaxConversationsFree" value="100" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Messages</label>
+                        <input type="number" id="tierMaxMessagesFree" value="500" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Storage (GB)</label>
+                        <input type="number" id="tierMaxStorageFree" value="5" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Quizzes</label>
+                        <input type="number" id="tierMaxQuizzesFree" value="20" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Summaries</label>
+                        <input type="number" id="tierMaxSummariesFree" value="50" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div style="grid-column: 1/-1; margin-top: 10px;">
+                        <button type="submit" class="btn btn-primary" style="background: white; color: #f5576c;">Save Free Tier</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Pro Tier Card -->
+            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
+                <h4 style="margin-top: 0; color: white;">Pro Tier</h4>
+                <p style="font-size: 13px; margin: 10px 0;">Premium plan with advanced features - 100GB Storage</p>
+                <form id="tierFormPro" onsubmit="saveTierConfig(event, 'pro')" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Notes</label>
+                        <input type="number" id="tierMaxNotesPro" value="500" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Subjects</label>
+                        <input type="number" id="tierMaxSubjectsPro" value="100" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Groups</label>
+                        <input type="number" id="tierMaxGroupsPro" value="50" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Conversations</label>
+                        <input type="number" id="tierMaxConversationsPro" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Messages</label>
+                        <input type="number" id="tierMaxMessagesPro" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Storage (GB)</label>
+                        <input type="number" id="tierMaxStoragePro" value="100" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Quizzes</label>
+                        <input type="number" id="tierMaxQuizzesPro" value="200" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Summaries</label>
+                        <input type="number" id="tierMaxSummariesPro" value="500" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div style="grid-column: 1/-1; margin-top: 10px;">
+                        <button type="submit" class="btn btn-primary" style="background: white; color: #00f2fe;">Save Pro Tier</button>
                     </div>
                 </form>
             </div>

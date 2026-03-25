@@ -105,3 +105,21 @@ class UserActionRequest(BaseModel):
     user_id: int
     action: str  # deactivate, delete, reset_password, tier
     value: Optional[str] = None
+
+
+class TierConfigSchema(BaseModel):
+    id: str  # unlimited, free, pro
+    display_name: str
+    max_notes: int = -1
+    max_subjects: int = -1
+    max_groups: int = -1
+    max_conversations: int = -1
+    max_messages: int = -1
+    max_storage_gb: int = -1
+    max_quizzes: int = -1
+    max_summaries: int = -1
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

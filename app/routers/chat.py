@@ -12,6 +12,7 @@ import uuid
 from app.models.db import User, Lecture, ChatMessage, Subject, SubjectGroup
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
+from app.utils.quotas import enforce_quota_messages, check_quota_conversations, get_user_conversation_count, get_user_tier_config
 from app.processing.ai_client import AIClient
 from app.processing.embeddings import find_relevant_snippets, combine_snippets
 
@@ -521,6 +522,19 @@ async def ask_question(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Must provide lecture_id, subject_id, or group_id"
         )
+
+    # Enforce tier quotas
+    enforce_quota_messages(current_user, db)
+    
+    # Check conversation quota if creating a new conversation
+    if not request.conversation_id and request.auto_detect_conversation:
+        if not check_quota_conversations(current_user, db):
+            tier_config = get_user_tier_config(current_user, db)
+            current = get_user_conversation_count(current_user, db)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Conversation quota exceeded. Your {current_user.tier.upper()} tier allows {tier_config.max_conversations} conversations. You have {current}."
+            )
 
     t_start = time.time()
     step_times = {f"step{i}": 0.0 for i in range(1, 10)}

@@ -23,6 +23,7 @@ function switchTab(tabId) {
     // Load data based on tab
     if (tabId === 'tab-users') loadUsers();
     if (tabId === 'tab-invitations') loadInvitations();
+    if (tabId === 'tab-tiers') loadTiers();
     if (tabId === 'tab-settings') loadSystemSettings();
     if (tabId === 'tab-rate-limits') loadRateLimits();
     if (tabId === 'tab-email') loadEmailConfig();
@@ -144,14 +145,14 @@ async function loadUsers() {
                 <td>${u.conversations_count} / ${u.questions_count}</td>
                 <td>${u.storage_used}</td>
                 <td>${u.total_logins} / ${u.total_online_time}m</td>
-                <td><span class="badge ${u.tier === 'pro' ? 'pro' : 'free'}">${u.tier}</span></td>
+                <td><span class="badge ${u.tier === 'pro' ? 'pro' : u.tier === 'unlimited' ? 'unlimited' : 'free'}">${u.tier}</span></td>
                 <td>
                     ${u.is_active ? '<span style="color:green">Active</span>' : '<span style="color:red">Inactive</span>'}
                     <br>
                     ${u.is_admin ? '<span style="color:purple;font-size:12px">Admin</span>' : ''}
                 </td>
                 <td>
-                    <button class="action-btn" onclick="userAction(${u.id}, 'tier', '${u.tier === "pro" ? "free" : "pro"}')">Toggle Tier</button>
+                    <button class="action-btn" onclick="openTierModal(${u.id}, '${u.email}', '${u.tier}')">Change Tier</button>
                     ${u.is_active 
                         ? `<button class="action-btn" onclick="userAction(${u.id}, 'deactivate')">Deactivate</button>` 
                         : `<button class="action-btn" onclick="userAction(${u.id}, 'activate')">Activate</button>`}
@@ -170,6 +171,37 @@ async function userAction(userId, action, value = null) {
         await apiCall('/admin/users/action', 'POST', { user_id: userId, action, value });
         loadUsers(); // refresh
     } catch (e) { alert(e.message); }
+}
+
+function openTierModal(userId, email, currentTier) {
+    document.getElementById('changeTierModal').style.display = 'flex';
+    document.getElementById('changeTierUserEmail').value = email;
+    document.getElementById('changeTierSelect').value = currentTier;
+    document.getElementById('changeTierSelect').dataset.userId = userId;
+}
+
+function closeTierModal() {
+    document.getElementById('changeTierModal').style.display = 'none';
+}
+
+async function submitTierChange(e) {
+    e.preventDefault();
+    const userId = parseInt(document.getElementById('changeTierSelect').dataset.userId);
+    const newTier = document.getElementById('changeTierSelect').value;
+    
+    if (!newTier) {
+        alert('Please select a tier');
+        return;
+    }
+    
+    try {
+        await apiCall('/admin/users/action', 'POST', { user_id: userId, action: 'tier', value: newTier });
+        alert('User tier updated successfully');
+        closeTierModal();
+        loadUsers();
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
 }
 
 // ========================
@@ -425,4 +457,97 @@ async function loadLogs() {
             tbody.appendChild(tr);
         });
     } catch(e) { alert(e.message); }
+}
+
+// ========================
+// TIER CONFIGURATION
+// ========================
+async function loadTiers() {
+    try {
+        const tiers = await apiCall('/admin/tiers');
+        
+        // Populate tier forms with data
+        const tierMap = {};
+        tiers.forEach(t => {
+            tierMap[t.id] = t;
+        });
+        
+        // Populate Unlimited Tier
+        if (tierMap.unlimited) {
+            const t = tierMap.unlimited;
+            document.getElementById('tierMaxNotesUnlimited').value = t.max_notes;
+            document.getElementById('tierMaxSubjectsUnlimited').value = t.max_subjects;
+            document.getElementById('tierMaxGroupsUnlimited').value = t.max_groups;
+            document.getElementById('tierMaxConversationsUnlimited').value = t.max_conversations;
+            document.getElementById('tierMaxMessagesUnlimited').value = t.max_messages;
+            document.getElementById('tierMaxStorageUnlimited').value = t.max_storage_gb;
+            document.getElementById('tierMaxQuizzesUnlimited').value = t.max_quizzes;
+            document.getElementById('tierMaxSummariesUnlimited').value = t.max_summaries;
+        }
+        
+        // Populate Free Tier
+        if (tierMap.free) {
+            const t = tierMap.free;
+            document.getElementById('tierMaxNotesFree').value = t.max_notes;
+            document.getElementById('tierMaxSubjectsFree').value = t.max_subjects;
+            document.getElementById('tierMaxGroupsFree').value = t.max_groups;
+            document.getElementById('tierMaxConversationsFree').value = t.max_conversations;
+            document.getElementById('tierMaxMessagesFree').value = t.max_messages;
+            document.getElementById('tierMaxStorageFree').value = t.max_storage_gb;
+            document.getElementById('tierMaxQuizzesFree').value = t.max_quizzes;
+            document.getElementById('tierMaxSummariesFree').value = t.max_summaries;
+        }
+        
+        // Populate Pro Tier
+        if (tierMap.pro) {
+            const t = tierMap.pro;
+            document.getElementById('tierMaxNotesPro').value = t.max_notes;
+            document.getElementById('tierMaxSubjectsPro').value = t.max_subjects;
+            document.getElementById('tierMaxGroupsPro').value = t.max_groups;
+            document.getElementById('tierMaxConversationsPro').value = t.max_conversations;
+            document.getElementById('tierMaxMessagesPro').value = t.max_messages;
+            document.getElementById('tierMaxStoragePro').value = t.max_storage_gb;
+            document.getElementById('tierMaxQuizzesPro').value = t.max_quizzes;
+            document.getElementById('tierMaxSummariesPro').value = t.max_summaries;
+        }
+        
+        // Update invite modal dropdown
+        const inviteTierSelect = document.getElementById('inviteTier');
+        if (inviteTierSelect) {
+            inviteTierSelect.innerHTML = '';
+            tiers.forEach(tier => {
+                const opt = document.createElement('option');
+                opt.value = tier.id;
+                opt.textContent = tier.display_name;
+                inviteTierSelect.appendChild(opt);
+            });
+        }
+    } catch (e) { console.error('Error loading tiers:', e); }
+}
+
+async function saveTierConfig(e, tierId) {
+    e.preventDefault();
+    
+    const fieldSuffix = tierId.charAt(0).toUpperCase() + tierId.slice(1);
+    
+    const tierData = {
+        id: tierId,
+        display_name: tierId.charAt(0).toUpperCase() + tierId.slice(1),
+        max_notes: parseInt(document.getElementById(`tierMaxNotes${fieldSuffix}`).value),
+        max_subjects: parseInt(document.getElementById(`tierMaxSubjects${fieldSuffix}`).value),
+        max_groups: parseInt(document.getElementById(`tierMaxGroups${fieldSuffix}`).value),
+        max_conversations: parseInt(document.getElementById(`tierMaxConversations${fieldSuffix}`).value),
+        max_messages: parseInt(document.getElementById(`tierMaxMessages${fieldSuffix}`).value),
+        max_storage_gb: parseInt(document.getElementById(`tierMaxStorage${fieldSuffix}`).value),
+        max_quizzes: parseInt(document.getElementById(`tierMaxQuizzes${fieldSuffix}`).value),
+        max_summaries: parseInt(document.getElementById(`tierMaxSummaries${fieldSuffix}`).value)
+    };
+    
+    try {
+        await apiCall(`/admin/tiers/${tierId}`, 'PUT', tierData);
+        alert(`${tierId.charAt(0).toUpperCase() + tierId.slice(1)} tier updated successfully!`);
+        loadTiers();
+    } catch (err) {
+        alert('Error updating tier: ' + err.message);
+    }
 }

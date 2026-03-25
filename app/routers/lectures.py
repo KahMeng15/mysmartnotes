@@ -13,6 +13,7 @@ from app.models.db import User, Lecture, Subject, Summary
 from app.schemas.schemas import LectureResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
+from app.utils.quotas import enforce_quota_notes, enforce_quota_storage
 from app.processing.ocr import OCRProcessor
 from app.processing.image_extractor import ImageExtractor
 from app.processing.text_processor import ContentType
@@ -98,6 +99,10 @@ async def upload_lecture(
             status_code=status.HTTP_413_PAYLOAD_TOO_LARGE,
             detail="File size exceeds 50MB limit"
         )
+    
+    # Enforce tier quotas
+    enforce_quota_notes(current_user, db)
+    enforce_quota_storage(current_user, len(contents), db)
     
     # Create upload directory structure
     user_upload_dir = os.path.join(UPLOAD_DIR, str(current_user.id))

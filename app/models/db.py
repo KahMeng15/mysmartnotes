@@ -441,3 +441,21 @@ class RateLimitConfig(Base):
     sessions = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TierConfig(Base):
+    """Tier configuration and limits"""
+    __tablename__ = "tier_configs"
+
+    id = Column(String(50), primary_key=True)  # unlimited, free, pro
+    display_name = Column(String(100), nullable=False)  # "Unlimited", "Free", "Pro"
+    max_notes = Column(Integer, default=-1)  # -1 = unlimited
+    max_subjects = Column(Integer, default=-1)
+    max_groups = Column(Integer, default=-1)
+    max_conversations = Column(Integer, default=-1)
+    max_messages = Column(Integer, default=-1)
+    max_storage_gb = Column(Integer, default=-1)  # in GB, -1 = unlimited
+    max_quizzes = Column(Integer, default=-1)
+    max_summaries = Column(Integer, default=-1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

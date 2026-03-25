@@ -11,6 +11,7 @@ import string
 from app.models.db import User, Lecture, Summary
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
+from app.utils.quotas import enforce_quota_summaries
 from app.processing.ai_client import AIClient
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,9 @@ async def generate_summary_endpoint(
     db: Session = Depends(get_db)
 ):
     """Generate or retrieve cached summary for a lecture"""
+    
+    # Enforce tier quotas
+    enforce_quota_summaries(current_user, db)
     
     # Verify lecture belongs to user
     lecture = db.query(Lecture).filter(
@@ -342,6 +346,9 @@ async def generate_cheatsheet(
     db: Session = Depends(get_db)
 ):
     """Generate study cheatsheet from lecture"""
+    
+    # Enforce tier quotas
+    enforce_quota_summaries(current_user, db)
     
     # Verify lecture belongs to user
     lecture = db.query(Lecture).filter(

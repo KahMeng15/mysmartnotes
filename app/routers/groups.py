@@ -6,6 +6,7 @@ from app.models.db import User, SubjectGroup
 from app.schemas.schemas import SubjectGroupCreate, SubjectGroupUpdate, SubjectGroupResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
+from app.utils.quotas import enforce_quota_groups
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
@@ -25,6 +26,9 @@ async def create_group(
     db: Session = Depends(get_db)
 ):
     """Create a new subject group"""
+    # Enforce tier quotas
+    enforce_quota_groups(current_user, db)
+    
     db_group = SubjectGroup(
         id=generate_random_id(db, SubjectGroup),
         name=group.name,

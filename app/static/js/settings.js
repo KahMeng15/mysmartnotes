@@ -6,6 +6,7 @@ window.addEventListener('load', () => {
     if (!token) window.location.href = '/login';
     loadSettings();
     loadStats();
+    loadQuotas();
 });
 
 async function loadStats() {
@@ -43,6 +44,76 @@ async function loadStats() {
         }
     } catch (e) {
         console.error('Failed to load stats', e);
+    }
+}
+
+async function loadQuotas() {
+    try {
+        const response = await fetch('/auth/quotas', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (response.ok) {
+            const quotaData = await response.json();
+            
+            // Display tier name
+            document.getElementById('tierName').textContent = quotaData.tier_name || 'Unknown';
+            document.getElementById('tierStatus').textContent = quotaData.tier.toUpperCase();
+            
+            // Populate quota items
+            const quotasContainer = document.getElementById('quotasContainer');
+            quotasContainer.innerHTML = '';
+            
+            const quotaLabels = {
+                'notes': 'Notes',
+                'subjects': 'Subjects',
+                'groups': 'Groups',
+                'conversations': 'Conversations',
+                'messages': 'Messages',
+                'quizzes': 'Quizzes',
+                'summaries': 'Summaries',
+                'storage_gb': 'Storage'
+            };
+            
+            const quotaUnits = {
+                'storage_gb': 'GB'
+            };
+            
+            for (const [key, quota] of Object.entries(quotaData.quotas)) {
+                const label = quotaLabels[key] || key;
+                const unit = quotaUnits[key] || 'items';
+                
+                const card = document.createElement('div');
+                card.style.cssText = 'background: #f5f5f5; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;';
+                
+                const used = quota.used;
+                const limit = quota.unlimited ? '∞' : quota.limit;
+                const percentage = quota.unlimited ? 100 : Math.round((used / quota.limit) * 100);
+                const barColor = percentage > 80 ? '#f5576c' : (percentage > 50 ? '#ffa502' : '#667eea');
+                
+                let progressBar = '';
+                if (!quota.unlimited) {
+                    progressBar = `
+                        <div style="width: 100%; background: #ddd; border-radius: 4px; height: 6px; margin-top: 8px; overflow: hidden;">
+                            <div style="width: ${percentage}%; background: ${barColor}; height: 100%;"></div>
+                        </div>
+                    `;
+                }
+                
+                card.innerHTML = `
+                    <div style="font-weight: 600; margin-bottom: 5px;">${label}</div>
+                    <div style="font-size: 14px; color: #666;">
+                        <strong>${used}</strong> / ${limit} ${unit}
+                    </div>
+                    ${progressBar}
+                `;
+                
+                quotasContainer.appendChild(card);
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load quotas', e);
     }
 }
 

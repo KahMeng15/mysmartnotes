@@ -7,6 +7,7 @@ from app.models.db import User, Subject
 from app.schemas.schemas import SubjectCreate, SubjectUpdate, SubjectResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
+from app.utils.quotas import enforce_quota_subjects
 
 router = APIRouter(prefix="/subjects", tags=["subjects"])
 
@@ -28,6 +29,9 @@ async def create_subject(
     db: Session = Depends(get_db)
 ):
     """Create a new subject"""
+    # Enforce tier quotas
+    enforce_quota_subjects(current_user, db)
+    
     # Check if subject already exists
     existing = db.query(Subject).filter(
         Subject.user_id == current_user.id,

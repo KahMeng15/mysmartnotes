@@ -12,6 +12,7 @@ from app.models.db import User, SystemSettings, UserInvitation
 from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, TokenResponse, UserUpdate
 from app.utils.db import get_db
 from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user as get_current_user_from_token
+from app.utils.quotas import get_user_quota_status
 from app.config import get_settings
 from sqlalchemy import func
 from app.models.db import Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserLog
@@ -586,6 +587,11 @@ def get_user_stats(current_user: User = Depends(get_current_user_from_token), db
         "quota": "Unlimited for early testers",
         "recent_logins": recent_logins
     }
+
+@router.get("/quotas")
+def get_user_quotas(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Get current user's tier, quotas, and usage statistics"""
+    return get_user_quota_status(current_user, db)
 
 class PasswordChange(BaseModel):
     current_password: str

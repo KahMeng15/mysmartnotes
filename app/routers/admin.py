@@ -6,10 +6,10 @@ from typing import List, Optional
 import datetime
 import secrets
 
-from app.models.db import User, SystemSettings, EmailConfig, IPFilter, RateLimitConfig, UserLog, Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation
+from app.models.db import User, SystemSettings, EmailConfig, IPFilter, RateLimitConfig, UserLog, Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation, TierConfig
 from app.schemas.admin import (
     SystemSettingsSchema, EmailConfigSchema, IPFilterSchema, IPFilterCreate, RateLimitConfigSchema, UserLogSchema, UserAdminResponse, UserActionRequest,
-    UserInvitationCreate, UserInvitationResponse
+    UserInvitationCreate, UserInvitationResponse, TierConfigSchema
 )
 from app.utils.db import get_db
 from app.routers.auth import get_current_user
@@ -128,6 +128,83 @@ def update_rate_limits(update_data: RateLimitConfigSchema, db: Session = Depends
     db.commit()
     db.refresh(limits)
     return limits
+
+# --- Tier Configurations ---
+@router.get("/tiers", response_model=List[TierConfigSchema])
+def get_all_tiers(db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    """Get all tier configurations"""
+    tiers = db.query(TierConfig).all()
+    
+    # Initialize default tiers if they don't exist
+    if not tiers:
+        default_tiers = [
+            TierConfig(
+                id="unlimited",
+                display_name="Unlimited",
+                max_notes=-1,
+                max_subjects=-1,
+                max_groups=-1,
+                max_conversations=-1,
+                max_messages=-1,
+                max_storage_gb=-1,
+                max_quizzes=-1,
+                max_summaries=-1
+            ),
+            TierConfig(
+                id="free",
+                display_name="Free",
+                max_notes=50,
+                max_subjects=10,
+                max_groups=5,
+                max_conversations=100,
+                max_messages=500,
+                max_storage_gb=5,
+                max_quizzes=20,
+                max_summaries=50
+            ),
+            TierConfig(
+                id="pro",
+                display_name="Pro",
+                max_notes=500,
+                max_subjects=100,
+                max_groups=50,
+                max_conversations=-1,
+                max_messages=-1,
+                max_storage_gb=100,
+                max_quizzes=200,
+                max_summaries=500
+            )
+        ]
+        for tier in default_tiers:
+            db.add(tier)
+        db.commit()
+        tiers = default_tiers
+    
+    return tiers
+
+@router.get("/tiers/{tier_id}", response_model=TierConfigSchema)
+def get_tier(tier_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    """Get a specific tier configuration"""
+    tier = db.query(TierConfig).filter(TierConfig.id == tier_id).first()
+    if not tier:
+        raise HTTPException(status_code=404, detail="Tier not found")
+    return tier
+
+@router.put("/tiers/{tier_id}", response_model=TierConfigSchema)
+def update_tier(tier_id: str, update_data: TierConfigSchema, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    """Update a tier configuration"""
+    tier = db.query(TierConfig).filter(TierConfig.id == tier_id).first()
+    if not tier:
+        raise HTTPException(status_code=404, detail="Tier not found")
+    
+    for key, value in update_data.model_dump(exclude={"created_at", "updated_at"}).items():
+        if value is not None:
+            setattr(tier, key, value)
+    
+    tier.updated_at = datetime.datetime.utcnow()
+    db.commit()
+    db.refresh(tier)
+    return tier
 
 # --- IP Filters ---
 @router.get("/ip-filters", response_model=List[IPFilterSchema])

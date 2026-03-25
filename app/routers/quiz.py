@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 from app.models.db import User, Quiz, QuizQuestion, Subject, Lecture, QuizProgress, Summary, SubjectGroup, QuizGroup
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
+from app.utils.quotas import enforce_quota_quizzes
 from app.schemas.quiz import (
     QuizCreate, QuizUpdate, QuizResponse, QuizQuestionCreate, QuizQuestionResponse,
     QuizQuestionUpdate,
@@ -219,6 +220,9 @@ async def generate_quiz_ai(
     db: Session = Depends(get_db)
 ):
     """Generate a quiz using AI."""
+    # Enforce tier quotas
+    enforce_quota_quizzes(current_user, db)
+    
     ai_client = get_ai_client(user=current_user, db=db)
     
     try:
