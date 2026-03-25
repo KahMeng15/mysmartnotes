@@ -7,12 +7,14 @@ import jwt
 import json
 from typing import Optional
 import httpx
+import secrets
 
-from app.models.db import User, SystemSettings, UserInvitation
+from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken
 from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, TokenResponse, UserUpdate
 from app.utils.db import get_db
 from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user as get_current_user_from_token
 from app.utils.quotas import get_user_quota_status
+from app.utils.email import send_password_reset_email
 from app.config import get_settings
 from sqlalchemy import func
 from app.models.db import Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserLog
@@ -652,3 +654,124 @@ def download_data(current_user: User = Depends(get_current_user_from_token), db:
     }
     return JSONResponse(content=data, headers=headers)
 
+# --- Password Reset ---
+class PasswordResetRequest(BaseModel):
+    email: str
+
+class PasswordResetSubmit(BaseModel):
+    token: str
+    new_password: str
+
+@router.post("/password-reset-request")
+def request_password_reset(reset_request: PasswordResetRequest, request: Request, db: Session = Depends(get_db)):
+    """Request a password reset email. Rate limited to prevent abuse."""
+    email = reset_request.email.lower().strip()
+    
+    # Check if user exists
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        # For security, don't reveal whether email exists
+        return {"message": "If an account exists with this email, a password reset link has been sent."}
+    
+    # Check for too many recent requests from same email (rate limiting)
+    recent_resets = db.query(PasswordResetToken).filter(
+        PasswordResetToken.email == email,
+        PasswordResetToken.is_used == False,
+        PasswordResetToken.expires_at > datetime.utcnow()
+    ).all()
+    
+    if len(recent_resets) >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many password reset requests. Please wait a few hours before trying again."
+        )
+    
+    # Create password reset token (24 hour expiry)
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        email=email,
+        token=secrets.token_urlsafe(32),
+        expires_at=datetime.utcnow() + timedelta(hours=24)
+    )
+    db.add(reset_token)
+    db.commit()
+    db.refresh(reset_token)
+    
+    # Build reset link
+    sys_settings = db.query(SystemSettings).first()
+    domain = sys_settings.domain_url if sys_settings and sys_settings.domain_url else "http://localhost:8000"
+    if not domain.startswith("http"):
+        domain = f"http://{domain}"
+    
+    reset_link = f"{domain.rstrip('/')}/login?reset_token={reset_token.token}"
+    
+    # Send email
+    send_password_reset_email(db, email, reset_link)
+    
+    # Log action
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    db.add(UserLog(user_id=user.id, action="password_reset_request", ip_address=ip_address, device_info=user_agent))
+    db.commit()
+    
+    return {"message": "If an account exists with this email, a password reset link has been sent."}
+
+@router.post("/password-reset")
+def reset_password(reset_data: PasswordResetSubmit, request: Request, db: Session = Depends(get_db)):
+    """Reset password with valid token"""
+    
+    # Find the reset token
+    reset_token = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == reset_data.token,
+        PasswordResetToken.is_used == False
+    ).first()
+    
+    if not reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or already-used password reset token."
+        )
+    
+    # Check if token has expired
+    if reset_token.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset link has expired. Please request a new one."
+        )
+    
+    # Get user
+    user = db.query(User).filter(User.id == reset_token.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not found."
+        )
+    
+    # Update password
+    user.hashed_password = hash_password(reset_data.new_password)
+    reset_token.is_used = True
+    
+    # Log action
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    db.add(UserLog(user_id=user.id, action="password_reset_complete", ip_address=ip_address, device_info=user_agent))
+    
+    db.commit()
+    
+    return {"message": "Password has been reset successfully. You can now log in with your new password."}
+
+@router.get("/password-reset-token-valid")
+def check_reset_token_validity(token: str, db: Session = Depends(get_db)):
+    """Check if a password reset token is still valid"""
+    reset_token = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == token,
+        PasswordResetToken.is_used == False
+    ).first()
+    
+    if not reset_token:
+        return {"valid": False, "message": "Invalid or already-used token"}
+    
+    if reset_token.expires_at < datetime.utcnow():
+        return {"valid": False, "message": "Token has expired"}
+    
+    return {"valid": True, "message": "Token is valid"}

@@ -65,3 +65,24 @@ def send_invitation_email(db: Session, recipient_email: str, invitation_link: st
     </html>
     """
     return send_email(db, recipient_email, subject, body, is_html=True)
+
+def send_password_reset_email(db: Session, recipient_email: str, reset_link: str) -> bool:
+    """Send a password reset email to a user"""
+    subject = "Password Reset Request - MySmartNotes"
+    body = f"""
+    <html>
+        <body>
+            <h2>Password Reset Request</h2>
+            <p>We received a request to reset the password for your MySmartNotes account.</p>
+            <p>Click the link below to reset your password:</p>
+            <p><a href="{reset_link}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">Reset Password</a></p>
+            <p>Or copy and paste this link in your browser:</p>
+            <p><small>{reset_link}</small></p>
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">This link will expire in 24 hours.</p>
+            <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email. Your password will remain unchanged.</p>
+            <br>
+            <p>Best regards,<br>The MySmartNotes Team</p>
+        </body>
+    </html>
+    """
+    return send_email(db, recipient_email, subject, body, is_html=True)

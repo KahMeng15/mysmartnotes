@@ -59,6 +59,7 @@
                 <button class="btn btn-next btn-block" onclick="handleLogin()">Sign In</button>
             </div>
             <p class="toggle-link" id="signupLink">Don't have an account? <a onclick="switchPanel('register')">Sign up</a></p>
+            <p class="toggle-link" style="margin-top: 8px;"><a onclick="switchPanel('forgotPassword')" style="color: #3b82f6; cursor: pointer; text-decoration: none;">Forgot password?</a></p>
         </div>
 
         <!-- Register Panel -->
@@ -144,6 +145,40 @@
                 </div>
                 <button type="submit" class="btn btn-next btn-block" style="margin-top:16px;">Create Account</button>
                 <p class="toggle-link">Changed your mind? <a onclick="closeGoogleRegisterModal()">Cancel</a></p>
+            </form>
+        </div>
+
+        <!-- Forgot Password Panel -->
+        <div class="panel" id="forgotPasswordPanel">
+            <div id="forgotPasswordMsg" class="message-box"></div>
+            <h2 style="font-size: 1.5rem; margin-bottom: 8px;">Reset Your Password</h2>
+            <p style="color: #75757A; margin-bottom: 24px; font-size: 0.9rem;">Enter your email address and we'll send you a link to reset your password.</p>
+            <form onsubmit="handleForgotPassword(event)">
+                <div class="form-group">
+                    <label class="form-label" for="forgotPasswordEmail">Email Address</label>
+                    <input class="form-input" type="email" id="forgotPasswordEmail" placeholder="you@example.com" required>
+                </div>
+                <button type="submit" class="btn btn-next btn-block" style="margin-top:16px;">Send Reset Link</button>
+                <p class="toggle-link">Remember your password? <a onclick="switchPanel('login')">Sign in</a></p>
+            </form>
+        </div>
+
+        <!-- Reset Password Panel (from email link) -->
+        <div class="panel" id="resetPasswordPanel">
+            <div id="resetPasswordMsg" class="message-box"></div>
+            <h2 style="font-size: 1.5rem; margin-bottom: 8px;">Create New Password</h2>
+            <p style="color: #75757A; margin-bottom: 24px; font-size: 0.9rem;">Enter your new password below.</p>
+            <form onsubmit="handleResetPassword(event)">
+                <div class="form-group">
+                    <label class="form-label" for="resetPasswordNew">New Password</label>
+                    <input class="form-input" type="password" id="resetPasswordNew" placeholder="••••••••" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="resetPasswordConfirm">Confirm Password</label>
+                    <input class="form-input" type="password" id="resetPasswordConfirm" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-next btn-block" style="margin-top:16px;">Reset Password</button>
+                <p class="toggle-link"><a onclick="switchPanel('login')">Back to login</a></p>
             </form>
         </div>
     </div>

@@ -275,6 +275,15 @@ async def serve_note_edit(id: str):
 async def serve_login():
     return FileResponse(os.path.join(static_dir, "login.html"))
 
+@app.get("/reset-password")
+async def serve_reset_password():
+    return FileResponse(os.path.join(static_dir, "reset-password.html"))
+
+@app.get("/signup")
+async def serve_signup():
+    # Serve login.html (signup panel inside) with invitation token if provided
+    return FileResponse(os.path.join(static_dir, "login.html"))
+
 @app.get("/dashboard")
 async def serve_dashboard():
     return FileResponse(os.path.join(static_dir, "dashboard.html"))

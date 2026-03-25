@@ -13,6 +13,43 @@ window.addEventListener('load', async () => {
             }
         }
     } catch (e) { console.error('Error loading public settings', e); }
+    
+    // Check for invitation token in URL (signup with invitation)
+    const params = new URLSearchParams(window.location.search);
+    const invitationToken = params.get('token');
+    
+    if (invitationToken) {
+        // Redirect to register panel with token
+        switchPanel('register');
+        // Store token for registration
+        window.invitationToken = invitationToken;
+        document.getElementById('regNickname').focus();
+    }
+    
+    // Check for password reset token in URL
+    const resetToken = params.get('reset_token');
+    
+    if (resetToken) {
+        // Validate token before showing reset form
+        try {
+            const validateRes = await fetch(`/auth/password-reset-token-valid?token=${encodeURIComponent(resetToken)}`);
+            const tokenData = await validateRes.json();
+            if (tokenData.valid) {
+                switchPanel('resetPassword');
+                // Small delay to ensure DOM is ready
+                setTimeout(() => {
+                    const input = document.getElementById('resetPasswordNew');
+                    if (input) input.focus();
+                }, 100);
+            } else {
+                showMessageBox('resetPasswordMsg', 'error', tokenData.message || 'Invalid reset link.');
+                switchPanel('login');
+            }
+        } catch (e) {
+            console.error('Token validation error:', e);
+            switchPanel('login');
+        }
+    }
 });
 
 function updateSignupLink(signupConfig) {
@@ -190,10 +227,17 @@ async function handleRegister() {
     }
     
     try {
+        const body = { nickname, email, password, agree_tos, agree_privacy, agree_fair_use };
+        
+        // Add invitation token if present
+        if (window.invitationToken) {
+            body.token = window.invitationToken;
+        }
+        
         const res = await fetch('/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nickname, email, password, agree_tos, agree_privacy, agree_fair_use })
+            body: JSON.stringify(body)
         });
         if (res.ok) {
             showMessageBox('registerMsg', 'success', 'Account created! Please sign in.');
@@ -331,6 +375,92 @@ async function handleGoogleComplete(event) {
         showMessageBox('googleRegisterMsg', 'error', 'An error occurred. Please try again.');
     }
 }
+
+// --- Password Reset Functions ---
+async function handleForgotPassword(event) {
+    event.preventDefault();
+    const email = document.getElementById('forgotPasswordEmail').value.trim();
+    
+    if (!email) {
+        showMessageBox('forgotPasswordMsg', 'error', 'Please enter your email address.');
+        return;
+    }
+    
+    try {
+        const res = await fetch('/auth/password-reset-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        
+        if (res.ok) {
+            showMessageBox('forgotPasswordMsg', 'success', 'Check your email for a password reset link. It expires in 24 hours.');
+            setTimeout(() => switchPanel('login'), 3000);
+        } else {
+            const err = await res.json();
+            if (res.status === 429) {
+                showMessageBox('forgotPasswordMsg', 'error', err.detail || 'Too many reset requests. Please try again later.');
+            } else {
+                showMessageBox('forgotPasswordMsg', 'error', err.detail || 'Error processing request. Please try again.');
+            }
+        }
+    } catch (e) {
+        console.error('Password reset request error:', e);
+        showMessageBox('forgotPasswordMsg', 'error', 'Connection error. Please try again.');
+    }
+}
+
+async function handleResetPassword(event) {
+    event.preventDefault();
+    const newPassword = document.getElementById('resetPasswordNew').value;
+    const confirmPassword = document.getElementById('resetPasswordConfirm').value;
+    
+    if (!newPassword || !confirmPassword) {
+        showMessageBox('resetPasswordMsg', 'error', 'Please enter both password fields.');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showMessageBox('resetPasswordMsg', 'error', 'Passwords do not match.');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showMessageBox('resetPasswordMsg', 'error', 'Password must be at least 6 characters long.');
+        return;
+    }
+    
+    try {
+        // Get token from URL params
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('reset_token');
+        
+        if (!token) {
+            showMessageBox('resetPasswordMsg', 'error', 'Invalid reset link. Please request a new password reset.');
+            return;
+        }
+        
+        const res = await fetch('/auth/password-reset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, new_password: newPassword })
+        });
+        
+        if (res.ok) {
+            showMessageBox('resetPasswordMsg', 'success', 'Password reset successfully! Redirecting to login...');
+            setTimeout(() => switchPanel('login'), 2000);
+        } else {
+            const err = await res.json();
+            showMessageBox('resetPasswordMsg', 'error', err.detail || 'Password reset failed.');
+        }
+    } catch (e) {
+        console.error('Password reset error:', e);
+        showMessageBox('resetPasswordMsg', 'error', 'Connection error. Please try again.');
+    }
+}
+
+// Check for reset-password page on load
+// (This is already handled in the main load event listener above)
 
 // Allow Enter key to advance form
 document.addEventListener('keydown', e => {

@@ -389,6 +389,22 @@ class UserInvitation(Base):
     inviter = relationship("User")
 
 
+class PasswordResetToken(Base):
+    """Password reset tokens for users who forgot their password"""
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    token = Column(String(100), nullable=False, unique=True, index=True)
+    is_used = Column(Boolean, default=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+
 class EmailConfig(Base):
     """SMTP Email Configuration"""
     __tablename__ = "email_config"
