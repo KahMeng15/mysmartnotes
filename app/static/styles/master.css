@@ -192,6 +192,7 @@ a:hover {
   max-height: calc(100vh - var(--spacing-lg) * 2);
   box-sizing: border-box;
   margin: var(--spacing-lg);
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -3004,6 +3005,26 @@ body.auth-page {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+/* Global Footer - fixed position at bottom of page */
+.global-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--font-size-2xs);
+  color: var(--color-gray);
+  line-height: var(--line-height-normal);
+  height: var(--spacing-lg);
+  z-index: 99;
 }
 
 .dashboard-grid {
