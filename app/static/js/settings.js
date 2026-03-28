@@ -2,6 +2,14 @@ const API_URL = '';
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
 
+const tierGradients = {
+    unlimited: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    free: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    pro: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    early_tester: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
+};
+const defaultTierGradient = tierGradients.unlimited;
+
 window.addEventListener('load', () => {
     if (!token) window.location.href = '/login';
     loadSettings();
@@ -59,6 +67,10 @@ async function loadQuotas() {
             
             // Display tier name
             document.getElementById('tierName').textContent = quotaData.tier_name || 'Unknown';
+            const tierBanner = document.getElementById('tierCardBanner');
+            if (tierBanner) {
+                tierBanner.style.background = tierGradients[quotaData.tier] || defaultTierGradient;
+            }
             const earlyNote = document.getElementById('earlyTesterCallout');
             if (earlyNote) {
                 earlyNote.style.display = quotaData.tier === 'early_tester' ? 'block' : 'none';
