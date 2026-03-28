@@ -87,6 +87,26 @@ def verify_firebase_token(id_token_str: str):
 
 
 
+def record_auth_attempt(db: Session, action: str, email: Optional[str], ip_address: Optional[str], device_info: str, status: str, reason: Optional[str] = None, user: Optional[User] = None):
+    detail_parts = []
+    if email:
+        detail_parts.append(f"email={email}")
+    else:
+        detail_parts.append("email=unknown")
+    detail_parts.append(f"status={status}")
+    if reason:
+        detail_parts.append(reason)
+    db.add(UserLog(
+        user_id=user.id if user else None,
+        action=action,
+        ip_address=ip_address,
+        device_info=device_info,
+        details="; ".join(detail_parts)
+    ))
+    db.commit()
+
+
+
 def validate_invitation_token(db: Session, token: Optional[str], email: str) -> UserInvitation:
     if not token:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is restricted to invited users only. Token required.")
@@ -246,9 +266,12 @@ async def login(request: Request, db: Session = Depends(get_db)):
         
     email = credentials.get("email")
     password = credentials.get("password")
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
     
     if not email or not password:
-         raise HTTPException(status_code=400, detail="Missing email or password")
+        record_auth_attempt(db, action="login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="missing_credentials", reason="Email or password missing")
+        raise HTTPException(status_code=400, detail="Missing email or password")
 
     # Check maintenance mode
     sys_settings = db.query(SystemSettings).first()
@@ -263,11 +286,13 @@ async def login(request: Request, db: Session = Depends(get_db)):
     
     try:
         if not user or not verify_password(password, user.hashed_password):
+            record_auth_attempt(db, action="login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="invalid_credentials", reason="Invalid email or password", user=user)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid username or password"
             )
     except ValueError as e:
+        record_auth_attempt(db, action="login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="verification_error", reason=str(e), user=user)
         print(f"Password verification error for user {email}: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -275,12 +300,14 @@ async def login(request: Request, db: Session = Depends(get_db)):
         )
 
     if not user.is_active:
+        record_auth_attempt(db, action="login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="disabled", reason="Account disabled", user=user)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is disabled"
         )
     
     if not user.is_approved:
+        record_auth_attempt(db, action="login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="unapproved", reason="Account pending approval", user=user)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is pending approval by administrator"
@@ -309,7 +336,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
     # Log login
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent", "Unknown Device")
-    db.add(UserLog(user_id=user.id, action="login", ip_address=ip_address, device_info=user_agent))
+    db.add(UserLog(user_id=user.id, action="login", ip_address=ip_address, device_info=user_agent, details=f"email={email}; status=success"))
     db.commit()
     
     return {
@@ -330,12 +357,15 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
     """Verify Google token and check if user exists"""
     # Check maintenance mode
     sys_settings = db.query(SystemSettings).first()
-    signup_config = sys_settings.signup_config if sys_settings else "open"
     if sys_settings and sys_settings.maintenance_mode:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Google Sign-In is disabled during maintenance. Please use administrative email login."
         )
+    signup_config = sys_settings.signup_config if sys_settings else "open"
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    email: Optional[str] = None
 
     try:
         print(f"[DEBUG] Received Google login request")
@@ -351,6 +381,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
         print(f"[DEBUG] Token verified for email: {email}")
         
         if not email:
+            record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="missing_email", reason="Email missing from Google token")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email not found in Google account"
@@ -362,9 +393,16 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
         if user:
             # Existing user - log them in
             if not user.is_active:
+                record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="disabled", reason="Account disabled", user=user)
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="User account is disabled"
+                )
+            if not user.is_approved:
+                record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="unapproved", reason="Account pending approval", user=user)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User account is pending approval by administrator"
                 )
                 
             if settings.ADMIN_EMAIL and user.email.lower() == settings.ADMIN_EMAIL.lower() and not user.is_admin:
@@ -389,7 +427,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
             # Log login
             ip_address = request.client.host if request.client else None
             user_agent = request.headers.get("user-agent", "Unknown Device")
-            db.add(UserLog(user_id=user.id, action="login", ip_address=ip_address, device_info=user_agent, details="Google Auth"))
+            db.add(UserLog(user_id=user.id, action="login", ip_address=ip_address, device_info=user_agent, details=f"Google Auth; email={email}; status=success"))
             db.commit()
             
             print(f"[DEBUG] Existing user logged in: {email}")
@@ -401,9 +439,14 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
             }
         else:
             # New user - enforce invite-only config before prompting for profile completion
-            if signup_config == "invite":
-                validate_invitation_token(db, google_request.invitation_token, email)
+            try:
+                if signup_config == "invite":
+                    validate_invitation_token(db, google_request.invitation_token, email)
+            except HTTPException as invite_exc:
+                record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="invite_invalid", reason=str(invite_exc.detail))
+                raise
 
+            record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="new_user", reason="Needs profile completion")
             print(f"[DEBUG] New user detected: {email}")
             return {
                 "is_new_user": True,
@@ -416,12 +459,14 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
     except HTTPException:
         raise
     except ValueError as e:
+        record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="token_error", reason=str(e))
         print(f"[DEBUG] Verification error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e)
         )
     except Exception as e:
+        record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="auth_error", reason=str(e))
         print(f"[DEBUG] Unexpected error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
