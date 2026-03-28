@@ -382,6 +382,33 @@ async function saveEmailConfig(e) {
     } catch(err) { alert(err.message); }
 }
 
+async function sendTestEmail(e) {
+    e.preventDefault();
+    const testEmail = document.getElementById('testEmailAddress').value.trim();
+    const msgBox = document.getElementById('testEmailMsg');
+    
+    if (!testEmail) {
+        msgBox.className = 'message-box error';
+        msgBox.textContent = 'Please enter an email address.';
+        msgBox.style.display = 'block';
+        return;
+    }
+    
+    msgBox.style.display = 'none';
+    
+    try {
+        const result = await apiCall('/admin/email-config/test', 'POST', { test_email: testEmail });
+        msgBox.className = 'message-box success';
+        msgBox.textContent = result.message || 'Test email sent successfully!';
+        msgBox.style.display = 'block';
+        document.getElementById('testEmailAddress').value = '';
+    } catch(err) {
+        msgBox.className = 'message-box error';
+        msgBox.textContent = err.message || 'Failed to send test email.';
+        msgBox.style.display = 'block';
+    }
+}
+
 // ========================
 // IP FILTERS
 // ========================
@@ -483,6 +510,9 @@ async function loadTiers() {
             document.getElementById('tierMaxStorageUnlimited').value = t.max_storage_gb;
             document.getElementById('tierMaxQuizzesUnlimited').value = t.max_quizzes;
             document.getElementById('tierMaxSummariesUnlimited').value = t.max_summaries;
+            document.getElementById('tierConversationsResetUnlimited').value = t.conversations_reset_period || '';
+            document.getElementById('tierMessagesResetUnlimited').value = t.messages_reset_period || '';
+            document.getElementById('tierSummariesResetUnlimited').value = t.summaries_reset_period || '';
         }
         
         // Populate Free Tier
@@ -496,6 +526,9 @@ async function loadTiers() {
             document.getElementById('tierMaxStorageFree').value = t.max_storage_gb;
             document.getElementById('tierMaxQuizzesFree').value = t.max_quizzes;
             document.getElementById('tierMaxSummariesFree').value = t.max_summaries;
+            document.getElementById('tierConversationsResetFree').value = t.conversations_reset_period || '';
+            document.getElementById('tierMessagesResetFree').value = t.messages_reset_period || '';
+            document.getElementById('tierSummariesResetFree').value = t.summaries_reset_period || '';
         }
         
         // Populate Pro Tier
@@ -509,6 +542,25 @@ async function loadTiers() {
             document.getElementById('tierMaxStoragePro').value = t.max_storage_gb;
             document.getElementById('tierMaxQuizzesPro').value = t.max_quizzes;
             document.getElementById('tierMaxSummariesPro').value = t.max_summaries;
+            document.getElementById('tierConversationsResetPro').value = t.conversations_reset_period || '';
+            document.getElementById('tierMessagesResetPro').value = t.messages_reset_period || '';
+            document.getElementById('tierSummariesResetPro').value = t.summaries_reset_period || '';
+        }
+        
+        // Populate Early Testers Tier
+        if (tierMap.early_tester) {
+            const t = tierMap.early_tester;
+            document.getElementById('tierMaxNotesEarlyTester').value = t.max_notes;
+            document.getElementById('tierMaxSubjectsEarlyTester').value = t.max_subjects;
+            document.getElementById('tierMaxGroupsEarlyTester').value = t.max_groups;
+            document.getElementById('tierMaxConversationsEarlyTester').value = t.max_conversations;
+            document.getElementById('tierMaxMessagesEarlyTester').value = t.max_messages;
+            document.getElementById('tierMaxStorageEarlyTester').value = t.max_storage_gb;
+            document.getElementById('tierMaxQuizzesEarlyTester').value = t.max_quizzes;
+            document.getElementById('tierMaxSummariesEarlyTester').value = t.max_summaries;
+            document.getElementById('tierConversationsResetEarlyTester').value = t.conversations_reset_period || '';
+            document.getElementById('tierMessagesResetEarlyTester').value = t.messages_reset_period || '';
+            document.getElementById('tierSummariesResetEarlyTester').value = t.summaries_reset_period || '';
         }
         
         // Update invite modal dropdown
@@ -528,11 +580,11 @@ async function loadTiers() {
 async function saveTierConfig(e, tierId) {
     e.preventDefault();
     
-    const fieldSuffix = tierId.charAt(0).toUpperCase() + tierId.slice(1);
+    const fieldSuffix = tierId === 'early_tester' ? 'EarlyTester' : (tierId.charAt(0).toUpperCase() + tierId.slice(1));
     
     const tierData = {
         id: tierId,
-        display_name: tierId.charAt(0).toUpperCase() + tierId.slice(1),
+        display_name: tierId === 'early_tester' ? 'Early Tester' : (tierId.charAt(0).toUpperCase() + tierId.slice(1)),
         max_notes: parseInt(document.getElementById(`tierMaxNotes${fieldSuffix}`).value),
         max_subjects: parseInt(document.getElementById(`tierMaxSubjects${fieldSuffix}`).value),
         max_groups: parseInt(document.getElementById(`tierMaxGroups${fieldSuffix}`).value),
@@ -540,12 +592,15 @@ async function saveTierConfig(e, tierId) {
         max_messages: parseInt(document.getElementById(`tierMaxMessages${fieldSuffix}`).value),
         max_storage_gb: parseInt(document.getElementById(`tierMaxStorage${fieldSuffix}`).value),
         max_quizzes: parseInt(document.getElementById(`tierMaxQuizzes${fieldSuffix}`).value),
-        max_summaries: parseInt(document.getElementById(`tierMaxSummaries${fieldSuffix}`).value)
+        max_summaries: parseInt(document.getElementById(`tierMaxSummaries${fieldSuffix}`).value),
+        conversations_reset_period: document.getElementById(`tierConversationsReset${fieldSuffix}`).value || null,
+        messages_reset_period: document.getElementById(`tierMessagesReset${fieldSuffix}`).value || null,
+        summaries_reset_period: document.getElementById(`tierSummariesReset${fieldSuffix}`).value || null
     };
     
     try {
         await apiCall(`/admin/tiers/${tierId}`, 'PUT', tierData);
-        alert(`${tierId.charAt(0).toUpperCase() + tierId.slice(1)} tier updated successfully!`);
+        alert(`${tierId === 'early_tester' ? 'Early Testers' : (tierId.charAt(0).toUpperCase() + tierId.slice(1))} tier updated successfully!`);
         loadTiers();
     } catch (err) {
         alert('Error updating tier: ' + err.message);

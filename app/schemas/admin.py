@@ -118,6 +118,10 @@ class TierConfigSchema(BaseModel):
     max_storage_gb: int = -1
     max_quizzes: int = -1
     max_summaries: int = -1
+    # Reset periods: "week", "month", or None for cumulative
+    conversations_reset_period: Optional[str] = None
+    messages_reset_period: Optional[str] = None
+    summaries_reset_period: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

@@ -13,7 +13,7 @@ from app.models.db import User, SystemSettings, UserInvitation, PasswordResetTok
 from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, TokenResponse, UserUpdate
 from app.utils.db import get_db
 from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user as get_current_user_from_token
-from app.utils.quotas import get_user_quota_status
+from app.utils.quotas import get_user_quota_status, get_user_tier_config
 from app.utils.email import send_password_reset_email
 from app.config import get_settings
 from sqlalchemy import func
@@ -568,6 +568,9 @@ def get_user_stats(current_user: User = Depends(get_current_user_from_token), db
     
     storage_bytes = db.query(func.sum(Lecture.file_size)).filter(Lecture.user_id == u_id).scalar() or 0
     storage_mb = round(storage_bytes / (1024 * 1024), 2)
+
+    tier_config = get_user_tier_config(current_user, db)
+    storage_limit_label = "Unlimited" if tier_config.max_storage_gb == -1 else f"{tier_config.max_storage_gb} GB"
     
     recent_logins_query = db.query(UserLog).filter(UserLog.user_id == u_id, UserLog.action == "login").order_by(UserLog.timestamp.desc()).limit(5).all()
     
@@ -586,7 +589,7 @@ def get_user_stats(current_user: User = Depends(get_current_user_from_token), db
         "questions_asked": questions_count,
         "time_spent_mins": time_spent_mins,
         "space_used_mb": storage_mb,
-        "quota": "Unlimited for early testers",
+        "storage_limit": storage_limit_label,
         "recent_logins": recent_logins
     }
 

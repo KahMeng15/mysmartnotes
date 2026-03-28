@@ -26,7 +26,7 @@ async function loadStats() {
             document.getElementById('statQuestions').textContent = stats.questions_asked;
             document.getElementById('statTime').textContent = `${stats.time_spent_mins} mins`;
             document.getElementById('statStorage').textContent = `${stats.space_used_mb} MB`;
-            document.getElementById('statQuota').textContent = stats.quota;
+            document.getElementById('statStorageLimit').textContent = stats.storage_limit;
             
             // Populate recent logins
             const loginsList = document.getElementById('recentLoginsList');
@@ -59,7 +59,10 @@ async function loadQuotas() {
             
             // Display tier name
             document.getElementById('tierName').textContent = quotaData.tier_name || 'Unknown';
-            document.getElementById('tierStatus').textContent = quotaData.tier.toUpperCase();
+            const earlyNote = document.getElementById('earlyTesterCallout');
+            if (earlyNote) {
+                earlyNote.style.display = quotaData.tier === 'early_tester' ? 'block' : 'none';
+            }
             
             // Populate quota items
             const quotasContainer = document.getElementById('quotasContainer');
@@ -85,12 +88,20 @@ async function loadQuotas() {
                 const unit = quotaUnits[key] || 'items';
                 
                 const card = document.createElement('div');
-                card.style.cssText = 'background: #f5f5f5; padding: 15px; border-radius: 8px; border-left: 4px solid #667eea;';
+                card.style.cssText = 'background: #f5f5f5; padding: 15px; border-radius: 8px;';
                 
                 const used = quota.used;
                 const limit = quota.unlimited ? '∞' : quota.limit;
                 const percentage = quota.unlimited ? 100 : Math.round((used / quota.limit) * 100);
                 const barColor = percentage > 80 ? '#f5576c' : (percentage > 50 ? '#ffa502' : '#667eea');
+                
+                // Determine reset period label
+                let periodLabel = '';
+                if (quota.reset_period === 'week') {
+                    periodLabel = ' per week';
+                } else if (quota.reset_period === 'month') {
+                    periodLabel = ' per month';
+                }
                 
                 let progressBar = '';
                 if (!quota.unlimited) {
@@ -104,7 +115,7 @@ async function loadQuotas() {
                 card.innerHTML = `
                     <div style="font-weight: 600; margin-bottom: 5px;">${label}</div>
                     <div style="font-size: 14px; color: #666;">
-                        <strong>${used}</strong> / ${limit} ${unit}
+                        <strong>${used}</strong> / ${limit} ${unit}${periodLabel}
                     </div>
                     ${progressBar}
                 `;

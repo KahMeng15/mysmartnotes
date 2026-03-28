@@ -1,8 +1,9 @@
 """Admin Dashboard Router"""
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from typing import List, Optional
+from app.utils.quotas import ensure_default_tier_configs
 import datetime
 import secrets
 
@@ -103,6 +104,84 @@ def update_email_config(update_data: EmailConfigSchema, db: Session = Depends(ge
     db.refresh(config)
     return config
 
+@router.post("/email-config/test")
+def test_email_config(request_body: dict, request: Request, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    """Send a test email to verify email configuration is working"""
+    from app.utils.email import send_email
+    from pydantic import BaseModel, validator
+    
+    class TestEmailRequest(BaseModel):
+        test_email: str
+        
+        @validator('test_email')
+        def validate_email(cls, v):
+            if not v or '@' not in v:
+                raise ValueError('Invalid email address')
+            return v.lower().strip()
+    
+    # Validate request
+    try:
+        validated = TestEmailRequest(**request_body)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid email: {str(e)}")
+    
+    # Get email config
+    config = db.query(EmailConfig).first()
+    if not config or not config.smtp_provider or not config.email_address or not config.app_password:
+        raise HTTPException(
+            status_code=400, 
+            detail="Email configuration is incomplete. Please configure SMTP settings first."
+        )
+    
+    # Send test email
+    test_subject = "MySmartNotes Email Configuration Test"
+    test_body = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <h2 style="color: #3b82f6;">Email Configuration Test</h2>
+            <p>This is a test email from MySmartNotes to verify your SMTP configuration is working correctly.</p>
+            <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
+                <p style="margin: 0;"><strong>✓ Good news!</strong> Your email configuration is working properly.</p>
+            </div>
+            <p style="font-size: 12px; color: #666; margin-top: 30px;">
+                If you received this email, your system can now send:
+                <ul style="margin: 10px 0;">
+                    <li>User invitations</li>
+                    <li>Password reset links</li>
+                    <li>System notifications</li>
+                </ul>
+            </p>
+            <p style="font-size: 11px; color: #999; margin-top: 20px;">
+                Sent at {datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")} UTC
+            </p>
+        </body>
+    </html>
+    """
+    
+    success = send_email(db, validated.test_email, test_subject, test_body, is_html=True)
+    
+    if success:
+        # Log action
+        ip_address = request.client.host if request.client else None
+        db.add(UserLog(
+            user_id=admin.id,
+            action="email_test",
+            ip_address=ip_address,
+            device_info=request.headers.get("user-agent", "Unknown"),
+            details=f"Test email sent to {validated.test_email}"
+        ))
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Test email sent successfully to {validated.test_email}. Please check your inbox."
+        }
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to send test email. Check your SMTP configuration and try again."
+        )
+
 # --- Rate Limit Config ---
 @router.get("/rate-limits", response_model=RateLimitConfigSchema)
 def get_rate_limits(db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
@@ -133,53 +212,8 @@ def update_rate_limits(update_data: RateLimitConfigSchema, db: Session = Depends
 @router.get("/tiers", response_model=List[TierConfigSchema])
 def get_all_tiers(db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
     """Get all tier configurations"""
+    ensure_default_tier_configs(db)
     tiers = db.query(TierConfig).all()
-    
-    # Initialize default tiers if they don't exist
-    if not tiers:
-        default_tiers = [
-            TierConfig(
-                id="unlimited",
-                display_name="Unlimited",
-                max_notes=-1,
-                max_subjects=-1,
-                max_groups=-1,
-                max_conversations=-1,
-                max_messages=-1,
-                max_storage_gb=-1,
-                max_quizzes=-1,
-                max_summaries=-1
-            ),
-            TierConfig(
-                id="free",
-                display_name="Free",
-                max_notes=50,
-                max_subjects=10,
-                max_groups=5,
-                max_conversations=100,
-                max_messages=500,
-                max_storage_gb=5,
-                max_quizzes=20,
-                max_summaries=50
-            ),
-            TierConfig(
-                id="pro",
-                display_name="Pro",
-                max_notes=500,
-                max_subjects=100,
-                max_groups=50,
-                max_conversations=-1,
-                max_messages=-1,
-                max_storage_gb=100,
-                max_quizzes=200,
-                max_summaries=500
-            )
-        ]
-        for tier in default_tiers:
-            db.add(tier)
-        db.commit()
-        tiers = default_tiers
-    
     return tiers
 
 @router.get("/tiers/{tier_id}", response_model=TierConfigSchema)

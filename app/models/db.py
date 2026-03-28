@@ -473,5 +473,9 @@ class TierConfig(Base):
     max_storage_gb = Column(Integer, default=-1)  # in GB, -1 = unlimited
     max_quizzes = Column(Integer, default=-1)
     max_summaries = Column(Integer, default=-1)
+    # Reset periods: "week", "month", or None for cumulative limits
+    conversations_reset_period = Column(String(20), nullable=True)  # week, month, or None
+    messages_reset_period = Column(String(20), nullable=True)
+    summaries_reset_period = Column(String(20), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

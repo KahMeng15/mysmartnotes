@@ -84,16 +84,15 @@
                 <div class="settings-section">
                     <h3><i class="ph ph-star"></i> Subscription & Quotas</h3>
                     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <p style="margin: 0; font-size: 14px; opacity: 0.9;">Current Tier</p>
-                                <h2 style="margin: 5px 0 0 0;" id="tierName">Loading...</h2>
-                            </div>
-                            <div style="text-align: right;">
-                                <p style="margin: 0; font-size: 12px; opacity: 0.9;">Account Status</p>
-                                <p style="margin: 5px 0 0 0; font-size: 14px;" id="tierStatus">Loading...</p>
-                            </div>
+                        <div>
+                            <p style="margin: 0; font-size: 14px; opacity: 0.9;">Current Tier</p>
+                            <h2 style="margin: 5px 0 0 0;" id="tierName">Loading...</h2>
                         </div>
+                    </div>
+                    <div id="earlyTesterCallout" style="display: none; background: #1f2937; padding: 15px; border-radius: 10px; color: #cbd5f5; margin-bottom: 20px; font-size: 13px;">
+                        <p style="margin: 0; line-height: 1.5;">
+                            This app is an early closed release, so storage is currently unlimited for Early Testers. Limits may change in the future as we ship broader tiers.
+                        </p>
                     </div>
                     
                     <div style="margin-bottom: 20px;">
@@ -128,6 +127,12 @@
                             <span style="color: var(--color-gray);">Time Spent</span> <strong id="statTime">0
                                 mins</strong>
                         </div>
+                        <div>
+                            <span style="color: var(--color-gray);">Storage Used</span> <strong id="statStorage">0 MB</strong>
+                        </div>
+                        <div>
+                            <span style="color: var(--color-gray);">Storage Limit</span> <strong id="statStorageLimit">Loading...</strong>
+                        </div>
                     </div>
                 </div>
 
@@ -154,31 +159,16 @@
                     </div>
                 </div>
 
-                <!-- 4. Storage & Delete Data -->
+                <!-- 4. Data Management & Danger Zone -->
                 <div class="settings-section">
-                    <h3><i class="ph ph-floppy-disk"></i> Storage & Data</h3>
-                    <div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: var(--spacing-sm);">
-                            <div>
-                                <div style="font-weight: 600;">Storage Used</div>
-                                <div style="font-size: var(--font-size-sm); color: var(--color-gray);"><span
-                                        id="statStorage">0 MB</span> / <span id="statQuota">Unlimited</span></div>
-                            </div>
-                            <div style="font-weight: 600; color: var(--color-success);">Unlimited</div>
-                        </div>
-                        <div class="alert alert-info" style="margin-top: var(--spacing-md);">
-                            This app is an early closed release, so for now the storage is unlimited. May change in
-                            the future.
-                        </div>
-                    </div>
-                    
+                    <h3><i class="ph ph-floppy-disk"></i> Data Management & Danger Zone</h3>
                     <div style="margin-top: var(--spacing-lg);">
                         <button onclick="showFeatureComingSoon()" class="btn btn-block" disabled style="opacity: 0.5; cursor: not-allowed;">
                             <i class="ph ph-clock"></i> Clear Cache - Coming Soon
                         </button>
                     </div>
 
-                    <div class="danger-zone">
+                    <div class="danger-zone" style="margin-top: var(--spacing-lg);">
                         <h4 class="danger-title">
                             <i class="ph ph-warning-circle"></i> Danger Zone
                         </h4>

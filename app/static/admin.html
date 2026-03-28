@@ -115,8 +115,9 @@
                         <label>User Tier</label>
                         <select id="inviteTier" style="width:100%; padding:8px; margin-top:5px;">
                             <option value="unlimited">Unlimited</option>
-                            <option value="free">Free</option>
                             <option value="pro">Pro</option>
+                            <option value="early_tester">Early Testers</option>
+                            <option value="free">Free</option>
                         </select>
                     </div>
                     <div style="display:flex; gap:10px;">
@@ -141,8 +142,9 @@
                         <select id="changeTierSelect" style="width:100%; padding:8px; margin-top:5px;">
                             <option value="">-- Select Tier --</option>
                             <option value="unlimited">Unlimited</option>
-                            <option value="free">Free</option>
                             <option value="pro">Pro</option>
+                            <option value="early_tester">Early Testers</option>
+                            <option value="free">Free</option>
                         </select>
                     </div>
                     <div style="display:flex; gap:10px;">
@@ -195,6 +197,31 @@
                         <label style="color: rgba(255,255,255,0.9);">Max Summaries</label>
                         <input type="number" id="tierMaxSummariesUnlimited" value="-1" style="width:100%; padding:8px; margin-top:5px;">
                     </div>
+                    <hr style="grid-column: 1/-1; border: 0; border-top: 1px solid rgba(255,255,255,0.3); margin: 10px 0;">
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Conversations Reset Period</label>
+                        <select id="tierConversationsResetUnlimited" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Messages Reset Period</label>
+                        <select id="tierMessagesResetUnlimited" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Summaries Reset Period</label>
+                        <select id="tierSummariesResetUnlimited" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
                     <div style="grid-column: 1/-1; margin-top: 10px;">
                         <button type="submit" class="btn btn-primary" style="background: white; color: #667eea;">Save Unlimited Tier</button>
                     </div>
@@ -237,6 +264,31 @@
                     <div class="form-group">
                         <label style="color: rgba(255,255,255,0.9);">Max Summaries</label>
                         <input type="number" id="tierMaxSummariesFree" value="50" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <hr style="grid-column: 1/-1; border: 0; border-top: 1px solid rgba(255,255,255,0.3); margin: 10px 0;">
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Conversations Reset Period</label>
+                        <select id="tierConversationsResetFree" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Messages Reset Period</label>
+                        <select id="tierMessagesResetFree" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Summaries Reset Period</label>
+                        <select id="tierSummariesResetFree" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
                     </div>
                     <div style="grid-column: 1/-1; margin-top: 10px;">
                         <button type="submit" class="btn btn-primary" style="background: white; color: #f5576c;">Save Free Tier</button>
@@ -281,10 +333,104 @@
                         <label style="color: rgba(255,255,255,0.9);">Max Summaries</label>
                         <input type="number" id="tierMaxSummariesPro" value="500" style="width:100%; padding:8px; margin-top:5px;">
                     </div>
+                    <hr style="grid-column: 1/-1; border: 0; border-top: 1px solid rgba(255,255,255,0.3); margin: 10px 0;">
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Conversations Reset Period</label>
+                        <select id="tierConversationsResetPro" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Messages Reset Period</label>
+                        <select id="tierMessagesResetPro" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Summaries Reset Period</label>
+                        <select id="tierSummariesResetPro" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
                     <div style="grid-column: 1/-1; margin-top: 10px;">
                         <button type="submit" class="btn btn-primary" style="background: white; color: #00f2fe;">Save Pro Tier</button>
                     </div>
                 </form>
+            </div>
+
+            <!-- Early Testers Tier Card -->
+            <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
+                <h4 style="margin-top: 0; color: white;">Early Testers Tier</h4>
+                <p style="font-size: 13px; margin: 10px 0;">Special tier for beta testers and early adopters - Full access during beta period</p>
+                <form id="tierFormEarlyTester" onsubmit="saveTierConfig(event, 'early_tester')" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Notes</label>
+                        <input type="number" id="tierMaxNotesEarlyTester" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Subjects</label>
+                        <input type="number" id="tierMaxSubjectsEarlyTester" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Groups</label>
+                        <input type="number" id="tierMaxGroupsEarlyTester" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Conversations</label>
+                        <input type="number" id="tierMaxConversationsEarlyTester" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Messages</label>
+                        <input type="number" id="tierMaxMessagesEarlyTester" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Storage (GB)</label>
+                        <input type="number" id="tierMaxStorageEarlyTester" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Quizzes</label>
+                        <input type="number" id="tierMaxQuizzesEarlyTester" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Max Summaries</label>
+                        <input type="number" id="tierMaxSummariesEarlyTester" value="-1" style="width:100%; padding:8px; margin-top:5px;">
+                    </div>
+                    <hr style="grid-column: 1/-1; border: 0; border-top: 1px solid rgba(255,255,255,0.3); margin: 10px 0;">
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Conversations Reset Period</label>
+                        <select id="tierConversationsResetEarlyTester" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Messages Reset Period</label>
+                        <select id="tierMessagesResetEarlyTester" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: rgba(255,255,255,0.9);">Summaries Reset Period</label>
+                        <select id="tierSummariesResetEarlyTester" style="width:100%; padding:8px; margin-top:5px;">
+                            <option value="">Cumulative (No Reset)</option>
+                            <option value="week">Weekly (Monday-Sunday)</option>
+                            <option value="month">Monthly (1st-last day)</option>
+                        </select>
+                    </div>
+                    <div style="grid-column: 1/-1; margin-top: 10px;">
+                        <button type="submit" class="btn btn-primary" style="background: white; color: #38ef7d;">Save Early Testers Tier</button>
+                    </div>
+                </form>
+                <p style="font-size: 12px; margin-top: 15px; font-style: italic; color: rgba(255,255,255,0.8); border-top: 1px solid rgba(255,255,255,0.3); padding-top: 10px;">💡 Note: This tier grants full access during the beta period. Use it for trusted users and early adopters who provide feedback.</p>
             </div>
         </div>
 
@@ -467,6 +613,19 @@
                 <div style="grid-column: 1/-1; margin-top: 10px;">
                     <button type="submit" class="btn btn-primary">Save Email Config</button>
                 </div>
+            </form>
+
+            <hr style="margin: 30px 0; border: 0; border-top: 1px solid var(--color-light-gray);">
+
+            <h3>Test Email Delivery</h3>
+            <p style="color: var(--color-gray); margin-bottom: 15px; font-size: 0.95rem;">Send a test email to verify your SMTP configuration is working correctly.</p>
+            <div id="testEmailMsg" class="message-box" style="display:none; margin-bottom: 15px;"></div>
+            <form id="testEmailForm" onsubmit="sendTestEmail(event)" style="display: flex; gap: 10px; align-items: flex-end;">
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label>Test Email Address</label>
+                    <input type="email" id="testEmailAddress" placeholder="your-email@example.com" required style="width: 100%; padding: 8px;">
+                </div>
+                <button type="submit" class="btn btn-primary" style="padding: 8px 24px;">Send Test Email</button>
             </form>
         </div>
 
