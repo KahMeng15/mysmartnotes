@@ -10,7 +10,7 @@ import httpx
 import secrets
 
 from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken
-from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, TokenResponse, UserUpdate
+from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, UserUpdate
 from app.utils.db import get_db
 from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user as get_current_user_from_token
 from app.utils.quotas import get_user_quota_status, get_user_tier_config
@@ -30,12 +30,14 @@ FIREBASE_VERIFY_URL = "https://www.googleapis.com/identitytoolkit/v3/relyingpart
 class GoogleLoginRequest(BaseModel):
     """Google Sign-In request model"""
     idToken: str
+    invitation_token: Optional[str] = None
 
 
 class GoogleCompleteRequest(BaseModel):
     """Complete Google registration with additional info"""
     idToken: str
     nickname: str
+    invitation_token: Optional[str] = None
     agree_tos: bool = False
     agree_privacy: bool = False
     agree_fair_use: bool = False
@@ -83,6 +85,23 @@ def verify_firebase_token(id_token_str: str):
         print(f"[DEBUG] Token verification error: {str(e)}")
         raise ValueError(f"Token verification failed: {str(e)}")
 
+
+
+def validate_invitation_token(db: Session, token: Optional[str], email: str) -> UserInvitation:
+    if not token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is restricted to invited users only. Token required.")
+
+    invitation = db.query(UserInvitation).filter(UserInvitation.token == token, UserInvitation.is_used == False).first()
+    if not invitation:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or expired invitation token.")
+
+    if invitation.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token has expired.")
+
+    if invitation.email.lower() != email.lower():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token was issued for a different email address.")
+
+    return invitation
 
 
 @router.get("/firebase-config")
@@ -311,6 +330,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
     """Verify Google token and check if user exists"""
     # Check maintenance mode
     sys_settings = db.query(SystemSettings).first()
+    signup_config = sys_settings.signup_config if sys_settings else "open"
     if sys_settings and sys_settings.maintenance_mode:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -380,7 +400,10 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
                 "is_new_user": False
             }
         else:
-            # New user - return info for registration confirmation
+            # New user - enforce invite-only config before prompting for profile completion
+            if signup_config == "invite":
+                validate_invitation_token(db, google_request.invitation_token, email)
+
             print(f"[DEBUG] New user detected: {email}")
             return {
                 "is_new_user": True,
@@ -406,7 +429,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
         )
 
 
-@router.post("/google-complete", response_model=TokenResponse)
+@router.post("/google-complete")
 def google_complete(google_request: GoogleCompleteRequest, request: Request, db: Session = Depends(get_db)):
     """Complete Google registration for new user with additional info"""
     # Check maintenance mode
@@ -416,6 +439,7 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Google Sign-In is disabled during maintenance."
         )
+    signup_config = sys_settings.signup_config if sys_settings else "open"
 
     try:
         # Check required agreement fields
@@ -480,6 +504,14 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
             return {"access_token": access_token, "token_type": "bearer", "user": existing_user}
         
         # Create new user with the provided nickname
+        invitation = None
+        if signup_config == "invite":
+            invitation = validate_invitation_token(db, google_request.invitation_token, email)
+
+        is_admin = True if settings.ADMIN_EMAIL and email.lower() == settings.ADMIN_EMAIL.lower() else False
+        is_approved = True if signup_config != "approval" or is_admin else False
+        tier = invitation.tier if invitation else "free"
+
         user = User(
             username=email,
             email=email,
@@ -487,12 +519,31 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
             nickname=google_request.nickname,
             hashed_password="",  # No local password for Google auth users
             is_active=True,
-            is_admin=True if settings.ADMIN_EMAIL and email.lower() == settings.ADMIN_EMAIL.lower() else False
+            is_admin=is_admin,
+            is_approved=is_approved,
+            tier=tier
         )
         db.add(user)
+        if invitation:
+            invitation.is_used = True
         db.commit()
         db.refresh(user)
-        
+
+        # Log signup
+        ip_address = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent", "Unknown Device")
+        log_details = "Google Auth"
+        if not is_approved:
+            log_details = "Google Auth (pending approval)"
+        db.add(UserLog(user_id=user.id, action="signup", ip_address=ip_address, device_info=user_agent, details=log_details))
+        db.commit()
+
+        if not is_approved:
+            return {
+                "pending_approval": True,
+                "message": "Your account is pending administrator approval. We'll notify you once it is ready."
+            }
+
         # Create JWT token
         sys_settings = db.query(SystemSettings).first()
         expire_minutes = settings.ACCESS_TOKEN_EXPIRE_MINUTES
@@ -503,18 +554,12 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
                 expire_minutes = length * 60
             elif unit == "days":
                 expire_minutes = length * 1440
-                
+
         access_token = create_access_token(
             data={"sub": str(user.id)},
             expires_delta=timedelta(minutes=expire_minutes)
         )
-        
-        # Log signup
-        ip_address = request.client.host if request.client else None
-        user_agent = request.headers.get("user-agent", "Unknown Device")
-        db.add(UserLog(user_id=user.id, action="signup", ip_address=ip_address, device_info=user_agent, details="Google Auth"))
-        db.commit()
-        
+
         return {"access_token": access_token, "token_type": "bearer", "user": user}
         
     except ValueError as e:

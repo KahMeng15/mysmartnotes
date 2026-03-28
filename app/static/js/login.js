@@ -264,10 +264,15 @@ async function handleGoogleSignIn() {
         const idToken = await user.getIdToken();
 
         // Send token to backend to verify
+        const payload = { idToken };
+        if (window.invitationToken) {
+            payload.invitation_token = window.invitationToken;
+        }
+
         const res = await fetch('/auth/google-login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken })
+            body: JSON.stringify(payload)
         });
 
         if (res.ok) {
@@ -349,14 +354,24 @@ async function handleGoogleComplete(event) {
     }
 
     try {
+        const body = { idToken: window.googleIdToken, nickname, agree_tos, agree_privacy, agree_fair_use };
+        if (window.invitationToken) {
+            body.invitation_token = window.invitationToken;
+        }
+
         const res = await fetch('/auth/google-complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken: window.googleIdToken, nickname, agree_tos, agree_privacy, agree_fair_use })
+            body: JSON.stringify(body)
         });
 
         if (res.ok) {
             const data = await res.json();
+            if (data.pending_approval) {
+                showMessageBox('googleRegisterMsg', 'info', data.message || 'Your account is pending approval. Please try signing in once an administrator approves it.');
+                setTimeout(() => switchPanel('login'), 2500);
+                return;
+            }
             localStorage.setItem('token', data.access_token);
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
             showMessageBox('googleRegisterMsg', 'success', 'Welcome! Redirecting…');
