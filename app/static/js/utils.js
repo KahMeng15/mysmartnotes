@@ -1,4 +1,138 @@
 /**
+ * ─── TOAST NOTIFICATION SYSTEM ─────────────────────────────────────
+ * Modern, non-blocking notifications to replace browser alert()
+ */
+
+// Initialize toast container
+function initToastContainer() {
+    if (!document.getElementById('toast-container')) {
+        const container = document.createElement('div');
+        container.id = 'toast-container';
+        container.setAttribute('aria-live', 'polite');
+        container.setAttribute('aria-atomic', 'true');
+        container.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        `;
+        document.body.appendChild(container);
+    }
+}
+
+/**
+ * Show a toast notification
+ * @param {string} type - 'success', 'error', 'info', 'warning'
+ * @param {string} message - Toast message
+ * @param {number} duration - Auto-dismiss duration in ms (0 = no auto-dismiss)
+ */
+function showToast(type = 'info', message = '', duration = 4000) {
+    initToastContainer();
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    const typeClass = `toast-${type}`;
+    
+    toast.className = `toast ${typeClass}`;
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); background: var(--toast-${type}-bg, #fff); color: var(--toast-${type}-text, #000); max-width: 400px; word-wrap: break-word;">
+            <span>${message}</span>
+            <button class="toast-close" onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: inherit; padding: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;" aria-label="Close notification">×</button>
+        </div>
+    `;
+    
+    container.appendChild(toast);
+    
+    if (duration > 0) {
+        setTimeout(() => toast.remove(), duration);
+    }
+    
+    return toast;
+}
+
+/**
+ * ─── UTILITY FUNCTIONS ─────────────────────────────────────────────
+ */
+
+/**
+ * Generates a UUID v4 string
+ * @returns {string} UUID in format xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+ */
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0,
+            v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+/**
+ * AI Explanation Mode Metadata (centralized)
+ */
+const MODE_META = {
+    normal: { label: 'Normal', description: 'Learn the concept, step-by-step, in your current language' },
+    concise: { label: 'Concise', description: 'Quick summary, key points only' },
+    socratic: { label: 'Socratic', description: 'Guided questions to help you discover the answer' },
+    creative: { label: 'Creative', description: 'Real-world examples, analogies, stories' },
+    game: { label: 'Game', description: 'Learning through interactive challenges and quizzes' }
+};
+
+const OUTPUT_FORMAT_META = {
+    sentence: { label: 'Sentences', description: 'Short, readable paragraphs' },
+    bullet: { label: 'Bullet Points', description: 'Key takeaways, quick reference format' },
+    table: { label: 'Table', description: 'Structured comparison or breakdown' },
+    code: { label: 'Code', description: 'Programming examples and snippets' }
+};
+
+/**
+ * Safe localStorage wrapper - handles quota exceeded and private mode
+ */
+const SafeStorage = {
+    set: function(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+            return true;
+        } catch (error) {
+            if (error.name === 'QuotaExceededError') {
+                console.warn('Storage quota exceeded');
+                return false;
+            }
+            if (error.name === 'SecurityError') {
+                console.warn('Cannot access storage in private mode');
+                return false;
+            }
+            console.error('Storage error:', error);
+            return false;
+        }
+    },
+    
+    get: function(key, defaultValue = null) {
+        try {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : defaultValue;
+        } catch (error) {
+            console.warn('Error reading from storage:', error);
+            return defaultValue;
+        }
+    },
+    
+    remove: function(key) {
+        try {
+            localStorage.removeItem(key);
+            return true;
+        } catch (error) {
+            console.error('Error removing from storage:', error);
+            return false;
+        }
+    }
+};
+
+/**
  * Generates a contrasting color for a new subject based on existing colors.
  * @param {string[]} existingColors - Array of hex color strings (e.g., ['#ff0000', '#00ff00'])
  * @returns {string} - Hex color string (e.g., '#0000ff')

@@ -18,6 +18,7 @@ from app.utils.email import send_password_reset_email
 from app.config import get_settings
 from sqlalchemy import func
 from app.models.db import Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserLog
+from app.utils.invitation_utils import is_link_only_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -118,7 +119,7 @@ def validate_invitation_token(db: Session, token: Optional[str], email: str) -> 
     if invitation.expires_at < datetime.utcnow():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token has expired.")
 
-    if invitation.email.lower() != email.lower():
+    if not is_link_only_email(invitation.email) and invitation.email.lower() != email.lower():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invitation token was issued for a different email address.")
 
     return invitation
@@ -200,7 +201,7 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
         if invitation.expires_at < datetime.utcnow():
             raise HTTPException(status_code=403, detail="Invitation token has expired.")
             
-        if invitation.email.lower() != user_data.email.lower():
+        if not is_link_only_email(invitation.email) and invitation.email.lower() != user_data.email.lower():
             raise HTTPException(status_code=403, detail="Invitation token was issued for a different email address.")
 
     # Check if user exists

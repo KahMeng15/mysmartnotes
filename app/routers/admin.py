@@ -16,6 +16,7 @@ from app.utils.db import get_db
 from app.routers.auth import get_current_user
 from app.utils.auth import hash_password
 from app.utils.email import send_invitation_email
+from app.utils.invitation_utils import build_link_only_email, is_link_only_email
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -329,27 +330,38 @@ def user_action(request: UserActionRequest, db: Session = Depends(get_db), admin
 # --- Invitations ---
 @router.post("/invitations", response_model=UserInvitationResponse)
 def create_invitation(invite_data: UserInvitationCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
-    # Check if user already exists
-    existing_user = db.query(User).filter(User.email == invite_data.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="User with this email already exists")
+    send_email = invite_data.send_email
+    requested_email = invite_data.email.lower().strip() if invite_data.email else None
+    target_email = requested_email if send_email else None
 
-    # Check if invitation already exists
-    existing_invite = db.query(UserInvitation).filter(UserInvitation.email == invite_data.email, UserInvitation.is_used == False).first()
+    # Targeted invites have existing users and invitations tied to the email address
+    existing_invite = None
+    if target_email:
+        existing_user = db.query(User).filter(User.email == target_email).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="User with this email already exists")
+
+        existing_invite = db.query(UserInvitation).filter(UserInvitation.email == target_email, UserInvitation.is_used == False).first()
+
+    expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=7)
+    token = secrets.token_urlsafe(32)
+    email_value = target_email or build_link_only_email(token)
+
     if existing_invite:
-        # Update existing invite
-        existing_invite.token = secrets.token_urlsafe(32)
-        existing_invite.expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=7)
+        existing_invite.token = token
+        existing_invite.expires_at = expires_at
+        existing_invite.tier = invite_data.tier
+        existing_invite.email = email_value
         db.commit()
         db.refresh(existing_invite)
         invite = existing_invite
     else:
         invite = UserInvitation(
-            email=invite_data.email,
-            token=secrets.token_urlsafe(32),
+            email=email_value,
+            token=token,
             invited_by=admin.id,
             tier=invite_data.tier,
-            expires_at=datetime.datetime.utcnow() + datetime.timedelta(days=7)
+            expires_at=expires_at
         )
         db.add(invite)
         db.commit()
@@ -363,11 +375,13 @@ def create_invitation(invite_data: UserInvitationCreate, db: Session = Depends(g
     
     invitation_link = f"{domain.rstrip('/')}/signup?token={invite.token}"
     
-    # Try to send email
-    send_invitation_email(db, invite.email, invitation_link)
+    # Send email only when requested
+    if send_email and target_email:
+        send_invitation_email(db, target_email, invitation_link)
     
     response = UserInvitationResponse.model_validate(invite)
     response.invitation_link = invitation_link
+    response.send_email = send_email
     return response
 
 @router.get("/invitations", response_model=List[UserInvitationResponse])
@@ -382,6 +396,7 @@ def get_invitations(db: Session = Depends(get_db), admin: User = Depends(get_cur
         
     for i in invites:
         resp = UserInvitationResponse.model_validate(i)
+        resp.send_email = not is_link_only_email(i.email)
         resp.invitation_link = f"{domain.rstrip('/')}/signup?token={i.token}"
         results.append(resp)
         

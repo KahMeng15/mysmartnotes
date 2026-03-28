@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.schemas.schemas import User
@@ -24,8 +24,15 @@ class SystemSettingsSchema(BaseModel):
         from_attributes = True
 
 class UserInvitationCreate(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
     tier: str = "free"
+    send_email: bool = True
+
+    @model_validator(mode="after")
+    def ensure_email_when_sending(cls, values):
+        if values.send_email and not values.email:
+            raise ValueError("Email is required when sending an invitation email.")
+        return values
 
 class UserInvitationResponse(BaseModel):
     id: int
@@ -36,6 +43,7 @@ class UserInvitationResponse(BaseModel):
     is_used: bool
     expires_at: datetime
     created_at: datetime
+    send_email: bool = False
     invitation_link: Optional[str] = None
 
     class Config:

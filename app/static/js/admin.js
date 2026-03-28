@@ -1,6 +1,7 @@
 const API_URL = '';
 const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
+let inviteMethod = 'email';
 
 window.addEventListener('load', () => {
     if (!token || !user.is_admin) {
@@ -8,7 +9,7 @@ window.addEventListener('load', () => {
         window.location.href = 'dashboard.html';
         return;
     }
-    
+    setInviteMethod('email');
     // Initial fetch for the active tab
     loadUsers();
 });
@@ -209,20 +210,55 @@ async function submitTierChange(e) {
 // ========================
 function openInviteModal() {
     document.getElementById('inviteModal').style.display = 'flex';
+    const emailRadio = document.querySelector('input[name="inviteMethod"][value="email"]');
+    if (emailRadio) emailRadio.checked = true;
+    setInviteMethod('email');
 }
 
 function closeInviteModal() {
     document.getElementById('inviteModal').style.display = 'none';
 }
 
+function setInviteMethod(mode) {
+    inviteMethod = mode;
+    const emailInput = document.getElementById('inviteEmail');
+    const emailGroup = document.getElementById('inviteEmailGroup');
+    const helpText = document.getElementById('inviteMethodHelp');
+    if (!emailInput || !emailGroup) return;
+    if (mode === 'email') {
+        emailInput.disabled = false;
+        emailInput.required = true;
+        emailGroup.style.opacity = '1';
+        if (helpText) helpText.textContent = 'Invitations sent via email will notify users automatically.';
+    } else {
+        emailInput.disabled = true;
+        emailInput.required = false;
+        emailGroup.style.opacity = '0.6';
+        if (helpText) helpText.textContent = 'Shareable links can be distributed without entering an email address.';
+    }
+}
+
 async function sendInvite(e) {
     e.preventDefault();
-    const email = document.getElementById('inviteEmail').value;
+    const emailInput = document.getElementById('inviteEmail');
+    const email = emailInput.value.trim();
     const tier = document.getElementById('inviteTier').value;
+    const sendEmail = inviteMethod === 'email';
     
     try {
-        const res = await apiCall('/admin/invitations', 'POST', { email, tier });
-        alert(`Invitation link created and sent to ${email}:\n\n${res.invitation_link}`);
+        if (sendEmail && !email) {
+            alert('Please enter an email address to send the invitation.');
+            return;
+        }
+
+        const payload = { tier, send_email: sendEmail };
+        if (sendEmail) payload.email = email;
+
+        const res = await apiCall('/admin/invitations', 'POST', payload);
+        const message = sendEmail
+            ? `Invitation link created and sent to ${email}`
+            : 'Shareable invitation link created';
+        alert(`${message}:\n\n${res.invitation_link}`);
         closeInviteModal();
         loadInvitations();
     } catch (err) {
@@ -237,15 +273,20 @@ async function loadInvitations() {
         tbody.innerHTML = '';
         
         if (invites.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">No pending invitations</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7">No pending invitations</td></tr>';
             return;
         }
         
         invites.forEach(i => {
             const tr = document.createElement('tr');
             const expires = new Date(i.expires_at).toLocaleString();
+            const emailDisplay = i.send_email ? i.email : '<span style="color:var(--color-gray)">Shareable link</span>';
+            const methodLabel = i.send_email
+                ? '<span style="color:#0f9d58; font-weight:600;">Email</span>'
+                : '<span style="color:#f59e0b; font-weight:600;">Link only</span>';
             tr.innerHTML = `
-                <td>${i.email}</td>
+                <td>${emailDisplay}</td>
+                <td>${methodLabel}</td>
                 <td><code>${i.token.substring(0, 8)}...</code></td>
                 <td>${i.tier}</td>
                 <td><small>${i.invitation_link}</small></td>

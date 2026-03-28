@@ -228,13 +228,11 @@ async function handleRegister() {
     
     try {
         const body = { nickname, email, password, agree_tos, agree_privacy, agree_fair_use };
+        const endpoint = window.invitationToken
+            ? `/auth/register?token=${encodeURIComponent(window.invitationToken)}`
+            : '/auth/register';
         
-        // Add invitation token if present
-        if (window.invitationToken) {
-            body.token = window.invitationToken;
-        }
-        
-        const res = await fetch('/auth/register', {
+        const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)

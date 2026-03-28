@@ -10,23 +10,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/styles/master.css">
     <link rel="stylesheet" href="/styles/settings.css">
-    <style>
-        .admin-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
-        .admin-table th, .admin-table td { border: 1px solid var(--color-light-gray); padding: 8px; text-align: left; }
-        .admin-table th { background-color: #f9fafb; font-weight: 600; }
-        .tab-btn { margin-right: 10px; padding: 6px 16px; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid transparent; background: transparent; }
-        .tab-btn.active { background: var(--color-primary); color: white; }
-        .admin-section { display: none; }
-        .admin-section.active { display: block; }
-        .action-btn { padding: 4px 8px; font-size: 12px; margin-right: 4px; cursor: pointer; }
-        .badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
-        .badge.free { background-color: #dbeafe; color: #1e40af; }
-        .badge.pro { background-color: #fecaca; color: #991b1b; }
-        .badge.unlimited { background-color: #c4b5fd; color: #5b21b6; }
-    </style>
+    <link rel="stylesheet" href="/styles/admin.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
     <script src="/js/nav.js"></script>
+    <script src="/js/utils.js"></script>
     <script src="/js/admin.js"></script>
     <script src="/js/footer.js"></script>
 </head>
@@ -92,11 +80,11 @@
                 <table class="admin-table" id="invitationsTable">
                     <thead>
                         <tr>
-                            <th>Email</th><th>Token</th><th>Tier</th><th>Link</th><th>Expires</th><th>Status</th>
+                            <th>Email</th><th>Method</th><th>Token</th><th>Tier</th><th>Link</th><th>Expires</th><th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td colspan="6">Loading invitations...</td></tr>
+                        <tr><td colspan="7">Loading invitations...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -108,6 +96,20 @@
                 <h3>Invite User</h3>
                 <form onsubmit="sendInvite(event)">
                     <div class="form-group" style="margin-bottom:15px;">
+                        <label>Invitation Method</label>
+                        <div style="display:flex; gap:12px; margin-top:5px;">
+                            <label style="display:flex; align-items:center; gap:6px;">
+                                <input type="radio" name="inviteMethod" value="email" checked onchange="setInviteMethod('email')">
+                                Send email (recommended)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:6px;">
+                                <input type="radio" name="inviteMethod" value="link" onchange="setInviteMethod('link')">
+                                Generate shareable link
+                            </label>
+                        </div>
+                        <small id="inviteMethodHelp" style="display:block; margin-top:6px; color:var(--color-gray); font-size:12px;">Invitations sent via email will notify users automatically.</small>
+                    </div>
+                    <div class="form-group" id="inviteEmailGroup" style="margin-bottom:15px;">
                         <label>Email Address</label>
                         <input type="email" id="inviteEmail" required placeholder="user@example.com" style="width:100%; padding:8px; margin-top:5px;">
                     </div>
@@ -699,5 +701,9 @@
 
         </div>
     </div>
+    <script>
+        // Initialize toast notification system on page load
+        document.addEventListener('DOMContentLoaded', initToastContainer);
+    </script>
 </body>
 </html>

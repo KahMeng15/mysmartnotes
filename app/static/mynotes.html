@@ -409,10 +409,10 @@
                     showSuccessModal('Group Created', 'Your new group has been created successfully!');
                     fetchData(); // Reload
                 } else {
-                    alert('Failed to create group');
+                    showToast('error', 'Failed to create group');
                 }
             } catch (err) {
-                alert('Failed to create group');
+                showToast('error', 'Failed to create group');
             }
         }
 
@@ -434,10 +434,10 @@
                     showSuccessModal('Group Updated', 'Your group has been updated successfully!');
                     fetchData(); // Reload
                 } else {
-                    alert('Failed to update group');
+                    showToast('error', 'Failed to update group');
                 }
             } catch (err) {
-                alert('Error updating group');
+                showToast('error', 'Error updating group');
             }
         }
 
@@ -469,10 +469,10 @@
                     showSuccessModal('Subject Created', 'Your new subject has been created successfully!');
                     fetchData();
                 } else {
-                    alert('Failed to create subject');
+                    showToast('error', 'Failed to create subject');
                 }
             } catch (err) {
-                alert('Failed to create subject');
+                showToast('error', 'Failed to create subject');
             }
         }
 
@@ -502,10 +502,10 @@
                     }, 100);
                 } else {
                     const errorText = await res.text();
-                    alert('Failed to delete group: ' + res.status);
+                    showToast('error', 'Failed to delete group: ' + res.status);
                 }
             } catch (err) {
-                alert('Failed to delete group: ' + err.message);
+                showToast('error', 'Failed to delete group: ' + err.message);
             }
         }
 
@@ -523,6 +523,9 @@
                 event.target.classList.remove('active');
             }
         }
+        
+        // Initialize toast notification system
+        document.addEventListener('DOMContentLoaded', initToastContainer);
     </script>
 </body>
 
