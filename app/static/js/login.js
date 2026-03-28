@@ -23,6 +23,13 @@ window.addEventListener('load', async () => {
         switchPanel('register');
         // Store token for registration
         window.invitationToken = invitationToken;
+        
+        // Show Google sign-in button if invitation exists
+        const regGoogleBtn = document.getElementById('regGoogleBtn');
+        if (regGoogleBtn) {
+            regGoogleBtn.style.display = 'flex';
+        }
+        
         document.getElementById('regNickname').focus();
     }
     
@@ -284,6 +291,20 @@ async function handleGoogleSignIn() {
                 // Existing user - log them in
                 localStorage.setItem('token', data.access_token);
                 if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+                
+                // Fetch fresh user data from /auth/me
+                try {
+                    const meRes = await fetch('/auth/me', {
+                        headers: { 'Authorization': `Bearer ${data.access_token}` }
+                    });
+                    if (meRes.ok) {
+                        const userData = await meRes.json();
+                        localStorage.setItem('user', JSON.stringify(userData));
+                    }
+                } catch (e) {
+                    console.warn('Failed to fetch user data:', e);
+                }
+                
                 showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
                 setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
             }
@@ -387,6 +408,13 @@ async function handleGoogleComplete(event) {
         console.error('Google registration error:', e);
         showMessageBox('googleRegisterMsg', 'error', 'An error occurred. Please try again.');
     }
+}
+
+// Wrapper for Google sign-in from invitation context
+async function handleGoogleSignInWithInvite() {
+    // The regular handleGoogleSignIn already checks for window.invitationToken
+    // So we just call it directly
+    handleGoogleSignIn();
 }
 
 // --- Password Reset Functions ---

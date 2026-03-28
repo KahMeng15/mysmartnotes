@@ -44,6 +44,17 @@ class GoogleCompleteRequest(BaseModel):
     agree_fair_use: bool = False
 
 
+class LinkGoogleAccountRequest(BaseModel):
+    """Link Google account to existing user account"""
+    idToken: str
+    password: str
+
+
+class UnlinkGoogleAccountRequest(BaseModel):
+    """Unlink Google account from user account"""
+    password: str
+
+
 def verify_firebase_token(id_token_str: str):
     """Verify Firebase ID token by decoding JWT and validating claims"""
     try:
@@ -205,7 +216,7 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
             raise HTTPException(status_code=403, detail="Invitation token was issued for a different email address.")
 
     # Check if user exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    existing_user = db.query(User).filter(func.lower(User.email) == func.lower(user_data.email)).first()
     
     # Special handling for Admin Email: allow "re-claiming" via signup if password is lost
     is_admin_signup = settings.ADMIN_EMAIL and user_data.email.lower() == settings.ADMIN_EMAIL.lower()
@@ -283,7 +294,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
                 detail="System is undergoing maintenance. Only administrators can log in at this time."
             )
 
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(func.lower(User.email) == func.lower(email)).first()
     
     try:
         if not user or not verify_password(password, user.hashed_password):
@@ -389,10 +400,16 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
             )
         
         # Check if user exists
-        user = db.query(User).filter(User.email == email).first()
+        user = db.query(User).filter(func.lower(User.email) == func.lower(email)).first()
         
         if user:
             # Existing user - log them in
+            # Store google_oauth_id if not already set
+            if not user.google_oauth_id:
+                user.google_oauth_id = claims.get('user_id') or claims.get('sub')
+                db.commit()
+                db.refresh(user)  # Refresh to get latest data
+            
             if not user.is_active:
                 record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="disabled", reason="Account disabled", user=user)
                 raise HTTPException(
@@ -511,6 +528,7 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
         # Extract user information from token
         email = claims.get('email')
         full_name = claims.get('name', '')
+        google_user_id = claims.get('user_id') or claims.get('sub')  # Firebase user ID
         
         if not email:
             raise HTTPException(
@@ -519,10 +537,16 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
             )
         
         # Check if user already exists
-        existing_user = db.query(User).filter(User.email == email).first()
+        existing_user = db.query(User).filter(func.lower(User.email) == func.lower(email)).first()
         
         if existing_user:
             # User already exists, just log them in
+            # Update google_oauth_id if not already set
+            if not existing_user.google_oauth_id:
+                existing_user.google_oauth_id = claims.get('user_id') or claims.get('sub')
+                db.commit()
+                db.refresh(existing_user)  # Refresh to get latest data
+            
             if not existing_user.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -547,6 +571,8 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
                 data={"sub": str(existing_user.id)},
                 expires_delta=timedelta(minutes=expire_minutes)
             )
+            # Ensure user object is fresh with latest google_oauth_id
+            db.refresh(existing_user)
             return {"access_token": access_token, "token_type": "bearer", "user": existing_user}
         
         # Create new user with the provided nickname
@@ -567,7 +593,8 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
             is_active=True,
             is_admin=is_admin,
             is_approved=is_approved,
-            tier=tier
+            tier=tier,
+            google_oauth_id=google_user_id  # Store Firebase user ID
         )
         db.add(user)
         if invitation:
@@ -623,8 +650,16 @@ def get_current_user(current_user: User = Depends(get_current_user_from_token)):
     return current_user
 
 
+@router.get("/me", response_model=UserSchema)
+async def get_current_user_info(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Get current user information - used for session validation and data refresh"""
+    # Refresh user data from DB to ensure we have latest info
+    db.refresh(current_user)
+    return current_user
+
+
 @router.put("/profile", response_model=UserSchema)
-def update_profile(user_update: UserUpdate, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+async def update_profile(user_update: UserUpdate, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Update user profile"""
     if user_update.full_name is not None:
         current_user.full_name = user_update.full_name
@@ -647,7 +682,7 @@ def update_profile(user_update: UserUpdate, current_user: User = Depends(get_cur
 
 
 @router.get("/stats")
-def get_user_stats(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+async def get_user_stats(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Get personalized statistics and recent logins for the current user"""
     u_id = current_user.id
     notes_count = db.query(func.count(Lecture.id)).filter(Lecture.user_id == u_id).scalar() or 0
@@ -685,7 +720,7 @@ def get_user_stats(current_user: User = Depends(get_current_user_from_token), db
     }
 
 @router.get("/quotas")
-def get_user_quotas(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+async def get_user_quotas(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Get current user's tier, quotas, and usage statistics"""
     return get_user_quota_status(current_user, db)
 
@@ -694,7 +729,7 @@ class PasswordChange(BaseModel):
     new_password: str
 
 @router.put("/change-password")
-def change_password(passwords: PasswordChange, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+async def change_password(passwords: PasswordChange, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Change the user's password"""
     if not current_user.hashed_password:
         raise HTTPException(status_code=400, detail="Cannot change password for OAuth accounts. Please login via Google.")
@@ -710,14 +745,14 @@ def change_password(passwords: PasswordChange, current_user: User = Depends(get_
     return {"message": "Password changed successfully"}
 
 @router.delete("/profile")
-def delete_account(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+async def delete_account(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Permanently delete user account and data"""
     db.delete(current_user)
     db.commit()
     return {"message": "Account deleted successfully"}
 
 @router.get("/download-data")
-def download_data(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+async def download_data(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Export all user data as JSON"""
     uid = current_user.id
     
@@ -762,7 +797,7 @@ def request_password_reset(reset_request: PasswordResetRequest, request: Request
     email = reset_request.email.lower().strip()
     
     # Check if user exists
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(func.lower(User.email) == email).first()
     if not user:
         # For security, don't reveal whether email exists
         return {"message": "If an account exists with this email, a password reset link has been sent."}
@@ -869,3 +904,142 @@ def check_reset_token_validity(token: str, db: Session = Depends(get_db)):
         return {"valid": False, "message": "Token has expired"}
     
     return {"valid": True, "message": "Token is valid"}
+
+
+# --- Google Account Linking ---
+
+@router.get("/connected-accounts")
+async def get_connected_accounts(current_user: User = Depends(get_current_user_from_token)):
+    """Get list of connected OAuth accounts for current user"""
+    return {
+        "google_linked": bool(current_user.google_oauth_id),
+        "email": current_user.email,
+        "has_password": bool(current_user.hashed_password)
+    }
+
+
+@router.post("/link-google-account")
+async def link_google_account(request_data: LinkGoogleAccountRequest, request: Request, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Link a Google account to the current user's account"""
+    # Verify password first (security requirement)
+    try:
+        if not current_user.hashed_password or not verify_password(request_data.password, current_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password"
+            )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Error verifying password"
+        )
+    
+    # Check if already linked
+    if current_user.google_oauth_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A Google account is already linked to this account"
+        )
+    
+    # Verify Google token
+    try:
+        claims = verify_firebase_token(request_data.idToken)
+        google_user_email = claims.get('email', '').lower()
+        google_user_id = claims.get('user_id') or claims.get('sub', '')
+        
+        if not google_user_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email not found in Google token"
+            )
+        
+        # Security check: Ensure the Google email matches the current user's email (case-insensitive)
+        if google_user_email != current_user.email.lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Google account email does not match your account email. Please use the same email address."
+            )
+        
+        # Check if this Google ID is already linked to another account
+        existing_google_link = db.query(User).filter(User.google_oauth_id == google_user_id).first()
+        if existing_google_link and existing_google_link.id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This Google account is already linked to another user account"
+            )
+        
+        # Link the Google account
+        current_user.google_oauth_id = google_user_id
+        db.commit()
+        
+        # Log action
+        ip_address = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent", "Unknown Device")
+        db.add(UserLog(user_id=current_user.id, action="google_linked", ip_address=ip_address, device_info=user_agent))
+        db.commit()
+        
+        return {
+            "message": "Google account successfully linked",
+            "google_linked": True,
+            "email": current_user.email
+        }
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Google token: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error linking Google account: {str(e)}"
+        )
+
+
+@router.post("/unlink-google-account")
+async def unlink_google_account(request_data: UnlinkGoogleAccountRequest, request: Request, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Unlink Google account from current user's account"""
+    # Verify password first (security requirement)
+    try:
+        if not current_user.hashed_password or not verify_password(request_data.password, current_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password"
+            )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Error verifying password"
+        )
+    
+    # Check if Google is linked
+    if not current_user.google_oauth_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No Google account is currently linked"
+        )
+    
+    # Require password to be set (so user can still login)
+    if not current_user.hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must set a password before unlinking your Google account, so you can continue to log in"
+        )
+    
+    # Unlink the Google account
+    current_user.google_oauth_id = None
+    db.commit()
+    
+    # Log action
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    db.add(UserLog(user_id=current_user.id, action="google_unlinked", ip_address=ip_address, device_info=user_agent))
+    db.commit()
+    
+    return {
+        "message": "Google account successfully unlinked",
+        "google_linked": False,
+        "email": current_user.email
+    }

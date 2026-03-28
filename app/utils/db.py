@@ -100,6 +100,9 @@ def apply_sqlite_migrations():
 
     # Consolidated list of expected columns across major tables
     migrations = [
+        ("users", [
+            ("google_oauth_id", "VARCHAR(255) DEFAULT NULL")
+        ]),
         ("system_settings", [
             ("session_length", "INTEGER DEFAULT 24"),
             ("session_unit", "TEXT DEFAULT 'hours'"),

@@ -328,6 +328,10 @@ async def serve_quiz_view(id: str):
 async def serve_quiz_mode_view(id: str, mode: str):
     return FileResponse(os.path.join(static_dir, "quiz_view.html"))
 
+@app.get("/settings")
+async def serve_settings():
+    return FileResponse(os.path.join(static_dir, "settings.html"))
+
 @app.get("/pomodoro_popout.html")
 async def serve_pomodoro_popout():
     return FileResponse(os.path.join(static_dir, "pomodoro_popout.html"))

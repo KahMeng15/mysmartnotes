@@ -337,11 +337,11 @@ def create_invitation(invite_data: UserInvitationCreate, db: Session = Depends(g
     # Targeted invites have existing users and invitations tied to the email address
     existing_invite = None
     if target_email:
-        existing_user = db.query(User).filter(User.email == target_email).first()
+        existing_user = db.query(User).filter(func.lower(User.email) == func.lower(target_email)).first()
         if existing_user:
             raise HTTPException(status_code=400, detail="User with this email already exists")
 
-        existing_invite = db.query(UserInvitation).filter(UserInvitation.email == target_email, UserInvitation.is_used == False).first()
+        existing_invite = db.query(UserInvitation).filter(func.lower(UserInvitation.email) == func.lower(target_email), UserInvitation.is_used == False).first()
 
     expires_at = datetime.datetime.utcnow() + datetime.timedelta(days=7)
     token = secrets.token_urlsafe(32)

@@ -26,6 +26,7 @@ class User(Base):
     ai_base_url = Column(String(255), nullable=True)
     ai_api_key = Column(String(255), nullable=True)
     use_global_ai_config = Column(Boolean, default=False)  # Whether to use global settings instead of personal
+    google_oauth_id = Column(String(255), nullable=True, unique=True)  # Firebase UID for Google OAuth audit trail
     
     # Pomodoro Preferences
     pomo_study_mins = Column(Integer, default=25)

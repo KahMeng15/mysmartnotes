@@ -4,7 +4,51 @@
  * Handles collapse toggle and persists state in localStorage.
  */
 
+// Global function to sync user display
+window.syncUserDisplay = async function() {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        // Fetch latest user data from /auth/me
+        const response = await fetch('/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const userData = await response.json();
+            localStorage.setItem('user', JSON.stringify(userData));
+            // Update dashboard heading with new user data
+            updateDashboardUserName();
+        } else if (response.status === 401) {
+            // Token is invalid, redirect to login
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+    } catch (e) {
+        console.warn('Error syncing user data:', e);
+    }
+};
+
+window.updateDashboardUserName = function() {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+    try {
+        const user = JSON.parse(userStr);
+        const name = user.nickname || user.full_name || user.username || 'Student';
+        const dashboardUserEl = document.getElementById('userName');
+        if (dashboardUserEl) {
+            dashboardUserEl.textContent = name;
+        }
+    } catch (e) {
+        console.error('Error updating dashboard user name', e);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Sync user data from backend on page load
+    window.syncUserDisplay();
     injectSidebar();
 });
 
