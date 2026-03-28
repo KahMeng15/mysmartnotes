@@ -4,8 +4,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from app.config import get_settings
 from app.models.db import Base
 import logging
-import random
-import string
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -23,15 +22,15 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def generate_random_id(db: Session, model, length: int = 8) -> str:
-    """Generate a unique case-sensitive alphanumeric ID with model-specific prefix.
+    """Generate a unique hex-based ID with model-specific prefix.
     
     Args:
         db: Database session
         model: SQLAlchemy model class to check for ID uniqueness
-        length: Length of the random part of the ID (default 8)
+        length: Number of hex digits to include (default 8)
     
     Returns:
-        A unique prefixed random alphanumeric ID (case-sensitive)
+        A unique prefixed hex ID derived from UUID4
     """
     from app.models.db import SubjectGroup, Subject, Lecture, Summary, Quiz, QuizGroup
     
@@ -50,7 +49,12 @@ def generate_random_id(db: Session, model, length: int = 8) -> str:
         prefix = "qg_"
         
     while True:
-        random_part = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+        needed_chars = length
+        random_chunks = []
+        while needed_chars > 0:
+            random_chunks.append(uuid.uuid4().hex)
+            needed_chars -= 32
+        random_part = ''.join(random_chunks)[:length]
         new_id = f"{prefix}{random_part}"
         if not db.query(model).filter(model.id == new_id).first():
             return new_id
