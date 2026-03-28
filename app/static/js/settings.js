@@ -100,7 +100,7 @@ async function loadQuotas() {
                 const unit = quotaUnits[key] || 'items';
                 
                 const card = document.createElement('div');
-                card.style.cssText = 'background: #f5f5f5; padding: 15px; border-radius: 8px;';
+                card.classList.add('quota-card');
                 
                 const used = quota.used;
                 const limit = quota.unlimited ? '∞' : quota.limit;
@@ -118,7 +118,7 @@ async function loadQuotas() {
                 let progressBar = '';
                 if (!quota.unlimited) {
                     progressBar = `
-                        <div style="width: 100%; background: #ddd; border-radius: 4px; height: 6px; margin-top: 8px; overflow: hidden;">
+                        <div style="width: 100%; background: var(--color-card-surface); border-radius: 4px; height: 6px; margin-top: 8px; overflow: hidden;">
                             <div style="width: ${percentage}%; background: ${barColor}; height: 100%;"></div>
                         </div>
                     `;

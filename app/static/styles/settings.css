@@ -82,7 +82,7 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--spacing-md);
-    background: var(--color-background);
+    background: var(--color-card-surface);
     border-radius: var(--radius-md);
     gap: var(--spacing-md);
 }
@@ -130,6 +130,17 @@
 
 #userStatsContainer > div:last-child {
     border-bottom: none;
+}
+
+/* Quota cards should share the same card surface look */
+#quotasContainer > div {
+    background: var(--color-card-surface);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+}
+
+#quotasContainer > div:hover {
+    box-shadow: var(--shadow-md);
 }
 
 /* Alert/Info boxes within settings */
