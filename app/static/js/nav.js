@@ -94,11 +94,11 @@ function injectSidebar() {
             <li><a href="/quiz" class="sidebar-nav-link" data-page="quiz"><i class="ph ph-exam"></i><span>Quiz</span></a></li>
 
             <li><a href="/pomodoro" class="sidebar-nav-link" data-page="pomodoro" id="pomodoroNavLink"><i class="ph ph-clock"></i><span>Pomodoro</span></a></li>
-            <li><a href="/upload.html" class="sidebar-nav-link" data-page="upload.html"><i class="ph ph-upload-simple"></i><span>Upload</span></a></li>
+            <li><a href="/upload" class="sidebar-nav-link" data-page="upload"><i class="ph ph-upload-simple"></i><span>Upload</span></a></li>
             <li><a href="/exporttemplates" class="sidebar-nav-link" data-page="exporttemplates"><i class="ph ph-palette"></i><span>Templates</span></a></li>
             <li class="sidebar-divider"></li>
             ${adminItem}
-            <li><a href="/settings.html" class="sidebar-nav-link" data-page="settings.html"><i class="ph ph-gear"></i><span>Settings</span></a></li>
+            <li><a href="/settings" class="sidebar-nav-link" data-page="settings"><i class="ph ph-gear"></i><span>Settings</span></a></li>
             <li><a href="#" class="sidebar-nav-link disabled" title="Coming soon"><i class="ph ph-clock-user"></i><span>Recent</span></a></li>
         </ul>
 
@@ -160,7 +160,7 @@ function injectSidebar() {
 
 function setActiveLink() {
     const currentPath = window.location.pathname;
-    const pageName = currentPath.split('/').pop() || 'dashboard.html';
+    const pageName = currentPath.split('/').pop() || 'dashboard';
 
     document.querySelectorAll('.sidebar-nav-link[data-page]').forEach(link => {
         if (link.dataset.page === pageName) {

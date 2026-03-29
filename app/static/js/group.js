@@ -110,7 +110,7 @@ function openSubject(id) {
 
 // --- Actions ---
 function goToUpload() {
-    window.location.href = `upload.html?group_id=${groupId}`;
+    window.location.href = `/upload?group_id=${groupId}`;
 }
 
 function openEditGroupModal() {

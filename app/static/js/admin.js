@@ -6,7 +6,7 @@ let inviteMethod = 'email';
 window.addEventListener('load', () => {
     if (!token || !user.is_admin) {
         alert('Unauthorized access');
-        window.location.href = 'dashboard.html';
+        window.location.href = '/dashboard';
         return;
     }
     setInviteMethod('email');

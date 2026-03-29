@@ -27,6 +27,7 @@ class User(Base):
     ai_api_key = Column(String(255), nullable=True)
     use_global_ai_config = Column(Boolean, default=False)  # Whether to use global settings instead of personal
     google_oauth_id = Column(String(255), nullable=True, unique=True)  # Firebase UID for Google OAuth audit trail
+    token_version = Column(Integer, default=0, nullable=False)  # Increment to revoke all existing JWT sessions
     
     # Pomodoro Preferences
     pomo_study_mins = Column(Integer, default=25)

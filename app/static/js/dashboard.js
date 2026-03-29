@@ -118,7 +118,7 @@ function displayRecentLectures(lectures) {
             <div class="empty-state">
                 <i class="ph ph-files" style="font-size: 48px; margin-bottom: 1rem;"></i>
                 <p>No notes yet.</p>
-                <a href="upload.html" class="btn btn-primary" style="margin-top: 1rem;">Upload First Note</a>
+                <a href="/upload" class="btn btn-primary" style="margin-top: 1rem;">Upload First Note</a>
             </div>
         `;
         return;

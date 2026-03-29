@@ -315,6 +315,7 @@ def user_action(request: UserActionRequest, db: Session = Depends(get_db), admin
         if not request.value:
             raise HTTPException(status_code=400, detail="New password required")
         user.hashed_password = hash_password(request.value)
+        user.token_version = int(user.token_version or 0) + 1
     elif request.action == "tier":
         if not request.value:
             raise HTTPException(status_code=400, detail="Tier value required")

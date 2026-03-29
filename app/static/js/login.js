@@ -1,5 +1,29 @@
 
 window.addEventListener('load', async () => {
+    // If user is already authenticated, skip login screen and go to dashboard.
+    const existingToken = localStorage.getItem('token');
+    if (existingToken) {
+        try {
+            const meRes = await fetch('/auth/me', {
+                headers: { 'Authorization': `Bearer ${existingToken}` }
+            });
+
+            if (meRes.ok) {
+                const userData = await meRes.json();
+                localStorage.setItem('user', JSON.stringify(userData));
+                window.location.href = '/dashboard';
+                return;
+            }
+
+            if (meRes.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+            }
+        } catch (e) {
+            console.warn('Could not verify existing session on login page:', e);
+        }
+    }
+
     try {
         const res = await fetch('/auth/public-settings');
         if (res.ok) {
@@ -200,7 +224,7 @@ async function handleLogin() {
             localStorage.setItem('token', data.access_token);
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
             showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
-            setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
+            setTimeout(() => { window.location.href = '/dashboard'; }, 800);
         } else {
             const err = await res.json();
             if (res.status === 503) {
@@ -307,7 +331,7 @@ async function handleGoogleSignIn() {
                 }
                 
                 showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
-                setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
+                setTimeout(() => { window.location.href = '/dashboard'; }, 800);
             }
         } else {
             const err = await res.json();
@@ -401,7 +425,7 @@ async function handleGoogleComplete(event) {
             localStorage.setItem('token', data.access_token);
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
             showMessageBox('googleRegisterMsg', 'success', 'Welcome! Redirecting…');
-            setTimeout(() => { window.location.href = '/dashboard.html'; }, 800);
+            setTimeout(() => { window.location.href = '/dashboard'; }, 800);
         } else {
             const err = await res.json();
             if (res.status === 503) {

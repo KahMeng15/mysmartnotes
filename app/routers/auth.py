@@ -347,7 +347,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
             expire_minutes = length * 1440
             
     access_token = create_access_token(
-        data={"sub": str(user.id)},
+        data={"sub": str(user.id), "tv": int(user.token_version or 0)},
         expires_delta=timedelta(minutes=expire_minutes)
     )
     
@@ -456,7 +456,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
                     expire_minutes = length * 1440
             
             access_token = create_access_token(
-                data={"sub": str(user.id)},
+                data={"sub": str(user.id), "tv": int(user.token_version or 0)},
                 expires_delta=timedelta(minutes=expire_minutes)
             )
             
@@ -588,7 +588,7 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
                     expire_minutes = length * 1440
             
             access_token = create_access_token(
-                data={"sub": str(existing_user.id)},
+                data={"sub": str(existing_user.id), "tv": int(existing_user.token_version or 0)},
                 expires_delta=timedelta(minutes=expire_minutes)
             )
             # Ensure user object is fresh with latest google_oauth_id
@@ -651,7 +651,7 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
                 expire_minutes = length * 1440
 
         access_token = create_access_token(
-            data={"sub": str(user.id)},
+            data={"sub": str(user.id), "tv": int(user.token_version or 0)},
             expires_delta=timedelta(minutes=expire_minutes)
         )
 
@@ -863,6 +863,7 @@ async def confirm_password_change(request_data: ConfirmPasswordChange, request: 
     
     # Update password
     current_user.hashed_password = confirmation.new_password_hash
+    current_user.token_version = int(current_user.token_version or 0) + 1
     confirmation.is_used = True
     
     # Log action
@@ -1008,6 +1009,7 @@ def reset_password(reset_data: PasswordResetSubmit, request: Request, db: Sessio
     
     # Update password
     user.hashed_password = hash_password(reset_data.new_password)
+    user.token_version = int(user.token_version or 0) + 1
     reset_token.is_used = True
     
     # Log action

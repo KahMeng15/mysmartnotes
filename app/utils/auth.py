@@ -51,6 +51,16 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 
+def token_version_matches_user(payload: dict, user) -> bool:
+    """Check whether token's session version still matches user's active session version."""
+    try:
+        token_version = int(payload.get("tv", 0))
+    except (TypeError, ValueError):
+        token_version = 0
+    user_token_version = int(getattr(user, "token_version", 0) or 0)
+    return token_version == user_token_version
+
+
 async def get_current_user(
     authorization: str = Header(None),
     db: Session = Depends(get_db)
@@ -99,6 +109,13 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not token_version_matches_user(payload, user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please log in again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

@@ -11,7 +11,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -142,14 +142,14 @@ async def system_settings_middleware(request: Request, call_next):
                 if auth_header and auth_header.startswith("Bearer "):
                     token = auth_header.split(" ")[1]
                     try:
-                        from app.utils.auth import decode_token
+                        from app.utils.auth import decode_token, token_version_matches_user
                         payload = decode_token(token)
                         if payload:
                             u_id = payload.get("sub")
                             if u_id:
                                 from app.models.db import User
                                 user = db.query(User).filter(User.id == int(u_id)).first()
-                                if user and user.is_admin:
+                                if user and user.is_admin and token_version_matches_user(payload, user):
                                     is_admin = True
                     except Exception as e:
                         logger.error(f"Error verifying admin bypass: {e}")
@@ -183,12 +183,17 @@ async def system_settings_middleware(request: Request, call_next):
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
                 try:
-                    from app.utils.auth import decode_token, create_access_token
+                    from app.utils.auth import decode_token, create_access_token, token_version_matches_user
                     from datetime import timedelta
                     payload = decode_token(token)
                     if payload:
                         u_id = payload.get("sub")
                         if u_id:
+                            from app.models.db import User
+                            user = db.query(User).filter(User.id == int(u_id)).first()
+                            if not user or not token_version_matches_user(payload, user):
+                                return response
+
                             # Re-issue token with full duration
                             expire_minutes = 30 # default
                             if settings.session_length:
@@ -198,7 +203,7 @@ async def system_settings_middleware(request: Request, call_next):
                                 elif unit == "days": expire_minutes = length * 1440
                             
                             new_token = create_access_token(
-                                data={"sub": u_id},
+                                data={"sub": str(u_id), "tv": int(user.token_version or 0)},
                                 expires_delta=timedelta(minutes=expire_minutes)
                             )
                             response.headers["X-New-Token"] = new_token
@@ -332,13 +337,66 @@ async def serve_quiz_mode_view(id: str, mode: str):
 async def serve_settings():
     return FileResponse(os.path.join(static_dir, "settings.html"))
 
+@app.get("/upload")
+async def serve_upload():
+    return FileResponse(os.path.join(static_dir, "upload.html"))
+
+@app.get("/settings.html")
+async def redirect_settings_html():
+    return RedirectResponse(url="/settings", status_code=307)
+
+@app.get("/upload.html")
+async def redirect_upload_html():
+    return RedirectResponse(url="/upload", status_code=307)
+
 @app.get("/pomodoro_popout.html")
 async def serve_pomodoro_popout():
     return FileResponse(os.path.join(static_dir, "pomodoro_popout.html"))
 
 @app.get("/")
 async def root():
-    return RedirectResponse(url="/login")
+        # Decide landing page based on client-side auth token state.
+        # Tokens are stored in localStorage, so server cannot reliably inspect auth on this request.
+        return HTMLResponse(
+                """
+<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+    <meta charset=\"UTF-8\" />
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
+    <title>Redirecting...</title>
+</head>
+<body>
+    <script>
+        (async function () {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.replace('/login');
+                return;
+            }
+
+            try {
+                const res = await fetch('/auth/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    window.location.replace('/dashboard');
+                    return;
+                }
+            } catch (e) {
+                // Network issue or transient error, fall through to login.
+            }
+
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.replace('/login');
+        })();
+    </script>
+</body>
+</html>
+                """
+        )
 
 # Serve static files and templates
 if os.path.exists(static_dir):

@@ -248,7 +248,7 @@
                         <button onclick="event.stopPropagation(); openSubjectModal('${group.id}')" class="btn btn-outline btn-small">
                             <i class="ph ph-plus"></i> Subject
                         </button>
-                         <button onclick="event.stopPropagation(); location.href='upload.html?group_id=${group.id}'" class="btn btn-outline btn-small">
+                         <button onclick="event.stopPropagation(); location.href='/upload?group_id=${group.id}'" class="btn btn-outline btn-small">
                             <i class="ph ph-upload-simple"></i> Upload
                         </button>
                         <button onclick="event.stopPropagation(); openEditGroupModal('${group.id}', '${group.name.replace(/'/g, "\\'")}')" class="btn btn-outline btn-small">

@@ -142,7 +142,7 @@ function openLecture(id) {
 
 function goToUpload() {
     // Need group info? We can get it from currentSubject.group_id
-    let url = `upload.html?subject_id=${subjectId}`;
+    let url = `/upload?subject_id=${subjectId}`;
     if (currentSubject && currentSubject.group_id) {
         url += `&group_id=${currentSubject.group_id}`;
     }
