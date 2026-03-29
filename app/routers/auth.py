@@ -39,6 +39,7 @@ class GoogleCompleteRequest(BaseModel):
     """Complete Google registration with additional info"""
     idToken: str
     nickname: str
+    full_name: Optional[str] = None
     invitation_token: Optional[str] = None
     agree_tos: bool = False
     agree_privacy: bool = False
@@ -253,6 +254,9 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
             tier=invitation.tier if invitation else "free"
         )
         db.add(user)
+
+    # Ensure new users have an ID before we set invitation.used_by
+    db.flush()
     
     if invitation:
         invitation.is_used = True
@@ -541,7 +545,9 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
         
         # Extract user information from token
         email = claims.get('email')
-        full_name = claims.get('name', '')
+        token_full_name = claims.get('name', '')
+        requested_full_name = (google_request.full_name or '').strip()
+        full_name = requested_full_name or token_full_name
         google_user_id = claims.get('user_id') or claims.get('sub')  # Firebase user ID
         
         if not email:
@@ -611,8 +617,10 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
             google_oauth_id=google_user_id  # Store Firebase user ID
         )
         db.add(user)
+        db.flush()
         if invitation:
             invitation.is_used = True
+            invitation.used_by = user.id
         db.commit()
         db.refresh(user)
 

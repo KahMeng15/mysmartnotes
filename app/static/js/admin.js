@@ -286,7 +286,12 @@ async function loadInvitations() {
                 : '<span style="color:#f59e0b; font-weight:600;">Link only</span>';
             
             let acceptedByDisplay = '-';
-            if (i.is_used && i.accepted_by_email) {
+            if (i.is_used && i.used_by) {
+                const identity = i.accepted_by_email
+                    ? `${i.accepted_by_name} (${i.accepted_by_email})`
+                    : 'Accepted user';
+                acceptedByDisplay = `<span style="color:#0f9d58">${identity}</span><br><small style="color:var(--color-gray)">ID: ${i.used_by}</small>`;
+            } else if (i.is_used && i.accepted_by_email) {
                 acceptedByDisplay = `<span style="color:#0f9d58">${i.accepted_by_name} (${i.accepted_by_email})</span>`;
             } else if (i.is_used) {
                 acceptedByDisplay = '<span style="color:#0f9d58">Accepted</span>';

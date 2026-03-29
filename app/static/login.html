@@ -88,6 +88,10 @@
                         <input class="form-input" type="text" id="regNickname" placeholder="What should we call you?">
                     </div>
                     <div class="form-group">
+                        <label class="form-label" for="regFullName">Full Name</label>
+                        <input class="form-input" type="text" id="regFullName" placeholder="Your full name">
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" for="regEmail">Email</label>
                         <input class="form-input" type="email" id="regEmail" placeholder="you@example.com">
                     </div>
@@ -131,17 +135,17 @@
             <p style="color: #75757A; margin-bottom: 24px; font-size: 0.9rem;">Let's get your account set up!</p>
             <form id="googleRegisterForm" onsubmit="handleGoogleComplete(event)">
                 <div class="form-group">
-                    <label class="form-label" for="googleEmail">Email</label>
-                    <input class="form-input" type="email" id="googleEmail" readonly>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="googleFullName">Full Name</label>
-                    <input class="form-input" type="text" id="googleFullName" readonly>
-                </div>
-                <div class="form-group">
                     <label class="form-label" for="googleNickname">Nickname</label>
                     <input class="form-input" type="text" id="googleNickname" placeholder="What should we call you?"
                         required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="googleFullName">Full Name</label>
+                    <input class="form-input" type="text" id="googleFullName" placeholder="Your full name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="googleEmail">Email</label>
+                    <input class="form-input" type="email" id="googleEmail" readonly>
                 </div>
                 <div style="margin-top: 16px; margin-bottom: 16px; border: 1px solid #ddd; border-radius: 4px; padding: 12px; background: #f9f9f9;">
                     <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 10px;">I agree to:</div>

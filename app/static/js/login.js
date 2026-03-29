@@ -216,6 +216,7 @@ async function handleLogin() {
 }
 
 async function handleRegister() {
+    const full_name = document.getElementById('regFullName').value.trim();
     const nickname = document.getElementById('regNickname').value.trim();
     const email = document.getElementById('regEmail').value.trim();
     const password = document.getElementById('regPassword').value;
@@ -223,7 +224,7 @@ async function handleRegister() {
     const agree_privacy = document.getElementById('regAgreePrivacy').checked;
     const agree_fair_use = document.getElementById('regAgreeFairUse').checked;
     
-    if (!nickname || !email || !password) {
+    if (!full_name || !nickname || !email || !password) {
         showMessageBox('registerMsg', 'error', 'All fields are required.');
         return;
     }
@@ -234,7 +235,7 @@ async function handleRegister() {
     }
     
     try {
-        const body = { nickname, email, password, agree_tos, agree_privacy, agree_fair_use };
+        const body = { full_name, nickname, email, password, agree_tos, agree_privacy, agree_fair_use };
         const endpoint = window.invitationToken
             ? `/auth/register?token=${encodeURIComponent(window.invitationToken)}`
             : '/auth/register';
@@ -333,7 +334,7 @@ async function handleGoogleSignIn() {
 
 function showGoogleRegisterModal(data) {
     document.getElementById('googleEmail').value = data.email;
-    document.getElementById('googleFullName').value = data.full_name || '(not provided)';
+    document.getElementById('googleFullName').value = data.full_name || '';
     document.getElementById('googleNickname').value = data.suggested_nickname || '';
     switchPanel('googleRegister');
     document.getElementById('googleNickname').focus();
@@ -358,10 +359,16 @@ async function handleGoogleComplete(event) {
     }
 
     const nickname = document.getElementById('googleNickname').value.trim();
+    const full_name = document.getElementById('googleFullName').value.trim();
     const agree_tos = document.getElementById('googleAgreeTos').checked;
     const agree_privacy = document.getElementById('googleAgreePrivacy').checked;
     const agree_fair_use = document.getElementById('googleAgreeFairUse').checked;
     
+    if (!full_name) {
+        showMessageBox('googleRegisterMsg', 'error', 'Please enter your full name.');
+        return;
+    }
+
     if (!nickname) {
         showMessageBox('googleRegisterMsg', 'error', 'Please enter a nickname.');
         return;
@@ -373,7 +380,7 @@ async function handleGoogleComplete(event) {
     }
 
     try {
-        const body = { idToken: window.googleIdToken, nickname, agree_tos, agree_privacy, agree_fair_use };
+        const body = { idToken: window.googleIdToken, full_name, nickname, agree_tos, agree_privacy, agree_fair_use };
         if (window.invitationToken) {
             body.invitation_token = window.invitationToken;
         }

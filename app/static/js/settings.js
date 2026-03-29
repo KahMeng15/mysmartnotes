@@ -7,6 +7,7 @@ const tierGradients = {
     early_tester: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
 };
 const defaultTierGradient = tierGradients.unlimited;
+let pendingUnlinkAfterPasswordSetup = false;
 
 // Wait for Firebase to be initialized
 async function waitForFirebase(timeout = 5000) {
@@ -333,9 +334,16 @@ async function updateProfile(event) {
         
         const useGlobal = document.getElementById('globalSettingsToggle').classList.contains('active');
         
+        const fullName = document.getElementById('fullName').value.trim();
+        const nickname = document.getElementById('nickname').value.trim();
+        if (!fullName || !nickname) {
+            showErrorModal('Validation Error', 'Full name and nickname are required.');
+            return;
+        }
+
         const payload = {
-            full_name: document.getElementById('fullName').value,
-            nickname: document.getElementById('nickname').value,
+            full_name: fullName,
+            nickname: nickname,
             use_global_ai_config: useGlobal
         };
         
@@ -505,8 +513,8 @@ async function setPasswordFromWarningModal() {
         
         if (res.ok) {
             const data = await res.json();
-            // Clear the warning modal
-            closeNeedPasswordWarningModal();
+            // Continue unlink flow after password verification succeeds.
+            pendingUnlinkAfterPasswordSetup = true;
             // Show confirmation code modal
             document.getElementById('passwordChangeCode').value = '';
             document.getElementById('passwordChangeMsg').innerHTML = '';
@@ -528,8 +536,11 @@ async function setPasswordFromWarningModal() {
     }
 }
 
-function closePasswordChangeConfirmationModal() {
+function closePasswordChangeConfirmationModal(keepFlow = false) {
     document.getElementById('passwordChangeConfirmationModal').style.display = 'none';
+    if (!keepFlow) {
+        pendingUnlinkAfterPasswordSetup = false;
+    }
 }
 
 async function confirmPasswordChange() {
@@ -556,14 +567,26 @@ async function confirmPasswordChange() {
         
         if (res.ok) {
             showMessageInBox(msgBox, 'success', 'Password changed successfully!');
+            window.userHasPassword = true;
+            await loadConnectedAccounts();
+            const continueUnlinkFlow = pendingUnlinkAfterPasswordSetup;
             setTimeout(() => {
-                closePasswordChangeConfirmationModal();
+                closePasswordChangeConfirmationModal(true);
+                closeNeedPasswordWarningModal(true);
                 // Clear all password fields
                 document.getElementById('currentPassword').value = '';
                 document.getElementById('newPassword').value = '';
                 document.getElementById('confirmPassword').value = '';
                 document.getElementById('warningSetPassword').value = '';
                 document.getElementById('warningConfirmPassword').value = '';
+
+                if (continueUnlinkFlow) {
+                    document.getElementById('unlinkGooglePassword').value = '';
+                    document.getElementById('unlinkGoogleMsg').innerHTML = '<div class="message-box-success">Password verified. Please enter it again to unlink your Google account.</div>';
+                    document.getElementById('unlinkGoogleModal').style.display = 'flex';
+                    document.getElementById('unlinkGooglePassword').focus();
+                }
+                pendingUnlinkAfterPasswordSetup = false;
             }, 1500);
         } else {
             const error = await res.json();
@@ -772,7 +795,14 @@ async function linkGoogleAccount() {
     }
 }
 
-function showUnlinkGoogleModal() {
+async function showUnlinkGoogleModal() {
+    // Refresh account state first so UI does not require manual page refresh
+    try {
+        await loadConnectedAccounts();
+    } catch (e) {
+        console.warn('Could not refresh connected account state before unlink check', e);
+    }
+
     // Check if user has password set
     if (!window.userHasPassword) {
         // Show warning modal instead
@@ -788,11 +818,26 @@ function showUnlinkGoogleModal() {
 }
 
 function showNeedPasswordWarningModal() {
+    pendingUnlinkAfterPasswordSetup = false;
     document.getElementById('needPasswordWarningModal').style.display = 'flex';
 }
 
-function closeNeedPasswordWarningModal() {
+function closeNeedPasswordWarningModal(keepFlow = false) {
+    const msgBox = document.getElementById('passwordSetMsg');
+    const buttons = document.getElementById('passwordSetButtons');
+    const form = document.getElementById('passwordSetForm');
+    const warningSetPassword = document.getElementById('warningSetPassword');
+    const warningConfirmPassword = document.getElementById('warningConfirmPassword');
+
     document.getElementById('needPasswordWarningModal').style.display = 'none';
+    if (!keepFlow) {
+        pendingUnlinkAfterPasswordSetup = false;
+    }
+    if (msgBox) msgBox.innerHTML = '';
+    if (buttons) buttons.style.display = 'flex';
+    if (form) form.style.display = 'none';
+    if (warningSetPassword) warningSetPassword.value = '';
+    if (warningConfirmPassword) warningConfirmPassword.value = '';
 }
 
 function closeUnlinkGoogleModal() {
