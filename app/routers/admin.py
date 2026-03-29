@@ -398,6 +398,14 @@ def get_invitations(db: Session = Depends(get_db), admin: User = Depends(get_cur
         resp = UserInvitationResponse.model_validate(i)
         resp.send_email = not is_link_only_email(i.email)
         resp.invitation_link = f"{domain.rstrip('/')}/signup?token={i.token}"
+        
+        # Get accepted user info if invitation was used
+        if i.used_by:
+            accepted_user = db.query(User).filter(User.id == i.used_by).first()
+            if accepted_user:
+                resp.accepted_by_email = accepted_user.email
+                resp.accepted_by_name = accepted_user.full_name or accepted_user.nickname or "N/A"
+        
         results.append(resp)
         
     return results

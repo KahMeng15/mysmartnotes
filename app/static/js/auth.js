@@ -63,11 +63,45 @@
 
     // 3. Intercept fetch requests to add auth headers and handle 401
     const originalFetch = window.fetch;
+
+    function getRequestUrl(url) {
+        if (typeof url === 'string') {
+            return url;
+        }
+
+        if (url && typeof url.url === 'string') {
+            return url.url;
+        }
+
+        return null;
+    }
+
+    function isSameOriginRequest(url) {
+        const requestUrl = getRequestUrl(url);
+        if (!requestUrl) {
+            return false;
+        }
+
+        // Relative URLs are same-origin by default.
+        if (requestUrl.startsWith('/') || (!requestUrl.startsWith('http://') && !requestUrl.startsWith('https://'))) {
+            return true;
+        }
+
+        try {
+            const parsed = new URL(requestUrl, window.location.origin);
+            return parsed.origin === window.location.origin;
+        } catch {
+            // If URL parsing fails, avoid mutating the request.
+            return false;
+        }
+    }
+
     window.fetch = async function (url, options = {}) {
         const currentToken = localStorage.getItem('token');
+        const isSameOrigin = isSameOriginRequest(url);
         
-        // Add Authorization header if token exists and not already set
-        if (currentToken && !options.headers?.Authorization && !options.headers?.['Authorization']) {
+        // Only attach app JWT to our own backend requests.
+        if (isSameOrigin && currentToken && !options.headers?.Authorization && !options.headers?.['Authorization']) {
             options.headers = {
                 ...options.headers,
                 'Authorization': `Bearer ${currentToken}`
@@ -77,8 +111,8 @@
         try {
             const response = await originalFetch(url, options);
 
-            // Only handle 401 from OUR backend, not from external APIs (Google, etc)
-            if (response.status === 401 && typeof url === 'string' && !url.includes('googleapis.com') && !url.includes('google.com')) {
+            // Only handle 401 from our backend, not from external APIs.
+            if (response.status === 401 && isSameOrigin) {
                 console.error(`❌ 401 Unauthorized on ${url} - clearing session and redirecting to login...`);
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');

@@ -381,13 +381,15 @@ class UserInvitation(Base):
     email = Column(String(255), nullable=False, unique=True, index=True)
     token = Column(String(100), nullable=False, unique=True, index=True)
     invited_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    used_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     tier = Column(String(50), default="free")
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    inviter = relationship("User")
+    inviter = relationship("User", foreign_keys=[invited_by])
+    accepted_by_user = relationship("User", foreign_keys=[used_by])
 
 
 class PasswordResetToken(Base):
@@ -398,6 +400,23 @@ class PasswordResetToken(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     email = Column(String(255), nullable=False, index=True)
     token = Column(String(100), nullable=False, unique=True, index=True)
+    is_used = Column(Boolean, default=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+
+class PasswordChangeConfirmation(Base):
+    """Password change confirmation tokens for users changing their password through settings"""
+    __tablename__ = "password_change_confirmations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    confirmation_code = Column(String(10), nullable=False, unique=True, index=True)
+    new_password_hash = Column(String(255), nullable=False)  # Hash of the new password attempt
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

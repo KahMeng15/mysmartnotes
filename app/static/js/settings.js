@@ -8,6 +8,17 @@ const tierGradients = {
 };
 const defaultTierGradient = tierGradients.unlimited;
 
+// Wait for Firebase to be initialized
+async function waitForFirebase(timeout = 5000) {
+    const startTime = Date.now();
+    while (!window.firebaseAuth || !window.googleProvider) {
+        if (Date.now() - startTime > timeout) {
+            throw new Error('Firebase initialization timeout');
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+}
+
 window.addEventListener('load', async () => {
     try {
         console.log('=== SETTINGS PAGE LOAD START ===');
@@ -411,19 +422,19 @@ async function changePassword() {
     const confirm = document.getElementById('confirmPassword').value;
 
     if (!current || !newPass || !confirm) {
-        alert('Please fill in all password fields');
+        showMessageInElement('passwordMsg', 'error', 'Please fill in all password fields');
         return;
     }
 
     if (newPass !== confirm) {
-        alert('Passwords do not match');
+        showMessageInElement('passwordMsg', 'error', 'Passwords do not match');
         return;
     }
 
     try {
         const token = localStorage.getItem('token');
-        const res = await fetch('/auth/change-password', {
-            method: 'PUT',
+        const res = await fetch('/auth/request-password-change', {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
@@ -435,17 +446,139 @@ async function changePassword() {
         });
         
         if (res.ok) {
-            alert('Password changed successfully');
+            const data = await res.json();
+            showMessageInElement('passwordMsg', 'success', data.message);
             document.getElementById('currentPassword').value = '';
             document.getElementById('newPassword').value = '';
             document.getElementById('confirmPassword').value = '';
+            
+            // Show confirmation code modal after 2 seconds
+            setTimeout(() => {
+                document.getElementById('passwordChangeConfirmationModal').style.display = 'flex';
+                document.getElementById('passwordChangeCode').focus();
+            }, 2000);
         } else {
             const error = await res.json();
-            alert('Error: ' + error.detail);
+            showMessageInElement('passwordMsg', 'error', error.detail || 'Failed to request password change');
         }
     } catch(err) {
-        alert('Error: ' + err.message);
+        showMessageInElement('passwordMsg', 'error', err.message || 'Failed to request password change');
     }
+}
+
+function showPasswordSetForm() {
+    document.getElementById('passwordSetButtons').style.display = 'none';
+    document.getElementById('passwordSetForm').style.display = 'block';
+    document.getElementById('warningSetPassword').focus();
+}
+
+async function setPasswordFromWarningModal() {
+    const newPass = document.getElementById('warningSetPassword').value;
+    const confirm = document.getElementById('warningConfirmPassword').value;
+    const msgBox = document.getElementById('passwordSetMsg');
+    
+    if (!newPass || !confirm) {
+        showMessageInBox(msgBox, 'error', 'Please fill in all fields');
+        return;
+    }
+    
+    if (newPass !== confirm) {
+        showMessageInBox(msgBox, 'error', 'Passwords do not match');
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('token');
+        // For setting password from warning modal, we don't need current password verification
+        // since the user doesn't have one yet. We'll use an empty string.
+        const res = await fetch('/auth/request-password-change', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                current_password: '',  // Empty since user has no password yet
+                new_password: newPass
+            })
+        });
+        
+        if (res.ok) {
+            const data = await res.json();
+            // Clear the warning modal
+            closeNeedPasswordWarningModal();
+            // Show confirmation code modal
+            document.getElementById('passwordChangeCode').value = '';
+            document.getElementById('passwordChangeMsg').innerHTML = '';
+            document.getElementById('passwordChangeConfirmationModal').style.display = 'flex';
+            document.getElementById('passwordChangeCode').focus();
+        } else {
+            const error = await res.json();
+            
+            // If error is about empty current password, it might be a different flow
+            if (error.detail && error.detail.includes('current password')) {
+                showMessageInBox(msgBox, 'error', 'There was an issue setting your password. Please try again.');
+            } else {
+                showMessageInBox(msgBox, 'error', error.detail || 'Failed to set password');
+            }
+        }
+    } catch(e) {
+        console.error('Error setting password:', e);
+        showMessageInBox(msgBox, 'error', e.message || 'Failed to set password');
+    }
+}
+
+function closePasswordChangeConfirmationModal() {
+    document.getElementById('passwordChangeConfirmationModal').style.display = 'none';
+}
+
+async function confirmPasswordChange() {
+    const code = document.getElementById('passwordChangeCode').value;
+    const msgBox = document.getElementById('passwordChangeMsg');
+    
+    if (!code) {
+        showMessageInBox(msgBox, 'error', 'Please enter the confirmation code');
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/auth/confirm-password-change', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                confirmation_code: code
+            })
+        });
+        
+        if (res.ok) {
+            showMessageInBox(msgBox, 'success', 'Password changed successfully!');
+            setTimeout(() => {
+                closePasswordChangeConfirmationModal();
+                // Clear all password fields
+                document.getElementById('currentPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+                document.getElementById('warningSetPassword').value = '';
+                document.getElementById('warningConfirmPassword').value = '';
+            }, 1500);
+        } else {
+            const error = await res.json();
+            showMessageInBox(msgBox, 'error', error.detail || 'Failed to confirm password change');
+        }
+    } catch(e) {
+        console.error('Error confirming password:', e);
+        showMessageInBox(msgBox, 'error', e.message || 'Failed to confirm password change');
+    }
+}
+
+function showMessageInElement(elementId, type, message) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    element.innerHTML = `<div class="message-box-${type}">${message}</div>`;
 }
 
 async function downloadData() {
@@ -498,6 +631,9 @@ async function loadConnectedAccounts() {
             const googleLinked = data.google_linked;
             const hasPassword = data.has_password;
             
+            // Store password status in global for modal access
+            window.userHasPassword = hasPassword;
+            
             // Update UI based on linked status
             const linkBtn = document.getElementById('linkGoogleBtn');
             const unlinkBtn = document.getElementById('unlinkGoogleBtn');
@@ -511,7 +647,11 @@ async function loadConnectedAccounts() {
             } else {
                 googleStatus.textContent = 'Not connected';
                 googleStatus.style.color = 'var(--color-gray)';
-                linkBtn.style.display = 'block';
+                if (hasPassword) {
+                    linkBtn.style.display = 'block';
+                } else {
+                    linkBtn.style.display = 'none';
+                }
                 unlinkBtn.style.display = 'none';
             }
         }
@@ -531,6 +671,29 @@ function closeLinkGoogleModal() {
     document.getElementById('linkGoogleModal').style.display = 'none';
 }
 
+function showGoogleLinkSuccessModal(googleEmail = '') {
+    const modal = document.getElementById('googleLinkSuccessModal');
+    const emailText = document.getElementById('googleLinkSuccessEmail');
+    if (!modal || !emailText) return;
+
+    if (googleEmail) {
+        emailText.textContent = `Linked Google account: ${googleEmail}`;
+        emailText.style.display = 'block';
+    } else {
+        emailText.textContent = '';
+        emailText.style.display = 'none';
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeGoogleLinkSuccessModal() {
+    const modal = document.getElementById('googleLinkSuccessModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
 async function linkGoogleAccount() {
     const password = document.getElementById('linkGooglePassword').value;
     const msgBox = document.getElementById('linkGoogleMsg');
@@ -541,6 +704,7 @@ async function linkGoogleAccount() {
     }
     
     try {
+        // Get JWT token from localStorage
         const token = localStorage.getItem('token');
         if (!token) {
             showMessageInBox(msgBox, 'error', 'Session expired. Please login again.');
@@ -548,18 +712,30 @@ async function linkGoogleAccount() {
             return;
         }
         
-        // Get Google ID token
+        // Wait for Firebase to be initialized
         if (!window.firebaseAuth || !window.googleProvider) {
-            showMessageInBox(msgBox, 'error', 'Google authentication not initialized');
+            showMessageInBox(msgBox, 'error', 'Firebase not initialized. Please refresh the page.');
             return;
         }
         
-        const result = await window.signInWithPopup(window.firebaseAuth, window.googleProvider);
-        const user = result.user;
-        const idToken = await user.getIdToken();
+        // Get a fresh Google provider
+        const provider = new window.GoogleAuthProvider();
+        provider.addScope('profile');
+        provider.addScope('email');
+        provider.setCustomParameters({ prompt: 'select_account' });
         
-        // Send to backend
-        const res = await fetch('/auth/link-google-account', {
+        console.log('Starting Google account linking via popup...');
+        
+        // Use signInWithPopup (NOT linkWithPopup) - same pattern as login.html
+        const result = await window.signInWithPopup(window.firebaseAuth, provider);
+        console.log('✓ Google popup flow completed');
+        
+        const idToken = await result.user.getIdToken();
+        console.log('✓ Got Google ID token');
+        
+        // Send to backend's new link-google-via-popup endpoint
+        console.log('Calling /auth/link-google-via-popup with idToken and password...');
+        const res = await fetch('/auth/link-google-via-popup', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -572,32 +748,51 @@ async function linkGoogleAccount() {
         });
         
         if (res.ok) {
-            showMessageInBox(msgBox, 'success', 'Google account linked successfully!');
-            setTimeout(() => {
-                closeLinkGoogleModal();
-                loadConnectedAccounts();
-            }, 1500);
+            const data = await res.json();
+            console.log('✓ Backend confirmed linking:', data);
+            closeLinkGoogleModal();
+            await loadConnectedAccounts();
+            showGoogleLinkSuccessModal(data.google_email || result.user?.email || '');
         } else {
             const err = await res.json();
+            console.error('Backend error:', err);
             showMessageInBox(msgBox, 'error', err.detail || 'Failed to link Google account');
-            // Sign out from Firebase on error
-            window.firebaseAuth.signOut();
+            // Don't sign out - user can try again
         }
     } catch (e) {
+        console.error('Linking error:', e);
         if (e.code === 'auth/popup-closed-by-user') {
-            showMessageInBox(msgBox, 'error', 'Google sign-in was cancelled');
+            // User closed the popup - don't show error, they know what happened
+            console.log('User cancelled Google popup');
+        } else if (e.code === 'auth/permission-denied') {
+            showMessageInBox(msgBox, 'error', 'Permission denied. Please try again.');
         } else {
-            console.error('Error linking Google:', e);
-            showMessageInBox(msgBox, 'error', e.message || 'Failed to link Google account');
+            showMessageInBox(msgBox, 'error', e.message || 'Failed to link Google account. Please try again.');
         }
     }
 }
 
 function showUnlinkGoogleModal() {
+    // Check if user has password set
+    if (!window.userHasPassword) {
+        // Show warning modal instead
+        showNeedPasswordWarningModal();
+        return;
+    }
+    
+    // User has password, show normal unlink confirmation modal
     document.getElementById('unlinkGooglePassword').value = '';
     document.getElementById('unlinkGoogleMsg').innerHTML = '';
     document.getElementById('unlinkGoogleModal').style.display = 'flex';
     document.getElementById('unlinkGooglePassword').focus();
+}
+
+function showNeedPasswordWarningModal() {
+    document.getElementById('needPasswordWarningModal').style.display = 'flex';
+}
+
+function closeNeedPasswordWarningModal() {
+    document.getElementById('needPasswordWarningModal').style.display = 'none';
 }
 
 function closeUnlinkGoogleModal() {

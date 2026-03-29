@@ -273,7 +273,7 @@ async function loadInvitations() {
         tbody.innerHTML = '';
         
         if (invites.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">No pending invitations</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8">No pending invitations</td></tr>';
             return;
         }
         
@@ -284,6 +284,14 @@ async function loadInvitations() {
             const methodLabel = i.send_email
                 ? '<span style="color:#0f9d58; font-weight:600;">Email</span>'
                 : '<span style="color:#f59e0b; font-weight:600;">Link only</span>';
+            
+            let acceptedByDisplay = '-';
+            if (i.is_used && i.accepted_by_email) {
+                acceptedByDisplay = `<span style="color:#0f9d58">${i.accepted_by_name} (${i.accepted_by_email})</span>`;
+            } else if (i.is_used) {
+                acceptedByDisplay = '<span style="color:#0f9d58">Accepted</span>';
+            }
+            
             tr.innerHTML = `
                 <td>${emailDisplay}</td>
                 <td>${methodLabel}</td>
@@ -291,6 +299,7 @@ async function loadInvitations() {
                 <td>${i.tier}</td>
                 <td><small>${i.invitation_link}</small></td>
                 <td>${expires}</td>
+                <td>${acceptedByDisplay}</td>
                 <td>${i.is_used ? '<span style="color:green">Used</span>' : '<span style="color:orange">Pending</span>'}</td>
             `;
             tbody.appendChild(tr);

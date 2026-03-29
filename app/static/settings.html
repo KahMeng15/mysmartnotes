@@ -46,6 +46,35 @@
                             <input type="text" id="nickname" class="form-control">
                         </div>
                     </form>
+                    
+                    <!-- Connected Accounts (merged into Profile Settings) -->
+                    <div style="margin-top: var(--spacing-xl); padding-top: var(--spacing-lg); border-top: 1px solid var(--color-border);">
+                        <h4 style="margin-top: 0; margin-bottom: var(--spacing-md); font-size: var(--font-size-sm); font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <i class="ph ph-link"></i> Connected Accounts
+                        </h4>
+                        <div id="connectedAccountsMsg" class="message-box"></div>
+                        <div id="googleAccountStatus">
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: var(--color-card-surface); border-radius: 10px; margin-bottom: 15px;">
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <svg class="google-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 32px; height: 32px;">
+                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                                    </svg>
+                                    <div>
+                                        <div style="font-weight: 600;">Google Account</div>
+                                        <div id="googleStatus" style="font-size: var(--font-size-sm); color: var(--color-gray);">Not connected</div>
+                                    </div>
+                                </div>
+                                <div id="googleButton" style="display: flex; gap: 8px;">
+                                    <button id="linkGoogleBtn" onclick="showLinkGoogleModal()" class="btn btn-sm" style="display: none;">Link Account</button>
+                                    <button id="unlinkGoogleBtn" onclick="showUnlinkGoogleModal()" class="btn btn-sm btn-danger" style="display: none;">Unlink</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="section-footer">
                         <button type="button" class="btn btn-primary btn-block"
                             onclick="document.getElementById('profileForm').requestSubmit()">Save Profile</button>
@@ -76,36 +105,13 @@
                             <li>Loading...</li>
                         </ul>
                     </div>
+                    <div id="passwordMsg" class="message-box" style="margin-bottom: 15px;">
+                    </div>
                     <div class="section-footer">
                         <button onclick="changePassword()" class="btn btn-primary btn-block">Change Password</button>
                     </div>
                 </div>
 
-                <!-- 2.1 Connected Accounts (Google OAuth) -->
-                <div class="settings-section">
-                    <h3><i class="ph ph-link"></i> Connected Accounts</h3>
-                    <div id="connectedAccountsMsg" class="message-box"></div>
-                    <div id="googleAccountStatus" style="margin-bottom: var(--spacing-lg);">
-                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 15px; background: var(--color-card-surface); border-radius: 10px; margin-bottom: 15px;">
-                            <div style="display: flex; align-items: center; gap: 12px;">
-                                <svg class="google-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 32px; height: 32px;">
-                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                                </svg>
-                                <div>
-                                    <div style="font-weight: 600;">Google Account</div>
-                                    <div id="googleStatus" style="font-size: var(--font-size-sm); color: var(--color-gray);">Not connected</div>
-                                </div>
-                            </div>
-                            <div id="googleButton" style="display: flex; gap: 8px;">
-                                <button id="linkGoogleBtn" onclick="showLinkGoogleModal()" class="btn btn-sm" style="display: none;">Link Account</button>
-                                <button id="unlinkGoogleBtn" onclick="showUnlinkGoogleModal()" class="btn btn-sm btn-danger" style="display: none;">Unlink</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Link Google Account Modal -->
                 <div id="linkGoogleModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
@@ -121,6 +127,19 @@
                             <button onclick="closeLinkGoogleModal()" class="btn btn-block" style="flex: 1;">Cancel</button>
                             <button onclick="linkGoogleAccount()" class="btn btn-primary btn-block" style="flex: 1;">Link with Google</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Google Link Success Modal -->
+                <div id="googleLinkSuccessModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1001; align-items: center; justify-content: center;">
+                    <div style="background: white; border-radius: 12px; padding: 30px; max-width: 420px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.2); text-align: center;">
+                        <div style="width: 64px; height: 64px; border-radius: 9999px; background: #E8F5E9; margin: 0 auto 16px auto; display: flex; align-items: center; justify-content: center;">
+                            <i class="ph ph-check-circle" style="font-size: 36px; color: #34A853;"></i>
+                        </div>
+                        <h3 style="margin: 0 0 10px 0;">Google Account Linked</h3>
+                        <p style="color: var(--color-gray); margin: 0 0 8px 0;">Your Google account is now connected successfully.</p>
+                        <p id="googleLinkSuccessEmail" style="display: none; color: var(--color-gray); margin: 0 0 20px 0; font-size: var(--font-size-sm);"></p>
+                        <button onclick="closeGoogleLinkSuccessModal()" class="btn btn-primary btn-block">Continue</button>
                     </div>
                 </div>
 
@@ -141,7 +160,65 @@
                     </div>
                 </div>
 
-                <!-- 2.3 Subscription Tier & Quotas -->
+                <!-- Warning: Set Password Before Unlinking Modal -->
+                <div id="needPasswordWarningModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+                    <div style="background: white; border-radius: 12px; padding: 30px; max-width: 400px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;">
+                        <h3 style="margin-top: 0; display: flex; align-items: center; gap: 10px;">
+                            <i class="ph ph-warning" style="color: #FF9800; font-size: 24px;"></i>
+                            Set a Password First
+                        </h3>
+                        <p style="color: var(--color-gray); margin: 15px 0; line-height: 1.6;">
+                            You must create a password before unlinking your Google account. This password will be needed to log in after you unlink Google.
+                        </p>
+                        <div style="background: #FFF3E0; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                            <p style="margin: 0; font-size: 0.9em; color: #E65100;">
+                                <strong>Why?</strong> If you unlink Google without a password, you won't be able to log in.
+                            </p>
+                        </div>
+                        
+                        <div id="passwordSetMsg" class="message-box" style="margin-bottom: 15px;"></div>
+                        
+                        <div style="display: none;" id="passwordSetForm">
+                            <div class="form-group full-width">
+                                <label>New Password</label>
+                                <input type="password" id="warningSetPassword" class="form-control" placeholder="Enter new password">
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Confirm Password</label>
+                                <input type="password" id="warningConfirmPassword" class="form-control" placeholder="Confirm password">
+                            </div>
+                            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                                <button onclick="closeNeedPasswordWarningModal()" class="btn btn-block" style="flex: 1;">Cancel</button>
+                                <button onclick="setPasswordFromWarningModal()" class="btn btn-primary btn-block" style="flex: 1;">Set Password</button>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px;" id="passwordSetButtons">
+                            <button onclick="closeNeedPasswordWarningModal()" class="btn btn-block" style="flex: 1;">Dismiss</button>
+                            <button onclick="showPasswordSetForm()" class="btn btn-primary btn-block" style="flex: 1;">Set Password Now</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Password Change Confirmation Code Modal -->
+                <div id="passwordChangeConfirmationModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+                    <div style="background: white; border-radius: 12px; padding: 30px; max-width: 400px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+                        <h3 style="margin-top: 0;">Confirm Password Change</h3>
+                        <p style="color: var(--color-gray); margin-bottom: 20px;">A confirmation code has been sent to your email. Enter it below to confirm your password change.</p>
+                        <div id="passwordChangeMsg" class="message-box"></div>
+                        <div class="form-group full-width">
+                            <label>Confirmation Code</label>
+                            <input type="text" id="passwordChangeCode" class="form-control" placeholder="Enter 6-digit code" maxlength="6">
+                        </div>
+                        <p style="color: var(--color-gray); font-size: 0.9em;">The code will expire in 15 minutes.</p>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="closePasswordChangeConfirmationModal()" class="btn btn-block" style="flex: 1;">Cancel</button>
+                            <button onclick="confirmPasswordChange()" class="btn btn-primary btn-block" style="flex: 1;">Confirm</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Subscription Tier & Quotas -->
                 <div class="settings-section">
                     <h3><i class="ph ph-star"></i> Subscription & Quotas</h3>
                     <div id="tierCardBanner" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
@@ -164,7 +241,7 @@
                     </div>
                 </div>
 
-                <!-- 2.5 Statistics -->
+                <!-- 4. Statistics -->
                 <div class="settings-section">
                     <h3><i class="ph ph-chart-bar"></i> Statistics</h3>
                     <div id="userStatsContainer">

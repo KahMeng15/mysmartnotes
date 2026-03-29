@@ -8,8 +8,9 @@ import json
 from typing import Optional
 import httpx
 import secrets
+import random
 
-from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken
+from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken, PasswordChangeConfirmation
 from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, UserUpdate
 from app.utils.db import get_db
 from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user as get_current_user_from_token
@@ -255,6 +256,7 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
     
     if invitation:
         invitation.is_used = True
+        invitation.used_by = user.id
         
     db.commit()
     db.refresh(user)
@@ -403,12 +405,24 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
         user = db.query(User).filter(func.lower(User.email) == func.lower(email)).first()
         
         if user:
-            # Existing user - log them in
-            # Store google_oauth_id if not already set
+            # Existing user - validate Google account is linked
+            firebase_user_id = claims.get('user_id') or claims.get('sub')
+            
+            # Check if Google account is actually linked
             if not user.google_oauth_id:
-                user.google_oauth_id = claims.get('user_id') or claims.get('sub')
-                db.commit()
-                db.refresh(user)  # Refresh to get latest data
+                record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="not_linked", reason="Google account not linked to this user")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="This Google account is not linked to any account. Please link it first from your settings."
+                )
+            
+            # Verify the google_oauth_id matches the Firebase user_id
+            if user.google_oauth_id != firebase_user_id:
+                record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="mismatch", reason="Google OAuth ID mismatch", user=user)
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Google account mismatch. This Google account is not linked to your user account."
+                )
             
             if not user.is_active:
                 record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="disabled", reason="Account disabled", user=user)
@@ -728,6 +742,13 @@ class PasswordChange(BaseModel):
     current_password: str
     new_password: str
 
+class RequestPasswordChangeConfirmation(BaseModel):
+    current_password: str
+    new_password: str
+
+class ConfirmPasswordChange(BaseModel):
+    confirmation_code: str
+
 @router.put("/change-password")
 async def change_password(passwords: PasswordChange, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Change the user's password"""
@@ -743,6 +764,107 @@ async def change_password(passwords: PasswordChange, current_user: User = Depend
     current_user.hashed_password = hash_password(passwords.new_password)
     db.commit()
     return {"message": "Password changed successfully"}
+
+@router.post("/request-password-change")
+async def request_password_change(request_data: RequestPasswordChangeConfirmation, request: Request, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Request a password change with email confirmation"""
+    # If user has no password, they're setting one for the first time
+    if current_user.hashed_password:
+        # Verify current password for existing password users
+        try:
+            if not verify_password(request_data.current_password, current_user.hashed_password):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect current password"
+                )
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Error verifying current password"
+            )
+    # If user has no password, current_password check is skipped (first-time setup)
+    
+    # Check for too many recent requests (rate limiting)
+    recent_confirmations = db.query(PasswordChangeConfirmation).filter(
+        PasswordChangeConfirmation.user_id == current_user.id,
+        PasswordChangeConfirmation.is_used == False,
+        PasswordChangeConfirmation.expires_at > datetime.utcnow()
+    ).all()
+    
+    if len(recent_confirmations) >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many password change requests. Please wait before trying again."
+        )
+    
+    # Generate confirmation code (6 digits)
+    confirmation_code = str(random.randint(100000, 999999))
+    
+    # Hash the new password for later verification
+    new_password_hash = hash_password(request_data.new_password)
+    
+    # Create confirmation record (15 minute expiry)
+    password_confirmation = PasswordChangeConfirmation(
+        user_id=current_user.id,
+        email=current_user.email,
+        confirmation_code=confirmation_code,
+        new_password_hash=new_password_hash,
+        expires_at=datetime.utcnow() + timedelta(minutes=15)
+    )
+    db.add(password_confirmation)
+    db.commit()
+    
+    # Send confirmation email
+    from app.utils.email import send_password_change_confirmation_email
+    send_password_change_confirmation_email(db, current_user.email, confirmation_code)
+    
+    # Log action
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    action_type = "password_set_requested" if not current_user.hashed_password else "password_change_requested"
+    db.add(UserLog(user_id=current_user.id, action=action_type, ip_address=ip_address, device_info=user_agent))
+    db.commit()
+    
+    return {
+        "message": "Confirmation code sent to your email. Please check your email and enter the code in the next 1 hour.",
+        "email_masked": f"{current_user.email[:2]}***@{current_user.email.split('@')[1]}"
+    }
+
+@router.post("/confirm-password-change")
+async def confirm_password_change(request_data: ConfirmPasswordChange, request: Request, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Confirm password change with confirmation code"""
+    # Find the confirmation record
+    confirmation = db.query(PasswordChangeConfirmation).filter(
+        PasswordChangeConfirmation.user_id == current_user.id,
+        PasswordChangeConfirmation.confirmation_code == request_data.confirmation_code,
+        PasswordChangeConfirmation.is_used == False
+    ).first()
+    
+    if not confirmation:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid confirmation code."
+        )
+    
+    # Check if token has expired
+    if confirmation.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirmation code has expired. Please request a new one."
+        )
+    
+    # Update password
+    current_user.hashed_password = confirmation.new_password_hash
+    confirmation.is_used = True
+    
+    # Log action
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    db.add(UserLog(user_id=current_user.id, action="password_changed", ip_address=ip_address, device_info=user_agent))
+    
+    db.commit()
+    
+    return {"message": "Password has been changed successfully!"}
 
 @router.delete("/profile")
 async def delete_account(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
@@ -921,9 +1043,16 @@ async def get_connected_accounts(current_user: User = Depends(get_current_user_f
 @router.post("/link-google-account")
 async def link_google_account(request_data: LinkGoogleAccountRequest, request: Request, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Link a Google account to the current user's account"""
-    # Verify password first (security requirement)
+    # Require password to be set (security requirement for account management)
+    if not current_user.hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must set a password before linking a Google account. Please create a password first."
+        )
+    
+    # Verify password
     try:
-        if not current_user.hashed_password or not verify_password(request_data.password, current_user.hashed_password):
+        if not verify_password(request_data.password, current_user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect password"
@@ -998,12 +1127,26 @@ async def link_google_account(request_data: LinkGoogleAccountRequest, request: R
         )
 
 
-@router.post("/unlink-google-account")
-async def unlink_google_account(request_data: UnlinkGoogleAccountRequest, request: Request, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
-    """Unlink Google account from current user's account"""
-    # Verify password first (security requirement)
+@router.post("/link-google-via-popup")
+async def link_google_via_popup(request_data: LinkGoogleAccountRequest, request: Request, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """
+    Link a Google account to current user via popup flow.
+    
+    This endpoint is simpler than link-google-account:
+    - User must provide password for identity verification
+    - Google account can be from any email (not just current user's email)
+    - Allows linking via the simple signInWithPopup flow from settings
+    """
+    # Require password to be set (security requirement for account management)
+    if not current_user.hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must set a password before linking a Google account. Please create a password first."
+        )
+    
+    # Verify password
     try:
-        if not current_user.hashed_password or not verify_password(request_data.password, current_user.hashed_password):
+        if not verify_password(request_data.password, current_user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect password"
@@ -1014,6 +1157,67 @@ async def unlink_google_account(request_data: UnlinkGoogleAccountRequest, reques
             detail="Error verifying password"
         )
     
+    # Check if already linked
+    if current_user.google_oauth_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A Google account is already linked to this account"
+        )
+    
+    # Verify Google token
+    try:
+        claims = verify_firebase_token(request_data.idToken)
+        google_user_email = claims.get('email', '').lower()
+        google_user_id = claims.get('user_id') or claims.get('sub', '')
+        
+        if not google_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Google account ID not found in token"
+            )
+        
+        # Check if this Google ID is already linked to another account
+        existing_google_link = db.query(User).filter(User.google_oauth_id == google_user_id).first()
+        if existing_google_link and existing_google_link.id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This Google account is already linked to another user account"
+            )
+        
+        # Link the Google account
+        current_user.google_oauth_id = google_user_id
+        db.commit()
+        
+        # Log action
+        ip_address = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent", "Unknown Device")
+        db.add(UserLog(user_id=current_user.id, action="google_linked", ip_address=ip_address, device_info=user_agent))
+        db.commit()
+        
+        return {
+            "message": "Google account successfully linked",
+            "google_linked": True,
+            "email": current_user.email,
+            "google_email": google_user_email
+        }
+        
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Google token: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error linking Google account: {str(e)}"
+        )
+
+
+@router.post("/unlink-google-account")
+async def unlink_google_account(request_data: UnlinkGoogleAccountRequest, request: Request, current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
+    """Unlink Google account from current user's account"""
     # Check if Google is linked
     if not current_user.google_oauth_id:
         raise HTTPException(
@@ -1021,11 +1225,24 @@ async def unlink_google_account(request_data: UnlinkGoogleAccountRequest, reques
             detail="No Google account is currently linked"
         )
     
-    # Require password to be set (so user can still login)
+    # Require password to be set (so user can still login after unlinking)
     if not current_user.hashed_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You must set a password before unlinking your Google account, so you can continue to log in"
+            detail="You must set a password before unlinking your Google account, so you can continue to log in. Please create a password first in your security settings."
+        )
+    
+    # Verify password (security requirement)
+    try:
+        if not verify_password(request_data.password, current_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password"
+            )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Error verifying password"
         )
     
     # Unlink the Google account

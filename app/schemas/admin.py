@@ -41,6 +41,9 @@ class UserInvitationResponse(BaseModel):
     invited_by: int
     tier: str
     is_used: bool
+    used_by: Optional[int] = None
+    accepted_by_email: Optional[str] = None
+    accepted_by_name: Optional[str] = None
     expires_at: datetime
     created_at: datetime
     send_email: bool = False

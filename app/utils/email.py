@@ -86,3 +86,23 @@ def send_password_reset_email(db: Session, recipient_email: str, reset_link: str
     </html>
     """
     return send_email(db, recipient_email, subject, body, is_html=True)
+
+def send_password_change_confirmation_email(db: Session, recipient_email: str, confirmation_code: str) -> bool:
+    """Send a password change confirmation email to a user"""
+    subject = "Confirm Your Password Change - MySmartNotes"
+    body = f"""
+    <html>
+        <body>
+            <h2>Confirm Your Password Change</h2>
+            <p>A password change has been requested for your MySmartNotes account.</p>
+            <p>Your confirmation code is:</p>
+            <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #3b82f6; background: #f0f0f0; padding: 15px; border-radius: 6px; text-align: center;">{confirmation_code}</p>
+            <p>Enter this code in the settings page to complete your password change.</p>
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">This code will expire in 1 hour.</p>
+            <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email. Your password will remain unchanged.</p>
+            <br>
+            <p>Best regards,<br>The MySmartNotes Team</p>
+        </body>
+    </html>
+    """
+    return send_email(db, recipient_email, subject, body, is_html=True)
