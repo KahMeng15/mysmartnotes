@@ -8,6 +8,7 @@ const tierGradients = {
 };
 const defaultTierGradient = tierGradients.unlimited;
 let pendingUnlinkAfterPasswordSetup = false;
+window.hasStoredAiApiKey = false;
 
 // Wait for Firebase to be initialized
 async function waitForFirebase(timeout = 5000) {
@@ -245,6 +246,7 @@ function loadSettings() {
                 const aiModelEl = document.getElementById('aiModel');
                 const aiBaseUrlEl = document.getElementById('aiBaseUrl');
                 const aiApiKeyEl = document.getElementById('aiApiKey');
+                window.hasStoredAiApiKey = !!user.ai_api_key;
                 
                 if (aiProviderEl) aiProviderEl.value = user.ai_provider || 'gemini';
                 if (aiModelEl) aiModelEl.value = user.ai_model || '';
@@ -332,8 +334,6 @@ async function updateProfile(event) {
             return;
         }
         
-        const useGlobal = document.getElementById('globalSettingsToggle').classList.contains('active');
-        
         const fullName = document.getElementById('fullName').value.trim();
         const nickname = document.getElementById('nickname').value.trim();
         if (!fullName || !nickname) {
@@ -343,35 +343,8 @@ async function updateProfile(event) {
 
         const payload = {
             full_name: fullName,
-            nickname: nickname,
-            use_global_ai_config: useGlobal
+            nickname: nickname
         };
-        
-        // Only include personal settings if not using global
-        if (!useGlobal) {
-            const provider = document.getElementById('aiProvider').value;
-            const apiKey = document.getElementById('aiApiKey').value;
-            const baseUrl = document.getElementById('aiBaseUrl').value;
-            const model = document.getElementById('aiModel').value;
-            
-            // Validation
-            const requiresBaseUrl = ['ollama', 'local_modal'].includes(provider);
-            const requiresApiKey = ['gemini', 'huggingface', 'chatgpt', 'claude', 'openrouter'].includes(provider);
-
-            if (requiresBaseUrl && !baseUrl) {
-                showErrorModal('Validation Error', `Base URL is required for ${provider}`);
-                return;
-            }
-            if (requiresApiKey && !apiKey) {
-                showErrorModal('Validation Error', `API Key is required for ${provider}`);
-                return;
-            }
-            
-            payload.ai_provider = provider;
-            payload.ai_model = model || null;
-            payload.ai_base_url = baseUrl || null;
-            payload.ai_api_key = apiKey || null;
-        }
         
         const response = await fetch('/auth/profile', {
             method: 'PUT',
@@ -385,13 +358,10 @@ async function updateProfile(event) {
         if (response.ok) {
             const updatedUser = await response.json();
             localStorage.setItem('user', JSON.stringify(updatedUser));
-            showSuccessModal('Configuration Saved', 'Your AI configuration has been saved successfully.');
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
+            showSuccessModal('Profile Saved', 'Your profile information has been updated successfully.');
         } else {
             const error = await response.json();
-            showErrorModal('Error', error.detail || 'Failed to save settings');
+            showErrorModal('Error', error.detail || 'Failed to save profile');
         }
     } catch (error) {
         showErrorModal('Error', error.message || 'Failed to update profile');
@@ -408,8 +378,72 @@ function toggleNotifications() {
     toggle.classList.toggle('active');
 }
 
-function saveAiConfiguration() {
-    updateProfile(new Event('submit', { bubbles: true }));
+async function saveAiConfiguration(event) {
+    if (event) event.preventDefault();
+
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            showErrorModal('Error', 'Session expired. Please login again.');
+            window.location.href = '/login';
+            return;
+        }
+
+        const useGlobal = document.getElementById('globalSettingsToggle').classList.contains('active');
+        const payload = {
+            use_global_ai_config: useGlobal
+        };
+
+        if (!useGlobal) {
+            const provider = document.getElementById('aiProvider').value;
+            const apiKey = document.getElementById('aiApiKey').value.trim();
+            const baseUrl = document.getElementById('aiBaseUrl').value.trim();
+            const model = document.getElementById('aiModel').value.trim();
+
+            const requiresBaseUrl = ['ollama', 'local_modal'].includes(provider);
+            const requiresApiKey = ['gemini', 'huggingface', 'chatgpt', 'claude', 'openrouter'].includes(provider);
+            const hasAnyApiKey = apiKey.length > 0 || window.hasStoredAiApiKey;
+
+            if (requiresBaseUrl && !baseUrl) {
+                showErrorModal('Validation Error', `Base URL is required for ${provider}`);
+                return;
+            }
+            if (requiresApiKey && !hasAnyApiKey) {
+                showErrorModal('Validation Error', `API Key is required for ${provider}`);
+                return;
+            }
+
+            payload.ai_provider = provider;
+            payload.ai_model = model || null;
+            payload.ai_base_url = baseUrl || null;
+            if (apiKey) {
+                payload.ai_api_key = apiKey;
+            }
+        }
+
+        const response = await fetch('/auth/profile', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            const updatedUser = await response.json();
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+            if (payload.ai_api_key) {
+                window.hasStoredAiApiKey = true;
+            }
+            showSuccessModal('AI Configuration Saved', 'Your AI settings have been updated successfully.');
+        } else {
+            const error = await response.json();
+            showErrorModal('Error', error.detail || 'Failed to save AI configuration');
+        }
+    } catch (error) {
+        showErrorModal('Error', error.message || 'Failed to save AI configuration');
+    }
 }
 
 function showFeatureComingSoon() {
@@ -425,12 +459,21 @@ function clearCache() {
 }
 
 async function changePassword() {
+    if (typeof window.userHasPassword !== 'boolean') {
+        await loadConnectedAccounts();
+    }
+
+    const hasPassword = !!window.userHasPassword;
     const current = document.getElementById('currentPassword').value;
     const newPass = document.getElementById('newPassword').value;
     const confirm = document.getElementById('confirmPassword').value;
 
-    if (!current || !newPass || !confirm) {
-        showMessageInElement('passwordMsg', 'error', 'Please fill in all password fields');
+    if (!newPass || !confirm || (hasPassword && !current)) {
+        showMessageInElement(
+            'passwordMsg',
+            'error',
+            hasPassword ? 'Please fill in all password fields' : 'Please fill in new password and confirm password'
+        );
         return;
     }
 
@@ -448,7 +491,7 @@ async function changePassword() {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                current_password: current,
+                current_password: hasPassword ? current : '',
                 new_password: newPass
             })
         });
@@ -568,7 +611,9 @@ async function confirmPasswordChange() {
         if (res.ok) {
             showMessageInBox(msgBox, 'success', 'Password changed successfully!');
             window.userHasPassword = true;
+            updateSecurityPasswordMode(true);
             await loadConnectedAccounts();
+            showSuccessModal('Password Updated', 'Your password has been verified and saved successfully.');
             const continueUnlinkFlow = pendingUnlinkAfterPasswordSetup;
             setTimeout(() => {
                 closePasswordChangeConfirmationModal(true);
@@ -656,6 +701,7 @@ async function loadConnectedAccounts() {
             
             // Store password status in global for modal access
             window.userHasPassword = hasPassword;
+            updateSecurityPasswordMode(hasPassword);
             
             // Update UI based on linked status
             const linkBtn = document.getElementById('linkGoogleBtn');
@@ -681,6 +727,29 @@ async function loadConnectedAccounts() {
     } catch (e) {
         console.error('Failed to load connected accounts', e);
     }
+}
+
+function updateSecurityPasswordMode(hasPassword) {
+    const currentGroup = document.getElementById('currentPasswordGroup');
+    const currentLabel = document.getElementById('currentPasswordLabel');
+    const currentInput = document.getElementById('currentPassword');
+    const actionBtn = document.getElementById('securityPasswordActionBtn');
+    const hint = document.getElementById('securityPasswordHint');
+
+    if (!currentGroup || !currentLabel || !currentInput || !actionBtn || !hint) return;
+
+    if (hasPassword) {
+        currentGroup.style.display = '';
+        currentLabel.textContent = 'Current Password';
+        actionBtn.textContent = 'Change Password';
+        hint.textContent = 'Use your current password to set a new one. A verification code will be sent to your email.';
+        return;
+    }
+
+    currentGroup.style.display = 'none';
+    currentInput.value = '';
+    actionBtn.textContent = 'Set Password';
+    hint.textContent = 'Set a password for your account. A verification code will be sent to your email before it is saved.';
 }
 
 function showLinkGoogleModal() {
