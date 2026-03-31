@@ -256,6 +256,154 @@ async def import_quiz_from_content(
 ) -> Quiz:
     """Parse questions from raw text and create a quiz."""
     import re as _re
+
+    def _looks_like_provider_error(raw_response: str) -> bool:
+        if not raw_response:
+            return False
+        lower = raw_response.strip().lower()
+        error_markers = [
+            "connection failed",
+            "failed after",
+            "provider error",
+            "timeout",
+            "timed out",
+            "[gemini]",
+            "[huggingface]",
+            "[ollama]",
+        ]
+        return any(marker in lower for marker in error_markers)
+
+    def _normalize_type(raw: str) -> str:
+        lower = (raw or "").lower()
+        if lower in {"objective", "multiple_choice", "multiple-choice", "mcq"}:
+            return "objective"
+        if lower in {"fill_in_the_blank", "fill-in-the-blank", "blank"}:
+            return "fill_in_the_blank"
+        return "subjective"
+
+    def _extract_fallback_questions(raw_text: str) -> List[Dict[str, Any]]:
+        """Best-effort extractor used when AI output is unavailable/unparseable.
+
+        Supports common formats:
+        - Q: ... / A: ...
+        - Question ... / Answer ...
+        - Lines ending with '?' followed by next line(s) as answer.
+        """
+        if not raw_text:
+            return []
+
+        extracted: List[Dict[str, Any]] = []
+
+        qa_pattern = _re.compile(
+            r"(?ims)(?:^|\n)\s*(?:q(?:uestion)?\s*[\d.\-)]*\s*[:\-])\s*(.+?)\s*"
+            r"(?:\n|\r\n)\s*(?:a(?:nswer)?\s*[\d.\-)]*\s*[:\-])\s*(.+?)"
+            r"(?=\n\s*(?:q(?:uestion)?\s*[\d.\-)]*\s*[:\-])|\Z)"
+        )
+
+        for match in qa_pattern.finditer(raw_text):
+            q_text = " ".join(match.group(1).split())
+            a_text = " ".join(match.group(2).split())
+            if not q_text:
+                continue
+            q_type = "fill_in_the_blank" if "_____" in q_text else "subjective"
+            extracted.append(
+                {
+                    "question_text": q_text,
+                    "original_number": None,
+                    "answer_text": a_text,
+                    "question_type": q_type,
+                    "options": None,
+                }
+            )
+
+        if extracted:
+            return extracted
+
+        # Secondary heuristic: question lines ending with '?' and answer in following lines.
+        lines = [line.strip() for line in raw_text.splitlines()]
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if not line:
+                i += 1
+                continue
+
+            question_text = None
+            q_match = _re.match(r"^(?:q(?:uestion)?\s*[\d.\-)]*\s*[:\-]\s*)?(.*\?)$", line, flags=_re.IGNORECASE)
+            if q_match:
+                question_text = q_match.group(1).strip()
+
+            if not question_text:
+                i += 1
+                continue
+
+            answer_parts: List[str] = []
+            j = i + 1
+            while j < len(lines):
+                candidate = lines[j]
+                if not candidate:
+                    if answer_parts:
+                        break
+                    j += 1
+                    continue
+                # stop if next question-like line encountered
+                if candidate.endswith("?"):
+                    break
+                candidate = _re.sub(r"^(?:a(?:nswer)?\s*[:\-]\s*)", "", candidate, flags=_re.IGNORECASE)
+                answer_parts.append(candidate)
+                j += 1
+
+            answer_text = " ".join(answer_parts).strip() or "Answer not provided in source text."
+            q_type = "fill_in_the_blank" if "_____" in question_text else "subjective"
+            extracted.append(
+                {
+                    "question_text": question_text,
+                    "original_number": None,
+                    "answer_text": answer_text,
+                    "question_type": q_type,
+                    "options": None,
+                }
+            )
+            i = j if j > i else i + 1
+
+        return extracted
+
+    def _try_parse_import_payload(raw_response: str):
+        """Parse AI output that may include code fences or surrounding prose."""
+        if not raw_response:
+            raise json.JSONDecodeError("Empty response", "", 0)
+
+        candidates = []
+        text = raw_response.strip()
+        candidates.append(text)
+
+        # Common fenced output: ```json ... ``` or ``` ... ```
+        fenced_blocks = _re.findall(r"```(?:json)?\s*([\s\S]*?)\s*```", text, flags=_re.IGNORECASE)
+        candidates.extend([block.strip() for block in fenced_blocks if block.strip()])
+
+        # If model added prose, attempt object/array substring extraction.
+        obj_start = text.find("{")
+        obj_end = text.rfind("}")
+        if obj_start != -1 and obj_end != -1 and obj_end > obj_start:
+            candidates.append(text[obj_start:obj_end + 1].strip())
+
+        arr_start = text.find("[")
+        arr_end = text.rfind("]")
+        if arr_start != -1 and arr_end != -1 and arr_end > arr_start:
+            candidates.append(text[arr_start:arr_end + 1].strip())
+
+        seen = set()
+        for candidate in candidates:
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+
+        # Raise with original raw payload context path.
+        raise json.JSONDecodeError("Could not parse JSON payload", text, 0)
     
     # Truncate if too long (25k chars is usually enough for a quiz)
     if len(text) > 25000:
@@ -336,31 +484,72 @@ Respond with ONLY the JSON object.
     start_time = time.time()
     response = await ai_client.generate_text(prompt, max_tokens=3500)
     processing_time_ms = int((time.time() - start_time) * 1000)
+
+    provider_failed = _looks_like_provider_error(response)
+    suggested_title = None
+    questions_data: List[Dict[str, Any]] = []
     
-    try:
-        clean_response = response.strip()
-        if clean_response.startswith("```json"):
-            clean_response = clean_response[7:-3].strip()
-        elif clean_response.startswith("```"):
-            clean_response = clean_response[3:-3].strip()
-            
-        data = json.loads(clean_response)
-        
-        # Handle both old array format and new object format for robustness
-        if isinstance(data, list):
-            questions_data = data
-            suggested_title = None  # Legacy array format - no title suggestion
-        else:
-            questions_data = data.get("questions", [])
-            raw_title = data.get("suggested_title")
-            # Use the AI title only if it's a non-empty string
-            suggested_title = raw_title.strip() if isinstance(raw_title, str) and raw_title.strip() else None
-        
-        logger.info(f"[quiz import] AI suggested_title='{suggested_title}', incoming title='{title}'")
-            
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse imported quiz JSON: {response}")
-        raise ValueError("AI failed to structure the imported content properly. Please check your input.") from e
+    if not provider_failed:
+        try:
+            data = _try_parse_import_payload(response)
+
+            # Handle both old array format and new object format for robustness
+            if isinstance(data, list):
+                questions_data = data
+                suggested_title = None  # Legacy array format - no title suggestion
+            else:
+                questions_data = data.get("questions", [])
+                raw_title = data.get("suggested_title")
+                # Use the AI title only if it's a non-empty string
+                suggested_title = raw_title.strip() if isinstance(raw_title, str) and raw_title.strip() else None
+
+            logger.info(f"[quiz import] AI suggested_title='{suggested_title}', incoming title='{title}'")
+
+        except json.JSONDecodeError:
+            logger.error(f"Failed to parse imported quiz JSON: {response}")
+
+    # Fallback parser for provider outages or malformed AI output.
+    if not questions_data:
+        questions_data = _extract_fallback_questions(text)
+        if questions_data:
+            logger.warning(
+                "[quiz import] using fallback parser",
+                extra={
+                    "provider_failed": provider_failed,
+                    "extracted_questions": len(questions_data),
+                },
+            )
+
+    if not questions_data:
+        if provider_failed:
+            raise ValueError(
+                "AI provider is currently unavailable, and no Q/A patterns were detected in your import text. "
+                "Try again shortly or import content that includes clear 'Q:' and 'A:' pairs."
+            )
+        raise ValueError("AI failed to structure the imported content properly. Please check your input.")
+
+    # Normalize and sanitize question payload before persistence.
+    normalized_questions: List[Dict[str, Any]] = []
+    for q_data in questions_data:
+        q_text = str(q_data.get("question_text", "")).strip()
+        if not q_text:
+            continue
+        q_type = _normalize_type(str(q_data.get("question_type", "subjective")))
+        options = q_data.get("options") if q_type == "objective" else None
+        normalized_questions.append(
+            {
+                "question_text": q_text,
+                "original_number": q_data.get("original_number"),
+                "answer_text": str(q_data.get("answer_text", "")).strip(),
+                "question_type": q_type,
+                "options": options,
+            }
+        )
+
+    if not normalized_questions:
+        raise ValueError("No valid questions could be extracted from the provided content.")
+
+    questions_data = normalized_questions
 
     # Create the Quiz
     quiz = Quiz(

@@ -39,6 +39,7 @@ def get_pipeline() -> SmartPipeline:
 async def smart_extract(
     file: UploadFile = File(...),
     use_ai: bool = False,
+    current_user: User = Depends(get_current_user),
 ):
     """
     Upload a PDF/PPTX and get clean Markdown back immediately.
@@ -115,6 +116,7 @@ async def smart_extract(
 async def smart_extract_download(
     file: UploadFile = File(...),
     use_ai: bool = False,
+    current_user: User = Depends(get_current_user),
 ):
     """
     Upload a PDF/PPTX and download the result as a .md file directly.

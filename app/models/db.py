@@ -285,9 +285,11 @@ class Task(Base):
     __tablename__ = "tasks"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String(128), unique=True, nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     task_type = Column(String(100))  # ocr, embedding, generation
     status = Column(String(50), default="pending")  # pending, processing, completed, failed
+    progress = Column(Integer, default=0)
     input_data = Column(Text)  # JSON
     result = Column(Text)  # JSON
     error_message = Column(Text)

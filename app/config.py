@@ -1,55 +1,58 @@
 """Configuration management"""
-from pydantic_settings import BaseSettings
 from functools import lru_cache
-import os
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Application settings from environment variables
-    
-    AI Configuration Hierarchy:
-    ===========================
-    1. GLOBAL_* settings: Administrator-managed defaults for all users
-       - Used when user enables "Use Global AI Settings" in their profile
-       - Recommended for most users in managed environments
-    
-    2. User personal settings: Individual user configurations (stored in DB)
-       - Used when user disables "Use Global AI Settings"
-       - Allows users to use their own API keys and providers
-    
-    3. Fallback settings: System-wide defaults (GEMINI_API_KEY, AI_PROVIDER, etc.)
-       - Used only when user has no personal settings and not using global
-       - Typically not used in production environments
-    """
-    
+    """Application settings from environment variables."""
+
     # Database
     DATABASE_URL: str = "sqlite:///./data/app.db"
-    
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 40
+    DB_POOL_TIMEOUT_SECONDS: int = 30
+    DB_POOL_RECYCLE_SECONDS: int = 1800
+
+    # Runtime Environment
+    ENVIRONMENT: str = "development"  # development, staging, production
+    ALLOW_SQLITE_IN_PRODUCTION: bool = False
+
     # JWT Security
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
+
+    # CORS
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:8000,http://127.0.0.1:8000"
+
+    # Session Cookie Security
+    COOKIE_SECURE: bool = False
+    COOKIE_SAMESITE: str = "lax"  # strict, lax, none
+    CSRF_COOKIE_NAME: str = "csrf_token"
+    CSRF_HEADER_NAME: str = "X-CSRF-Token"
+
+    # Encryption for secrets stored in DB (Fernet key, URL-safe base64-encoded 32-byte key)
+    APP_ENCRYPTION_KEY: str = ""
+
+    # Background task retention
+    TASK_RETENTION_DAYS: int = 14
+
     # Admin Bootstrap
     ADMIN_EMAIL: str = ""
     ADMIN_PASSWORD: str = ""
-    
-    # ============================================
+
     # Global AI Configuration (Administrator-managed)
-    # ============================================
     GLOBAL_AI_PROVIDER: str = "gemini"  # Options: gemini, huggingface, ollama
-    GLOBAL_GEMINI_API_KEY: str = ""     # API key for global Gemini usage
-    GLOBAL_HUGGINGFACE_TOKEN: str = ""  # API token for global Hugging Face usage
-    GLOBAL_AI_MODEL: str = ""           # Optional: specific model name (leave empty for auto-select)
-    
-    # ============================================
-    # Fallback AI Settings (System defaults)
-    # ============================================
-    GEMINI_API_KEY: str = ""            # Fallback Gemini API key
-    HUGGINGFACE_TOKEN: str = ""         # Fallback Hugging Face token
-    AI_PROVIDER: str = "gemini"         # Fallback provider
-    OLLAMA_BASE_URL: str = ""           # Ollama server URL (e.g., "http://192.168.1.100:11434")
-    
+    GLOBAL_GEMINI_API_KEY: str = ""
+    GLOBAL_HUGGINGFACE_TOKEN: str = ""
+    GLOBAL_AI_MODEL: str = ""
+
+    # Fallback AI Settings
+    GEMINI_API_KEY: str = ""
+    HUGGINGFACE_TOKEN: str = ""
+    AI_PROVIDER: str = "gemini"
+    OLLAMA_BASE_URL: str = ""
 
     # Firebase Cloud Configuration
     FIREBASE_API_KEY: str = ""
@@ -64,19 +67,19 @@ class Settings(BaseSettings):
     APP_NAME: str = "MySmartNotes"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
-    
+
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
-    
+
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 50
     ALLOWED_EXTENSIONS: str = "pdf,pptx,png,jpg,jpeg"
-    
+
     # Processing
     OCR_ENABLED: bool = True
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = True
@@ -85,5 +88,5 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Get cached settings instance"""
+    """Get cached settings instance."""
     return Settings()

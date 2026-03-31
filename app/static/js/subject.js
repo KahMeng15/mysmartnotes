@@ -1,5 +1,4 @@
 const API_URL = '';
-const token = localStorage.getItem('token');
 const urlParams = new URLSearchParams(window.location.search);
 const subjectId = urlParams.get('id');
 
@@ -7,7 +6,6 @@ let allLectures = [];
 let currentSubject = null;
 
 window.addEventListener('load', () => {
-    if (!token) window.location.href = '/login';
     if (!subjectId) {
         alert('No subject specified');
         window.location.href = 'notes.html';
@@ -20,9 +18,7 @@ window.addEventListener('load', () => {
 async function loadSubjectDetails() {
     try {
         // Determine group context? We can just fetch subjects to find this one.
-        const response = await fetch(`${API_URL}/subjects`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`${API_URL}/subjects`);
         if (response.ok) {
             const subjects = await response.json();
             currentSubject = subjects.find(s => s.id == subjectId);
@@ -33,9 +29,7 @@ async function loadSubjectDetails() {
                 // Update breadcrumb with group info if available
                 if (currentSubject.group_id) {
                     // Fetch group details
-                    const groupsRes = await fetch(`${API_URL}/groups`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
+                    const groupsRes = await fetch(`${API_URL}/groups`);
                     if (groupsRes.ok) {
                         const groups = await groupsRes.json();
                         const group = groups.find(g => g.id === currentSubject.group_id);
@@ -58,9 +52,7 @@ async function loadSubjectDetails() {
 
 async function loadLectures() {
     try {
-        const response = await fetch(`${API_URL}/lectures?subject_id=${subjectId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`${API_URL}/lectures?subject_id=${subjectId}`);
 
         if (response.ok) {
             let data = await response.json();
@@ -172,7 +164,6 @@ async function handleEditSubject(e) {
         const res = await fetch(`${API_URL}/subjects/${subjectId}`, {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -207,8 +198,7 @@ async function deleteSubject() {
     showConfirmModal('Are you sure you want to delete this subject? All lectures within it will also be deleted.', async function() {
         try {
             const response = await fetch(`${API_URL}/subjects/${subjectId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+                method: 'DELETE'
             });
             if (response.ok) {
                 showSuccessModal('Subject Deleted', 'The subject has been deleted successfully!');
@@ -234,8 +224,7 @@ async function deleteLecture(id) {
     showConfirmModal('Delete this lecture?', async function() {
         try {
             const response = await fetch(`${API_URL}/lectures/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+                method: 'DELETE'
             });
             if (response.ok) {
                 showSuccessModal('Lecture Deleted', 'The lecture has been deleted successfully!');

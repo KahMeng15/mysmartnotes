@@ -10,12 +10,23 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+is_sqlite = "sqlite" in settings.DATABASE_URL
+
 # Create engine
-engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
-    echo=settings.DEBUG,
-)
+engine_kwargs = {
+    "echo": settings.DEBUG,
+}
+
+if is_sqlite:
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
+    engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+    engine_kwargs["pool_timeout"] = settings.DB_POOL_TIMEOUT_SECONDS
+    engine_kwargs["pool_recycle"] = settings.DB_POOL_RECYCLE_SECONDS
+    engine_kwargs["pool_pre_ping"] = True
+
+engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -76,7 +87,7 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     
     # Apply SQLite auto-migrations for missing columns
-    if "sqlite" in settings.DATABASE_URL:
+    if is_sqlite:
         try:
             apply_sqlite_migrations()
         except Exception as e:
@@ -148,6 +159,10 @@ def apply_sqlite_migrations():
             ("interval_days", "INTEGER DEFAULT 0"),
             ("ease_factor", "REAL DEFAULT 2.5"),
             ("consecutive_correct", "INTEGER DEFAULT 0")
+        ]),
+        ("tasks", [
+            ("task_id", "VARCHAR(128)"),
+            ("progress", "INTEGER DEFAULT 0")
         ])
     ]
 

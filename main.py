@@ -1,6 +1,10 @@
 """Main application entry point"""
 import sys
 import os
+import time
+import uuid
+from collections import defaultdict, deque
+from threading import Lock
 
 # Ensure the current directory is in the path for module resolution
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -17,6 +21,8 @@ import uvicorn
 
 from app.config import get_settings
 from app.utils.db import init_db
+from app.utils.crypto import encrypt_secret
+from app.utils.observability import record_request
 from app.routers import auth, subjects, lectures, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support
 
 # Configure logging
@@ -26,13 +32,47 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+def _is_production() -> bool:
+    return settings.ENVIRONMENT.lower() == "production"
+
+
+def _parse_cors_origins() -> list[str]:
+    origins = [origin.strip() for origin in settings.CORS_ALLOWED_ORIGINS.split(",") if origin.strip()]
+    if not origins:
+        return ["http://localhost:8000", "http://127.0.0.1:8000"]
+    return origins
+
+
+def _validate_production_settings() -> None:
+    if not _is_production():
+        return
+
+    if not settings.SECRET_KEY or len(settings.SECRET_KEY) < 32:
+        raise RuntimeError("Production startup blocked: SECRET_KEY must be set to at least 32 characters")
+
+    if "sqlite" in settings.DATABASE_URL and not settings.ALLOW_SQLITE_IN_PRODUCTION:
+        raise RuntimeError("Production startup blocked: sqlite is not allowed. Set a production database URL or explicitly enable ALLOW_SQLITE_IN_PRODUCTION=true")
+
+    if "*" in _parse_cors_origins():
+        raise RuntimeError("Production startup blocked: wildcard CORS origin is not allowed")
+
+
 # Lifespan context manager for startup/shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    _validate_production_settings()
     logger.info(f"Starting {settings.APP_NAME}")
     init_db()
     logger.info("Database initialized")
+
+    try:
+        from app.utils.tasks import TaskManager
+        deleted = TaskManager.cleanup_old_tasks()
+        if deleted:
+            logger.info(f"Cleaned up {deleted} old task records")
+    except Exception as e:
+        logger.warning(f"Task cleanup startup warning: {e}")
     
     # Seed default export templates
     from app.utils.db import SessionLocal
@@ -48,12 +88,12 @@ async def lifespan(app: FastAPI):
             sys_settings = SystemSettings(
                 global_ai_provider=settings.GLOBAL_AI_PROVIDER,
                 global_ai_model=settings.GLOBAL_AI_MODEL,
-                global_ai_api_key=settings.GLOBAL_GEMINI_API_KEY or settings.GLOBAL_HUGGINGFACE_TOKEN,
+                global_ai_api_key=encrypt_secret(settings.GLOBAL_GEMINI_API_KEY or settings.GLOBAL_HUGGINGFACE_TOKEN),
                 # Note: We prioritize Gemini key if provider is gemini, else HF
             )
             # If specifically huggingface, use that token
             if settings.GLOBAL_AI_PROVIDER == "huggingface":
-                sys_settings.global_ai_api_key = settings.GLOBAL_HUGGINGFACE_TOKEN
+                sys_settings.global_ai_api_key = encrypt_secret(settings.GLOBAL_HUGGINGFACE_TOKEN)
                 
             db.add(sys_settings)
             db.commit()
@@ -88,6 +128,11 @@ async def lifespan(app: FastAPI):
     
     yield
     # Shutdown
+    try:
+        from app.utils.tasks import task_executor
+        task_executor.shutdown(wait=False, cancel_futures=True)
+    except Exception as e:
+        logger.warning(f"Task executor shutdown warning: {e}")
     logger.info("Shutting down application")
 
 
@@ -99,19 +144,118 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+_rate_limit_lock = Lock()
+_rate_limit_buckets = defaultdict(deque)
+
+# Endpoint-level burst controls for abuse-prone routes.
+_RATE_LIMIT_POLICY = {
+    "/auth/login": (10, 60),
+    "/auth/google-login": (20, 60),
+    "/auth/password-reset-request": (5, 3600),
+    "/processing/smart-extract": (6, 60),
+    "/processing/smart-extract/download": (6, 60),
+}
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_parse_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-CSRF-Token"],
 )
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from app.models.db import SystemSettings, IPFilter, UserLog
 from app.utils.db import SessionLocal
+
+
+@app.middleware("http")
+async def request_observability_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    started_at = time.time()
+
+    response = await call_next(request)
+    duration_ms = int((time.time() - started_at) * 1000)
+
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googleapis.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://www.googleapis.com https://identitytoolkit.googleapis.com"
+
+    if _is_production():
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+    logger.info(
+        "request.completed",
+        extra={
+            "request_id": request_id,
+            "path": request.url.path,
+            "method": request.method,
+            "status_code": response.status_code,
+            "duration_ms": duration_ms,
+        },
+    )
+    record_request(request.url.path, response.status_code, duration_ms)
+    return response
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    policy = _RATE_LIMIT_POLICY.get(request.url.path)
+    if not policy:
+        return await call_next(request)
+
+    max_requests, window_seconds = policy
+    client_ip = request.client.host if request.client else "unknown"
+    key = f"{client_ip}:{request.url.path}"
+    now = time.time()
+
+    with _rate_limit_lock:
+        bucket = _rate_limit_buckets[key]
+        while bucket and bucket[0] <= now - window_seconds:
+            bucket.popleft()
+
+        if len(bucket) >= max_requests:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Too many requests. Please retry later."},
+            )
+
+        bucket.append(now)
+
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def csrf_protection_middleware(request: Request, call_next):
+    if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        return await call_next(request)
+
+    csrf_exempt_paths = {
+        "/auth/login",
+        "/auth/google-login",
+        "/auth/google-complete",
+        "/auth/register",
+        "/auth/password-reset-request",
+        "/auth/password-reset",
+    }
+    if request.url.path in csrf_exempt_paths:
+        return await call_next(request)
+
+    cookie_token = request.cookies.get("access_token")
+    # Enforce CSRF only for cookie-authenticated browser sessions.
+    if not cookie_token:
+        return await call_next(request)
+
+    csrf_cookie = request.cookies.get(settings.CSRF_COOKIE_NAME)
+    csrf_header = request.headers.get(settings.CSRF_HEADER_NAME)
+    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+        return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
+
+    return await call_next(request)
 
 @app.middleware("http")
 async def system_settings_middleware(request: Request, call_next):
@@ -121,12 +265,12 @@ async def system_settings_middleware(request: Request, call_next):
 
     db = SessionLocal()
     try:
-        settings = db.query(SystemSettings).first()
+        sys_settings = db.query(SystemSettings).first()
         client_ip = request.client.host if request.client else "127.0.0.1"
 
-        if settings:
+        if sys_settings:
             # 1. Lockdown Mode: allow local IPs only
-            if settings.lockdown_mode:
+            if sys_settings.lockdown_mode:
                 if not (client_ip.startswith("127.") or client_ip.startswith("192.168.") or client_ip.startswith("10.") or client_ip == "::1"):
                     return JSONResponse(status_code=403, content={"detail": "System is in Lockdown Mode. Local network access only."})
             
@@ -135,12 +279,18 @@ async def system_settings_middleware(request: Request, call_next):
             bypass_paths = ["/admin", "/auth", "/login", "/maintenance", "/styles", "/js", "/fonts", "/favicon.ico"]
             is_bypassed = any(request.url.path.startswith(path) for path in bypass_paths)
             
-            if settings.maintenance_mode and not is_bypassed:
+            if sys_settings.maintenance_mode and not is_bypassed:
                 # 2a. Allow admin bypass if authenticated
                 is_admin = False
                 auth_header = request.headers.get("Authorization")
+                cookie_token = request.cookies.get("access_token")
+                token = None
                 if auth_header and auth_header.startswith("Bearer "):
                     token = auth_header.split(" ")[1]
+                elif cookie_token:
+                    token = cookie_token
+
+                if token:
                     try:
                         from app.utils.auth import decode_token, token_version_matches_user
                         payload = decode_token(token)
@@ -178,10 +328,16 @@ async def system_settings_middleware(request: Request, call_next):
         response = await call_next(request)
 
         # 5. Sliding Session (Reset timer on activity)
-        if settings and settings.session_reset_on_activity:
+        if sys_settings and sys_settings.session_reset_on_activity and request.url.path != "/auth/logout":
             auth_header = request.headers.get("Authorization")
+            cookie_token = request.cookies.get("access_token")
+            token = None
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
+            elif cookie_token:
+                token = cookie_token
+
+            if token:
                 try:
                     from app.utils.auth import decode_token, create_access_token, token_version_matches_user
                     from datetime import timedelta
@@ -196,9 +352,9 @@ async def system_settings_middleware(request: Request, call_next):
 
                             # Re-issue token with full duration
                             expire_minutes = 30 # default
-                            if settings.session_length:
-                                length = settings.session_length
-                                unit = settings.session_unit or "hours"
+                            if sys_settings.session_length:
+                                length = sys_settings.session_length
+                                unit = sys_settings.session_unit or "hours"
                                 if unit == "hours": expire_minutes = length * 60
                                 elif unit == "days": expire_minutes = length * 1440
                             
@@ -208,6 +364,15 @@ async def system_settings_middleware(request: Request, call_next):
                             )
                             response.headers["X-New-Token"] = new_token
                             response.headers["Access-Control-Expose-Headers"] = "X-New-Token"
+                            response.set_cookie(
+                                key="access_token",
+                                value=new_token,
+                                httponly=True,
+                                secure=settings.COOKIE_SECURE,
+                                samesite=settings.COOKIE_SAMESITE,
+                                max_age=expire_minutes * 60,
+                                path="/",
+                            )
                 except Exception as e:
                     pass # Silently fail for token re-issue
 

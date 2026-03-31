@@ -1,5 +1,4 @@
 const API_URL = '';
-const token = localStorage.getItem('token');
 const urlParams = new URLSearchParams(window.location.search);
 const groupId = urlParams.get('id');
 
@@ -7,7 +6,6 @@ let currentGroup = null;
 let groupSubjects = [];
 
 window.addEventListener('load', () => {
-    if (!token) window.location.href = '/login';
     if (!groupId) {
         alert('No group specified');
         window.location.href = 'notes.html';
@@ -25,9 +23,7 @@ async function fetchData() {
         // Let's assume we fetch all groups for now to be safe, or try /groups/{id} if implemented.
         // Based on previous `notes.html`, we fetched all.
 
-        const groupsRes = await fetch(`${API_URL}/groups`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const groupsRes = await fetch(`${API_URL}/groups`);
         if (groupsRes.ok) {
             const groups = await groupsRes.json();
             currentGroup = groups.find(g => g.id == groupId);
@@ -42,9 +38,7 @@ async function fetchData() {
         }
 
         // Fetch Subjects
-        const subjectsRes = await fetch(`${API_URL}/subjects`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const subjectsRes = await fetch(`${API_URL}/subjects`);
         if (subjectsRes.ok) {
             const allSubjects = await subjectsRes.json();
             groupSubjects = allSubjects.filter(s => s.group_id == groupId);
@@ -136,7 +130,6 @@ async function handleEditGroup(e) {
         const res = await fetch(`${API_URL}/groups/${groupId}`, {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ name })
@@ -158,8 +151,7 @@ async function deleteGroup() {
     showConfirmModal('Delete this group? Subjects in it will be deleted or ungrouped.', async function() {
         try {
             const res = await fetch(`${API_URL}/groups/${groupId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+                method: 'DELETE'
             });
             if (res.ok) {
                 showSuccessModal('Group Deleted', 'The group has been deleted successfully!');
@@ -182,11 +174,7 @@ async function deleteGroup() {
 }
 
 function logout() {
-    if (confirm('Logout?')) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-    }
+    window.logout();
 }
 
 // Close modal on outside click

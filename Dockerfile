@@ -1,9 +1,9 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
 # Install system dependencies for OCR and PDF processing
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     poppler-utils \
     libsm6 \
@@ -20,16 +20,31 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create data and output directories
-RUN mkdir -p /app/data /app/generated /app/output
+# Create non-root user and writable runtime directories
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && mkdir -p /app/data /app/generated /app/output \
+    && chown -R appuser:appuser /app
 
 # Set Default Environment Variables (these can be overridden by docker-compose or run command)
 ENV PYTHONPATH=. \
     PORT=8000 \
     DATABASE_URL=sqlite:///./data/app.db \
-    SECRET_KEY=dev-secret-key-change-in-production \
+    DB_POOL_SIZE=20 \
+    DB_MAX_OVERFLOW=40 \
+    DB_POOL_TIMEOUT_SECONDS=30 \
+    DB_POOL_RECYCLE_SECONDS=1800 \
+    SECRET_KEY="" \
+    ENVIRONMENT=development \
+    ALLOW_SQLITE_IN_PRODUCTION=False \
     ALGORITHM=HS256 \
     ACCESS_TOKEN_EXPIRE_MINUTES=30 \
+    CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000 \
+    COOKIE_SECURE=False \
+    COOKIE_SAMESITE=lax \
+    CSRF_COOKIE_NAME=csrf_token \
+    CSRF_HEADER_NAME=X-CSRF-Token \
+    APP_ENCRYPTION_KEY="" \
+    TASK_RETENTION_DAYS=14 \
     GLOBAL_AI_PROVIDER=gemini \
     GLOBAL_GEMINI_API_KEY="" \
     GLOBAL_AI_MODEL="" \
@@ -56,6 +71,8 @@ ENV PYTHONPATH=. \
 
 # Note: EXPOSE is mostly for documentation when using docker-compose, but we document 8000 here
 EXPOSE 8000
+
+USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

@@ -17,8 +17,30 @@ from app.routers.auth import get_current_user
 from app.utils.auth import hash_password
 from app.utils.email import send_invitation_email
 from app.utils.invitation_utils import build_link_only_email, is_link_only_email
+from app.utils.crypto import encrypt_secret, decrypt_secret
+from app.utils.observability import get_runtime_metrics_snapshot
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _prepare_system_settings_response(settings: SystemSettings) -> dict:
+    return {
+        "lockdown_mode": settings.lockdown_mode,
+        "signup_config": settings.signup_config,
+        "maintenance_mode": settings.maintenance_mode,
+        "footer_text": settings.footer_text,
+        "domain_url": settings.domain_url,
+        "global_ai_provider": settings.global_ai_provider,
+        "global_ai_model": settings.global_ai_model,
+        "global_ai_api_key": decrypt_secret(settings.global_ai_api_key),
+        "global_ai_base_url": settings.global_ai_base_url,
+        "ai_limit_per_user": settings.ai_limit_per_user,
+        "session_length": settings.session_length,
+        "session_unit": settings.session_unit,
+        "session_reset_on_activity": settings.session_reset_on_activity,
+        "max_quiz_questions": settings.max_quiz_questions,
+        "unnecessary_logins_enabled": settings.unnecessary_logins_enabled,
+    }
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)):
     """Dependency to check if current user is an admin"""
@@ -28,6 +50,12 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)):
             detail="Admin privileges required"
         )
     return current_user
+
+
+@router.get("/runtime-metrics")
+def get_runtime_metrics(admin: User = Depends(get_current_admin_user)):
+    """Get lightweight runtime metrics for production diagnostics."""
+    return get_runtime_metrics_snapshot()
 
 # --- System Settings ---
 @router.get("/system-settings", response_model=SystemSettingsSchema)
@@ -40,7 +68,7 @@ def get_system_settings(db: Session = Depends(get_db), admin: User = Depends(get
         settings = SystemSettings(
             global_ai_provider=app_settings.GLOBAL_AI_PROVIDER,
             global_ai_model=app_settings.GLOBAL_AI_MODEL,
-            global_ai_api_key=app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GLOBAL_HUGGINGFACE_TOKEN,
+            global_ai_api_key=encrypt_secret(app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GLOBAL_HUGGINGFACE_TOKEN),
         )
         db.add(settings)
         db.commit()
@@ -55,14 +83,14 @@ def get_system_settings(db: Session = Depends(get_db), admin: User = Depends(get
             settings.global_ai_model = app_settings.GLOBAL_AI_MODEL
             updated = True
         if not settings.global_ai_api_key:
-            settings.global_ai_api_key = app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GLOBAL_HUGGINGFACE_TOKEN
+            settings.global_ai_api_key = encrypt_secret(app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GLOBAL_HUGGINGFACE_TOKEN)
             updated = True
         
         if updated:
             db.commit()
             db.refresh(settings)
             
-    return settings
+    return _prepare_system_settings_response(settings)
 
 @router.put("/system-settings", response_model=SystemSettingsSchema)
 def update_system_settings(update_data: SystemSettingsSchema, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
@@ -72,12 +100,15 @@ def update_system_settings(update_data: SystemSettingsSchema, db: Session = Depe
         db.add(settings)
     
     for key, value in update_data.model_dump().items():
-        setattr(settings, key, value)
+        if key == "global_ai_api_key":
+            setattr(settings, key, encrypt_secret(value))
+        else:
+            setattr(settings, key, value)
     
     settings.updated_at = datetime.datetime.utcnow()
     db.commit()
     db.refresh(settings)
-    return settings
+    return _prepare_system_settings_response(settings)
 
 # --- Email Config ---
 @router.get("/email-config", response_model=EmailConfigSchema)
@@ -285,6 +316,8 @@ def get_all_users(db: Session = Depends(get_db), admin: User = Depends(get_curre
         total_time_mins = db.query(func.sum(StudySession.duration_minutes)).filter(StudySession.user_id == u.id).scalar() or 0
         
         user_dict = u.__dict__.copy()
+        user_dict["ai_api_key"] = None
+        user_dict["ai_api_key_configured"] = bool(u.ai_api_key)
         user_dict.update({
             "notes_count": notes_count,
             "subjects_count": subjects_count,

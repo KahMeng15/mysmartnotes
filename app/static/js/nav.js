@@ -7,13 +7,8 @@
 // Global function to sync user display
 window.syncUserDisplay = async function() {
     try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
         // Fetch latest user data from /auth/me
-        const response = await fetch('/auth/me', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch('/auth/me');
         
         if (response.ok) {
             const userData = await response.json();
@@ -21,8 +16,7 @@ window.syncUserDisplay = async function() {
             // Update dashboard heading with new user data
             updateDashboardUserName();
         } else if (response.status === 401) {
-            // Token is invalid, redirect to login
-            localStorage.removeItem('token');
+            // Session is invalid, redirect to login
             localStorage.removeItem('user');
             window.location.href = '/login';
         }
@@ -231,8 +225,13 @@ window.logout = function () {
     logoutModal.classList.add('active');
 };
 
-window.confirmLogout = function () {
-    localStorage.removeItem('token');
+window.confirmLogout = async function () {
+    try {
+        await fetch('/auth/logout', { method: 'POST' });
+    } catch (e) {
+        console.warn('Logout request failed, continuing local cleanup:', e);
+    }
+
     localStorage.removeItem('user');
     window.location.href = '/login';
 };

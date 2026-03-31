@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Cookie
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -63,25 +63,32 @@ def token_version_matches_user(payload: dict, user) -> bool:
 
 async def get_current_user(
     authorization: str = Header(None),
+    access_token: str = Cookie(None),
     db: Session = Depends(get_db)
 ):
     """Get current user from JWT token"""
-    if not authorization:
+    token = None
+
+    if authorization:
+        # Extract token from "Bearer <token>" format
+        try:
+            scheme, parsed_token = authorization.split()
+            if scheme.lower() != "bearer":
+                raise ValueError("Invalid auth scheme")
+            token = parsed_token
+        except (ValueError, AttributeError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authorization header",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    elif access_token:
+        token = access_token
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authorization header missing",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # Extract token from "Bearer <token>" format
-    try:
-        scheme, token = authorization.split()
-        if scheme.lower() != "bearer":
-            raise ValueError("Invalid auth scheme")
-    except (ValueError, AttributeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header",
             headers={"WWW-Authenticate": "Bearer"},
         )
     

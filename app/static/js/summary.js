@@ -1,6 +1,5 @@
 // Summary Page Logic
 let lectureId = null;
-let token = localStorage.getItem('token');
 let summaryData = null;
 let quickreadData = null;
 let currentSummaryMode = localStorage.getItem('globalAiMode') || 'normal';
@@ -20,7 +19,7 @@ let isEditMode = false;
 let isSourceMode = false;
 let selectedExportFormat = 'pdf';
 
-const MODE_META = {
+const SUMMARY_MODE_META = {
     quick: { label: 'Quick', icon: 'ph-lightning' },
     simple: { label: 'Simple', icon: 'ph-text-a-underline' },
     normal: { label: 'Normal', icon: 'ph-stack' },
@@ -36,11 +35,6 @@ const FORMAT_META = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    if (!token) {
-        window.location.href = '/login';
-        return;
-    }
-
     // Extract lectureId from URL path: /note/{id}/summary
     const pathParts = window.location.pathname.split('/');
     lectureId = pathParts[2]; 
@@ -133,9 +127,7 @@ function updateURL() {
 
 async function loadSummaryVersions() {
     try {
-        const res = await fetch(`/summaries?lecture_id=${lectureId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(`/summaries?lecture_id=${lectureId}`);
         if (res.ok) {
             const docs = await res.json();
             const summaries = docs.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
@@ -194,9 +186,7 @@ async function loadSummaryVersion(docId, pushURL = true) {
             fetchUrl += `?lecture_id=${lectureId}`;
         }
         
-        const res = await fetch(fetchUrl, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(fetchUrl);
         if (res.ok) {
             const data = await res.json();
             if (data.content) {
@@ -253,8 +243,7 @@ async function confirmDeleteVersion() {
     
     try {
         const res = await fetch(`/summaries/${docIdToDelete}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            method: 'DELETE'
         });
         if (res.ok || res.status === 204) {
             const summaries = await loadSummaryVersions();
@@ -324,9 +313,7 @@ function showNoSummaryUI() {
 
 async function loadNoteMetadata() {
     try {
-        const res = await fetch(`/lectures/${lectureId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(`/lectures/${lectureId}`);
         if (res.ok) {
             const note = await res.json();
             const noteTitleEl = document.getElementById('noteTitle');
@@ -359,7 +346,7 @@ async function loadNoteMetadata() {
                 
                 if (currentVersionId) {
                     // Add summary mode to breadcrumb - use class instead of inline styles
-                    const summaryModeLabel = MODE_META[currentSummaryMode]?.label || 'Summary';
+                    const summaryModeLabel = SUMMARY_MODE_META[currentSummaryMode]?.label || 'Summary';
                     breadcrumbHTML += `<a class="note-nav-crumb-link">${summaryModeLabel} in ${FORMAT_META[currentSummaryFormat]?.label || 'Summary'}</a>`;
                 } else {
                     breadcrumbHTML += `<a class="note-nav-crumb-link">AI Summary</a>`;
@@ -416,8 +403,8 @@ function displaySummary() {
 
     // Update Mode & Format Display
     if (displayAiModePill) {
-        const modeLabel = MODE_META[currentSummaryMode]?.label || currentSummaryMode;
-        const modeIcon = MODE_META[currentSummaryMode]?.icon || 'ph-lightbulb';
+        const modeLabel = SUMMARY_MODE_META[currentSummaryMode]?.label || currentSummaryMode;
+        const modeIcon = SUMMARY_MODE_META[currentSummaryMode]?.icon || 'ph-lightbulb';
         displayAiModePill.innerHTML = `<i class="ph ${modeIcon}"></i> ${modeLabel}`;
     }
     if (displayAiFormatPill) {
@@ -703,7 +690,6 @@ async function generateSummary() {
         const res = await fetch('/summaries/summary', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -864,7 +850,6 @@ async function saveContent() {
         const res = await fetch(`/summaries/${currentVersionId}`, {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
@@ -1079,9 +1064,7 @@ async function exportNote() {
 
     // Load templates for dropdown
     try {
-        const res = await fetch('/templates', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch('/templates');
         if (res.ok) {
             const templates = await res.json();
             const select = document.getElementById('exportTemplateSelect');
@@ -1143,7 +1126,6 @@ async function doExport() {
         const response = await fetch(`/summaries/${currentVersionId}/export`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
@@ -1157,9 +1139,7 @@ async function doExport() {
             updateExportProgress('Downloading file...', 95);
 
             // Download the file
-            const dlRes = await fetch(data.download_url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const dlRes = await fetch(data.download_url);
             if (dlRes.ok) {
                 updateExportProgress('Complete!', 100);
                 const blob = await dlRes.blob();

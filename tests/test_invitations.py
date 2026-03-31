@@ -6,13 +6,14 @@ Tests both email-based and link-only invitations.
 import pytest
 import datetime
 import json
+from datetime import timedelta
 from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient as FastAPITestClient
 
 from main import app
 from app.models.db import User, UserInvitation
 from app.utils.db import SessionLocal, init_db
-from app.utils.auth import hash_password
+from app.utils.auth import hash_password, create_access_token
 from app.utils.invitation_utils import is_link_only_email, build_link_only_email
 
 
@@ -75,14 +76,12 @@ def admin_user(db: Session):
 
 
 @pytest.fixture
-def admin_token(client, admin_user: User):
-    """Get authentication token for admin user"""
-    response = client.post(
-        "/auth/login",
-        json={"email": "admin@test.com", "password": "admin123"}
+def admin_token(admin_user: User):
+    """Create an admin token directly to avoid login rate limiting in tests."""
+    return create_access_token(
+        data={"sub": str(admin_user.id), "tv": int(admin_user.token_version or 0)},
+        expires_delta=timedelta(minutes=30),
     )
-    assert response.status_code == 200
-    return response.json()["access_token"]
 
 
 @pytest.fixture
@@ -91,15 +90,24 @@ def cleanup_users(db: Session):
     yield
     # Clean up all test users - use a broader approach that clears all non-admin test users
     try:
+        # Ensure session is usable even if the test failed during commit/flush.
+        db.rollback()
+
         # Core test emails we know about
         test_emails = [
             "testuser@test.com",
             "testuser2@test.com",
             "testuser3@test.com",
+            "nonadmin@test.com",
             "invited@test.com",
+            "invited1@test.com",
             "linkinvite@test.com",
             "existing@test.com",
-            "different@test.com"
+            "different@test.com",
+            "expired@test.com",
+            "workflow@test.com",
+            "reuse@test.com",
+            "reuse2@test.com"
         ]
         for email in test_emails:
             try:
@@ -231,6 +239,10 @@ class TestInvitationCreation:
             headers={"Authorization": f"Bearer {admin_token}"}
         )
         token1 = response1.json()["token"]
+
+        # Sliding-session middleware may set an auth cookie; clear it so this
+        # bearer-token request is not subject to cookie-based CSRF checks.
+        client.cookies.clear()
         
         # Create second invitation for same email with different tier
         response2 = client.post(
@@ -267,6 +279,7 @@ class TestInvitationListing:
             json={"email": "invited1@test.com", "tier": "pro", "send_email": True},
             headers={"Authorization": f"Bearer {admin_token}"}
         )
+        client.cookies.clear()
         client.post(
             "/admin/invitations",
             json={"tier": "free", "send_email": False},
@@ -589,13 +602,11 @@ class TestAuthorizationAndAccess:
         )
         db.add(user)
         db.commit()
-        
-        # Login as non-admin
-        login_response = client.post(
-            "/auth/login",
-            json={"email": "nonadmin@test.com", "password": "password123"}
+
+        token = create_access_token(
+            data={"sub": str(user.id), "tv": int(user.token_version or 0)},
+            expires_delta=timedelta(minutes=30),
         )
-        token = login_response.json()["access_token"]
         
         # Try to create invitation
         response = client.post(
@@ -619,13 +630,11 @@ class TestAuthorizationAndAccess:
         )
         db.add(user)
         db.commit()
-        
-        # Login as non-admin
-        login_response = client.post(
-            "/auth/login",
-            json={"email": "nonadmin@test.com", "password": "password123"}
+
+        token = create_access_token(
+            data={"sub": str(user.id), "tv": int(user.token_version or 0)},
+            expires_delta=timedelta(minutes=30),
         )
-        token = login_response.json()["access_token"]
         
         # Try to list invitations
         response = client.get(

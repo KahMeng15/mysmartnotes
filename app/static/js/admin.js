@@ -1,17 +1,33 @@
 const API_URL = '';
-const token = localStorage.getItem('token');
 const user = JSON.parse(localStorage.getItem('user') || '{}');
 let inviteMethod = 'email';
 
-window.addEventListener('load', () => {
-    if (!token || !user.is_admin) {
-        alert('Unauthorized access');
-        window.location.href = '/dashboard';
-        return;
+window.addEventListener('load', async () => {
+    try {
+        const meRes = await fetch('/auth/me');
+        if (!meRes.ok) {
+            alert('Unauthorized access');
+            window.location.href = '/dashboard';
+            return;
+        }
+
+        const currentUser = await meRes.json();
+        localStorage.setItem('user', JSON.stringify(currentUser));
+
+        if (!currentUser.is_admin) {
+            alert('Unauthorized access');
+            window.location.href = '/dashboard';
+            return;
+        }
+
+        setInviteMethod('email');
+        // Initial fetch for the active tab
+        loadUsers();
+    } catch (e) {
+        console.error('Failed to validate admin session:', e);
+        alert('Unable to validate session. Please log in again.');
+        window.location.href = '/login';
     }
-    setInviteMethod('email');
-    // Initial fetch for the active tab
-    loadUsers();
 });
 
 function switchTab(tabId) {
@@ -111,7 +127,6 @@ async function apiCall(endpoint, method = 'GET', body = null) {
     const options = {
         method,
         headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         }
     };

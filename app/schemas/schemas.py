@@ -47,6 +47,7 @@ class User(UserBase):
     ai_model: Optional[str] = None
     ai_base_url: Optional[str] = None
     ai_api_key: Optional[str] = None
+    ai_api_key_configured: bool = False
     use_global_ai_config: bool = False
     created_at: Optional[datetime] = None
     

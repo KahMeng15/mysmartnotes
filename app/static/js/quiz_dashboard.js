@@ -76,6 +76,8 @@ function debounceSearch() {
 function renderQuizzes() {
     const containerEl = document.getElementById('quizContainer');
     const sortBy = document.getElementById('quizSort')?.value || 'date-desc';
+    const searchQuery = document.getElementById('quizSearch')?.value || '';
+    const hasActiveSearch = searchQuery.trim().length > 0;
     
     // Sort overall data first
     let sortedData = [...quizzesData];
@@ -87,8 +89,8 @@ function renderQuizzes() {
     });
 
     containerEl.innerHTML = '';
-    
-    if (sortedData.length === 0) {
+
+    if (sortedData.length === 0 && quizGroups.length === 0) {
         containerEl.innerHTML = `
             <div class="empty-state" style="padding: 40px; text-align: center;">
                 <i class="ph ph-mask-sad" style="font-size: 48px; color: var(--color-gray); margin-bottom: 16px;"></i>
@@ -113,16 +115,30 @@ function renderQuizzes() {
     });
 
     // Render Groups
+    let renderedSections = 0;
+
     quizGroups.forEach(group => {
         const quizzes = grouped[group.id];
-        if (quizzes.length > 0 || !document.getElementById('quizSearch').value) {
+        if (quizzes.length > 0 || !hasActiveSearch) {
             containerEl.insertAdjacentHTML('beforeend', createGroupSection(group, quizzes));
+            renderedSections += 1;
         }
     });
 
     // Render Ungrouped
     if (ungrouped.length > 0) {
         containerEl.insertAdjacentHTML('beforeend', createGroupSection({ id: 'none', name: 'Ungrouped' }, ungrouped, true));
+        renderedSections += 1;
+    }
+
+    if (renderedSections === 0) {
+        containerEl.innerHTML = `
+            <div class="empty-state" style="padding: 40px; text-align: center;">
+                <i class="ph ph-mask-sad" style="font-size: 48px; color: var(--color-gray); margin-bottom: 16px;"></i>
+                <h3>No Quizzes Found</h3>
+                <p style="color: var(--color-gray); margin-top: 8px;">Try a different search term or clear filters.</p>
+            </div>
+        `;
     }
 }
 

@@ -1,27 +1,16 @@
 
 window.addEventListener('load', async () => {
     // If user is already authenticated, skip login screen and go to dashboard.
-    const existingToken = localStorage.getItem('token');
-    if (existingToken) {
-        try {
-            const meRes = await fetch('/auth/me', {
-                headers: { 'Authorization': `Bearer ${existingToken}` }
-            });
-
-            if (meRes.ok) {
-                const userData = await meRes.json();
-                localStorage.setItem('user', JSON.stringify(userData));
-                window.location.href = '/dashboard';
-                return;
-            }
-
-            if (meRes.status === 401) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-            }
-        } catch (e) {
-            console.warn('Could not verify existing session on login page:', e);
+    try {
+        const meRes = await fetch('/auth/me');
+        if (meRes.ok) {
+            const userData = await meRes.json();
+            localStorage.setItem('user', JSON.stringify(userData));
+            window.location.href = '/dashboard';
+            return;
         }
+    } catch (e) {
+        console.warn('Could not verify cookie session on login page:', e);
     }
 
     try {
@@ -221,7 +210,6 @@ async function handleLogin() {
         });
         if (res.ok) {
             const data = await res.json();
-            localStorage.setItem('token', data.access_token);
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
             showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
             setTimeout(() => { window.location.href = '/dashboard'; }, 800);
@@ -314,14 +302,11 @@ async function handleGoogleSignIn() {
                 showGoogleRegisterModal(data);
             } else {
                 // Existing user - log them in
-                localStorage.setItem('token', data.access_token);
                 if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
                 
                 // Fetch fresh user data from /auth/me
                 try {
-                    const meRes = await fetch('/auth/me', {
-                        headers: { 'Authorization': `Bearer ${data.access_token}` }
-                    });
+                    const meRes = await fetch('/auth/me');
                     if (meRes.ok) {
                         const userData = await meRes.json();
                         localStorage.setItem('user', JSON.stringify(userData));
@@ -422,7 +407,6 @@ async function handleGoogleComplete(event) {
                 setTimeout(() => switchPanel('login'), 2500);
                 return;
             }
-            localStorage.setItem('token', data.access_token);
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
             showMessageBox('googleRegisterMsg', 'success', 'Welcome! Redirecting…');
             setTimeout(() => { window.location.href = '/dashboard'; }, 800);

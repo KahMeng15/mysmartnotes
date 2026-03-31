@@ -1,13 +1,8 @@
 // Dashboard functionality
 const API_URL = '';
-const token = localStorage.getItem('token');
 
 // Check authentication on page load
 window.addEventListener('load', async () => {
-    if (!token) {
-        window.location.href = '/login';
-        return;
-    }
     loadUserInfo();
     loadDashboardSummary();
     await loadSubjects(); 
@@ -16,9 +11,7 @@ window.addEventListener('load', async () => {
 
 async function loadDashboardSummary() {
     try {
-        const response = await fetch(`${API_URL}/analytics/dashboard-summary`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`${API_URL}/analytics/dashboard-summary`);
         if (response.ok) {
             const data = await response.json();
             document.getElementById('totalSubjectsValue').textContent = data.total_subjects;
@@ -78,9 +71,7 @@ async function loadUserInfo() {
 
 async function loadSubjects() {
     try {
-        const subjectsRes = await fetch(`${API_URL}/subjects`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const subjectsRes = await fetch(`${API_URL}/subjects`);
 
         if (subjectsRes.ok) {
             const subjects = await subjectsRes.json();
@@ -94,9 +85,7 @@ async function loadSubjects() {
 
 async function loadRecentLectures() {
     try {
-        const response = await fetch(`${API_URL}/lectures`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`${API_URL}/lectures`);
         if (response.ok) {
             const lectures = await response.json();
             document.getElementById('totalNotesValue').textContent = lectures.length;
@@ -168,8 +157,7 @@ async function createSubject(event) {
         const response = await fetch(`${API_URL}/subjects`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 name: document.getElementById('subjectName').value,

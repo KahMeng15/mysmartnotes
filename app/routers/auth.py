@@ -1,14 +1,14 @@
 """Authentication router"""
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import logging
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from pydantic import BaseModel
-import jwt
-import json
 from typing import Optional
-import httpx
 import secrets
 import random
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken, PasswordChangeConfirmation
 from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, UserUpdate
@@ -20,13 +20,60 @@ from app.config import get_settings
 from sqlalchemy import func
 from app.models.db import Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserLog
 from app.utils.invitation_utils import is_link_only_email
+from app.utils.crypto import encrypt_secret
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 # Firebase project config
 
 FIREBASE_VERIFY_URL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken"
+
+
+def _set_auth_cookie(response: Response, access_token: str, expire_minutes: int) -> None:
+    csrf_token = secrets.token_urlsafe(32)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        max_age=expire_minutes * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key=settings.CSRF_COOKIE_NAME,
+        value=csrf_token,
+        httponly=False,
+        secure=settings.COOKIE_SECURE,
+        samesite=settings.COOKIE_SAMESITE,
+        max_age=expire_minutes * 60,
+        path="/",
+    )
+    response.headers[settings.CSRF_HEADER_NAME] = csrf_token
+
+
+def _prepare_user_for_response(user: User) -> dict:
+    """Ensure sensitive encrypted fields are safely presented in API responses."""
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "nickname": user.nickname,
+        "is_active": user.is_active,
+        "is_admin": user.is_admin,
+        "is_approved": user.is_approved,
+        "tier": user.tier,
+        "ai_provider": user.ai_provider,
+        "ai_model": user.ai_model,
+        "ai_base_url": user.ai_base_url,
+        "ai_api_key": None,
+        "ai_api_key_configured": bool(user.ai_api_key),
+        "use_global_ai_config": user.use_global_ai_config,
+        "created_at": user.created_at,
+    }
 
 
 class GoogleLoginRequest(BaseModel):
@@ -58,46 +105,37 @@ class UnlinkGoogleAccountRequest(BaseModel):
 
 
 def verify_firebase_token(id_token_str: str):
-    """Verify Firebase ID token by decoding JWT and validating claims"""
+    """Verify Firebase ID token signature and claims with Google certs."""
     try:
-        # Decode JWT without verification first to get claims
-        # Firebase tokens are already verified on the client side via Firebase SDK
-        unverified_claims = jwt.decode(id_token_str, options={"verify_signature": False})
-        
-        # Log for debugging
-        print(f"[DEBUG] Token claims: {json.dumps({k: v for k, v in unverified_claims.items() if k not in ['at_hash', 'claims_supported']}, indent=2)}")
-        
+        request_adapter = google_requests.Request()
+        verified_claims = id_token.verify_firebase_token(
+            id_token_str,
+            request_adapter,
+            audience=settings.FIREBASE_PROJECT_ID,
+        )
+
+        if not verified_claims:
+            raise ValueError("Token verification failed")
+
         # Validate essential claims
-        email = unverified_claims.get('email')
+        email = verified_claims.get('email')
         if not email:
             raise ValueError("Token missing email claim")
-        
-        # Check audience - Firebase ID tokens should have the project ID as audience
-        audience = unverified_claims.get('aud')
-        if audience != settings.FIREBASE_PROJECT_ID:
-            print(f"[DEBUG] Token audience '{audience}' doesn't match project ID '{settings.FIREBASE_PROJECT_ID}'")
-            # For now, allow it through as audience might be different formats
-        
-        # Check token hasn't expired
-        import time
-        exp = unverified_claims.get('exp', 0)
-        if exp and exp < time.time():
-            raise ValueError(f"Token has expired (exp: {exp}, now: {time.time()})")
-        
-        # Verify the issuer contains firebase
-        issuer = unverified_claims.get('iss', '')
-        if 'firebaseapp.com' not in issuer and 'googleapis.com' not in issuer:
-            print(f"[DEBUG] Issuer check warning: {issuer}")
-        
-        return unverified_claims
-        
-    except jwt.DecodeError as e:
-        raise ValueError(f"Invalid token format: {str(e)}")
+
+        # Verify exact issuer for the configured Firebase project
+        expected_issuer = f"https://securetoken.google.com/{settings.FIREBASE_PROJECT_ID}"
+        issuer = verified_claims.get("iss", "")
+        if issuer != expected_issuer:
+            raise ValueError("Invalid token issuer")
+
+        logger.debug("firebase.token_verified", extra={"email": email})
+        return verified_claims
+
     except ValueError as e:
         raise e
     except Exception as e:
-        print(f"[DEBUG] Token verification error: {str(e)}")
-        raise ValueError(f"Token verification failed: {str(e)}")
+        logger.error("firebase.token_verification_error", extra={"error": str(e)})
+        raise ValueError("Token verification failed")
 
 
 
@@ -275,7 +313,7 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
 
 
 @router.post("/login")
-async def login(request: Request, db: Session = Depends(get_db)):
+async def login(request: Request, response: Response, db: Session = Depends(get_db)):
     """Login user and return access token"""
     try:
         credentials = await request.json()
@@ -311,7 +349,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
             )
     except ValueError as e:
         record_auth_attempt(db, action="login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="verification_error", reason=str(e), user=user)
-        print(f"Password verification error for user {email}: {e}")
+        logger.warning("auth.password_verification_error", extra={"email": email, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password"
@@ -350,6 +388,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
         data={"sub": str(user.id), "tv": int(user.token_version or 0)},
         expires_delta=timedelta(minutes=expire_minutes)
     )
+    _set_auth_cookie(response, access_token, expire_minutes)
     
     # Log login
     ip_address = request.client.host if request.client else None
@@ -371,7 +410,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/google-login")
-def google_login(google_request: GoogleLoginRequest, request: Request, db: Session = Depends(get_db)):
+def google_login(google_request: GoogleLoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     """Verify Google token and check if user exists"""
     # Check maintenance mode
     sys_settings = db.query(SystemSettings).first()
@@ -386,7 +425,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
     email: Optional[str] = None
 
     try:
-        print(f"[DEBUG] Received Google login request")
+        logger.debug("auth.google_login.request_received")
         
         # Verify the Firebase ID token
         claims = verify_firebase_token(google_request.idToken)
@@ -396,7 +435,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
         full_name = claims.get('name', '')
         picture = claims.get('picture', '')
         
-        print(f"[DEBUG] Token verified for email: {email}")
+        logger.debug("auth.google_login.token_verified", extra={"email": email})
         
         if not email:
             record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="missing_email", reason="Email missing from Google token")
@@ -459,6 +498,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
                 data={"sub": str(user.id), "tv": int(user.token_version or 0)},
                 expires_delta=timedelta(minutes=expire_minutes)
             )
+            _set_auth_cookie(response, access_token, expire_minutes)
             
             # Log login
             ip_address = request.client.host if request.client else None
@@ -466,11 +506,11 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
             db.add(UserLog(user_id=user.id, action="login", ip_address=ip_address, device_info=user_agent, details=f"Google Auth; email={email}; status=success"))
             db.commit()
             
-            print(f"[DEBUG] Existing user logged in: {email}")
+            logger.info("auth.google_login.success", extra={"email": email, "is_new_user": False})
             return {
                 "access_token": access_token,
                 "token_type": "bearer",
-                "user": user,
+                "user": _prepare_user_for_response(user),
                 "is_new_user": False
             }
         else:
@@ -483,7 +523,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
                 raise
 
             record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="new_user", reason="Needs profile completion")
-            print(f"[DEBUG] New user detected: {email}")
+            logger.info("auth.google_login.new_user_detected", extra={"email": email})
             return {
                 "is_new_user": True,
                 "email": email,
@@ -496,14 +536,14 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
         raise
     except ValueError as e:
         record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="token_error", reason=str(e))
-        print(f"[DEBUG] Verification error: {str(e)}")
+        logger.warning("auth.google_login.token_error", extra={"email": email, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e)
         )
     except Exception as e:
         record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="auth_error", reason=str(e))
-        print(f"[DEBUG] Unexpected error: {str(e)}")
+        logger.error("auth.google_login.unexpected_error", extra={"email": email, "error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Authentication failed: {str(e)}"
@@ -511,7 +551,7 @@ def google_login(google_request: GoogleLoginRequest, request: Request, db: Sessi
 
 
 @router.post("/google-complete")
-def google_complete(google_request: GoogleCompleteRequest, request: Request, db: Session = Depends(get_db)):
+def google_complete(google_request: GoogleCompleteRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     """Complete Google registration for new user with additional info"""
     # Check maintenance mode
     sys_settings = db.query(SystemSettings).first()
@@ -591,9 +631,10 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
                 data={"sub": str(existing_user.id), "tv": int(existing_user.token_version or 0)},
                 expires_delta=timedelta(minutes=expire_minutes)
             )
+            _set_auth_cookie(response, access_token, expire_minutes)
             # Ensure user object is fresh with latest google_oauth_id
             db.refresh(existing_user)
-            return {"access_token": access_token, "token_type": "bearer", "user": existing_user}
+            return {"access_token": access_token, "token_type": "bearer", "user": _prepare_user_for_response(existing_user)}
         
         # Create new user with the provided nickname
         invitation = None
@@ -654,8 +695,9 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, db:
             data={"sub": str(user.id), "tv": int(user.token_version or 0)},
             expires_delta=timedelta(minutes=expire_minutes)
         )
+        _set_auth_cookie(response, access_token, expire_minutes)
 
-        return {"access_token": access_token, "token_type": "bearer", "user": user}
+        return {"access_token": access_token, "token_type": "bearer", "user": _prepare_user_for_response(user)}
         
     except ValueError as e:
         raise HTTPException(
@@ -677,7 +719,22 @@ async def get_current_user_info(current_user: User = Depends(get_current_user_fr
     """Get current user information - used for session validation and data refresh"""
     # Refresh user data from DB to ensure we have latest info
     db.refresh(current_user)
-    return current_user
+    return _prepare_user_for_response(current_user)
+
+
+@router.post("/logout")
+async def logout(
+    response: Response,
+    current_user: User = Depends(get_current_user_from_token),
+    db: Session = Depends(get_db),
+):
+    """Clear auth/session cookies and revoke active tokens for secure logout."""
+    current_user.token_version = int(current_user.token_version or 0) + 1
+    db.commit()
+
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key=settings.CSRF_COOKIE_NAME, path="/")
+    return {"message": "Logged out successfully"}
 
 
 @router.put("/profile", response_model=UserSchema)
@@ -694,13 +751,13 @@ async def update_profile(user_update: UserUpdate, current_user: User = Depends(g
     if user_update.ai_base_url is not None:
         current_user.ai_base_url = user_update.ai_base_url
     if user_update.ai_api_key is not None:
-        current_user.ai_api_key = user_update.ai_api_key
+        current_user.ai_api_key = encrypt_secret(user_update.ai_api_key)
     if user_update.use_global_ai_config is not None:
         current_user.use_global_ai_config = user_update.use_global_ai_config
         
     db.commit()
     db.refresh(current_user)
-    return current_user
+    return _prepare_user_for_response(current_user)
 
 
 @router.get("/stats")

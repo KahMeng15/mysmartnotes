@@ -25,18 +25,9 @@ window.addEventListener('load', async () => {
     try {
         console.log('=== SETTINGS PAGE LOAD START ===');
         console.log('URL:', window.location.href);
-        
-        // Get fresh token on page load (let auth.js handle session validation)
-        const token = localStorage.getItem('token');
-        console.log('Token exists?', !!token);
-        
-        if (!token) {
-            console.warn('No token found in localStorage, redirecting to login');
-            window.location.href = '/login';
-            return;
-        }
-        
-        console.log('Token found, calling load functions...');
+
+        // Cookie-based auth is handled by browser/session middleware.
+        console.log('Calling settings load functions...');
         
         try {
             loadSettings();
@@ -75,12 +66,7 @@ window.addEventListener('load', async () => {
 
 async function loadStats() {
     try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/auth/stats', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        const response = await fetch('/auth/stats');
         if (response.ok) {
             const stats = await response.json();
             
@@ -124,12 +110,7 @@ async function loadStats() {
 
 async function loadQuotas() {
     try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/auth/quotas', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        const response = await fetch('/auth/quotas');
         if (response.ok) {
             const quotaData = await response.json();
             
@@ -246,7 +227,7 @@ function loadSettings() {
                 const aiModelEl = document.getElementById('aiModel');
                 const aiBaseUrlEl = document.getElementById('aiBaseUrl');
                 const aiApiKeyEl = document.getElementById('aiApiKey');
-                window.hasStoredAiApiKey = !!user.ai_api_key;
+                window.hasStoredAiApiKey = !!(user.ai_api_key_configured || user.ai_api_key);
                 
                 if (aiProviderEl) aiProviderEl.value = user.ai_provider || 'gemini';
                 if (aiModelEl) aiModelEl.value = user.ai_model || '';
@@ -327,13 +308,6 @@ function toggleAIFields() {
 async function updateProfile(event) {
     event.preventDefault();
     try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            showErrorModal('Error', 'Session expired. Please login again.');
-            window.location.href = '/login';
-            return;
-        }
-        
         const fullName = document.getElementById('fullName').value.trim();
         const nickname = document.getElementById('nickname').value.trim();
         if (!fullName || !nickname) {
@@ -349,8 +323,7 @@ async function updateProfile(event) {
         const response = await fetch('/auth/profile', {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
         });
@@ -382,13 +355,6 @@ async function saveAiConfiguration(event) {
     if (event) event.preventDefault();
 
     try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            showErrorModal('Error', 'Session expired. Please login again.');
-            window.location.href = '/login';
-            return;
-        }
-
         const useGlobal = document.getElementById('globalSettingsToggle').classList.contains('active');
         const payload = {
             use_global_ai_config: useGlobal
@@ -424,8 +390,7 @@ async function saveAiConfiguration(event) {
         const response = await fetch('/auth/profile', {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
         });
@@ -483,12 +448,10 @@ async function changePassword() {
     }
 
     try {
-        const token = localStorage.getItem('token');
         const res = await fetch('/auth/request-password-change', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 current_password: hasPassword ? current : '',
@@ -539,14 +502,12 @@ async function setPasswordFromWarningModal() {
     }
     
     try {
-        const token = localStorage.getItem('token');
         // For setting password from warning modal, we don't need current password verification
         // since the user doesn't have one yet. We'll use an empty string.
         const res = await fetch('/auth/request-password-change', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 current_password: '',  // Empty since user has no password yet
@@ -596,12 +557,10 @@ async function confirmPasswordChange() {
     }
     
     try {
-        const token = localStorage.getItem('token');
         const res = await fetch('/auth/confirm-password-change', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 confirmation_code: code
@@ -662,10 +621,8 @@ function confirmDeleteAccount() {
 
 async function deleteAccount() {
     try {
-        const token = localStorage.getItem('token');
         const res = await fetch('/auth/profile', {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            method: 'DELETE'
         });
         
         if (res.ok) {
@@ -687,12 +644,7 @@ async function deleteAccount() {
 
 async function loadConnectedAccounts() {
     try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/auth/connected-accounts', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        const response = await fetch('/auth/connected-accounts');
         
         if (response.ok) {
             const data = await response.json();
@@ -796,14 +748,6 @@ async function linkGoogleAccount() {
     }
     
     try {
-        // Get JWT token from localStorage
-        const token = localStorage.getItem('token');
-        if (!token) {
-            showMessageInBox(msgBox, 'error', 'Session expired. Please login again.');
-            window.location.href = '/login';
-            return;
-        }
-        
         // Wait for Firebase to be initialized
         if (!window.firebaseAuth || !window.googleProvider) {
             showMessageInBox(msgBox, 'error', 'Firebase not initialized. Please refresh the page.');
@@ -830,8 +774,7 @@ async function linkGoogleAccount() {
         const res = await fetch('/auth/link-google-via-popup', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 idToken: idToken,
@@ -923,18 +866,10 @@ async function unlinkGoogleAccount() {
     }
     
     try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            showMessageInBox(msgBox, 'error', 'Session expired. Please login again.');
-            window.location.href = '/login';
-            return;
-        }
-        
         const res = await fetch('/auth/unlink-google-account', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ password: password })
         });

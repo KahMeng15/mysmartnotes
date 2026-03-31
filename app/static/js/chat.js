@@ -1,5 +1,4 @@
 const API_URL = '';
-const token = localStorage.getItem('token');
 
 // ── State ────────────────────────────────────────────────────────────
 let conversationMessages = [];   // Array of {role, content, time, ...} for current view
@@ -122,7 +121,6 @@ function applySavedMode() {
 
 // ── Bootstrap ─────────────────────────────────────────────────────
 window.addEventListener('load', () => {
-    if (!token) { window.location.href = '/login'; return; }
     applySavedMode();
     loadData();
     setupMessageInput();
@@ -131,10 +129,10 @@ window.addEventListener('load', () => {
 async function loadData() {
     try {
         const [gRes, sRes, lRes, cRes] = await Promise.all([
-            fetch('/groups', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('/subjects', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('/lectures', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('/chat/conversations', { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch('/groups'),
+            fetch('/subjects'),
+            fetch('/lectures'),
+            fetch('/chat/conversations'),
         ]);
 
         if (gRes.ok) allGroups = await gRes.json();
@@ -412,7 +410,7 @@ async function sendMessage() {
     try {
         const resp = await fetch(`${API_URL}/chat/ask`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
@@ -726,7 +724,7 @@ function toggleThinking(header) {
 // ── Conversation Sidebar ──────────────────────────────────────────
 async function fetchConversations() {
     try {
-        const res = await fetch('/chat/conversations', { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch('/chat/conversations');
         if (res.ok) { conversations = await res.json(); renderConversationList(); }
     } catch (e) { console.error('fetchConversations error', e); }
 }
@@ -857,9 +855,7 @@ async function loadConversation(convId) {
     });
 
     try {
-        const res = await fetch(`/chat/conversations/${convId}/messages`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(`/chat/conversations/${convId}/messages`);
         if (!res.ok) { console.error('Failed to load conversation'); return; }
         const msgs = await res.json();
 
@@ -1103,7 +1099,7 @@ document.addEventListener('click', (e) => {
 async function toggleConvPin(e, convId) {
     e.stopPropagation();
     try {
-        await fetch(`/chat/conversations/${convId}/pin`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+        await fetch(`/chat/conversations/${convId}/pin`, { method: 'PUT' });
         await fetchConversations();
     } catch (err) { console.error(err); }
 }
@@ -1111,7 +1107,7 @@ async function toggleConvPin(e, convId) {
 async function toggleConvFav(e, convId) {
     e.stopPropagation();
     try {
-        await fetch(`/chat/conversations/${convId}/favourite`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+        await fetch(`/chat/conversations/${convId}/favourite`, { method: 'PUT' });
         await fetchConversations();
     } catch (err) { console.error(err); }
 }
@@ -1125,7 +1121,7 @@ async function deleteConv(e, convId) {
 
 async function performDeleteConv(convId) {
     try {
-        await fetch(`/chat/conversations/${convId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        await fetch(`/chat/conversations/${convId}`, { method: 'DELETE' });
         if (currentConversationId === convId) createNewChat();
         await fetchConversations();
     } catch (err) { console.error(err); }
@@ -1167,7 +1163,7 @@ window.cancelDeleteConv = function () {
 async function exportConv(e, convId) {
     e.stopPropagation();
     try {
-        const res = await fetch(`/chat/conversations/${convId}/messages`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`/chat/conversations/${convId}/messages`);
         if (!res.ok) return;
         const msgs = await res.json();
 

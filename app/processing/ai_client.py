@@ -1,14 +1,17 @@
 """AI client for LLM interactions"""
+import asyncio
 import logging
-from typing import Optional, List
+import random
+from typing import Optional, List, Callable, TypeVar, Awaitable
 from app.config import get_settings
 from app.models.db import User, SystemSettings
+from app.utils.crypto import decrypt_secret
 from sqlalchemy.orm import Session
 import aiohttp
-import json
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+T = TypeVar("T")
 
 
 class AIClient:
@@ -26,6 +29,10 @@ class AIClient:
         self.connection_error = None
         self.model = None
         self.client = None
+        # Production-safe request controls for external providers
+        self.request_timeout_seconds = 20
+        self.max_retries = 3
+        self.retry_base_delay_seconds = 0.5
         
         # Determine settings source
         if user and user.use_global_ai_config:
@@ -38,8 +45,9 @@ class AIClient:
                 # Use settings from Admin Dashboard (DB)
                 self.provider = sys_settings.global_ai_provider or settings.GLOBAL_AI_PROVIDER
                 self.ai_model_name = sys_settings.global_ai_model or settings.GLOBAL_AI_MODEL or None
-                self.gemini_key = sys_settings.global_ai_api_key if self.provider == "gemini" else None
-                self.hf_token = sys_settings.global_ai_api_key if self.provider == "huggingface" else None
+                global_key = decrypt_secret(sys_settings.global_ai_api_key)
+                self.gemini_key = global_key if self.provider == "gemini" else None
+                self.hf_token = global_key if self.provider == "huggingface" else None
                 self.ollama_base_url = sys_settings.global_ai_base_url if self.provider == "ollama" else None
                 
                 # Fallback check: if DB key is empty, use .env key
@@ -62,8 +70,9 @@ class AIClient:
             # Use user's personal settings
             self.provider = user.ai_provider
             self.ai_model_name = user.ai_model or None
-            self.gemini_key = user.ai_api_key if self.provider == "gemini" else None
-            self.hf_token = user.ai_api_key if self.provider == "huggingface" else None
+            user_key = decrypt_secret(user.ai_api_key)
+            self.gemini_key = user_key if self.provider == "gemini" else None
+            self.hf_token = user_key if self.provider == "huggingface" else None
             self.ollama_base_url = user.ai_base_url if self.provider == "ollama" else None
             logger.info(f"[User {user.id}] Using personal AI settings: {self.provider}")
             
@@ -83,6 +92,37 @@ class AIClient:
             self._init_huggingface()
         elif self.provider == "ollama":
             logger.info(f"Ollama AI initialized (URL: {self.ollama_base_url})")
+
+    async def _with_retries_and_timeout(self, operation_name: str, operation: Callable[[], Awaitable[T]]) -> T:
+        """Run an async provider operation with bounded timeout and retries."""
+        last_error: Optional[Exception] = None
+
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                return await asyncio.wait_for(operation(), timeout=self.request_timeout_seconds)
+            except Exception as exc:
+                last_error = exc
+                if attempt >= self.max_retries:
+                    break
+
+                # Exponential backoff with jitter to avoid retry storms
+                jitter = random.uniform(0.0, 0.2)
+                delay = (self.retry_base_delay_seconds * (2 ** (attempt - 1))) + jitter
+                logger.warning(
+                    "AI provider call failed; retrying",
+                    extra={
+                        "provider": self.provider,
+                        "operation": operation_name,
+                        "attempt": attempt,
+                        "max_retries": self.max_retries,
+                        "error": str(exc),
+                    },
+                )
+                await asyncio.sleep(delay)
+
+        raise RuntimeError(
+            f"{operation_name} failed after {self.max_retries} attempts"
+        ) from last_error
     def _init_gemini(self):
         """Initialize Gemini API and dynamically select the best model."""
         try:
@@ -139,14 +179,27 @@ class AIClient:
                 if max_tokens:
                     import google.generativeai as genai
                     generation_config = genai.types.GenerationConfig(max_output_tokens=max_tokens)
-                
-                response = self.model.generate_content(prompt, generation_config=generation_config)
+
+                async def _gemini_call():
+                    # Gemini SDK call is sync; run in thread so event loop is not blocked.
+                    return await asyncio.to_thread(
+                        self.model.generate_content,
+                        prompt,
+                        generation_config=generation_config,
+                    )
+
+                response = await self._with_retries_and_timeout("gemini.generate_content", _gemini_call)
                 return response.text
             elif self.provider == "huggingface":
                 kwargs = {"max_new_tokens": max_tokens}
                 if self.ai_model_name:
                     kwargs["model"] = self.ai_model_name
-                response = self.client.text_generation(prompt, **kwargs)
+
+                async def _huggingface_call():
+                    # HF inference client call is sync; run in thread to prevent blocking.
+                    return await asyncio.to_thread(self.client.text_generation, prompt, **kwargs)
+
+                response = await self._with_retries_and_timeout("huggingface.text_generation", _huggingface_call)
                 return response
             elif self.provider == "ollama":
                 model_name = self.ai_model_name if self.ai_model_name else "llama3"
@@ -156,15 +209,32 @@ class AIClient:
                     "prompt": prompt,
                     "stream": False
                 }
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json=payload) as response:
-                        if response.status == 200:
-                            result = await response.json()
-                            return result.get("response", "")
-                        else:
+
+                async def _ollama_call() -> str:
+                    timeout = aiohttp.ClientTimeout(total=self.request_timeout_seconds)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        async with session.post(url, json=payload) as response:
+                            if response.status == 200:
+                                result = await response.json()
+                                return result.get("response", "")
+
                             error_text = await response.text()
-                            logger.error(f"Ollama API error: {error_text}")
-                            return f"Provider Error: Failed to generate response from Local Ollama ({response.status})"
+                            raise RuntimeError(
+                                f"Ollama API error ({response.status}): {error_text[:300]}"
+                            )
+
+                try:
+                    return await self._with_retries_and_timeout("ollama.generate", _ollama_call)
+                except Exception as ollama_error:
+                    logger.error(
+                        "Ollama provider request failed",
+                        extra={
+                            "provider": self.provider,
+                            "base_url": self.ollama_base_url,
+                            "error": str(ollama_error),
+                        },
+                    )
+                    return f"Provider Error: Failed to generate response from Local Ollama ({str(ollama_error)})"
         except Exception as e:
             error_msg = f"[{self.provider.upper()}] Connection failed: {str(e)}"
             if self.provider == "ollama":

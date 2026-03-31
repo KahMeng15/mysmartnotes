@@ -124,6 +124,16 @@ docker-compose up -d
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup and troubleshooting.
 
+## Production Safety Notes
+
+- Set `ENVIRONMENT=production` in deployment environments.
+- Set a strong `SECRET_KEY` (32+ characters).
+- Configure `CORS_ALLOWED_ORIGINS` to trusted domains only.
+- Use a non-SQLite database for production (`ALLOW_SQLITE_IN_PRODUCTION=false` by default).
+- Set `COOKIE_SECURE=true` behind HTTPS.
+- Set `APP_ENCRYPTION_KEY` to enable encryption for stored API keys.
+- Runtime diagnostics are available at `GET /admin/runtime-metrics` (admin-only).
+
 ## 💾 System Requirements
 
 | Scenario | CPU | RAM | Storage | Use Case |

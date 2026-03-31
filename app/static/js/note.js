@@ -1,5 +1,3 @@
-const TOKEN_KEY = 'token';
-const token = localStorage.getItem(TOKEN_KEY);
 let lectureId = null;
 let lectureData = null;
 let pollingInterval = null;
@@ -13,7 +11,7 @@ let chatOutputFormat = localStorage.getItem('globalOutputFormat') || 'sentence';
 window.replyingToMessageId = null;
 window.replyingToMessageContent = null;
 
-const MODE_META = {
+const NOTE_MODE_META = {
     quick: { label: 'Quick', icon: 'ph-lightning' },
     simple: { label: 'Simple', icon: 'ph-text-a-underline' },
     normal: { label: 'Normal', icon: 'ph-stack' },
@@ -21,7 +19,7 @@ const MODE_META = {
     eli5: { label: 'ELI5', icon: 'ph-smiley' },
 };
 
-const OUTPUT_FORMAT_META = {
+const NOTE_OUTPUT_FORMAT_META = {
     sentence: { label: 'Sentence', icon: 'ph-text-t' },
     pointform: { label: 'Pointform', icon: 'ph-list-bullets' },
     numbered_list: { label: 'Numbered List', icon: 'ph-list-numbers' },
@@ -114,8 +112,6 @@ function scrollToPosition(position) {
 
 // ===== INIT =====
 window.addEventListener('load', () => {
-    if (!token) { window.location.href = '/login'; return; }
-
     // Extract UUID or integer ID from path /note/123
     const pathParts = window.location.pathname.split('/');
     lectureId = pathParts[pathParts.length - 1];
@@ -139,9 +135,7 @@ window.addEventListener('load', () => {
 // ===== LOAD LECTURE =====
 async function loadLecture() {
     try {
-        const response = await fetch(`/lectures/${lectureId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`/lectures/${lectureId}`);
         if (!response.ok) throw new Error('Failed to load lecture');
         lectureData = await response.json();
         displayLecture();
@@ -227,7 +221,7 @@ function displayLecture() {
 
 async function fetchGroupName(groupId) {
     try {
-        const res = await fetch('/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch('/groups');
         if (res.ok) {
             const groups = await res.json();
             const group = groups.find(g => g.id == groupId);
@@ -326,7 +320,6 @@ async function updateLectureTitle(newTitle) {
         const response = await fetch(`/lectures/${lectureId}`, {
             method: 'PATCH',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ title: newTitle })
@@ -403,9 +396,7 @@ function setupStickyHeaderFading() {
 async function checkExtractionStatus() {
     if (lectureData.extracted_text) return;
     try {
-        const response = await fetch(`/search/task?lecture_id=${lectureId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`/search/task?lecture_id=${lectureId}`);
         if (response.ok) {
             const task = await response.json();
             document.getElementById('extractionStatus').style.display = 'block';
@@ -447,9 +438,7 @@ function startPolling() { pollingInterval = setInterval(pollStatus, 2000); }
 
 async function pollStatus() {
     try {
-        const response = await fetch(`/search/task?lecture_id=${lectureId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`/search/task?lecture_id=${lectureId}`);
         if (response.ok) {
             const task = await response.json();
             if (task.status === 'completed') { clearInterval(pollingInterval); reloadLecture(); }
@@ -460,9 +449,7 @@ async function pollStatus() {
 
 async function reloadLecture() {
     try {
-        const response = await fetch(`/lectures/${lectureId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`/lectures/${lectureId}`);
         if (response.ok) {
             lectureData = await response.json();
             updateExtractedText();
@@ -1210,7 +1197,6 @@ async function saveContent() {
         const res = await fetch(`/lectures/${lectureId}/content`, {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ extracted_text: mdText })
@@ -1238,9 +1224,7 @@ async function saveContent() {
 // ===== SNAPSHOTS =====
 async function loadSnapshots() {
     try {
-        const res = await fetch(`/snapshots/${lectureId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(`/snapshots/${lectureId}`);
         if (res.ok) {
             const snapshots = await res.json();
             renderSnapshots(snapshots);
@@ -1289,7 +1273,6 @@ async function createSnapshot() {
         const res = await fetch(`/snapshots/${lectureId}`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ name, content })
@@ -1316,9 +1299,7 @@ function promptCreateSnapshot() {
 
 async function viewSnapshot(snapshotId) {
     try {
-        const res = await fetch(`/snapshots/${lectureId}/${snapshotId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch(`/snapshots/${lectureId}/${snapshotId}`);
         if (res.ok) {
             const snapshot = await res.json();
             // Show snapshot content in the main view
@@ -1344,8 +1325,7 @@ async function deleteSnapshot(snapshotId) {
     if (!confirm('Delete this snapshot?')) return;
     try {
         const res = await fetch(`/snapshots/${lectureId}/${snapshotId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            method: 'DELETE'
         });
         if (res.status === 204) {
             loadSnapshots();
@@ -1380,9 +1360,7 @@ async function exportNote() {
 
     // Load templates for dropdown
     try {
-        const res = await fetch('/templates', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch('/templates');
         if (res.ok) {
             const templates = await res.json();
             const select = document.getElementById('exportTemplateSelect');
@@ -1438,7 +1416,6 @@ async function doExport() {
         const response = await fetch(`/lectures/${lectureId}/export`, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
@@ -1452,9 +1429,7 @@ async function doExport() {
             updateExportProgress('Downloading file...', 95);
 
             // Download the file
-            const dlRes = await fetch(data.download_url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const dlRes = await fetch(data.download_url);
             if (dlRes.ok) {
                 updateExportProgress('Complete!', 100);
                 const blob = await dlRes.blob();
@@ -1492,9 +1467,7 @@ function updateExportProgress(text, percent) {
 
 async function downloadOriginalFile() {
     try {
-        const response = await fetch(`/lectures/${lectureId}/download-file`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const response = await fetch(`/lectures/${lectureId}/download-file`);
         if (response.ok) {
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
@@ -1559,8 +1532,7 @@ async function confirmReprocess() {
 
     try {
         const response = await fetch(`/lectures/${lectureId}/reprocess-ocr`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
+            method: 'POST'
         });
         if (response.ok) {
             document.getElementById('progressFill').style.width = '100%';
@@ -1588,8 +1560,7 @@ async function deleteLecture() {
     if (!confirm('Delete this lecture? This cannot be undone.')) return;
     try {
         const response = await fetch(`/lectures/${lectureId}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            method: 'DELETE'
         });
         if (response.ok || response.status === 204) {
             alert('Lecture deleted');
@@ -1761,8 +1732,8 @@ function updateNoteChatOutputButtons() {
 }
 
 function updateNoteChatCompactDisplay() {
-    const modeMeta = MODE_META[chatAiMode];
-    const outputMeta = OUTPUT_FORMAT_META[chatOutputFormat];
+    const modeMeta = NOTE_MODE_META[chatAiMode];
+    const outputMeta = NOTE_OUTPUT_FORMAT_META[chatOutputFormat];
 
     if (modeMeta) {
         document.getElementById('noteModeIcon').className = 'ph ' + modeMeta.icon;
@@ -1777,9 +1748,7 @@ function updateNoteChatCompactDisplay() {
 
 async function loadNoteChatHistory() {
     try {
-        const res = await fetch('/chat/conversations', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch('/chat/conversations');
         if (!res.ok) return;
         const convos = await res.json();
         // Find the most recent conversation for this note
@@ -1787,9 +1756,7 @@ async function loadNoteChatHistory() {
         if (noteConvo) {
             chatConversationId = noteConvo.conversation_id;
             // Load messages
-            const msgRes = await fetch(`/chat/conversations/${chatConversationId}/messages`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const msgRes = await fetch(`/chat/conversations/${chatConversationId}/messages`);
             if (msgRes.ok) {
                 const msgs = await msgRes.json();
                 chatMessages = [];
@@ -1853,7 +1820,7 @@ async function sendNoteChat() {
     try {
         const resp = await fetch('/chat/ask', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 message,
                 ai_mode: chatAiMode,
@@ -1970,7 +1937,7 @@ function displayChatMessages() {
         // AI mode badge
         let modeMeta = null;
         if (msg.role === 'ai' && !msg.loading && msg.ai_mode) {
-            modeMeta = MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
+            modeMeta = NOTE_MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
         }
 
         // Thinking section

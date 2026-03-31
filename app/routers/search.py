@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
 
-from app.models.db import User, Lecture
+from app.models.db import User, Lecture, Task
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 
@@ -213,7 +213,7 @@ async def get_task_status(
     """Get status of a background processing task"""
     from app.utils.tasks import TaskManager
     
-    status_info = TaskManager.get_task_status(task_id)
+    status_info = TaskManager.get_task_status(task_id, user_id=current_user.id)
     
     if not status_info:
         raise HTTPException(
@@ -226,12 +226,11 @@ async def get_task_status(
 
 @router.get("/task")
 async def get_lecture_task_status(
-    lecture_id: int,
+    lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get status of OCR task for a lecture"""
-    from app.utils.tasks import tasks_tracking
     import logging
     logger = logging.getLogger(__name__)
     
@@ -248,21 +247,22 @@ async def get_lecture_task_status(
             detail="Lecture not found"
         )
     
-    # Try to find task by lecture_id pattern (ocr_<user_id>_<lecture_id>_<hash>)
-    task_id_pattern = f"ocr_{current_user.id}_{lecture_id}"
-    logger.info(f"Looking for task matching pattern: {task_id_pattern}")
-    logger.info(f"Active tasks in tracking: {list(tasks_tracking.keys())}")
-    
-    # Get all tasks and find one matching this pattern
-    status_info = None
-    for key in tasks_tracking:
-        if key.startswith(task_id_pattern):
-            status_info = tasks_tracking[key]
-            logger.info(f"Found active task: {key} with status: {status_info}")
-            break
-    
-    if status_info:
-        logger.info(f"Returning active task status: {status_info}")
+    # Try to find the latest OCR task by lecture_id pattern (ocr_<user_id>_<lecture_id>_<hash>)
+    task_id_pattern = f"ocr_{current_user.id}_{lecture_id}%"
+    db_task = db.query(Task).filter(
+        Task.user_id == current_user.id,
+        Task.task_id.like(task_id_pattern)
+    ).order_by(Task.updated_at.desc()).first()
+
+    if db_task:
+        status_info = {
+            "task_id": db_task.task_id,
+            "status": db_task.status,
+            "progress": db_task.progress or 0,
+            "updated_at": db_task.updated_at.isoformat() if db_task.updated_at else None,
+            "error": db_task.error_message,
+        }
+        logger.info(f"Returning DB task status: {status_info}")
         return status_info
     
     # No active task

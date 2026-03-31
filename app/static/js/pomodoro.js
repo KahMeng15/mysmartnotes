@@ -4,7 +4,6 @@
  */
 
 const API_URL = '';
-const token = localStorage.getItem('token');
 const syncChannel = new BroadcastChannel('pomodoro_sync');
 
 // State
@@ -24,8 +23,6 @@ const MODES = {
 
 // Initial Load
 window.addEventListener('load', async () => {
-    if (!token) window.location.href = '/login';
-    
     checkPopout();
     initEventListeners();
     await loadSettings(); // Load user preferences first
@@ -52,9 +49,7 @@ window.addEventListener('load', async () => {
 
 async function loadSettings() {
     try {
-        const res = await fetch('/study-sessions/settings', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch('/study-sessions/settings');
         if (res.ok) {
             const s = await res.json();
             MODES.pomodoro = s.pomo_study_mins * 60;
@@ -126,7 +121,6 @@ async function saveDefaultSettings() {
         const res = await fetch('/study-sessions/settings', {
             method: 'PUT',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
@@ -262,7 +256,6 @@ async function saveSessionToDB() {
         await fetch('/study-sessions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
@@ -274,7 +267,7 @@ async function saveSessionToDB() {
 
 async function loadLectures() {
     try {
-        const res = await fetch('/lectures', { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch('/lectures');
         const lectures = await res.json();
         const select = document.getElementById('lectureSelect');
         lectures.forEach(l => {
@@ -288,9 +281,7 @@ async function loadLectures() {
 
 async function loadCalendar() {
     try {
-        const res = await fetch('/study-sessions/calendar?days=30', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch('/study-sessions/calendar?days=30');
         const data = await res.json();
         renderCalendar(data);
     } catch (e) {}
@@ -328,9 +319,7 @@ function getIntensityLevel(mins) {
 
 async function loadDailyStats() {
     try {
-        const res = await fetch('/analytics/dashboard-summary', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await fetch('/analytics/dashboard-summary');
         const data = await res.json();
         document.getElementById('todayPomos').textContent = Math.floor(data.study_time_7d_mins / 25);
         document.getElementById('todayMinutes').textContent = `${data.study_time_7d_mins}m`;
