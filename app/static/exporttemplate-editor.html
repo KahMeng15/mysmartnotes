@@ -429,7 +429,6 @@
         };
 
         window.addEventListener('load', () => {
-            if (!token) window.location.href = '/login';
             const parts = window.location.pathname.split('/');
             selectedTemplateId = parts[parts.length - 1]; // e.g. /exporttemplate/{id}
             if (selectedTemplateId && selectedTemplateId !== 'exporttemplate') {

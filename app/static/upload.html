@@ -12,7 +12,6 @@
     <link rel="stylesheet" href="/styles/upload.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
-    <script src="/js/auth.js"></script>
     <script src="/js/nav.js"></script>
     <script src="/js/utils.js"></script>
     <script src="/js/footer.js"></script>
@@ -163,16 +162,11 @@
     </div>
 
     <script>
-        const TOKEN_KEY = 'token';
-        const token = localStorage.getItem(TOKEN_KEY);
+        const token = localStorage.getItem('token');
         let selectedFile = null;
         let allSubjects = [];
 
         window.addEventListener('load', () => {
-            if (!token) {
-                window.location.href = '/login';
-                return;
-            }
             loadData();
         });
 

@@ -1,4 +1,6 @@
 """Database utilities and session management"""
+from pathlib import Path
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from app.config import get_settings
@@ -12,6 +14,26 @@ settings = get_settings()
 
 is_sqlite = "sqlite" in settings.DATABASE_URL
 
+
+def _get_sqlite_path() -> str:
+    """Return the filesystem path for the configured SQLite database."""
+    db_url = settings.DATABASE_URL
+    if db_url.startswith("sqlite:////"):
+        return db_url.replace("sqlite:////", "/", 1)
+    if db_url.startswith("sqlite:///"):
+        return db_url.replace("sqlite:///", "", 1)
+    return db_url
+
+
+def _ensure_sqlite_directory() -> None:
+    """Create the parent directory for a SQLite database if needed."""
+    db_path = _get_sqlite_path()
+    if db_path == ":memory:":
+        return
+
+    parent_dir = Path(db_path).expanduser().resolve().parent
+    parent_dir.mkdir(parents=True, exist_ok=True)
+
 # Create engine
 engine_kwargs = {
     "echo": settings.DEBUG,
@@ -19,6 +41,7 @@ engine_kwargs = {
 
 if is_sqlite:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
+    _ensure_sqlite_directory()
 else:
     engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
     engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
@@ -102,7 +125,7 @@ def apply_sqlite_migrations():
     import os
     
     # Extract path from DATABASE_URL: sqlite:///./data/app.db -> ./data/app.db
-    db_path = settings.DATABASE_URL.replace("sqlite:///", "")
+    db_path = _get_sqlite_path()
     if not os.path.exists(db_path):
         return
 

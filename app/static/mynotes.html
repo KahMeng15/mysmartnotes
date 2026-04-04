@@ -137,7 +137,6 @@
         let minimizedGroups = new Set(); // Track minimized group IDs
 
         window.addEventListener('load', () => {
-            if (!token) window.location.href = '/login';
             fetchData();
         });
 
