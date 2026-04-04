@@ -1,5 +1,6 @@
 """Database utilities and session management"""
 import os
+import sys
 from pathlib import Path
 from typing import Generator
 
@@ -15,6 +16,10 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 is_sqlite = "sqlite" in settings.DATABASE_URL
+
+# Log at module level to capture initialization
+print(f"[DB_INIT] Loading database module. DATABASE_URL={settings.DATABASE_URL}", file=sys.stderr)
+logger.info(f"Loading database module. DATABASE_URL: {settings.DATABASE_URL}")
 
 
 def _project_root() -> Path:
@@ -51,12 +56,19 @@ def _normalize_database_url() -> str:
 def _ensure_sqlite_directory() -> None:
     """Create the parent directory for the SQLite database."""
     db_path = _get_sqlite_path()
+    print(f"[DB_INIT] _ensure_sqlite_directory called. db_path={db_path}", file=sys.stderr)
+    
     if db_path == ":memory:":
         logger.info("Using in-memory SQLite database")
         return
 
     db_path_obj = Path(db_path).expanduser().resolve()
     parent_dir = db_path_obj.parent
+    
+    print(f"[DB_INIT] SQLite config: {settings.DATABASE_URL}", file=sys.stderr)
+    print(f"[DB_INIT] Resolved path: {db_path_obj}", file=sys.stderr)
+    print(f"[DB_INIT] Parent dir: {parent_dir}", file=sys.stderr)
+    print(f"[DB_INIT] Parent exists: {parent_dir.exists()}", file=sys.stderr)
     
     logger.info(f"SQLite path from config: {settings.DATABASE_URL}")
     logger.info(f"Resolved SQLite path: {db_path_obj}")
@@ -65,12 +77,15 @@ def _ensure_sqlite_directory() -> None:
     
     try:
         parent_dir.mkdir(parents=True, exist_ok=True)
+        print(f"[DB_INIT] Parent directory created/verified", file=sys.stderr)
         logger.info(f"Parent directory created/verified")
     except Exception as e:
+        print(f"[DB_INIT] FAILED to create parent: {e}", file=sys.stderr)
         logger.error(f"Failed to create parent directory {parent_dir}: {e}")
         raise
     
     is_writable = os.access(parent_dir, os.W_OK)
+    print(f"[DB_INIT] Parent writable: {is_writable}", file=sys.stderr)
     logger.info(f"Parent directory writable: {is_writable}")
     logger.info(f"Database file will be at: {db_path_obj}")
 
@@ -81,7 +96,9 @@ engine_kwargs = {
 
 if is_sqlite:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
+    print(f"[DB_INIT] Calling _ensure_sqlite_directory()...", file=sys.stderr)
     _ensure_sqlite_directory()
+    print(f"[DB_INIT] _ensure_sqlite_directory() completed", file=sys.stderr)
 else:
     engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
     engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
@@ -90,8 +107,10 @@ else:
     engine_kwargs["pool_pre_ping"] = True
 
 normalized_url = _normalize_database_url()
+print(f"[DB_INIT] Creating engine with URL: {normalized_url}", file=sys.stderr)
 logger.info(f"Creating SQLAlchemy engine with URL: {normalized_url}")
 engine = create_engine(normalized_url, **engine_kwargs)
+print(f"[DB_INIT] Engine created successfully", file=sys.stderr)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
