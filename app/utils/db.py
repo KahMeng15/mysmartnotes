@@ -1,5 +1,7 @@
 """Database utilities and session management"""
+import os
 from pathlib import Path
+from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -46,14 +48,26 @@ def _normalize_database_url() -> str:
     return f"sqlite:////{db_path.lstrip('/')}"
 
 
-def _ensure_sqlite_directory() -> None:
-    """Create the parent directory for a SQLite database if needed."""
+def _resolve_sqlite_path() -> str:
+    """Return a writable SQLite path, falling back to /tmp if needed."""
     db_path = _get_sqlite_path()
     if db_path == ":memory:":
-        return
+        return db_path
 
-    parent_dir = Path(db_path).expanduser().resolve().parent
-    parent_dir.mkdir(parents=True, exist_ok=True)
+    candidate_path = Path(db_path).expanduser().resolve()
+    candidate_parent = candidate_path.parent
+
+    try:
+        candidate_parent.mkdir(parents=True, exist_ok=True)
+        if os.access(candidate_parent, os.W_OK):
+            return str(candidate_path)
+    except OSError as exc:
+        logger.warning(f"SQLite path {candidate_path} is not usable: {exc}")
+
+    fallback_path = Path("/tmp/mysmartnotes/app.db")
+    fallback_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.warning(f"Falling back to writable SQLite path {fallback_path}")
+    return str(fallback_path)
 
 # Create engine
 engine_kwargs = {
@@ -62,7 +76,6 @@ engine_kwargs = {
 
 if is_sqlite:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
-    _ensure_sqlite_directory()
 else:
     engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
     engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
@@ -70,7 +83,10 @@ else:
     engine_kwargs["pool_recycle"] = settings.DB_POOL_RECYCLE_SECONDS
     engine_kwargs["pool_pre_ping"] = True
 
-engine = create_engine(_normalize_database_url(), **engine_kwargs)
+engine = create_engine(
+    (f"sqlite:////{_resolve_sqlite_path().lstrip('/')}" if is_sqlite else _normalize_database_url()),
+    **engine_kwargs,
+)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -116,7 +132,7 @@ def generate_random_id(db: Session, model, length: int = 8) -> str:
         length += 1
 
 
-def get_db() -> Session:
+def get_db() -> Generator[Session, None, None]:
     """Dependency for getting database session"""
     db = SessionLocal()
     try:
