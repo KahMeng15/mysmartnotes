@@ -52,11 +52,27 @@ def _ensure_sqlite_directory() -> None:
     """Create the parent directory for the SQLite database."""
     db_path = _get_sqlite_path()
     if db_path == ":memory:":
+        logger.info("Using in-memory SQLite database")
         return
 
     db_path_obj = Path(db_path).expanduser().resolve()
-    db_path_obj.parent.mkdir(parents=True, exist_ok=True)
-    logger.info(f"SQLite database will use: {db_path_obj}")
+    parent_dir = db_path_obj.parent
+    
+    logger.info(f"SQLite path from config: {settings.DATABASE_URL}")
+    logger.info(f"Resolved SQLite path: {db_path_obj}")
+    logger.info(f"Parent directory: {parent_dir}")
+    logger.info(f"Parent exists: {parent_dir.exists()}")
+    
+    try:
+        parent_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Parent directory created/verified")
+    except Exception as e:
+        logger.error(f"Failed to create parent directory {parent_dir}: {e}")
+        raise
+    
+    is_writable = os.access(parent_dir, os.W_OK)
+    logger.info(f"Parent directory writable: {is_writable}")
+    logger.info(f"Database file will be at: {db_path_obj}")
 
 # Create engine
 engine_kwargs = {
@@ -73,7 +89,9 @@ else:
     engine_kwargs["pool_recycle"] = settings.DB_POOL_RECYCLE_SECONDS
     engine_kwargs["pool_pre_ping"] = True
 
-engine = create_engine(_normalize_database_url(), **engine_kwargs)
+normalized_url = _normalize_database_url()
+logger.info(f"Creating SQLAlchemy engine with URL: {normalized_url}")
+engine = create_engine(normalized_url, **engine_kwargs)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -131,7 +149,13 @@ def get_db() -> Generator[Session, None, None]:
 def init_db():
     """Initialize database with tables and apply simple migrations"""
     logger.info("Initializing database...")
-    Base.metadata.create_all(bind=engine)
+    logger.info(f"Engine URL: {engine.url}")
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created/verified")
+    except Exception as e:
+        logger.error(f"Failed to create database tables: {e}", exc_info=True)
+        raise
     
     # Apply SQLite auto-migrations for missing columns
     if is_sqlite:
