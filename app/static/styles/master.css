@@ -1835,27 +1835,42 @@ textarea {
 .search-box input {
   width: 100%;
   height: 100%;
-  padding: 0 var(--spacing-lg);
-  padding-left: 45px;
+  padding: 8px 12px 8px 50px;
   border: none;
   background: transparent;
   outline: none;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 24px;
+  color: var(--color-text);
+}
+
+.search-box input::placeholder {
+  color: var(--color-gray);
 }
 
 .search-box input:focus {
   border: none;
+  background: transparent;
 }
 
 .search-icon {
   position: absolute;
-  left: 15px;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-gray);
-  font-size: var(--font-size-xl);
+  font-size: 18px;
   pointer-events: none;
+  flex-shrink: 0;
+}
+
+/* ===== SEARCH & CONTROLS BAR ALIGNMENT ===== */
+.controls-bar select {
+  min-width: 180px;
+  max-width: 220px;
+  height: 40px;
+  padding: 8px 12px;
+  flex-shrink: 0;
 }
 
 /* ===== MODALS ===== */

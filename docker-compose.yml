@@ -12,7 +12,7 @@ services:
     environment:
       - PYTHONPATH=.
       - PORT=${PORT:-8000}
-      - DATABASE_URL=sqlite:////app/data/app.db
+      - DATABASE_URL=sqlite:///./data/app.db
     volumes:
       - ./data:/app/data
       - ./generated:/app/generated

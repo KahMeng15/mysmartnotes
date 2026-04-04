@@ -38,6 +38,7 @@
                 <button class="tab-btn" onclick="switchTab('tab-ip')">IP Filters</button>
                 <button class="tab-btn" onclick="switchTab('tab-logs')">System Logs</button>
                 <button class="tab-btn" onclick="switchTab('tab-database')">Database</button>
+                <button class="tab-btn" onclick="switchTab('tab-diagnostics')"><i class="ph ph-cat-head"></i> HTTP Cats</button>
             </div>
         </div>
 
@@ -697,6 +698,18 @@
             <div id="dbTableStats" style="margin-top: 10px; font-size: 13px; color: var(--color-gray);">
                 Showing 0 records.
             </div>
+        </div>
+
+        <!-- DIAGNOSTICS TAB -->
+        <div id="tab-diagnostics" class="admin-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3><i class="ph ph-cat-head"></i> HTTP Status Codes Diagnostics</h3>
+                <a href="/admin/diagnostics" class="btn btn-outline" target="_blank"><i class="ph ph-arrow-square-out"></i> Open Full Page</a>
+            </div>
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; padding: 20px; color: white; margin-bottom: 20px;">
+                <p>Explore HTTP status codes with cute cats from http.cat. Each status code has been paired with a unique cat photo, making error debugging a delightful experience!</p>
+            </div>
+            <iframe src="/admin/diagnostics" style="width: 100%; height: 800px; border: 1px solid var(--color-light-gray); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"></iframe>
         </div>
 
         </div>

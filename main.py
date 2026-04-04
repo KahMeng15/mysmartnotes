@@ -167,8 +167,37 @@ app.add_middleware(
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.models.db import SystemSettings, IPFilter, UserLog
 from app.utils.db import SessionLocal
+
+
+# Custom exception handlers for HTTP status codes
+@app.exception_handler(404)
+async def not_found_exception_handler(request: Request, exc):
+    return FileResponse(os.path.join(static_dir, "error-404.html"), media_type="text/html")
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        return FileResponse(os.path.join(static_dir, "error-404.html"), media_type="text/html", status_code=404)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(500)
+async def internal_error_exception_handler(request: Request, exc):
+    logger.error(f"Internal server error: {exc}", exc_info=True)
+    return FileResponse(os.path.join(static_dir, "error-500.html"), media_type="text/html", status_code=500)
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return FileResponse(os.path.join(static_dir, "error-500.html"), media_type="text/html", status_code=500)
 
 
 @app.middleware("http")
@@ -183,7 +212,7 @@ async def request_observability_middleware(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googleapis.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://www.googleapis.com https://identitytoolkit.googleapis.com"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; frame-src https://mysmartnotes-965fe.firebaseapp.com https://accounts.google.com; connect-src 'self' https://www.googleapis.com https://apis.google.com https://identitytoolkit.googleapis.com https://mysmartnotes-965fe.firebaseapp.com"
 
     if _is_production():
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -473,6 +502,10 @@ async def serve_export_templates():
 @app.get("/admin")
 async def serve_admin():
     return FileResponse(os.path.join(static_dir, "admin.html"))
+
+@app.get("/admin/diagnostics")
+async def serve_diagnostics():
+    return FileResponse(os.path.join(static_dir, "http-status-diagnostics.html"))
 
 @app.get("/maintenance")
 async def serve_maintenance():

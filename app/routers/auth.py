@@ -107,6 +107,11 @@ class UnlinkGoogleAccountRequest(BaseModel):
 def verify_firebase_token(id_token_str: str):
     """Verify Firebase ID token signature and claims with Google certs."""
     try:
+        logger.debug(f"Token verification starting, len={len(id_token_str) if id_token_str else 0}")
+        
+        if not id_token_str:
+            raise ValueError("No token provided")
+        
         request_adapter = google_requests.Request()
         verified_claims = id_token.verify_firebase_token(
             id_token_str,
@@ -115,7 +120,7 @@ def verify_firebase_token(id_token_str: str):
         )
 
         if not verified_claims:
-            raise ValueError("Token verification failed")
+            raise ValueError("Token verification returned empty claims")
 
         # Validate essential claims
         email = verified_claims.get('email')
@@ -126,16 +131,17 @@ def verify_firebase_token(id_token_str: str):
         expected_issuer = f"https://securetoken.google.com/{settings.FIREBASE_PROJECT_ID}"
         issuer = verified_claims.get("iss", "")
         if issuer != expected_issuer:
-            raise ValueError("Invalid token issuer")
+            raise ValueError(f"Invalid token issuer. Expected: {expected_issuer}, Got: {issuer}")
 
         logger.debug("firebase.token_verified", extra={"email": email})
         return verified_claims
 
     except ValueError as e:
+        logger.error(f"Token verification ValueError: {str(e)}")
         raise e
     except Exception as e:
-        logger.error("firebase.token_verification_error", extra={"error": str(e)})
-        raise ValueError("Token verification failed")
+        logger.error(f"Token verification error: {type(e).__name__}: {str(e)}", exc_info=True)
+        raise ValueError(f"Token verification failed: {type(e).__name__}")
 
 
 
@@ -446,25 +452,21 @@ def google_login(google_request: GoogleLoginRequest, request: Request, response:
         
         # Check if user exists
         user = db.query(User).filter(func.lower(User.email) == func.lower(email)).first()
+        firebase_user_id = claims.get('user_id') or claims.get('sub')
         
         if user:
-            # Existing user - validate Google account is linked
-            firebase_user_id = claims.get('user_id') or claims.get('sub')
-            
-            # Check if Google account is actually linked
+            # Existing user - auto-link Google account if not yet linked
             if not user.google_oauth_id:
-                record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="not_linked", reason="Google account not linked to this user")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="This Google account is not linked to any account. Please link it first from your settings."
-                )
-            
-            # Verify the google_oauth_id matches the Firebase user_id
-            if user.google_oauth_id != firebase_user_id:
+                # Auto-link the Google account
+                logger.info(f"Auto-linking Google account to existing user: {email}")
+                user.google_oauth_id = firebase_user_id
+                db.commit()
+            elif user.google_oauth_id != firebase_user_id:
+                # Different Google account is already linked
                 record_auth_attempt(db, action="google_login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="mismatch", reason="Google OAuth ID mismatch", user=user)
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Google account mismatch. This Google account is not linked to your user account."
+                    detail="A different Google account is linked to this account. Please use that Google account."
                 )
             
             if not user.is_active:

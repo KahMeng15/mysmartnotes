@@ -512,3 +512,43 @@ def get_table_data(
         "data": data,
         "count": len(data)
     }
+
+
+# --- HTTP Status Codes Diagnostics ---
+@router.get("/http-status-codes")
+def get_http_status_codes(admin: User = Depends(get_current_admin_user)):
+    """Get a list of common HTTP status codes for the diagnostics page"""
+    status_codes = {
+        "1xx Informational": [
+            {"code": 100, "text": "Continue", "description": "Request received, proceeding with upload"},
+            {"code": 101, "text": "Switching Protocols", "description": "Switching to a different protocol"},
+        ],
+        "2xx Success": [
+            {"code": 200, "text": "OK", "description": "Request succeeded"},
+            {"code": 201, "text": "Created", "description": "Resource created successfully"},
+            {"code": 202, "text": "Accepted", "description": "Request accepted for processing"},
+            {"code": 204, "text": "No Content", "description": "Request succeeded with no content"},
+        ],
+        "3xx Redirection": [
+            {"code": 300, "text": "Multiple Choices", "description": "Multiple options for the requested resource"},
+            {"code": 301, "text": "Moved Permanently", "description": "Resource permanently moved"},
+            {"code": 302, "text": "Found", "description": "Resource temporarily moved"},
+            {"code": 304, "text": "Not Modified", "description": "Cached resource is still valid"},
+        ],
+        "4xx Client Error": [
+            {"code": 400, "text": "Bad Request", "description": "Invalid request syntax"},
+            {"code": 401, "text": "Unauthorized", "description": "Authentication required"},
+            {"code": 403, "text": "Forbidden", "description": "Access denied"},
+            {"code": 404, "text": "Not Found", "description": "Resource not found"},
+            {"code": 409, "text": "Conflict", "description": "Request conflicts with current state"},
+            {"code": 429, "text": "Too Many Requests", "description": "Rate limit exceeded"},
+        ],
+        "5xx Server Error": [
+            {"code": 500, "text": "Internal Server Error", "description": "Server encountered an error"},
+            {"code": 501, "text": "Not Implemented", "description": "Server doesn't support the functionality"},
+            {"code": 502, "text": "Bad Gateway", "description": "Invalid response from upstream server"},
+            {"code": 503, "text": "Service Unavailable", "description": "Server temporarily unavailable"},
+        ],
+    }
+    return status_codes
+

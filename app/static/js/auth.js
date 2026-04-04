@@ -115,18 +115,8 @@
         const hasAuthHeader = !!authHeaderValue;
         const hasInvalidBearer = typeof authHeaderValue === 'string' && /^Bearer\s+(null|undefined)$/i.test(authHeaderValue.trim());
 
-        // Strip explicit bearer headers so cookie sessions are the only auth mechanism.
-        if (isSameOrigin && hasAuthHeader) {
-            if (options.headers instanceof Headers) {
-                options.headers.delete('Authorization');
-            } else {
-                options.headers = { ...(options.headers || {}) };
-                delete options.headers.Authorization;
-                delete options.headers['Authorization'];
-            }
-        }
-
-        // Strip invalid explicit bearer headers so cookie sessions can authenticate.
+        // Strip ONLY invalid explicit bearer headers (Bearer null/undefined)
+        // but preserve valid Bearer tokens as they are required for API authentication
         if (isSameOrigin && hasInvalidBearer) {
             if (options.headers instanceof Headers) {
                 options.headers.delete('Authorization');
