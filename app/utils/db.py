@@ -15,14 +15,35 @@ settings = get_settings()
 is_sqlite = "sqlite" in settings.DATABASE_URL
 
 
+def _project_root() -> Path:
+    """Return the application root directory."""
+    return Path(__file__).resolve().parents[2]
+
+
 def _get_sqlite_path() -> str:
     """Return the filesystem path for the configured SQLite database."""
     db_url = settings.DATABASE_URL
     if db_url.startswith("sqlite:////"):
         return db_url.replace("sqlite:////", "/", 1)
     if db_url.startswith("sqlite:///"):
-        return db_url.replace("sqlite:///", "", 1)
+        raw_path = db_url.replace("sqlite:///", "", 1)
+        if raw_path == ":memory:":
+            return raw_path
+        if raw_path.startswith("/"):
+            return raw_path
+        return str((_project_root() / raw_path).resolve())
     return db_url
+
+
+def _normalize_database_url() -> str:
+    """Convert a relative SQLite URL to an absolute one."""
+    if not is_sqlite:
+        return settings.DATABASE_URL
+
+    db_path = _get_sqlite_path()
+    if db_path == ":memory:":
+        return settings.DATABASE_URL
+    return f"sqlite:////{db_path.lstrip('/')}"
 
 
 def _ensure_sqlite_directory() -> None:
@@ -49,7 +70,7 @@ else:
     engine_kwargs["pool_recycle"] = settings.DB_POOL_RECYCLE_SECONDS
     engine_kwargs["pool_pre_ping"] = True
 
-engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
+engine = create_engine(_normalize_database_url(), **engine_kwargs)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
