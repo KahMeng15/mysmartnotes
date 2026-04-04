@@ -48,26 +48,15 @@ def _normalize_database_url() -> str:
     return f"sqlite:////{db_path.lstrip('/')}"
 
 
-def _resolve_sqlite_path() -> str:
-    """Return a writable SQLite path, falling back to /tmp if needed."""
+def _ensure_sqlite_directory() -> None:
+    """Create the parent directory for the SQLite database."""
     db_path = _get_sqlite_path()
     if db_path == ":memory:":
-        return db_path
+        return
 
-    candidate_path = Path(db_path).expanduser().resolve()
-    candidate_parent = candidate_path.parent
-
-    try:
-        candidate_parent.mkdir(parents=True, exist_ok=True)
-        if os.access(candidate_parent, os.W_OK):
-            return str(candidate_path)
-    except OSError as exc:
-        logger.warning(f"SQLite path {candidate_path} is not usable: {exc}")
-
-    fallback_path = Path("/tmp/mysmartnotes/app.db")
-    fallback_path.parent.mkdir(parents=True, exist_ok=True)
-    logger.warning(f"Falling back to writable SQLite path {fallback_path}")
-    return str(fallback_path)
+    db_path_obj = Path(db_path).expanduser().resolve()
+    db_path_obj.parent.mkdir(parents=True, exist_ok=True)
+    logger.info(f"SQLite database will use: {db_path_obj}")
 
 # Create engine
 engine_kwargs = {
@@ -76,6 +65,7 @@ engine_kwargs = {
 
 if is_sqlite:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
+    _ensure_sqlite_directory()
 else:
     engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
     engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
@@ -83,10 +73,7 @@ else:
     engine_kwargs["pool_recycle"] = settings.DB_POOL_RECYCLE_SECONDS
     engine_kwargs["pool_pre_ping"] = True
 
-engine = create_engine(
-    (f"sqlite:////{_resolve_sqlite_path().lstrip('/')}" if is_sqlite else _normalize_database_url()),
-    **engine_kwargs,
-)
+engine = create_engine(_normalize_database_url(), **engine_kwargs)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

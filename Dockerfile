@@ -28,7 +28,7 @@ RUN useradd --create-home --shell /usr/sbin/nologin appuser \
 # Set Default Environment Variables (these can be overridden by docker-compose or run command)
 ENV PYTHONPATH=. \
     PORT=8000 \
-    DATABASE_URL=sqlite:///./data/app.db \
+    DATABASE_URL=sqlite:////app/data/app.db \
     DB_POOL_SIZE=20 \
     DB_MAX_OVERFLOW=40 \
     DB_POOL_TIMEOUT_SECONDS=30 \
