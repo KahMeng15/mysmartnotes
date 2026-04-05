@@ -486,7 +486,7 @@ def get_table_data(
         raise HTTPException(status_code=404, detail="Table not found")
     
     # Use raw SQL to fetch data for any table generically
-    query = text(f"SELECT * FROM {table_name} LIMIT :limit OFFSET :offset")
+    query = text(f"SELECT * FROM {table_name} LIMIT :limit OFFSET :offset")  # nosec - table_name is validated against metadata
     result = db.execute(query, {"limit": limit, "offset": offset})
     
     # Get column names

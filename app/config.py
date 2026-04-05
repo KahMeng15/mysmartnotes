@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # Server
-    HOST: str = "0.0.0.0"
+    HOST: str = "0.0.0.0"  # nosec - intentional for Docker/container deployments
     PORT: int = 8000
 
     # File Upload

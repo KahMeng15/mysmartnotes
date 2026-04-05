@@ -231,7 +231,7 @@ def apply_sqlite_migrations():
 
     for table_name, columns in migrations:
         # Check if table exists
-        cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';")
+        cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';")  # nosec - table_name from hardcoded migrations list
         if not cursor.fetchone():
             continue
 
