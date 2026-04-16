@@ -2,100 +2,117 @@
 """
 Smart Pipeline Test Script
 
-Tests the multi-method extraction pipeline on INPUT.pdf and
-saves the result as Markdown.
+Tests the multi-method extraction pipeline on a file inside the `input` directory
+and saves the result and detailed debug logs to the `output` directory.
 """
 
 import sys
 import os
 import logging
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s"
-)
+def configure_logging(log_file: Path):
+    """Set up logging to go to both console and a debug log file."""
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
 
+    # Clear existing handlers
+    logger.handlers.clear()
+
+    # File handler (detailed debug)
+    fh = logging.FileHandler(log_file, mode="w", encoding="utf-8")
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+    logger.addHandler(fh)
+
+    # Console handler (clean info)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    ch.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(ch)
 
 def main():
     """Run the smart pipeline on the input file."""
-    output_dir = Path("output")
+    # Ensure directories exist
+    base_dir = Path(__file__).parent
+    input_dir = base_dir / "input"
+    output_dir = base_dir / "output"
+    input_dir.mkdir(exist_ok=True)
     output_dir.mkdir(exist_ok=True)
 
-    # Find input file
-    input_file = None
-    supported = [".pdf", ".pptx"]
-    for f in Path(".").iterdir():
-        if f.name.upper().startswith("INPUT") and f.suffix.lower() in supported:
-            input_file = f
-            break
+    log_file = output_dir / "debug_log.txt"
+    configure_logging(log_file)
 
-    if not input_file:
-        print("❌ No INPUT file found (PDF or PPTX)")
+    load_dotenv()
+
+    # Find all input files
+    supported = [".pdf", ".pptx"]
+    input_files = []
+    # Search recursively for supported files
+    for f in input_dir.rglob("*"):
+        if f.is_file() and f.suffix.lower() in supported and not f.name.startswith("~"):
+            input_files.append(f)
+
+    if not input_files:
+        logging.error(f"❌ No supported files (PDF or PPTX) found in {input_dir}")
         sys.exit(1)
 
-    print(f"📄 Found: {input_file}")
-    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    logging.info(f"📄 Found {len(input_files)} files to process in {input_dir}")
+    logging.info(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    # Check for --no-ai flag
-    use_ai = "--no-ai" not in sys.argv
+    # Check for --vision flag to enable Gemini Vision mode
+    use_vision = "--vision" in sys.argv
+    gemini_key = os.getenv("GEMINI_API_KEY")
 
-    if not use_ai:
-        print("⚠️  AI models disabled (--no-ai flag)")
+    if use_vision and not gemini_key:
+        logging.warning("⚠️  --vision requested but GEMINI_API_KEY is missing. Falling back to local.")
+    elif not use_vision:
+        logging.info("💡 Running local heuristic path (use --vision to test Gemini Vision).")
 
-    # Run pipeline
+    # Initialize pipeline
     from app.processing.smart_pipeline import SmartPipeline
-
+    
     pipeline = SmartPipeline(
-        use_layout_detection=use_ai,
-        use_table_transformer=use_ai,
+        use_vision=use_vision and bool(gemini_key),
+        gemini_api_key=gemini_key,
     )
 
-    try:
-        print("\n🚀 Running Smart Pipeline...")
-        markdown = pipeline.process(str(input_file))
+    for i, input_file in enumerate(input_files, 1):
+        try:
+            logging.info(f"\n🚀 [{i}/{len(input_files)}] Running Smart Pipeline on: {input_file.name}")
+            markdown = pipeline.process(str(input_file))
 
-        # Save Markdown
-        md_file = output_dir / "OUTPUT_smart.md"
-        with open(md_file, "w", encoding="utf-8") as f:
-            f.write(markdown)
+            # Save Markdown
+            md_file = output_dir / f"OUTPUT_{input_file.stem}_smart.md"
+            with open(md_file, "w", encoding="utf-8") as f:
+                f.write(markdown)
 
-        print(f"\n✅ Done!")
-        print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print(f"   Output: {md_file}")
+            logging.info(f"\n✅ Done with {input_file.name}!")
+            logging.info(f"   Markdown Output: {md_file}")
 
-        # Print quality summary
-        lines = markdown.split("\n")
-        headings = [l for l in lines if l.startswith("#")]
-        lists = [l for l in lines if l.strip().startswith("- ") or l.strip().startswith("1. ")]
-        tables = [l for l in lines if l.strip().startswith("|")]
-        body = [l for l in lines if l.strip() and not l.startswith("#") and not l.strip().startswith("-") and not l.strip().startswith("1.") and not l.strip().startswith("|")]
+            # Print quality summary
+            lines = markdown.split("\n")
+            headings = [l for l in lines if l.startswith("#")]
+            lists = [l for l in lines if l.strip().startswith("- ") or l.strip().startswith("1. ")]
+            tables = [l for l in lines if l.strip().startswith("|")]
+            body = [l for l in lines if l.strip() and not l.startswith("#") and not l.strip().startswith("-") and not l.strip().startswith("1.") and not l.strip().startswith("|")]
 
-        print(f"\n📊 Quality Metrics:")
-        print(f"   Headings:   {len(headings)}")
-        print(f"   List items: {len(lists)}")
-        print(f"   Table rows: {len(tables)}")
-        print(f"   Body text:  {len(body)}")
-        print(f"   Total lines: {len(lines)}")
+            logging.info(f"📊 Quality Metrics:")
+            logging.info(f"   Headings:   {len(headings)}")
+            logging.info(f"   List items: {len(lists)}")
+            logging.info(f"   Table rows: {len(tables)}")
+            logging.info(f"   Body text:  {len(body)}")
+            logging.info(f"   Total lines: {len(lines)}")
+            logging.info(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-        # Preview first 30 lines
-        print(f"\n📝 Preview (first 30 lines):")
-        print(f"{'─' * 50}")
-        for line in lines[:30]:
-            print(f"  {line}")
-        if len(lines) > 30:
-            print(f"  ... ({len(lines) - 30} more lines)")
-
-    except Exception as e:
-        print(f"\n❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-
+        except Exception as e:
+            logging.error(f"\n❌ Error processing {input_file.name}: {e}", exc_info=True)
+            logging.info(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            continue
 
 if __name__ == "__main__":
     main()

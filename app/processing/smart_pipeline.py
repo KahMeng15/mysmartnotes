@@ -122,6 +122,12 @@ class SmartPipeline:
         # Convert to Markdown
         markdown = blocks_to_markdown(merged_blocks)
 
+        # Post-processing: normalize non-standard bullet chars (e.g. Ø, q used in lecture PDFs)
+        markdown = self._normalize_pdf_bullets(markdown)
+
+        # Post-processing: remove table content that was also captured as plain body text
+        markdown = self._deduplicate_pdf_blocks(markdown)
+
         # Fix common PDF punctuation-spacing artefacts
         markdown = self._fix_punctuation_spacing(markdown)
 
@@ -147,6 +153,75 @@ class SmartPipeline:
         # but not at start-of-line (Markdown heading # ...) or inside URLs.
         text = re.sub(r'([.,;:])([A-Za-zÀ-žÀ-ÖØ-öø-ÿ\u0100-\u024F])', r'\1 \2', text)
         return text
+
+    def _normalize_pdf_bullets(self, text: str) -> str:
+        """
+        Normalize non-standard bullet characters used in lecture PDFs
+        (e.g. Ø, q, n, v as line-start decorators) into proper Markdown list markers.
+        """
+        import re
+        # These chars appear as bullet stand-ins at the start of lines
+        PDF_BULLET_CHARS = r'^[ØqnvlhÂ§ø·]\s+'
+        lines = text.split('\n')
+        normalized = []
+        for line in lines:
+            stripped = line.strip()
+            if re.match(PDF_BULLET_CHARS, stripped) and len(stripped) > 2:
+                # Convert to a proper list item, preserving indent
+                indent = len(line) - len(line.lstrip())
+                content = re.sub(PDF_BULLET_CHARS, '', stripped).strip()
+                normalized.append(' ' * indent + '- ' + content)
+            else:
+                normalized.append(line)
+        return '\n'.join(normalized)
+
+    def _deduplicate_pdf_blocks(self, markdown: str) -> str:
+        """
+        Remove plain-text blocks that are near-duplicates of table content.
+        After pdfplumber extracts tables, the font extractor also reads those
+        same characters as body text, causing each table to appear twice.
+        Strategy: scan for lines directly after a table that share ≥75% of
+        their words with the table rows above.
+        """
+        import re
+        lines = markdown.split('\n')
+        result = []
+        # Collect table cell words for deduplication window
+        table_words: set = set()
+        in_table = False
+        table_end_idx = -1
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+
+            # Track table regions
+            if stripped.startswith('|'):
+                in_table = True
+                table_end_idx = i
+                # Accumulate all words from table cells
+                cells = re.split(r'\s*\|\s*', stripped)
+                for cell in cells:
+                    table_words.update(cell.lower().split())
+                result.append(line)
+                continue
+
+            # Reset table word window after 3 non-table lines
+            if in_table and i > table_end_idx + 3:
+                in_table = False
+                table_words = set()
+
+            # Check candidate duplicate line (body text after a table)
+            if in_table and stripped and not stripped.startswith('#') and not stripped.startswith('-'):
+                line_words = set(stripped.lower().split())
+                if len(line_words) >= 4 and table_words:
+                    overlap = len(line_words & table_words) / len(line_words)
+                    if overlap >= 0.75:
+                        logger.debug(f"Dedup: skipping line with {overlap:.0%} table overlap: {stripped[:60]}")
+                        continue  # Drop the duplicate
+
+            result.append(line)
+
+        return '\n'.join(result)
 
     def _extract_tables_from_pdf(self, pdf_path: str) -> list:
         """
@@ -244,6 +319,21 @@ class SmartPipeline:
         name_lower = (font_name or "").lower()
         return any(kw in name_lower for kw in self.MONO_FONT_KEYWORDS)
 
+    # Shapes whose full text content we should skip entirely
+    _SKIP_SHAPE_PATTERNS = (
+        "faculty of", "department of", "university", "room no",
+        "universiti", "jabatan", "fakulti",  # Malaysian university metadata
+    )
+    # First-slide index (0-based) where metadata shapes are typically found
+    _METADATA_SLIDE_IDX = 0
+
+    def _is_metadata_shape(self, text: str, slide_num: int) -> bool:
+        """Return True if this shape appears to be institutional metadata on the cover slide."""
+        if slide_num != 1:
+            return False
+        low = text.lower()
+        return any(kw in low for kw in self._SKIP_SHAPE_PATTERNS)
+
     def _process_pptx(self, pptx_path: str) -> str:
         """Process a PPTX file using shape-level font extraction."""
         try:
@@ -259,7 +349,36 @@ class SmartPipeline:
         slide_width = prs.slide_width or 1
         slide_height = prs.slide_height or 1
 
+        # Compute the presentation's dominant body font size so we can
+        # calibrate heading thresholds relative to it rather than absolutely.
+        all_run_sizes = []
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if not shape.has_text_frame:
+                    continue
+                for para in shape.text_frame.paragraphs:
+                    for run in para.runs:
+                        if run.font.size:
+                            all_run_sizes.append(run.font.size.pt)
+
+        if all_run_sizes:
+            all_run_sizes.sort()
+            median_size = all_run_sizes[len(all_run_sizes) // 2]
+        else:
+            median_size = 18.0
+
+        # Heading thresholds are relative to median body size.
+        # A true heading should be meaningfully larger than body text.
+        h1_threshold = max(median_size * 1.6, 28.0)
+        h2_threshold = max(median_size * 1.3, 22.0)
+        h3_threshold = max(median_size * 1.1, 16.0)
+        logger.debug(
+            f"PPTX median body size: {median_size:.1f}pt → "
+            f"h1≥{h1_threshold:.1f}, h2≥{h2_threshold:.1f}, h3≥{h3_threshold:.1f}"
+        )
+
         md_parts = []
+        BULLET_CHARS = set("•‣◦⁃∙‐‑–—►▪▸➤➢")
 
         for slide_num, slide in enumerate(prs.slides, 1):
             slide_blocks = []
@@ -270,28 +389,47 @@ class SmartPipeline:
 
                 # Determine shape-level role
                 shape_role = "body"
-                shape_top_frac = shape.top / slide_height if slide_height else 0
+                # shape.top / shape.height can be None on some malformed slides
+                _top = shape.top
+                _height = shape.height
+                shape_top_frac = (_top / slide_height) if (slide_height and _top is not None) else 1.0
 
-                if hasattr(shape, "placeholder_format") and shape.placeholder_format:
+                if shape.is_placeholder:
                     ph_type = shape.placeholder_format.idx
                     # idx 0 = TITLE, idx 1 = BODY/CONTENT in standard layouts
                     if ph_type == 0:
                         shape_role = "title"
-                    elif ph_type == 1:
-                        shape_role = "body"
                     else:
                         shape_role = "body"
                 else:
                     # Non-placeholder text box: use position heuristic
                     # Top 15% of slide and relatively short shape → likely a title
-                    if shape_top_frac < 0.15 and shape.height / slide_height < 0.30:
+                    _h_frac = (_height / slide_height) if (slide_height and _height is not None) else 1.0
+                    if shape_top_frac < 0.15 and _h_frac < 0.30:
                         shape_role = "title"
 
-                for paragraph in shape.text_frame.paragraphs:
-                    text = paragraph.text.strip()
-                    if not text:
+                for para_idx, paragraph in enumerate(shape.text_frame.paragraphs):
+                    # Fix PowerPoint in-shape line breaks (\x0b = vertical tab)
+                    raw_text = paragraph.text.replace("\x0b", " ").strip()
+                    if not raw_text:
                         continue
 
+                    # 1.3 Skip bare slide-number lines (short pure-digit strings)
+                    if raw_text.isdigit() and len(raw_text) <= 3:
+                        logger.debug(f"Skip slide number literal: '{raw_text}'")
+                        continue
+
+                    # 1.6 Skip URLs
+                    if raw_text.startswith(("http://", "https://")):
+                        logger.debug(f"Skip URL: '{raw_text[:60]}'")
+                        continue
+
+                    # 1.6 Skip institutional metadata on cover slide
+                    if self._is_metadata_shape(raw_text, slide_num):
+                        logger.debug(f"Skip metadata shape on slide 1: '{raw_text[:60]}'")
+                        continue
+
+                    text = raw_text
                     level = paragraph.level  # indent level 0–8
 
                     # Collect run-level font info
@@ -308,26 +446,32 @@ class SmartPipeline:
                             is_code = True
 
                     # Determine block type
+                    # Long text (>120 chars) is always body regardless of size.
+                    is_long_text = len(text) > 120
+
+                    # Title placeholder: ONLY the first paragraph gets h1.
+                    # Subsequent paragraphs in the same shape are sub-content (body/list).
+                    is_title_first_para = (shape_role == "title" and level == 0 and para_idx == 0)
+
                     if is_code:
                         block_type = "code"
-                    elif shape_role == "title" and level == 0:
-                        # Title placeholder always → h1, regardless of font size
+                    elif is_title_first_para:
                         block_type = "h1"
-                    elif max_size >= 28:
+                    elif not is_long_text and max_size >= h1_threshold:
                         block_type = "h1"
-                    elif max_size >= 22:
+                    elif not is_long_text and max_size >= h2_threshold:
                         block_type = "h2"
-                    elif max_size >= 16 and is_bold:
+                    elif not is_long_text and max_size >= h3_threshold and is_bold:
                         block_type = "h3"
-                    elif max_size >= 14 and is_bold and len(text) < 100:
-                        block_type = "h4"
                     elif level > 0:
                         block_type = "list"
                     else:
                         # Check for common list text patterns used in slides
                         first_char = text[0] if text else ""
-                        BULLET_CHARS = set("•‣◦⁃∙‐‑–—►▪▸➤➢")
                         if first_char in BULLET_CHARS or text.startswith("- "):
+                            # Strip the bullet char so the list marker isn't duplicated
+                            if first_char in BULLET_CHARS:
+                                text = text[1:].strip()
                             block_type = "list"
                         else:
                             block_type = "body"
@@ -337,6 +481,40 @@ class SmartPipeline:
                         "text": text,
                         "indent": level,
                     })
+
+            if not slide_blocks:
+                continue
+
+            # --- Heading de-inflation ---
+            # Count h1s beyond the first one — multiple h1s per slide means the
+            # threshold still fired wrongly. Demote the excess to body/list.
+            h1_blocks = [b for b in slide_blocks if b["type"] == "h1"]
+            if len(h1_blocks) > 1:
+                seen_h1 = False
+                for b in slide_blocks:
+                    if b["type"] == "h1":
+                        if seen_h1:
+                            # Keep as heading only if it is short (≤8 words) — genuine sub-headings
+                            # A long h1 or a code-like token is clearly body text.
+                            word_count = len(b["text"].split())
+                            b["type"] = "h2" if word_count <= 8 else "body"
+                        else:
+                            seen_h1 = True
+
+            # Demote h2/h3 blocks if they dominate (>35% of total blocks)
+            h23_count = sum(1 for b in slide_blocks if b["type"] in ("h2", "h3"))
+            total = len(slide_blocks)
+            if total > 0 and h23_count / total > 0.35:
+                logger.debug(f"Slide {slide_num}: h2/h3 inflation ({h23_count}/{total}), demoting to body")
+                for b in slide_blocks:
+                    if b["type"] in ("h2", "h3"):
+                        b["type"] = "body"
+
+            # Emit a slide separator before each slide (except the first)
+            if slide_num > 1:
+                md_parts.append("")
+                md_parts.append("---")
+                md_parts.append("")
 
             # Emit markdown for this slide's blocks
             in_code_block = False

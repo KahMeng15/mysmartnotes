@@ -74,9 +74,10 @@ npm-debug.log
 .cache/
 uploads
 
-ProcessingAlgorithmTest/output/*
 output/*
-ProcessingAlgorithmTest/output/OUTPUT_smart.md
 .github/copilot-instructions.md
 generated/*
 test/*
+
+scripts/ProcessingAlgorithmTest/input/*
+scripts/ProcessingAlgorithmTest/output/*
