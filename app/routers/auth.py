@@ -72,6 +72,7 @@ def _prepare_user_for_response(user: User) -> dict:
         "ai_api_key": None,
         "ai_api_key_configured": bool(user.ai_api_key),
         "use_global_ai_config": user.use_global_ai_config,
+        "note_processing_mode": user.note_processing_mode or "smart",
         "created_at": user.created_at,
     }
 
@@ -756,6 +757,10 @@ async def update_profile(user_update: UserUpdate, current_user: User = Depends(g
         current_user.ai_api_key = encrypt_secret(user_update.ai_api_key)
     if user_update.use_global_ai_config is not None:
         current_user.use_global_ai_config = user_update.use_global_ai_config
+    if user_update.note_processing_mode is not None:
+        allowed = {"fast", "smart", "smart_throttled"}
+        if user_update.note_processing_mode in allowed:
+            current_user.note_processing_mode = user_update.note_processing_mode
         
     db.commit()
     db.refresh(current_user)

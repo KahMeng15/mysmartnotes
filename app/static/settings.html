@@ -387,6 +387,24 @@
                         </form>
                     </div>
 
+                    <!-- Note Processing Mode -->
+                    <div style="margin-bottom: var(--spacing-lg); padding: var(--spacing-md); background: var(--color-card-surface); border-radius: 10px;">
+                        <h4 style="margin: 0 0 var(--spacing-xs) 0; font-size: var(--font-size-sm); font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                            <i class="ph ph-file-doc"></i> Note Processing Mode
+                        </h4>
+                        <p style="margin: 0 0 var(--spacing-sm) 0; font-size: var(--font-size-sm); color: var(--color-gray);">
+                            Choose how uploaded lecture slides (PDF/PPTX) are processed.
+                        </p>
+                        <select id="noteProcessingMode" class="form-control">
+                            <option value="fast">🚀 Fast (Local Only) — Instant, no AI calls. Best for clean, text-based PDFs.</option>
+                            <option value="smart" selected>✨ Smart (AI Vision) — Gemini Vision classifies each slide. Best accuracy.</option>
+                            <option value="smart_throttled">🐢 Smart + Throttled — AI Vision with 1-second delay. Avoids rate limits.</option>
+                        </select>
+                        <small style="color: var(--color-gray); font-size: 12px; margin-top: 6px; display: block;">
+                            Smart modes require a Gemini API key configured above. Falls back to Fast if no key is set.
+                        </small>
+                    </div>
+
                     <div class="section-footer">
                         <button type="button" class="btn btn-primary btn-block"
                             onclick="saveAiConfiguration()">Save AI Configuration</button>

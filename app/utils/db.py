@@ -176,7 +176,8 @@ def apply_sqlite_migrations():
     migrations = [
         ("users", [
             ("google_oauth_id", "VARCHAR(255) DEFAULT NULL"),
-            ("token_version", "INTEGER DEFAULT 0")
+            ("token_version", "INTEGER DEFAULT 0"),
+            ("note_processing_mode", "VARCHAR(50) DEFAULT 'smart'")
         ]),
         ("system_settings", [
             ("session_length", "INTEGER DEFAULT 24"),

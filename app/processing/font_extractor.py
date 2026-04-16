@@ -55,7 +55,19 @@ class TextLine:
 
     @property
     def text(self) -> str:
-        return "".join(s.text for s in self.spans)
+        if not self.spans:
+            return ""
+        parts = []
+        for i, span in enumerate(self.spans):
+            if i == 0:
+                parts.append(span.text)
+            else:
+                prev = self.spans[i - 1]
+                # Insert a space between spans if neither end has one
+                if prev.text and not prev.text[-1].isspace() and span.text and not span.text[0].isspace():
+                    parts.append(" ")
+                parts.append(span.text)
+        return "".join(parts)
 
     @property
     def top(self) -> float:
@@ -348,10 +360,32 @@ class FontAwareExtractor:
                   abs(char["top"] - current_chars[-1]["top"]) < 3 and
                   char["x0"] - current_chars[-1]["x1"] < 15):
                 # Same font, same line, reasonable gap → extend span
+                # If there's a visible word gap (> 25% of font size), insert a space
+                gap = char["x0"] - current_chars[-1]["x1"]
+                if gap > font_size * 0.25 and current_chars:
+                    last_text = current_chars[-1].get("text", "")
+                    if last_text and not last_text[-1].isspace():
+                        # Synthesise a space char by injecting it into the text
+                        space_char = dict(current_chars[-1])  # shallow copy
+                        space_char["text"] = " "
+                        space_char["x0"] = current_chars[-1]["x1"]
+                        space_char["x1"] = char["x0"]
+                        current_chars.append(space_char)
                 current_chars.append(char)
             else:
                 # Different font or big gap → finalize current span
                 if current_chars:
+                    # If this split is due to a word gap (not just font change),
+                    # ensure trailing space so the next span doesn't merge with this one
+                    if (font == current_font and
+                            abs(char.get("top", 0) - current_chars[-1].get("top", 0)) < 3):
+                        last_text = current_chars[-1].get("text", "")
+                        if last_text and not last_text[-1].isspace():
+                            space_char = dict(current_chars[-1])
+                            space_char["text"] = " "
+                            space_char["x0"] = current_chars[-1]["x1"]
+                            space_char["x1"] = char["x0"]
+                            current_chars.append(space_char)
                     span = self._finalize_span(current_chars, current_font, page_num)
                     if span:
                         spans.append(span)

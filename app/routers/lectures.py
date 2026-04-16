@@ -31,6 +31,52 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
 
+def _build_pipeline(user) -> SmartPipeline:
+    """
+    Build a SmartPipeline configured from the user's note_processing_mode.
+
+    Modes:
+      "fast"             – local only, no Gemini calls
+      "smart"            – Gemini Vision, no delay
+      "smart_throttled" – Gemini Vision, 1-second inter-call delay
+    """
+    mode = getattr(user, "note_processing_mode", "fast") or "fast"
+
+    if mode == "fast":
+        return SmartPipeline(use_vision=False)
+
+    # Resolve Gemini API key: personal first, then global
+    gemini_key = None
+    if not getattr(user, "use_global_ai_config", False):
+        provider = getattr(user, "ai_provider", "") or ""
+        if "gemini" in provider.lower():
+            gemini_key = getattr(user, "ai_api_key", None)
+
+    if not gemini_key:
+        # Try global admin settings
+        try:
+            from app.utils.db import SessionLocal
+            from app.models.db import SystemSettings
+            with SessionLocal() as s:
+                settings = s.query(SystemSettings).first()
+                if settings and "gemini" in (settings.global_ai_provider or "").lower():
+                    gemini_key = settings.global_ai_api_key
+        except Exception:
+            pass
+
+    if not gemini_key:
+        # No Gemini key available — fall back to fast mode
+        logger.info(f"Note processing mode '{mode}' requested but no Gemini key found; using fast.")
+        return SmartPipeline(use_vision=False)
+
+    delay = 1.0 if mode == "smart_throttled" else 0.0
+    return SmartPipeline(
+        use_vision=True,
+        inter_call_delay_s=delay,
+        gemini_api_key=gemini_key,
+    )
+
+
 @router.get("", response_model=List[LectureResponse])
 async def get_lectures(
     subject_id: str = None,
@@ -139,14 +185,12 @@ async def upload_lecture(
         import time
         start_time = time.time()
         file_ext = os.path.splitext(file_path)[1].lower()
-        
+
         if file_ext in ('.pdf', '.pptx'):
             # Use SmartPipeline for PDF/PPTX — produces clean Markdown
-            logger.info(f"Starting smart pipeline processing for lecture {db_lecture.id}")
-            pipeline = SmartPipeline(
-                use_layout_detection=False,
-                use_table_transformer=False,
-            )
+            pipeline = _build_pipeline(current_user)
+            mode = getattr(current_user, "note_processing_mode", "fast") or "fast"
+            logger.info(f"Processing lecture {db_lecture.id} with mode={mode}")
             markdown = pipeline.process(file_path)
             structured_segments = _markdown_to_segments(markdown)
             
@@ -312,11 +356,9 @@ async def reprocess_ocr(
         
         if file_ext in ('.pdf', '.pptx'):
             # Use SmartPipeline for PDF/PPTX
-            logger.info(f"Using SmartPipeline for reprocessing {lecture.file_path}")
-            pipeline = SmartPipeline(
-                use_layout_detection=False,
-                use_table_transformer=False,
-            )
+            pipeline = _build_pipeline(current_user)
+            mode = getattr(current_user, "note_processing_mode", "fast") or "fast"
+            logger.info(f"Reprocessing lecture {lecture_id} with mode={mode}")
             raw_text = pipeline.process(lecture.file_path)
             structured_content = _markdown_to_segments(raw_text)
             
