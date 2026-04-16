@@ -174,7 +174,8 @@
             try {
                 // 1. Fetch Groups
                 const groupsRes = await fetch('/groups', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    cache: 'no-store'
                 });
                 if (groupsRes.ok) {
                     const groups = await groupsRes.json();
@@ -183,7 +184,8 @@
 
                 // 2. Fetch Subjects
                 const subjectsRes = await fetch('/subjects', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    cache: 'no-store'
                 });
                 if (subjectsRes.ok) {
                     allSubjects = await subjectsRes.json();
@@ -283,7 +285,7 @@
                     const newGroup = await res.json();
                     closeCreateGroupModal();
                     // Reload groups
-                    const groupsRes = await fetch('/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+                    const groupsRes = await fetch('/groups', { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' });
                     if (groupsRes.ok) {
                         const groups = await groupsRes.json();
                         populateGroups(groups);
@@ -341,7 +343,7 @@
                     const newSubj = await response.json();
                     closeCreateSubjectModal();
                     // Reload subjects
-                    const subjectsRes = await fetch('/subjects', { headers: { 'Authorization': `Bearer ${token}` } });
+                    const subjectsRes = await fetch('/subjects', { headers: { 'Authorization': `Bearer ${token}` }, cache: 'no-store' });
                     if (subjectsRes.ok) {
                         allSubjects = await subjectsRes.json();
                         filterSubjects();

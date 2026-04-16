@@ -144,13 +144,15 @@
             try {
                 // Fetch Groups
                 const groupsRes = await fetch(`${API_URL}/groups`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    cache: 'no-store'
                 });
                 if (groupsRes.ok) groupsData = await groupsRes.json();
 
                 // Fetch All Subjects
                 const subjectsRes = await fetch(`${API_URL}/subjects`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    cache: 'no-store'
                 });
                 if (subjectsRes.ok) subjectsData = await subjectsRes.json();
 
