@@ -120,17 +120,76 @@ class SmartPipeline:
 
         return markdown
 
+    # Normalization map for logical symbols and common OCR/PPTX corruption
+    NORMALIZATION_MAP = {
+        "": "¬",
+        "": "∨",
+        "": "∧",
+        "": "→",
+        "": "⇒",
+        "": "⇔",
+        "": "≡",
+        "": "⊕",
+        "": "↔",
+        "": "∴",
+        "": "∵",
+        "": "∀",
+        "": "∃",
+        "": "∈",
+        "": "∉",
+        "": "∪",
+        "": "∩",
+        "": "⊂",
+        "": "⊆",
+        "": "⊋",
+        "": "⊇",
+        "": "∅",
+        "": "√",
+        "": "∞",
+        "": "≠",
+        "": "≈",
+        "": "≤",
+        "": "≥",
+    }
+
+    def _normalize_text(self, text: str) -> str:
+        """Apply logical symbol mapping and general text cleanup."""
+        if not text:
+            return text
+            
+        # 1. Map legacy symbols to Unicode
+        for old, new in self.NORMALIZATION_MAP.items():
+            text = text.replace(old, new)
+            
+        # 2. Fix capitalization in specific terms like "DEFINITION"
+        # Only fix if it's the whole word and not an acronym
+        import re
+        text = re.sub(r'\bDEFINITION\b', 'Definition', text)
+        text = re.sub(r'\bOBJECTIVES\b', 'Objectives', text)
+        
+        # 3. Detect and fix joined words (CamelCase artifacts that should have space)
+        # e.g., "PeradabanAcuan" -> "Peradaban Acuan" but not when it's a known identifier
+        # Only if both parts are relatively long
+        text = re.sub(r'([a-z])([A-Z][a-z]{3,})', r'\1 \2', text)
+        
+        return text
+
     def _fix_punctuation_spacing(self, text: str) -> str:
         """
         Fix missing spaces after punctuation that is a common PDF extraction artefact.
         Only inserts spaces when a punctuation character is immediately followed by a
-        letter or digit (e.g. "masyarakat,namun" → "masyarakat, namun").
-        Skips Markdown syntax patterns like headers (# ...) and URLs.
+        letter or digit, but avoids common abbreviations like "v1.0", "U.S.", or dates.
         """
         import re
+        # List of common abbreviations to protect (ending with a dot)
+        PROTECT_PATTERNS = r'\b(v|vs|eg|ie|dr|mr|mrs|ms|prof|st|u\.s|p\.m|a\.m|p\.s)\b'
+        
         # Insert a space after . , ; : when followed by a letter/digit,
-        # but not at start-of-line (Markdown heading # ...) or inside URLs.
-        text = re.sub(r'([.,;:])([A-Za-zÀ-žÀ-ÖØ-öø-ÿ\u0100-\u024F])', r'\1 \2', text)
+        # but NOT if it looks like a version number (digit.digit) or protected abbr.
+        # Negative lookbehind for common abbreviations and negative lookahead for digits (to preserve 1.0)
+        text = re.sub(r'(?<![A-Z])([,;:!])([A-Za-zÀ-ž])', r'\1 \2', text)
+        # For dots, be more careful: only if followed by space or end-of-sentence pattern
+        text = re.sub(r'(?<![A-Z0-9\.])(\.)([A-ZÀ-ž][a-z])', r'\1 \2', text)
         return text
 
     def _normalize_pdf_bullets(self, text: str) -> str:
@@ -303,8 +362,13 @@ class SmartPipeline:
         "faculty of", "department of", "university", "room no",
         "universiti", "jabatan", "fakulti",  # Malaysian university metadata
     )
-    # First-slide index (0-based) where metadata shapes are typically found
-    _METADATA_SLIDE_IDX = 0
+
+    # Slides whose titles indicate they are low-value and should be skipped
+    _SKIP_SLIDE_TITLES = (
+        "outline", "table of contents", "learning outcomes", "objectives",
+        "introduction", "summary", "conclusion", "thank you", "any questions",
+        "recap", "revisions", "references", "bibliography"
+    )
 
     def _is_metadata_shape(self, text: str, slide_num: int) -> bool:
         """Return True if this shape appears to be institutional metadata on the cover slide."""
@@ -358,9 +422,12 @@ class SmartPipeline:
 
         md_parts = []
         BULLET_CHARS = set("•‣◦⁃∙‐‑–—►▪▸➤➢")
+        last_slide_title = ""
 
+        # Tracking content for cross-slide deduplication
         for slide_num, slide in enumerate(prs.slides, 1):
             slide_blocks = []
+            current_slide_title = ""
 
             for shape in slide.shapes:
                 if not shape.has_text_frame:
@@ -390,6 +457,8 @@ class SmartPipeline:
                 for para_idx, paragraph in enumerate(shape.text_frame.paragraphs):
                     # Fix PowerPoint in-shape line breaks (\x0b = vertical tab)
                     raw_text = paragraph.text.replace("\x0b", " ").strip()
+                    # 1.2 Normalize text (symbols, capitalization)
+                    raw_text = self._normalize_text(raw_text).strip()
                     if not raw_text:
                         continue
 
@@ -455,11 +524,34 @@ class SmartPipeline:
                         else:
                             block_type = "body"
 
+                    # Capture the title of the slide (first paragraph of title placeholder)
+                    if is_title_first_para:
+                        current_slide_title = text.strip()
+
                     slide_blocks.append({
                         "type": block_type,
                         "text": text,
                         "indent": level,
                     })
+
+            # --- Slide-level Filtering ---
+            # 1. Skip if the title is in the skip list and there's very little content
+            title_lower = current_slide_title.lower().strip()
+            if any(kw in title_lower for kw in self._SKIP_SLIDE_TITLES) and len(slide_blocks) <= 5:
+                logger.debug(f"Skip low-value slide {slide_num}: '{current_slide_title}'")
+                continue
+
+            # 2. Cross-slide title deduplication
+            # If this slide's title is identical to the previous slide's title,
+            # it's a continuation slide. Remove the title block to prevent duplication.
+            is_continuation = False
+            if current_slide_title and current_slide_title == last_slide_title:
+                is_continuation = True
+                # Remove the h1 block for this slide
+                slide_blocks = [b for b in slide_blocks if b["type"] != "h1"]
+                logger.debug(f"Slide {slide_num} is a continuation of '{current_slide_title}'")
+            
+            last_slide_title = current_slide_title
 
             if not slide_blocks:
                 continue
@@ -498,7 +590,17 @@ class SmartPipeline:
 
                 if btype == "code":
                     if not in_code_block:
-                        md_parts.append("```")
+                        # Determine language hint
+                        text_lower = text.lower()
+                        lang = ""
+                        if any(kw in text_lower for kw in ("public", "class", "void", "static", "println", "system.out")):
+                            lang = "java"
+                        elif any(kw in text_lower for kw in ("def ", "import ", "print(", "if __name__")):
+                            lang = "python"
+                        elif any(c in text for c in ("→", "∨", "∧", "¬", "↔", "≡")):
+                            lang = "logic"
+                        
+                        md_parts.append(f"```{lang}")
                         in_code_block = True
                     md_parts.append(text)
                 else:
@@ -557,6 +659,19 @@ class SmartPipeline:
         # If we see keywords like 'class' or 'public' + syntax characters, it's code
         if len(matches) >= 2 and (has_brackets or has_braces or has_terminate):
             return True
+
+        # 3. Logic formulas (common in discrete math/logic courses)
+        logic_chars = ("→", "∨", "∧", "¬", "↔", "⊕", "≡", "⇒", "⇔")
+        if any(c in text for c in logic_chars) and len(text) < 150:
+            # Check for pattern like "p ∧ q"
+            # EXCLUDE if it contains common English/Malay words that indicate a sentence
+            common_words = {"denotes", "that", "the", "has", "it", "meaning", "is", "dalam", "yang", "dan", "untuk"}
+            text_lower = text.lower()
+            if any(word in text_lower.split() for word in common_words):
+                return False
+                
+            if re.search(r'[pqr]\s*[∧∨→¬]', text) or re.search(r'[¬∧∨→]\s*[pqr]', text):
+                return True
 
         return False
 
@@ -674,24 +789,28 @@ from the slides (e.g., "# Topic 3: Inheritance"). Drop institutional names, cour
 CRITICAL RULES — TEXT INTEGRITY:
 - USE THE EXACT SAME WORDS AND SENTENCES from the input. Do NOT rephrase, paraphrase, reword, or add new words.
 - ONLY fix: heading levels, bullet formatting, code block fences/indentation, and join lines that were clearly broken mid-sentence.
-- Remove: slide numbers, repeated institutional headers/footers, and "End of Topic/Chapter" slides.
+- Remove: slide numbers, repetitive institutional headers/footers, and "End of Topic/Chapter" slides.
+- MERGE logical formulas: If you see logical symbols (¬, ∧, ∨, →) spread across lines, merge them into a single clean line or block.
+- MERGE "Continuation" sections: If a topic is split by slides (e.g., "(cont.)" or repeated titles), merge the content into the preceding section and remove the repetitive header.
+- RECONSTRUCT tables: If you see text that looks like a group of columns (e.g., truth table numbers 0 1 0...), reconstruct them into a proper Markdown table (| Col 1 | Col 2 |).
 {title_instruction}
 HEADING RULES:
 - There should be ONLY ONE H1 in the entire document (the title). If you see multiple H1s, demote the extras to H2.
-- H2 for major section headings (e.g., "Learning Objectives", "Class Inheritance").
-- H3 for sub-section headings.
+- H2 for major subtopics. H3 for topics within subtopics. H4 for sub-points.
+- Fix capitalization: e.g., "DEFINITION" should be "Definition", "OBJECTIVES" should be "Objectives".
 - Do NOT classify normal sentences as headings. A heading should be a short title, not a full sentence or paragraph.
-- If two consecutive headings appear with nothing between them (e.g., "## Syntax:" followed by "## super.method(parameters);"), merge them or demote the second.
+- If two consecutive headings appear with no content between them, merge them or remove the redundant one.
 
-CODE BLOCK RULES:
-- Merge scattered code fences that are clearly part of the SAME code block into ONE code block.
-- For example, if you see separate ``` blocks for "public static void main" then "System.out.println" on consecutive lines, merge them into a single ```java block.
-- Add proper Java indentation to code: class body indented 4 spaces, method body indented 8 spaces, etc.
-- If the EXACT SAME code block appears multiple times (repeated from slide animations), keep it ONLY ONCE and remove the duplicates.
+CODE & QUOTE RULES:
+- Use ```java or ```python ONLY for actual computer programming code.
+- Use `> ` (Quote block) for philosophical arguments, premises, and conclusions (e.g. "Premise: X", "Conclusion: Y").
+- Do NOT wrap standard sentences in code blocks just because they mention logical variables. Only use logic fences (```logic) for complex standalone formulas if they don't fit in a quote block.
+- Merge scattered code/quote blocks that are part of the SAME argument.
 
-FORMATTING RULES:
-- Wrap code in ```java fences.
-- Use bullet lists (- ) where the original used bullets.
+LIST RULES:
+- Use bullet lists (- ) by default.
+- Convert to Numbered Lists (1. ) if the input uses explicit prefixes like "(i)", "1)", "(a)", or "a)".
+- Preserve indentation for nested sub-bullets.
 
 You MUST begin your output with the exact marker: ===START===
 Output ONLY the cleaned markdown after the marker. No explanations, no meta-talk.

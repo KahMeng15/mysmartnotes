@@ -50,6 +50,11 @@ class SignalMerger:
         "Picture": "skip",
     }
 
+    # Pattern for ordered lists like "(i)", "1)", "(a)", "a)"
+    ORDERED_LIST_RE = re.compile(
+        r"^(?:\()?([0-9a-zA-Z]|[ivxIVX]+)(?:\.|\))(?:\s+|$)"
+    )
+
     # Pattern for numbered topic headings like "1.1", "1.2", "2.3.1"
     NUMBERED_HEADING_RE = re.compile(r"^(\d+(?:\.\d+)+)\s+(.+)$")
 
@@ -228,47 +233,56 @@ class SignalMerger:
     def _remove_duplicates(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
         """
         Remove duplicate content blocks.
-        Enhanced: fuzzy-match headings across levels, detect substring duplicates.
+        Enhanced: fuzzy-match headings across levels, detect recurring slide titles.
         """
         cleaned = []
         seen_headers = {}  # normalized_text -> block_type
+        seen_all_blocks = set()
 
         for block in blocks:
             if block.block_type == "skip":
                 continue
 
+            text_norm = block.text.strip().lower()
+            
+            # Global deduplication for every block (prevent exact repeating institutional lines)
+            if len(text_norm) > 10 and text_norm in seen_all_blocks:
+                # If it's a heading, we definitely remove it. 
+                # If it's body text, we remove it if it's identical and short.
+                if block.block_type.startswith("h") or len(text_norm) < 200:
+                    logger.debug(f"Removing exact duplicate block: {block.text[:60]}")
+                    continue
+            seen_all_blocks.add(text_norm)
+
             if block.block_type.startswith("h"):
                 # Normalize for comparison
                 norm = re.sub(r"\s*\(cont\.?(?:inued)?\).*$", "", block.text, flags=re.IGNORECASE)
                 norm = norm.strip().lower()
-                # Remove leading numbering for comparison (e.g., "1.4 " from "1.4 Clients and Servers")
+                # Remove leading numbering for comparison
                 norm_no_num = re.sub(r"^\d+(?:\.\d+)*\s*", "", norm).strip()
 
-                # Check exact duplicate
+                # Check exact normalized duplicate
                 if norm in seen_headers:
                     logger.debug(f"Removing duplicate header: {block.text}")
                     continue
 
                 # Check if this heading text (without numbering) is a substring of an already-seen heading
-                # or if an already-seen heading is a substring of this one
                 is_duplicate = False
                 for seen_text, seen_type in list(seen_headers.items()):
                     seen_no_num = re.sub(r"^\d+(?:\.\d+)*\s*", "", seen_text).strip()
-                    # Skip very short matches to avoid false positives
                     if len(norm_no_num) < 4 or len(seen_no_num) < 4:
                         continue
+                        
                     # If either is a close substring of the other, it's a duplicate
-                    if norm_no_num in seen_no_num or seen_no_num in norm_no_num:
-                        # Keep the more specific one (the one with numbering or the longer one)
+                    if norm_no_num == seen_no_num or (len(norm_no_num) > 10 and (norm_no_num in seen_no_num or seen_no_num in norm_no_num)):
+                        # Keep the more specific one
                         if len(norm) >= len(seen_text):
-                            # Current is longer/more specific — remove previous, keep current
                             cleaned = [b for b in cleaned if not (
                                 b.block_type.startswith("h") and
                                 b.text.strip().lower() == seen_text
                             )]
-                            del seen_headers[seen_text]
+                            if seen_text in seen_headers: del seen_headers[seen_text]
                         else:
-                            # Previous was more specific — skip current
                             is_duplicate = True
                             break
 
@@ -343,7 +357,6 @@ class SignalMerger:
                     continue
 
         # Pass 4: Enforce ONLY ONE H1 (the document title).
-        # All subsequent H1s are demoted to H2, and their sub-headings shift down.
         seen_first_h1 = False
         for block in blocks:
             if block.block_type == "h1":
@@ -352,7 +365,28 @@ class SignalMerger:
                 else:
                     seen_first_h1 = True
 
-        return blocks
+        # Pass 5: Remove consecutive duplicate/empty headers
+        final_blocks = []
+        for block in blocks:
+            if not final_blocks:
+                final_blocks.append(block)
+                continue
+            
+            last = final_blocks[-1]
+            if block.block_type.startswith("h") and last.block_type.startswith("h"):
+                # If they have identical text, remove the second
+                if block.text.strip().lower() == last.text.strip().lower():
+                    logger.debug(f"Removing consecutive identical header: {block.text}")
+                    continue
+                # If the first is empty or low quality, and levels are similar, favor the second
+                if len(last.text) < 3 and block.block_type == last.block_type:
+                    final_blocks.pop()
+                    final_blocks.append(block)
+                    continue
+            
+            final_blocks.append(block)
+
+        return final_blocks
 
     def _split_inline_bullets(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
         """
@@ -421,8 +455,15 @@ class SignalMerger:
             if not text:
                 continue
 
+            # Detect ordered list markers
+            m_ordered = self.ORDERED_LIST_RE.match(text)
+            if m_ordered:
+                # Strip the marker and mark as ordered_list
+                # We keep the marker for context during merging but eventually the formatter handles numbering
+                block.block_type = "ordered_list"
+
             # Detect leading dash as list marker
-            if text[0] in DASH_CHARS and len(text) > 1:
+            elif text[0] in DASH_CHARS and len(text) > 1:
                 # Strip leading dash(es) and mark as list
                 cleaned = text.lstrip("-–—‐‑ ")
                 if cleaned:
@@ -571,9 +612,13 @@ class SignalMerger:
 
             if should_merge:
                 sep = " "
-                if prev.text.endswith("-"):
-                    sep = ""
-                    prev.text = prev.text[:-1]
+                if prev.text.endswith("-") or prev.text.endswith("–") or prev.text.endswith("—"):
+                    # Check if it was a hyphenated word or just a dash
+                    # If it ends with a letter-dash, it's likely a hyphenated word split by line
+                    if len(prev.text) > 2 and prev.text[-2].isalpha():
+                        sep = ""
+                        prev.text = prev.text[:-1]
+                
                 prev.text += sep + block.text
             else:
                 merged.append(block)
