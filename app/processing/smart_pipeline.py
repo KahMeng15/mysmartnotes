@@ -168,9 +168,10 @@ class SmartPipeline:
         text = re.sub(r'\bOBJECTIVES\b', 'Objectives', text)
         
         # 3. Detect and fix joined words (CamelCase artifacts that should have space)
-        # e.g., "PeradabanAcuan" -> "Peradaban Acuan" but not when it's a known identifier
-        # Only if both parts are relatively long
-        text = re.sub(r'([a-z])([A-Z][a-z]{3,})', r'\1 \2', text)
+        # e.g., "PeradabanAcuan" -> "Peradaban Acuan"
+        # STRICTOR: Only split if the first word is 10+ chars and second 4+ chars
+        # OR if it's a known non-code context. (Prevents mangling 'GeometricObject', 'printCircle', etc.)
+        text = re.sub(r'([a-z]{10,})([A-Z][a-z]{4,})', r'\1 \2', text)
         
         return text
 
@@ -803,6 +804,7 @@ HEADING RULES:
 
 CODE & QUOTE RULES:
 - Use ```java or ```python ONLY for actual computer programming code.
+- Add proper indentation to code blocks (e.g., 4 spaces for class/method bodies).
 - Use `> ` (Quote block) for philosophical arguments, premises, and conclusions (e.g. "Premise: X", "Conclusion: Y").
 - Do NOT wrap standard sentences in code blocks just because they mention logical variables. Only use logic fences (```logic) for complex standalone formulas if they don't fit in a quote block.
 - Merge scattered code/quote blocks that are part of the SAME argument.
