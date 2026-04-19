@@ -1,17 +1,14 @@
 """
 Smart Pipeline Orchestrator
 
-Supports three processing modes driven by User.note_processing_mode:
-  "fast"             – local font-aware extraction only (original behaviour)
-  "smart"            – Gemini Vision for ambiguous slides, no delay
-  "smart_throttled"  – Gemini Vision with 1-second inter-call delay
-
-Falls back gracefully to local extraction if Gemini is unavailable.
+Processes PDF and PPTX files into clean Markdown using local font-aware
+extraction, heuristic merging, and an optional AI polish pass.
 """
 
+import os
 import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from app.processing.font_extractor import FontAwareExtractor
 from app.processing.signal_merger import SignalMerger, blocks_to_markdown
@@ -26,74 +23,68 @@ class SmartPipeline:
     Args:
         use_layout_detection: Legacy flag, kept for backward-compat (unused)
         use_table_transformer: Legacy flag, kept for backward-compat (unused)
-        use_vision: When True, use Gemini Vision for layout classification
-        inter_call_delay_s: Seconds to wait between Gemini Vision calls (rate-limit)
-        gemini_api_key: Gemini API key; if None, vision is silently disabled
-        gemini_model: Gemini multimodal model to use
+        gemini_api_key: Gemini API key for AI polish; if None, polish is disabled
+        gemini_model: Model to use for the AI polish pass
+        use_polish: When True, use Gemini to polish the final markdown
     """
 
     def __init__(
         self,
         use_layout_detection: bool = False,
         use_table_transformer: bool = False,
-        use_vision: bool = False,
-        inter_call_delay_s: float = 0.0,
         gemini_api_key: Optional[str] = None,
         gemini_model: str = "gemini-2.5-flash",
+        use_polish: bool = False,
+        # Legacy kwargs accepted but ignored
+        use_vision: bool = False,
+        inter_call_delay_s: float = 0.0,
     ):
-        self.use_vision = use_vision and bool(gemini_api_key)
+        self.use_polish = use_polish and bool(gemini_api_key)
+        self.gemini_api_key = gemini_api_key
+        self.gemini_model = gemini_model
         self.font_extractor = FontAwareExtractor()
         self.layout_detector = None  # Legacy: disabled
         self.table_detector = None   # Legacy: disabled
         self.merger = SignalMerger()
 
-        # Build vision extractor if requested
-        self._vision_extractor = None
-        if self.use_vision:
-            try:
-                from app.processing.vision_pipeline import SlideVisionExtractor
-                self._vision_extractor = SlideVisionExtractor(
-                    use_vision=True,
-                    inter_call_delay_s=inter_call_delay_s,
-                    gemini_api_key=gemini_api_key,
-                    gemini_model=gemini_model,
-                )
-                logger.info(
-                    f"Vision pipeline enabled "
-                    f"(delay={inter_call_delay_s}s, model={gemini_model})"
-                )
-            except Exception as e:
-                logger.warning(f"Could not init vision pipeline: {e}. Falling back to local.")
-                self.use_vision = False
-
     def process(self, file_path: str) -> str:
         """
         Process a PDF or PPTX file and return clean Markdown.
-
-        Args:
-            file_path: Path to the input file
-
-        Returns:
-            Clean Markdown string
         """
         file_path = str(file_path)
         ext = Path(file_path).suffix.lower()
 
-        # Vision path — delegates entirely to SlideVisionExtractor
-        if self.use_vision and self._vision_extractor:
-            try:
-                logger.info(f"Using vision pipeline for {file_path}")
-                return self._vision_extractor.process(file_path)
-            except Exception as e:
-                logger.warning(f"Vision pipeline failed ({e}), falling back to local.")
+        # Check for empty/missing file
+        if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+            return f"Error: File is missing or empty: {file_path}"
 
-        # Local fallback path
+        markdown = ""
+        try:
+            markdown = self._local_process(file_path, ext)
+
+            # Final AI Polish Pass
+            if self.use_polish and markdown:
+                markdown = self._ai_polish(markdown)
+
+            # Quality metrics (final)
+            lines = [l for l in markdown.split("\n") if l.strip()]
+            headings = len([l for l in lines if l.startswith("#")])
+            list_items = len([l for l in lines if l.startswith("- ") or l.startswith("1. ")])
+            logger.info(f"Final Output: {len(lines)} lines, {headings} headings, {list_items} list items")
+
+            return markdown
+        except Exception as e:
+            logger.error(f"Failed to process {file_path}: {e}", exc_info=True)
+            return f"Error: Could not process file due to extraction failure: {e}"
+
+    def _local_process(self, file_path: str, ext: str) -> str:
+        """Internal helper for local extraction."""
         if ext == ".pdf":
             return self._process_pdf(file_path)
         elif ext == ".pptx":
             return self._process_pptx(file_path)
         else:
-            raise ValueError(f"Unsupported file format: {ext}. Supported: .pdf, .pptx")
+            raise ValueError(f"Unsupported file format: {ext}")
 
 
     def _process_pdf(self, pdf_path: str) -> str:
@@ -122,22 +113,10 @@ class SmartPipeline:
         # Convert to Markdown
         markdown = blocks_to_markdown(merged_blocks)
 
-        # Post-processing: normalize non-standard bullet chars (e.g. Ø, q used in lecture PDFs)
+        # Post-processing steps
         markdown = self._normalize_pdf_bullets(markdown)
-
-        # Post-processing: remove table content that was also captured as plain body text
         markdown = self._deduplicate_pdf_blocks(markdown)
-
-        # Fix common PDF punctuation-spacing artefacts
         markdown = self._fix_punctuation_spacing(markdown)
-
-        # Quality metrics
-        stats = self._compute_stats(merged_blocks)
-        logger.info(f"Output: {stats['total_blocks']} blocks, "
-                     f"{stats['headings']} headings, "
-                     f"{stats['lists']} list items, "
-                     f"{stats['body']} body paragraphs, "
-                     f"{stats.get('tables', 0)} tables")
 
         return markdown
 
@@ -453,7 +432,7 @@ class SmartPipeline:
                     # Subsequent paragraphs in the same shape are sub-content (body/list).
                     is_title_first_para = (shape_role == "title" and level == 0 and para_idx == 0)
 
-                    if is_code:
+                    if is_code or self._looks_like_code(text):
                         block_type = "code"
                     elif is_title_first_para:
                         block_type = "h1"
@@ -510,12 +489,6 @@ class SmartPipeline:
                     if b["type"] in ("h2", "h3"):
                         b["type"] = "body"
 
-            # Emit a slide separator before each slide (except the first)
-            if slide_num > 1:
-                md_parts.append("")
-                md_parts.append("---")
-                md_parts.append("")
-
             # Emit markdown for this slide's blocks
             in_code_block = False
             for i, block in enumerate(slide_blocks):
@@ -554,7 +527,199 @@ class SmartPipeline:
 
         return "\n".join(md_parts).strip() + "\n"
 
+    def _looks_like_code(self, text: str) -> bool:
+        """Return True if text appears to be code even without monospace metadata."""
+        if not text or len(text) < 10 or len(text) > 500:
+            return False
+            
+        # Ignore lines that look like markdown headers
+        if text.startswith("#"):
+            return False
+        
+        # 1. Check for strong structural code characters (must have multiple types)
+        # We look for combinations like (); or {} or []
+        has_brackets = "(" in text and ")" in text
+        has_braces = "{" in text and "}" in text
+        has_terminate = ";" in text
+        has_assignment = "=" in text and not text.startswith("=")
+        
+        # Require serious syntax indicators
+        if (has_braces and has_terminate) or (has_brackets and has_terminate and has_assignment):
+            return True
+
+        # 2. Check for common programming keywords with strict boundary enforcement
+        import re
+        # Specialized keywords that are rarely used in plain lecture text without code
+        keywords = ("public", "private", "class", "void", "static", "System.out", "println", "import", "def", "return", "function", "const", "let")
+        kw_pattern = r'\b(' + '|'.join(keywords) + r')\b'
+        matches = re.findall(kw_pattern, text)
+        
+        # If we see keywords like 'class' or 'public' + syntax characters, it's code
+        if len(matches) >= 2 and (has_brackets or has_braces or has_terminate):
+            return True
+
+        return False
+
+    # ── chunk size for AI polish (characters) ──
+    _POLISH_CHUNK_SIZE = 6000
+
+    def _ai_polish(self, markdown: str) -> str:
+        """Perform a final formatting-only cleanup pass using Gemini/Gemma.
+        
+        Splits the input into manageable chunks to prevent quality degradation
+        from long contexts, then reassembles the polished chunks.
+        """
+        if not self.gemini_api_key or not markdown:
+            return markdown
+
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.gemini_api_key)
+            model = genai.GenerativeModel(self.gemini_model)
+
+            chunks = self._split_into_chunks(markdown)
+            logger.info(f"Refining output with {self.gemini_model} ({len(chunks)} chunk(s))...")
+
+            polished_chunks = []
+            for i, chunk in enumerate(chunks):
+                is_first = (i == 0)
+                polished = self._polish_chunk(model, chunk, is_first_chunk=is_first)
+                if polished:
+                    polished_chunks.append(polished)
+                else:
+                    # Fallback: use raw chunk if AI returned nothing
+                    polished_chunks.append(chunk)
+
+            result = "\n\n".join(polished_chunks).strip()
+
+            # ── Post-processing: enforce structural rules programmatically ──
+            import re
+            lines = result.split("\n")
+            cleaned = []
+            seen_h1 = False
+            for line in lines:
+                # Enforce only ONE H1
+                if re.match(r'^#\s+', line) and not re.match(r'^##', line):
+                    if seen_h1:
+                        # Demote to H2
+                        line = "#" + line
+                    else:
+                        seen_h1 = True
+                # Remove "End of Topic/Chapter" lines
+                if re.match(r'^#{1,3}\s+(End of|end of)\s+(Topic|Chapter|Lecture)', line, re.IGNORECASE):
+                    continue
+                cleaned.append(line)
+
+            return "\n".join(cleaned).strip()
+
+        except Exception as e:
+            logger.warning(f"AI Polish pass failed: {e}. Returning raw markdown.")
+
+        return markdown
+
+    def _split_into_chunks(self, markdown: str) -> List[str]:
+        """Split markdown into chunks at heading boundaries to avoid mid-paragraph splits."""
+        import re
+        lines = markdown.split("\n")
+        
+        chunks: List[str] = []
+        current_chunk: List[str] = []
+        current_size = 0
+
+        for line in lines:
+            current_chunk.append(line)
+            current_size += len(line) + 1  # +1 for newline
+
+            # Split at heading boundaries when chunk is large enough
+            if current_size >= self._POLISH_CHUNK_SIZE and re.match(r'^#{1,3}\s', line):
+                # The heading line starts a new chunk
+                heading_line = current_chunk.pop()
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+                current_chunk = [heading_line]
+                current_size = len(heading_line) + 1
+
+        if current_chunk:
+            chunks.append("\n".join(current_chunk))
+
+        return chunks if chunks else [markdown]
+
+    def _polish_chunk(self, model, chunk: str, is_first_chunk: bool = False) -> str:
+        """Polish a single chunk of markdown using the AI model."""
+        title_instruction = ""
+        if is_first_chunk:
+            title_instruction = """TITLE: The first heading should be a single H1 that uses the EXACT topic title
+from the slides (e.g., "# Topic 3: Inheritance"). Drop institutional names, course codes, and lecturer names.
+"""
+        else:
+            title_instruction = """IMPORTANT: Do NOT use H1 (# ) headings in this section. Use only H2 (## ) and H3 (### ).
+"""
+
+        prompt = f"""You are a formatting assistant. Restructure the following raw lecture notes into clean Markdown.
+
+CRITICAL RULES — TEXT INTEGRITY:
+- USE THE EXACT SAME WORDS AND SENTENCES from the input. Do NOT rephrase, paraphrase, reword, or add new words.
+- ONLY fix: heading levels, bullet formatting, code block fences/indentation, and join lines that were clearly broken mid-sentence.
+- Remove: slide numbers, repeated institutional headers/footers, and "End of Topic/Chapter" slides.
+{title_instruction}
+HEADING RULES:
+- There should be ONLY ONE H1 in the entire document (the title). If you see multiple H1s, demote the extras to H2.
+- H2 for major section headings (e.g., "Learning Objectives", "Class Inheritance").
+- H3 for sub-section headings.
+- Do NOT classify normal sentences as headings. A heading should be a short title, not a full sentence or paragraph.
+- If two consecutive headings appear with nothing between them (e.g., "## Syntax:" followed by "## super.method(parameters);"), merge them or demote the second.
+
+CODE BLOCK RULES:
+- Merge scattered code fences that are clearly part of the SAME code block into ONE code block.
+- For example, if you see separate ``` blocks for "public static void main" then "System.out.println" on consecutive lines, merge them into a single ```java block.
+- Add proper Java indentation to code: class body indented 4 spaces, method body indented 8 spaces, etc.
+- If the EXACT SAME code block appears multiple times (repeated from slide animations), keep it ONLY ONCE and remove the duplicates.
+
+FORMATTING RULES:
+- Wrap code in ```java fences.
+- Use bullet lists (- ) where the original used bullets.
+
+You MUST begin your output with the exact marker: ===START===
+Output ONLY the cleaned markdown after the marker. No explanations, no meta-talk.
+
+### INPUT:
+{chunk}
+"""
+        try:
+            response = model.generate_content(prompt)
+
+            if response and hasattr(response, "candidates") and response.candidates:
+                candidate = response.candidates[0]
+                if candidate.content and candidate.content.parts:
+                    text = "".join(
+                        part.text for part in candidate.content.parts
+                        if hasattr(part, "text")
+                    ).strip()
+
+                    # Extract content after the marker
+                    marker = "===START==="
+                    if marker in text:
+                        text = text.split(marker)[-1].strip()
+                    else:
+                        # Fallback: find first heading
+                        import re
+                        match = re.search(r'^#\s', text, re.MULTILINE)
+                        if match:
+                            text = text[match.start():].strip()
+
+                    # Strip outer markdown fences if AI wrapped everything
+                    lines = text.split("\n")
+                    if len(lines) > 2 and lines[0].strip().startswith("```") and lines[-1].strip() == "```":
+                        text = "\n".join(lines[1:-1]).strip()
+
+                    return text
+        except Exception as e:
+            logger.warning(f"AI Polish chunk failed: {e}")
+
+        return None
+
     def _compute_stats(self, blocks) -> Dict[str, int]:
+
         """Compute quality metrics for the output."""
         stats = {
             "total_blocks": len(blocks),

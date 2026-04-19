@@ -78,6 +78,7 @@ class Settings(BaseSettings):
 
     # Processing
     OCR_ENABLED: bool = True
+    AI_POLISH_ENABLED: bool = True
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
 
     class Config:

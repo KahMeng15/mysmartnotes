@@ -25,12 +25,15 @@ router = APIRouter(prefix="/processing", tags=["processing"])
 _pipeline = None
 
 def get_pipeline() -> SmartPipeline:
-    """Get or create the shared SmartPipeline instance."""
+    """Get or create the shared SmartPipeline instance using global settings."""
     global _pipeline
     if _pipeline is None:
+        from app.config import get_settings
+        settings = get_settings()
         _pipeline = SmartPipeline(
-            use_layout_detection=False,   # Enable when YOLO model is downloaded
-            use_table_transformer=False,  # Enable when Table Transformer is downloaded
+            use_polish=settings.AI_POLISH_ENABLED,
+            gemini_api_key=settings.GLOBAL_GEMINI_API_KEY,
+            gemini_model=settings.GLOBAL_AI_MODEL or "gemini-2.5-flash",
         )
     return _pipeline
 

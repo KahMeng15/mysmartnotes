@@ -81,3 +81,4 @@ test/*
 
 scripts/ProcessingAlgorithmTest/input/*
 scripts/ProcessingAlgorithmTest/output/*
+scripts/ProcessingAlgorithmTest/temp_input/*

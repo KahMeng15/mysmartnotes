@@ -31,20 +31,11 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
 
-def _build_pipeline(user) -> SmartPipeline:
+def _get_pipeline_for_user(user: "User") -> SmartPipeline:
     """
-    Build a SmartPipeline configured from the user's note_processing_mode.
-
-    Modes:
-      "fast"             – local only, no Gemini calls
-      "smart"            – Gemini Vision, no delay
-      "smart_throttled" – Gemini Vision, 1-second inter-call delay
+    Build a SmartPipeline for the given user using global AI settings.
+    Uses local extraction + optional AI polish pass.
     """
-    mode = getattr(user, "note_processing_mode", "fast") or "fast"
-
-    if mode == "fast":
-        return SmartPipeline(use_vision=False)
-
     # Resolve Gemini API key: personal first, then global
     gemini_key = None
     if not getattr(user, "use_global_ai_config", False):
@@ -64,16 +55,10 @@ def _build_pipeline(user) -> SmartPipeline:
         except Exception:
             pass
 
-    if not gemini_key:
-        # No Gemini key available — fall back to fast mode
-        logger.info(f"Note processing mode '{mode}' requested but no Gemini key found; using fast.")
-        return SmartPipeline(use_vision=False)
-
-    delay = 1.0 if mode == "smart_throttled" else 0.0
     return SmartPipeline(
-        use_vision=True,
-        inter_call_delay_s=delay,
+        use_polish=bool(gemini_key),
         gemini_api_key=gemini_key,
+        gemini_model=os.getenv("GLOBAL_AI_MODEL", "gemini-2.5-flash"),
     )
 
 
@@ -188,9 +173,8 @@ async def upload_lecture(
 
         if file_ext in ('.pdf', '.pptx'):
             # Use SmartPipeline for PDF/PPTX — produces clean Markdown
-            pipeline = _build_pipeline(current_user)
-            mode = getattr(current_user, "note_processing_mode", "fast") or "fast"
-            logger.info(f"Processing lecture {db_lecture.id} with mode={mode}")
+            pipeline = _get_pipeline_for_user(current_user)
+            logger.info(f"Processing lecture {db_lecture.id}")
             markdown = pipeline.process(file_path)
             structured_segments = _markdown_to_segments(markdown)
             
@@ -356,9 +340,8 @@ async def reprocess_ocr(
         
         if file_ext in ('.pdf', '.pptx'):
             # Use SmartPipeline for PDF/PPTX
-            pipeline = _build_pipeline(current_user)
-            mode = getattr(current_user, "note_processing_mode", "fast") or "fast"
-            logger.info(f"Reprocessing lecture {lecture_id} with mode={mode}")
+            pipeline = _get_pipeline_for_user(current_user)
+            logger.info(f"Reprocessing lecture {lecture_id}")
             raw_text = pipeline.process(lecture.file_path)
             structured_content = _markdown_to_segments(raw_text)
             

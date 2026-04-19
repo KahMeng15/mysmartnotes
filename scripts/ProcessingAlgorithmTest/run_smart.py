@@ -12,8 +12,12 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# Add project root to path
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(_PROJECT_ROOT))
+
+# Load .env from the project root so GEMINI_API_KEY is picked up
+load_dotenv(dotenv_path=_PROJECT_ROOT / ".env")
 
 def configure_logging(log_file: Path):
     """Set up logging to go to both console and a debug log file."""
@@ -47,7 +51,7 @@ def main():
     log_file = output_dir / "debug_log.txt"
     configure_logging(log_file)
 
-    load_dotenv()
+    # .env already loaded at module level; no need to call load_dotenv() again
 
     # Find all input files
     supported = [".pdf", ".pptx"]
@@ -64,21 +68,30 @@ def main():
     logging.info(f"📄 Found {len(input_files)} files to process in {input_dir}")
     logging.info(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-    # Check for --vision flag to enable Gemini Vision mode
-    use_vision = "--vision" in sys.argv
-    gemini_key = os.getenv("GEMINI_API_KEY")
+    # Check for flags.
+    use_polish = "--polish" in sys.argv
 
-    if use_vision and not gemini_key:
-        logging.warning("⚠️  --vision requested but GEMINI_API_KEY is missing. Falling back to local.")
-    elif not use_vision:
-        logging.info("💡 Running local heuristic path (use --vision to test Gemini Vision).")
+    # Parse --api-key=VALUE from argv
+    cli_key = None
+    for arg in sys.argv:
+        if arg.startswith("--api-key="):
+            cli_key = arg.split("=", 1)[1].strip()
+            break
+
+    gemini_key = cli_key or os.getenv("GEMINI_API_KEY") or os.getenv("GLOBAL_GEMINI_API_KEY")
+    
+    if use_polish and not gemini_key:
+        logging.warning("⚠️  --polish requested but no GEMINI_API_KEY found. Skipping AI refinement.")
 
     # Initialize pipeline
     from app.processing.smart_pipeline import SmartPipeline
     
+    gemini_model = os.getenv("GLOBAL_AI_MODEL") or "gemini-2.5-flash"
+
     pipeline = SmartPipeline(
-        use_vision=use_vision and bool(gemini_key),
+        use_polish=use_polish and bool(gemini_key),
         gemini_api_key=gemini_key,
+        gemini_model=gemini_model,
     )
 
     for i, input_file in enumerate(input_files, 1):
