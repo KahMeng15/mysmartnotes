@@ -578,17 +578,31 @@ class SmartPipeline:
             model = genai.GenerativeModel(self.gemini_model)
 
             chunks = self._split_into_chunks(markdown)
-            logger.info(f"Refining output with {self.gemini_model} ({len(chunks)} chunk(s))...")
+            num_chunks = len(chunks)
+            logger.info(f"Refining output with {self.gemini_model} ({num_chunks} chunk(s), parallel)...")
 
-            polished_chunks = []
-            for i, chunk in enumerate(chunks):
-                is_first = (i == 0)
-                polished = self._polish_chunk(model, chunk, is_first_chunk=is_first)
-                if polished:
-                    polished_chunks.append(polished)
-                else:
-                    # Fallback: use raw chunk if AI returned nothing
-                    polished_chunks.append(chunk)
+            # ── Parallel chunk processing ──
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            def _process_chunk(args):
+                idx, chunk = args
+                return idx, self._polish_chunk(model, chunk, is_first_chunk=(idx == 0))
+
+            polished_chunks = [None] * num_chunks
+
+            with ThreadPoolExecutor(max_workers=min(num_chunks, 4)) as executor:
+                futures = {
+                    executor.submit(_process_chunk, (i, chunk)): i
+                    for i, chunk in enumerate(chunks)
+                }
+                for future in as_completed(futures):
+                    idx, result = future.result()
+                    if result:
+                        polished_chunks[idx] = result
+                        logger.info(f"  ✓ Chunk {idx + 1}/{num_chunks} done")
+                    else:
+                        polished_chunks[idx] = chunks[idx]  # fallback to raw
+                        logger.warning(f"  ⚠ Chunk {idx + 1}/{num_chunks} returned empty, using raw")
 
             result = "\n\n".join(polished_chunks).strip()
 
