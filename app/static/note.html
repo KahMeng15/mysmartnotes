@@ -26,6 +26,9 @@
         <div class="note-content-card page-card">
             <!-- Sticky header bar with back + breadcrumb -->
             <div class="note-sticky-header">
+                <button class="mobile-back-btn" onclick="window.history.back()">
+                    <i class="ph ph-caret-left"></i>
+                </button>
 
                 <div class="note-breadcrumb-row" id="noteBreadcrumb">
                     <a href="#" id="metaGroup" class="note-nav-crumb-link">Group</a>
@@ -34,6 +37,16 @@
                     <span class="note-nav-sep">›</span>
                     <a href="#" id="metaNote" class="note-nav-crumb-link">Note Name</a>
                 </div>
+
+                <div class="mobile-note-actions">
+                    <button class="mobile-action-btn" onclick="toggleChat()" id="mobileChatToggle">
+                        <i class="ph ph-chat-circle-dots"></i>
+                    </button>
+                    <button class="mobile-action-btn" onclick="toggleMobileActionPanel()" id="mobileMenuToggle">
+                        <i class="ph ph-dots-three-vertical"></i>
+                    </button>
+                </div>
+                
                 <div style="display:none;"><a href="#" id="metaSubjectHidden"><span>Subject</span></a></div>
             </div>
             <div id="loadingContainer" class="loading">

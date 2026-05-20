@@ -79,7 +79,22 @@ function injectSidebar() {
     }
 
     const sidebarHtml = `
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+        <a href="/dashboard" class="mobile-brand">mysmartnotes</a>
+        <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+            <i class="ph ph-list"></i>
+        </button>
+    </header>
+
     <aside class="app-sidebar" id="appSidebar">
+        <div class="sidebar-mobile-header">
+             <a href="/dashboard" class="mobile-brand">mysmartnotes</a>
+             <button class="mobile-menu-close" onclick="toggleMobileMenu()">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+
         <a href="/dashboard" class="sidebar-brand">my<br>smart<br>notes</a>
 
         <ul class="sidebar-nav-list" id="sidebarNav">
@@ -120,6 +135,31 @@ function injectSidebar() {
             <span class="sidebar-user-name" id="sidebarUserName">...</span>
         </div>
     </aside>
+
+    <!-- Mobile Bottom Nav -->
+    <nav class="mobile-bottom-nav">
+        <a href="/dashboard" class="mobile-nav-item" data-page="dashboard">
+            <i class="ph ph-house-line"></i>
+            <span>Home</span>
+        </a>
+        <a href="/mynotes" class="mobile-nav-item" data-page="mynotes">
+            <i class="ph ph-notebook"></i>
+            <span>Notes</span>
+        </a>
+        <a href="/chat" class="mobile-nav-item" data-page="chat">
+            <i class="ph ph-chat-circle-dots"></i>
+            <span>Chat</span>
+        </a>
+        <a href="/quiz" class="mobile-nav-item" data-page="quiz">
+            <i class="ph ph-exam"></i>
+            <span>Quiz</span>
+        </a>
+        <a href="javascript:void(0)" class="mobile-nav-item" onclick="toggleMobileMenu()">
+            <i class="ph ph-dots-three-circle"></i>
+            <span>More</span>
+        </a>
+    </nav>
+    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
     `;
 
     if (isNotePage) {
@@ -153,11 +193,19 @@ function injectSidebar() {
     updateSidebarWidget();
 }
 
+window.toggleMobileMenu = function() {
+    const sidebar = document.getElementById('appSidebar');
+    const overlay = document.getElementById('mobileOverlay');
+    if (sidebar) sidebar.classList.toggle('mobile-active');
+    if (overlay) overlay.classList.toggle('active');
+    document.body.classList.toggle('menu-open');
+};
+
 function setActiveLink() {
     const currentPath = window.location.pathname;
     const pageName = currentPath.split('/').pop() || 'dashboard';
 
-    document.querySelectorAll('.sidebar-nav-link[data-page]').forEach(link => {
+    document.querySelectorAll('.sidebar-nav-link[data-page], .mobile-nav-item[data-page]').forEach(link => {
         if (link.dataset.page === pageName) {
             link.classList.add('active');
         }
@@ -165,8 +213,8 @@ function setActiveLink() {
 
     // note.html — highlight Notes
     if (pageName === '' || currentPath.includes('/note/')) {
-        const notesLink = document.querySelector('.sidebar-nav-link[data-page="mynotes.html"]');
-        if (notesLink) notesLink.classList.add('active');
+        const notesLinks = document.querySelectorAll('[data-page="mynotes"]');
+        notesLinks.forEach(link => link.classList.add('active'));
     }
 }
 

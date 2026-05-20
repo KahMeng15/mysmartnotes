@@ -1609,8 +1609,23 @@ let chatInitialized = false;
 
 function toggleChat() {
     const panel = document.getElementById('noteChatPanel');
-    const isHidden = panel.style.display === 'none';
-    panel.style.display = isHidden ? 'flex' : 'none';
+    if (!panel) return;
+    
+    const isHidden = panel.style.display === 'none' || !panel.classList.contains('mobile-active');
+    
+    if (window.innerWidth <= 1024) {
+        // Mobile/Tablet: Use drawer
+        panel.style.display = 'flex';
+        setTimeout(() => panel.classList.toggle('mobile-active'), 10);
+    } else {
+        // Desktop: Toggle display
+        panel.style.display = isHidden ? 'flex' : 'none';
+        panel.classList.remove('mobile-active');
+    }
+
+    const chatBtn = document.getElementById('mobileChatToggle');
+    if (chatBtn) chatBtn.classList.toggle('active', isHidden);
+
     if (isHidden && !chatInitialized) {
         initInlineChat();
     }
@@ -1618,6 +1633,16 @@ function toggleChat() {
         document.getElementById('noteChatInput').focus();
     }
 }
+
+window.toggleMobileActionPanel = function() {
+    const panel = document.querySelector('.note-action-panel');
+    if (panel) {
+        panel.classList.toggle('mobile-expanded');
+        const btn = document.getElementById('mobileMenuToggle');
+        if (btn) btn.classList.toggle('active');
+    }
+};
+
 
 function toggleActionPanel() {
     const layout = document.querySelector('.app-layout');
