@@ -1,9 +1,12 @@
 """Database models"""
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Table, Float, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Table, Float, JSON, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
+import os
+import logging
 
+logger = logging.getLogger(__name__)
 Base = declarative_base()
 
 
@@ -59,6 +62,8 @@ class SubjectGroup(Base):
     # Relationships
     user = relationship("User", back_populates="subject_groups")
     subjects = relationship("Subject", back_populates="group", cascade="all, delete-orphan")
+    chat_messages = relationship("ChatMessage", back_populates="group", cascade="all, delete-orphan")
+    quizzes = relationship("Quiz", back_populates="group", cascade="all, delete-orphan")
 
 
 class QuizGroup(Base):
@@ -93,6 +98,8 @@ class Subject(Base):
     owner = relationship("User", back_populates="subjects")
     group = relationship("SubjectGroup", back_populates="subjects")
     lectures = relationship("Lecture", back_populates="subject", cascade="all, delete-orphan")
+    chat_messages = relationship("ChatMessage", back_populates="subject", cascade="all, delete-orphan")
+    quizzes = relationship("Quiz", back_populates="subject", cascade="all, delete-orphan")
 
 
 class Lecture(Base):
@@ -124,6 +131,7 @@ class Lecture(Base):
     study_sessions = relationship("StudySession", back_populates="lecture", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="lecture", cascade="all, delete-orphan")
     snapshots = relationship("NoteSnapshot", back_populates="lecture", cascade="all, delete-orphan")
+    quizzes = relationship("Quiz", back_populates="lecture", cascade="all, delete-orphan")
 
 
 class ExportTemplate(Base):
@@ -205,9 +213,9 @@ class Quiz(Base):
     
     # Relationships
     user = relationship("User")
-    group = relationship("SubjectGroup")
-    subject = relationship("Subject")
-    lecture = relationship("Lecture")
+    group = relationship("SubjectGroup", back_populates="quizzes")
+    subject = relationship("Subject", back_populates="quizzes")
+    lecture = relationship("Lecture", back_populates="quizzes")
     quiz_group = relationship("QuizGroup", back_populates="quizzes")
     questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
     progress = relationship("QuizProgress", back_populates="quiz", cascade="all, delete-orphan")
@@ -330,8 +338,8 @@ class ChatMessage(Base):
     # Relationships
     user = relationship("User")
     lecture = relationship("Lecture", back_populates="chat_messages")
-    subject = relationship("Subject")
-    group = relationship("SubjectGroup")
+    subject = relationship("Subject", back_populates="chat_messages")
+    group = relationship("SubjectGroup", back_populates="chat_messages")
 
 
 class NoteSnapshot(Base):
@@ -503,3 +511,36 @@ class TierConfig(Base):
     summaries_reset_period = Column(String(20), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# --- Event Listeners for File Cleanup ---
+
+@event.listens_for(Lecture, 'after_delete')
+def receive_after_delete(mapper, connection, target):
+    """Delete original file and generated PDF when a lecture is deleted"""
+    # Delete original file
+    if target.file_path and os.path.exists(target.file_path):
+        try:
+            os.remove(target.file_path)
+            logger.info(f"Deleted original file for lecture {target.id}: {target.file_path}")
+        except Exception as e:
+            logger.warning(f"Error deleting original file for lecture {target.id}: {e}")
+            
+    # Delete generated output PDF
+    if target.output_pdf_path and os.path.exists(target.output_pdf_path):
+        try:
+            os.remove(target.output_pdf_path)
+            logger.info(f"Deleted output PDF for lecture {target.id}: {target.output_pdf_path}")
+        except Exception as e:
+            logger.warning(f"Error deleting output PDF for lecture {target.id}: {e}")
+
+
+@event.listens_for(Summary, 'after_delete')
+def receive_summary_after_delete(mapper, connection, target):
+    """Delete the physical file associated with a summary (PDF, DOCX, etc.)"""
+    if target.file_path and os.path.exists(target.file_path):
+        try:
+            os.remove(target.file_path)
+            logger.info(f"Deleted file for summary {target.id}: {target.file_path}")
+        except Exception as e:
+            logger.warning(f"Error deleting file for summary {target.id}: {e}")
