@@ -22,8 +22,11 @@
     <!-- Chat Container -->
     <div class="chat-container page-card" style="padding: 0;">
         <!-- Sidebar -->
-        <div class="chat-sidebar">
+        <div class="chat-sidebar" id="chatSidebar">
             <div class="sidebar-header">
+                <button class="mobile-sidebar-close" onclick="toggleChatSidebar()" title="Back to Chat">
+                    <i class="ph ph-caret-left"></i>
+                </button>
                 <h3 style="margin: 0;"><i class="ph ph-clock-counter-clockwise"></i> Conversations</h3>
                 <button class="new-chat-btn" onclick="createNewChat()" title="Start a new chat">
                     <i class="ph ph-plus"></i>
@@ -37,18 +40,23 @@
         </div>
 
         <!-- Main Chat -->
-        <div class="chat-main">
+        <div class="chat-main" id="chatMain">
             <!-- Header -->
             <div class="chat-header">
                 <div class="chat-header-top">
-                    <div class="chat-title-row">
-                        <h3 id="chatTitle" style="margin: 0;">Select a scope to start</h3>
-                        <p id="chatSubtitle"
-                            style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions
-                            about your notes, subjects, or groups</p>
-                        <p id="chatMeta"
-                            style="color: var(--color-gray); font-size: var(--font-size-xs); display: none; margin: 0;">
-                        </p>
+                    <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                        <button class="mobile-history-toggle" onclick="toggleChatSidebar()" title="Show History">
+                            <i class="ph ph-clock-counter-clockwise"></i>
+                        </button>
+                        <div class="chat-title-row">
+                            <h3 id="chatTitle" style="margin: 0;">Select a scope to start</h3>
+                            <p id="chatSubtitle"
+                                style="color: var(--color-gray); font-size: var(--font-size-sm); margin: 0;">Ask questions
+                                about your notes, subjects, or groups</p>
+                            <p id="chatMeta"
+                                style="color: var(--color-gray); font-size: var(--font-size-xs); display: none; margin: 0;">
+                            </p>
+                        </div>
                     </div>
                     <div class="context-display" id="contextDisplay" style="display: none;">
                         <span class="context-name" id="contextName"></span>
@@ -71,13 +79,30 @@
 
             <!-- Input -->
             <div class="chat-input-area">
-                <!-- AI Controls -->
-                <div class="ai-controls">
-                    <!-- Mode Selector -->
-                    <div>
-                        <div class="control-label">Mode</div>
-                        <div class="ai-mode-bar">
-                            <button class="mode-pill active" data-mode="normal" onclick="setAiMode('normal')"
+                <!-- AI Controls: Compact Display -->
+                <div class="ai-controls-compact" id="chatControlsCompact">
+                    <span
+                        style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Mode</span>
+                    <button class="control-badge" onclick="toggleChatMode()" title="Click to change mode">
+                        <i class="ph" id="chatModeIcon"></i>
+                        <span id="chatModeLabel"></span>
+                    </button>
+                    <span
+                        style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Output</span>
+                    <button class="control-badge" onclick="toggleChatOutput()" title="Click to change output format">
+                        <i class="ph" id="chatOutputIcon"></i>
+                        <span id="chatOutputLabel"></span>
+                    </button>
+                </div>
+
+                <!-- AI Controls: Expanded Selection -->
+                <div class="ai-controls-expanded" id="chatControlsExpanded">
+                    <!-- Mode Selection -->
+                    <div id="chatModeSelection">
+                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">
+                            Select Mode</div>
+                        <div class="ai-mode-bar" style="flex-direction: row; gap: 6px; flex-wrap: wrap;">
+                            <button class="mode-pill" data-mode="normal" onclick="setAiMode('normal')"
                                 title="A balanced response with standard detail">
                                 <i class="ph ph-stack"></i> Normal
                             </button>
@@ -100,12 +125,13 @@
                         </div>
                     </div>
 
-                    <!-- Output Format Selector -->
-                    <div>
-                        <div class="control-label">Output</div>
-                        <div class="output-format-bar">
-                            <button class="mode-pill active" data-format="sentence"
-                                onclick="setOutputFormat('sentence')" title="Single paragraph response">
+                    <!-- Output Selection -->
+                    <div id="chatOutputSelection">
+                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">
+                            Select Output</div>
+                        <div class="output-format-bar" style="flex-direction: row; gap: 6px; flex-wrap: wrap;">
+                            <button class="mode-pill" data-format="sentence" onclick="setOutputFormat('sentence')"
+                                title="Single paragraph response">
                                 <i class="ph ph-text-t"></i> Sentence
                             </button>
                             <button class="mode-pill" data-format="pointform" onclick="setOutputFormat('pointform')"

@@ -99,24 +99,126 @@ const OUTPUT_FORMAT_META = {
 
 function setAiMode(mode) {
     currentAiMode = mode;
-    document.querySelectorAll('.ai-mode-bar .mode-pill').forEach(p => {
-        p.classList.toggle('active', p.dataset.mode === mode);
-    });
     localStorage.setItem('globalAiMode', mode);
+    updateModeButtons();
+    updateCompactDisplay();
+    
+    // Smoothly close expanded view after selection
+    const compact = document.getElementById('chatControlsCompact');
+    const expanded = document.getElementById('chatControlsExpanded');
+    
+    expanded.classList.remove('active');
+    setTimeout(() => {
+        if (!expanded.classList.contains('active')) {
+            compact.classList.remove('hidden');
+            document.getElementById('chatModeSelection').classList.remove('active');
+        }
+    }, 300);
 }
 
 function setOutputFormat(format) {
     currentOutputFormat = format;
-    document.querySelectorAll('.output-format-bar .mode-pill').forEach(p => {
-        p.classList.toggle('active', p.dataset.format === format);
-    });
     localStorage.setItem('globalOutputFormat', format);
+    updateOutputButtons();
+    updateCompactDisplay();
+    
+    // Smoothly close expanded view after selection
+    const compact = document.getElementById('chatControlsCompact');
+    const expanded = document.getElementById('chatControlsExpanded');
+    
+    expanded.classList.remove('active');
+    setTimeout(() => {
+        if (!expanded.classList.contains('active')) {
+            compact.classList.remove('hidden');
+            document.getElementById('chatOutputSelection').classList.remove('active');
+        }
+    }, 300);
+}
+
+function toggleChatMode() {
+    const compact = document.getElementById('chatControlsCompact');
+    const expanded = document.getElementById('chatControlsExpanded');
+    const modeSelection = document.getElementById('chatModeSelection');
+    const outputSelection = document.getElementById('chatOutputSelection');
+
+    const isCurrentlyShowingMode = expanded.classList.contains('active') && modeSelection.classList.contains('active');
+
+    if (isCurrentlyShowingMode) {
+        // Close it
+        expanded.classList.remove('active');
+        setTimeout(() => {
+            if (!expanded.classList.contains('active')) {
+                compact.classList.remove('hidden');
+                modeSelection.classList.remove('active');
+            }
+        }, 300);
+    } else {
+        // Open it (or switch from output)
+        outputSelection.classList.remove('active');
+        compact.classList.add('hidden');
+        expanded.classList.add('active');
+        modeSelection.classList.add('active');
+    }
+}
+
+function toggleChatOutput() {
+    const compact = document.getElementById('chatControlsCompact');
+    const expanded = document.getElementById('chatControlsExpanded');
+    const modeSelection = document.getElementById('chatModeSelection');
+    const outputSelection = document.getElementById('chatOutputSelection');
+
+    const isCurrentlyShowingOutput = expanded.classList.contains('active') && outputSelection.classList.contains('active');
+
+    if (isCurrentlyShowingOutput) {
+        // Close it
+        expanded.classList.remove('active');
+        setTimeout(() => {
+            if (!expanded.classList.contains('active')) {
+                compact.classList.remove('hidden');
+                outputSelection.classList.remove('active');
+            }
+        }, 300);
+    } else {
+        // Open it (or switch from mode)
+        modeSelection.classList.remove('active');
+        compact.classList.add('hidden');
+        expanded.classList.add('active');
+        outputSelection.classList.add('active');
+    }
+}
+
+function updateModeButtons() {
+    document.querySelectorAll('#chatModeSelection .mode-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === currentAiMode);
+    });
+}
+
+function updateOutputButtons() {
+    document.querySelectorAll('#chatOutputSelection .mode-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.format === currentOutputFormat);
+    });
+}
+
+function updateCompactDisplay() {
+    const mode = MODE_META[currentAiMode] || { label: currentAiMode, icon: 'ph-sparkle' };
+    const output = OUTPUT_FORMAT_META[currentOutputFormat] || { label: currentOutputFormat, icon: 'ph-text-t' };
+
+    const modeIcon = document.getElementById('chatModeIcon');
+    const modeLabel = document.getElementById('chatModeLabel');
+    if (modeIcon) modeIcon.className = `ph ${mode.icon}`;
+    if (modeLabel) modeLabel.textContent = mode.label;
+
+    const outputIcon = document.getElementById('chatOutputIcon');
+    const outputLabel = document.getElementById('chatOutputLabel');
+    if (outputIcon) outputIcon.className = `ph ${output.icon}`;
+    if (outputLabel) outputLabel.textContent = output.label;
 }
 
 // Apply saved mode and output format on load
 function applySavedMode() {
-    setAiMode(currentAiMode);
-    setOutputFormat(currentOutputFormat);
+    updateModeButtons();
+    updateOutputButtons();
+    updateCompactDisplay();
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────
@@ -315,6 +417,14 @@ function createNewChat() {
     currentConversationId = null;
     conversationMessages = [];
     isViewingHistory = false;
+
+    if (window.innerWidth <= 768) {
+        const sidebar = document.getElementById('chatSidebar');
+        if (sidebar && sidebar.classList.contains('mobile-show')) {
+            toggleChatSidebar();
+        }
+    }
+
     document.getElementById('chatTitle').textContent = 'New Chat';
     document.getElementById('chatSubtitle').textContent = 'Ask questions about your notes, subjects, or groups';
     document.getElementById('chatMeta').style.display = 'none';
@@ -854,6 +964,10 @@ async function loadConversation(convId) {
         el.classList.toggle('active', el.onclick && el.getAttribute('onclick').includes(convId));
     });
 
+    if (window.innerWidth <= 768) {
+        toggleChatSidebar();
+    }
+
     try {
         const res = await fetch(`/chat/conversations/${convId}/messages`);
         if (!res.ok) { console.error('Failed to load conversation'); return; }
@@ -1259,6 +1373,15 @@ function highlightCitation(event, citationNum) {
 if (typeof marked === 'undefined') {
     document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');
 }
+function toggleChatSidebar() {
+    const sidebar = document.getElementById('chatSidebar');
+    const main = document.getElementById('chatMain');
+    if (sidebar && main) {
+        sidebar.classList.toggle('mobile-show');
+        main.classList.toggle('mobile-hide');
+    }
+}
+
 // Configure marked to enable tables and other features
 if (typeof marked !== 'undefined') {
     marked.setOptions({
