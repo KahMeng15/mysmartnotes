@@ -122,7 +122,15 @@ docker-compose up -d
 # Access at http://localhost:8000
 ```
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup and troubleshooting.
+See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed setup and troubleshooting.
+
+## 📚 Documentation
+
+Detailed documentation is available in the `docs/` folder:
+
+- **[Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)**: Deep dive into the architecture, data models, and core processing pipelines.
+- **[Development Guide](docs/DEVELOPMENT.md)**: Instructions for local setup, testing, and contribution.
+- **[Resource Requirements](docs/RESOURCE_REQUIREMENTS.md)**: Sizing guide and hardware recommendations for different usage scenarios.
 
 ## Production Safety Notes
 
@@ -142,7 +150,7 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup and troubleshooting.
 | **Friend Group** | 4 cores | 4GB | 50GB | 2-10 people |
 | **Growing Team** | 8 cores | 8GB | 100GB | 10-50 people |
 
-See [RESOURCE_REQUIREMENTS.md](RESOURCE_REQUIREMENTS.md) for deployment sizing details.
+See [RESOURCE_REQUIREMENTS.md](docs/RESOURCE_REQUIREMENTS.md) for deployment sizing details.
 
 ## 🛠️ Tech Stack Details
 
