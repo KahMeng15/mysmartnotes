@@ -1531,14 +1531,17 @@ async function confirmReprocess() {
     }, 5000);
 
     try {
-        const response = await fetch(`/lectures/${lectureId}/reprocess-ocr`, {
+        const response = await fetch(`/lectures/${lectureId}/reprocess`, {
             method: 'POST'
         });
         if (response.ok) {
             document.getElementById('progressFill').style.width = '100%';
             document.getElementById('progressPercent').textContent = '100%';
             document.getElementById('progressMessage').textContent = 'Complete! Reloading...';
-            setTimeout(() => window.location.reload(), 800);
+            setTimeout(() => {
+                const refreshUrl = `${window.location.pathname}?refresh=${Date.now()}`;
+                window.location.href = refreshUrl;
+            }, 800);
         } else {
             let errorMsg = 'Failed to reprocess';
             try { const e = await response.json(); errorMsg = e.detail || errorMsg; } catch (e) { }

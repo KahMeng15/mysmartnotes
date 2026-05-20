@@ -53,13 +53,36 @@ def main():
 
     # .env already loaded at module level; no need to call load_dotenv() again
 
-    # Find all input files
+    # Parse optional CLI file selection.
+    target_input = None
+    for idx, arg in enumerate(sys.argv):
+        if arg == "--input" and idx + 1 < len(sys.argv):
+            target_input = Path(sys.argv[idx + 1])
+            break
+        if arg.startswith("--input="):
+            target_input = Path(arg.split("=", 1)[1])
+            break
+
+    # Find input files
     supported = [".pdf", ".pptx"]
     input_files = []
-    # Search recursively for supported files
-    for f in input_dir.rglob("*"):
-        if f.is_file() and f.suffix.lower() in supported and not f.name.startswith("~"):
-            input_files.append(f)
+
+    if target_input:
+        candidate = target_input
+        if not candidate.is_absolute():
+            candidate = (base_dir / candidate).resolve()
+        if not candidate.exists():
+            logging.error(f"❌ Input file not found: {candidate}")
+            sys.exit(1)
+        if candidate.suffix.lower() not in supported:
+            logging.error(f"❌ Unsupported input file type: {candidate.suffix}. Supported: {', '.join(supported)}")
+            sys.exit(1)
+        input_files = [candidate]
+    else:
+        # Search recursively for supported files
+        for f in input_dir.rglob("*"):
+            if f.is_file() and f.suffix.lower() in supported and not f.name.startswith("~"):
+                input_files.append(f)
 
     if not input_files:
         logging.error(f"❌ No supported files (PDF or PPTX) found in {input_dir}")

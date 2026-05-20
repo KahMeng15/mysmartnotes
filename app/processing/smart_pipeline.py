@@ -6,6 +6,7 @@ extraction, heuristic merging, and an optional AI polish pass.
 """
 
 import os
+import re
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -152,6 +153,22 @@ class SmartPipeline:
         "": "≥",
     }
 
+    _PPTX_NOISE_EXACT = {
+        "run",
+        "animation",
+        "no value",
+        "reference value",
+    }
+
+    _PPTX_LABEL_HEADINGS = {
+        "objective",
+        "question",
+        "example",
+        "examples",
+        "note",
+        "tip",
+    }
+
     def _normalize_text(self, text: str) -> str:
         """Apply logical symbol mapping and general text cleanup."""
         if not text:
@@ -163,7 +180,6 @@ class SmartPipeline:
             
         # 2. Fix capitalization in specific terms like "DEFINITION"
         # Only fix if it's the whole word and not an acronym
-        import re
         text = re.sub(r'\bDEFINITION\b', 'Definition', text)
         text = re.sub(r'\bOBJECTIVES\b', 'Objectives', text)
         
@@ -174,6 +190,171 @@ class SmartPipeline:
         text = re.sub(r'([a-z]{10,})([A-Z][a-z]{4,})', r'\1 \2', text)
         
         return text
+
+    def _normalize_slide_title_for_compare(self, text: str) -> str:
+        """Normalize slide titles so continuation variants compare equal."""
+        normalized = (text or "").strip().lower()
+        normalized = re.sub(r"\s*[\(\[,;:-]?\s*cont\.?(?:inued)?[\)\]]?\s*$", "", normalized)
+        normalized = re.sub(r"\s+", " ", normalized)
+        return normalized
+
+    def _is_probable_pptx_noise(self, text: str) -> bool:
+        """Return True for common low-value PPTX artifacts like demo buttons and animation labels."""
+        stripped = (text or "").strip()
+        lowered = stripped.lower()
+        if not stripped:
+            return True
+        if lowered in self._PPTX_NOISE_EXACT:
+            return True
+        if re.match(r"^[A-Z][A-Za-z0-9]*(?:[A-Z][A-Za-z0-9]*)+$", stripped) and len(stripped) <= 40:
+            return True
+        return False
+
+    def _is_instructional_label(self, text: str) -> bool:
+        """Detect short label-like headings that should render as bold body text."""
+        stripped = (text or "").strip()
+        label = stripped.rstrip(":").strip().lower()
+        return label in self._PPTX_LABEL_HEADINGS
+
+    def _is_probable_heading(self, text: str) -> bool:
+        """Guard heading promotion so regular slide sentences are less likely to become headings."""
+        stripped = (text or "").strip()
+        if not stripped:
+            return False
+        if len(stripped) > 90:
+            return False
+        if stripped[-1] in ".!?":
+            return False
+        if self._looks_like_code(stripped):
+            return False
+        if re.search(r"\b(?:you|we|they|he|she|it)\b", stripped.lower()) and len(stripped.split()) >= 4:
+            return False
+
+        words = stripped.split()
+        if len(words) > 9:
+            return False
+
+        return True
+
+    def _has_substantive_slide_content(self, slide_blocks: List[Dict[str, object]]) -> bool:
+        """Return True when a slide has real content beyond a bare title or demo artifacts."""
+        substantive = 0
+        for block in slide_blocks:
+            text = str(block.get("text", "")).strip()
+            btype = str(block.get("type", "body"))
+            if not text or self._is_probable_pptx_noise(text):
+                continue
+            if btype == "h1":
+                continue
+            substantive += 1
+        return substantive > 0
+
+    def _is_trace_caption(self, title: str, text: str, block_type: str) -> bool:
+        """Drop short animation/diagram captions on trace/demo slides."""
+        title_low = (title or "").lower()
+        stripped = (text or "").strip()
+        if "trace" not in title_low:
+            return False
+        if block_type != "body":
+            return False
+        if self._looks_like_code(stripped):
+            return False
+        if len(stripped.split()) > 6:
+            return False
+        caption_terms = {
+            "declare", "create", "assign", "change", "reference",
+            "value", "circle", "mycircle", "yourcircle",
+        }
+        words = {w.lower().strip(".,:;()") for w in stripped.split()}
+        return bool(words & caption_terms)
+
+    def _clean_code_text(self, text: str) -> str:
+        """Remove slide numbering prefixes that should not appear inside code samples."""
+        cleaned = (text or "").strip()
+        if re.match(r"^\d+\.\s+(?:public|private|protected|class|interface|enum)\b", cleaned):
+            cleaned = re.sub(r"^\d+\.\s+", "", cleaned)
+        return cleaned
+
+    def _split_mixed_code_and_prose(self, text: str) -> Optional[tuple]:
+        """
+        Split a single PPTX paragraph that contains code followed by explanatory prose.
+        Example:
+        "Circle[] arr = new Circle[10]; An array of objects is ..."
+        """
+        stripped = (text or "").strip()
+        if len(stripped) < 40:
+            return None
+
+        prose_starts = (
+            "An ", "A ", "The ", "For ", "If ", "This ", "That ", "These ", "Those ",
+            "As ", "It ", "More ", "Java ",
+        )
+
+        matches = list(re.finditer(r";\s+", stripped))
+        for match in reversed(matches):
+            code_part = stripped[:match.end() - 1].strip()
+            prose_part = stripped[match.end():].strip()
+            if not prose_part or not prose_part.startswith(prose_starts):
+                continue
+            if not self._looks_like_code(code_part):
+                continue
+            if self._looks_like_code(prose_part):
+                continue
+            return self._clean_code_text(code_part), prose_part
+
+        return None
+
+    def _postprocess_pptx_markdown(self, markdown: str) -> str:
+        """Final PPTX-specific cleanup after block emission."""
+        lines = markdown.splitlines()
+        cleaned_lines: List[str] = []
+        i = 0
+
+        while i < len(lines):
+            line = lines[i]
+
+            # Clean the main title by dropping loud all-caps course prefixes before "Topic N".
+            if i == 0 and line.startswith("# "):
+                title = line[2:].strip()
+                title = re.sub(
+                    r"^(?:[A-Z][A-Z\-&/]+(?:\s+[A-Z][A-Z\-&/]+)+)\s+(Topic\s+\d+.*)$",
+                    r"\1",
+                    title,
+                )
+                line = f"# {title}"
+
+            if re.fullmatch(r"(TIP|NOTE|Question):?", line.strip(), flags=re.IGNORECASE):
+                label = line.strip().rstrip(":").upper()
+                cleaned_lines.append(f"**{label}:**")
+                i += 1
+                continue
+
+            # Remove consecutive duplicate fenced code blocks, common on trace-animation slides.
+            if line.startswith("```"):
+                block_start = i
+                block_lines = [line]
+                i += 1
+                while i < len(lines):
+                    block_lines.append(lines[i])
+                    if lines[i].startswith("```"):
+                        i += 1
+                        break
+                    i += 1
+
+                block_text = "\n".join(block_lines).strip()
+                prev_block = "\n".join(cleaned_lines[-len(block_lines):]).strip() if len(cleaned_lines) >= len(block_lines) else None
+                if prev_block == block_text:
+                    continue
+
+                cleaned_lines.extend(block_lines)
+                continue
+
+            cleaned_lines.append(line)
+            i += 1
+
+        result = "\n".join(cleaned_lines)
+        result = re.sub(r"\n{3,}", "\n\n", result).strip() + "\n"
+        return result
 
     def _fix_punctuation_spacing(self, text: str) -> str:
         """
@@ -502,15 +683,34 @@ class SmartPipeline:
                     # Subsequent paragraphs in the same shape are sub-content (body/list).
                     is_title_first_para = (shape_role == "title" and level == 0 and para_idx == 0)
 
+                    if self._is_probable_pptx_noise(text):
+                        logger.debug(f"Skip low-value PPTX artifact: '{text[:60]}'")
+                        continue
+
+                    mixed_code_prose = self._split_mixed_code_and_prose(text)
+                    if mixed_code_prose:
+                        code_text, prose_text = mixed_code_prose
+                        slide_blocks.append({
+                            "type": "code",
+                            "text": code_text,
+                            "indent": level,
+                        })
+                        slide_blocks.append({
+                            "type": "body",
+                            "text": prose_text,
+                            "indent": level,
+                        })
+                        continue
+
                     if is_code or self._looks_like_code(text):
                         block_type = "code"
                     elif is_title_first_para:
                         block_type = "h1"
-                    elif not is_long_text and max_size >= h1_threshold:
+                    elif not is_long_text and max_size >= h1_threshold and self._is_probable_heading(text):
                         block_type = "h1"
-                    elif not is_long_text and max_size >= h2_threshold:
+                    elif not is_long_text and max_size >= h2_threshold and self._is_probable_heading(text):
                         block_type = "h2"
-                    elif not is_long_text and max_size >= h3_threshold and is_bold:
+                    elif not is_long_text and max_size >= h3_threshold and is_bold and self._is_probable_heading(text):
                         block_type = "h3"
                     elif level > 0:
                         block_type = "list"
@@ -542,17 +742,28 @@ class SmartPipeline:
                 logger.debug(f"Skip low-value slide {slide_num}: '{current_slide_title}'")
                 continue
 
+            if slide_blocks and not self._has_substantive_slide_content(slide_blocks):
+                logger.debug(f"Skip non-substantive PPTX slide {slide_num}: '{current_slide_title}'")
+                continue
+
             # 2. Cross-slide title deduplication
             # If this slide's title is identical to the previous slide's title,
             # it's a continuation slide. Remove the title block to prevent duplication.
             is_continuation = False
-            if current_slide_title and current_slide_title == last_slide_title:
+            normalized_current_title = self._normalize_slide_title_for_compare(current_slide_title)
+            if normalized_current_title and normalized_current_title == last_slide_title:
                 is_continuation = True
                 # Remove the h1 block for this slide
                 slide_blocks = [b for b in slide_blocks if b["type"] != "h1"]
                 logger.debug(f"Slide {slide_num} is a continuation of '{current_slide_title}'")
             
-            last_slide_title = current_slide_title
+            last_slide_title = normalized_current_title
+
+            if slide_blocks:
+                slide_blocks = [
+                    b for b in slide_blocks
+                    if not self._is_trace_caption(current_slide_title, str(b.get("text", "")), str(b.get("type", "body")))
+                ]
 
             if not slide_blocks:
                 continue
@@ -590,6 +801,7 @@ class SmartPipeline:
                 indent = block.get("indent", 0)
 
                 if btype == "code":
+                    text = self._clean_code_text(text)
                     if not in_code_block:
                         # Determine language hint
                         text_lower = text.lower()
@@ -611,6 +823,10 @@ class SmartPipeline:
                         in_code_block = False
 
                     if btype.startswith("h"):
+                        if self._is_instructional_label(text):
+                            md_parts.append(f"**{text.rstrip(':')}:**")
+                            md_parts.append("")
+                            continue
                         hnum = int(btype[1])
                         md_parts.append(f"{'#' * hnum} {text}")
                         md_parts.append("")
@@ -628,7 +844,8 @@ class SmartPipeline:
                 md_parts.append("```")
                 md_parts.append("")
 
-        return "\n".join(md_parts).strip() + "\n"
+        markdown = "\n".join(md_parts).strip() + "\n"
+        return self._postprocess_pptx_markdown(markdown)
 
     def _looks_like_code(self, text: str) -> bool:
         """Return True if text appears to be code even without monospace metadata."""

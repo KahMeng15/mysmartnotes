@@ -14,6 +14,7 @@ from app.schemas.schemas import LectureResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
 from app.utils.quotas import enforce_quota_notes, enforce_quota_storage
+from app.utils.crypto import decrypt_secret
 from app.processing.ocr import OCRProcessor
 from app.processing.image_extractor import ImageExtractor
 from app.processing.text_processor import ContentType
@@ -38,10 +39,13 @@ def _get_pipeline_for_user(user: "User") -> SmartPipeline:
     """
     # Resolve Gemini API key: personal first, then global
     gemini_key = None
+    gemini_model = os.getenv("GLOBAL_AI_MODEL", "gemini-2.5-flash")
     if not getattr(user, "use_global_ai_config", False):
         provider = getattr(user, "ai_provider", "") or ""
         if "gemini" in provider.lower():
-            gemini_key = getattr(user, "ai_api_key", None)
+            gemini_key = decrypt_secret(getattr(user, "ai_api_key", None))
+            if getattr(user, "ai_model", None):
+                gemini_model = user.ai_model
 
     if not gemini_key:
         # Try global admin settings
@@ -51,15 +55,132 @@ def _get_pipeline_for_user(user: "User") -> SmartPipeline:
             with SessionLocal() as s:
                 settings = s.query(SystemSettings).first()
                 if settings and "gemini" in (settings.global_ai_provider or "").lower():
-                    gemini_key = settings.global_ai_api_key
+                    gemini_key = decrypt_secret(settings.global_ai_api_key)
+                    if settings.global_ai_model:
+                        gemini_model = settings.global_ai_model
         except Exception:
             pass
+
+    if not gemini_key:
+        gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GLOBAL_GEMINI_API_KEY")
 
     return SmartPipeline(
         use_polish=bool(gemini_key),
         gemini_api_key=gemini_key,
-        gemini_model=os.getenv("GLOBAL_AI_MODEL", "gemini-2.5-flash"),
+        gemini_model=gemini_model,
     )
+
+
+def _ensure_valid_markdown_result(markdown: str) -> str:
+    """
+    SmartPipeline returns an error string on failure; treat that as a real failure
+    so uploads do not silently store broken content as extracted notes.
+    """
+    if isinstance(markdown, str) and markdown.startswith("Error:"):
+        raise RuntimeError(markdown)
+    return markdown
+
+
+def _extract_markdown_for_user(user: "User", file_path: str) -> str:
+    """
+    Process a lecture with the configured SmartPipeline. If the AI polish pass
+    fails, retry once with local extraction only so uploads still complete.
+    """
+    pipeline = _get_pipeline_for_user(user)
+    try:
+        return _ensure_valid_markdown_result(pipeline.process(file_path))
+    except Exception:
+        if not getattr(pipeline, "use_polish", False):
+            raise
+
+        logger.warning(
+            "Smart pipeline with AI polish failed; retrying with local extraction only",
+            extra={"file_path": file_path},
+            exc_info=True,
+        )
+        fallback_pipeline = SmartPipeline(use_polish=False)
+        return _ensure_valid_markdown_result(fallback_pipeline.process(file_path))
+
+
+def _rebuild_lecture_content(
+    lecture: "Lecture",
+    current_user: "User",
+    db: Session,
+    use_v2: bool = True,
+    reset_first: bool = False,
+) -> "Lecture":
+    """
+    Rebuild a lecture's extracted content from the original uploaded file.
+    For PDF/PPTX, this reruns the SmartPipeline from scratch. For images,
+    this reruns OCR extraction. Structured content, images, processing time,
+    and embeddings are refreshed together.
+    """
+    if not os.path.exists(lecture.file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lecture file not found"
+        )
+
+    if reset_first:
+        lecture.extracted_text = None
+        lecture.extracted_content_structured = None
+        lecture.extracted_images_metadata = None
+        lecture.processing_time_ms = None
+        lecture.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(lecture)
+
+    import time
+    start_time = time.time()
+    file_ext = os.path.splitext(lecture.file_path)[1].lower()
+
+    if file_ext in ('.pdf', '.pptx'):
+        logger.info(f"Rebuilding lecture {lecture.id} with SmartPipeline from scratch")
+        raw_text = _extract_markdown_for_user(current_user, lecture.file_path)
+        structured_content = _markdown_to_segments(raw_text)
+
+        images_data = []
+        if file_ext == '.pdf':
+            try:
+                extractor = ImageExtractor(lecture_id=lecture.id)
+                images_extracted = extractor.extract_images_from_pdf(lecture.file_path)
+                images_data = [img.to_dict() for img in images_extracted]
+                logger.info(f"Extracted {len(images_data)} images during lecture rebuild")
+            except Exception as e:
+                logger.warning(f"Image extraction failed during lecture rebuild: {e}")
+    else:
+        logger.info(f"Rebuilding lecture {lecture.id} with OCR fallback")
+        ocr_result = OCRProcessor.extract_text(
+            lecture.file_path,
+            lecture.file_type,
+            lecture_id=lecture.id,
+            use_v2=use_v2
+        )
+        raw_text = ocr_result.get("raw_text", "")
+        structured_content = ocr_result.get("structured_content", [])
+        images_data = ocr_result.get("images", [])
+
+    lecture.processing_time_ms = int((time.time() - start_time) * 1000)
+    lecture.extracted_text = raw_text
+    lecture.extracted_content_structured = json.dumps(structured_content)
+    lecture.extracted_images_metadata = json.dumps(images_data)
+    lecture.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(lecture)
+
+    if raw_text and raw_text.strip():
+        try:
+            from app.processing.embeddings import update_lecture_embeddings
+            update_lecture_embeddings(lecture.id, raw_text, db)
+            logger.info(f"Updated embeddings after rebuilding lecture {lecture.id}")
+        except Exception as e:
+            logger.error(f"Error updating embeddings after lecture rebuild: {e}", exc_info=True)
+
+    logger.info(
+        f"Lecture rebuild complete: {lecture.id}, "
+        f"{len(raw_text)} chars, {len(structured_content)} segments, {len(images_data)} images"
+    )
+    return lecture
 
 
 @router.get("", response_model=List[LectureResponse])
@@ -173,9 +294,8 @@ async def upload_lecture(
 
         if file_ext in ('.pdf', '.pptx'):
             # Use SmartPipeline for PDF/PPTX — produces clean Markdown
-            pipeline = _get_pipeline_for_user(current_user)
             logger.info(f"Processing lecture {db_lecture.id}")
-            markdown = pipeline.process(file_path)
+            markdown = _extract_markdown_for_user(current_user, file_path)
             structured_segments = _markdown_to_segments(markdown)
             
             db_lecture.extracted_text = markdown
@@ -324,70 +444,9 @@ async def reprocess_ocr(
             detail="Lecture not found"
         )
     
-    if not os.path.exists(lecture.file_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lecture file not found"
-        )
-    
     try:
-        import time
-        start_time = time.time()
         logger.info(f"Reprocessing OCR for lecture {lecture_id} (use_v2={use_v2})")
-        
-        # Extract text with structured content using specified processor
-        file_ext = os.path.splitext(lecture.file_path)[1].lower()
-        
-        if file_ext in ('.pdf', '.pptx'):
-            # Use SmartPipeline for PDF/PPTX
-            pipeline = _get_pipeline_for_user(current_user)
-            logger.info(f"Reprocessing lecture {lecture_id}")
-            raw_text = pipeline.process(lecture.file_path)
-            structured_content = _markdown_to_segments(raw_text)
-            
-            # Extract images separately for PDF
-            images_data = []
-            if file_ext == '.pdf':
-                try:
-                    extractor = ImageExtractor(lecture_id=lecture.id)
-                    images_extracted = extractor.extract_images_from_pdf(lecture.file_path)
-                    images_data = [img.to_dict() for img in images_extracted]
-                    logger.info(f"Extracted {len(images_data)} images")
-                except Exception as e:
-                    logger.warning(f"Image extraction failed during reprocessing: {e}")
-        else:
-            # Use Legacy/Fallback OCR for images
-            ocr_result = OCRProcessor.extract_text(
-                lecture.file_path, 
-                lecture.file_type, 
-                lecture_id=lecture_id,
-                use_v2=use_v2
-            )
-            raw_text = ocr_result.get("raw_text", "")
-            structured_content = ocr_result.get("structured_content", [])
-            images_data = ocr_result.get("images", [])
-        
-        lecture.processing_time_ms = int((time.time() - start_time) * 1000)
-        logger.info(f"Reprocessing complete: {len(raw_text)} characters, {len(structured_content)} segments, {len(images_data)} images")
-        
-        # Update lecture with extracted content
-        lecture.extracted_text = raw_text
-        lecture.extracted_content_structured = json.dumps(structured_content)
-        lecture.extracted_images_metadata = json.dumps(images_data)
-        lecture.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(lecture)
-        
-        # Update embeddings after reprocessing
-        if raw_text and raw_text.strip():
-            try:
-                from app.processing.embeddings import update_lecture_embeddings
-                update_lecture_embeddings(lecture.id, raw_text, db)
-                logger.info(f"Updated embeddings after reprocessing for lecture {lecture_id}")
-            except Exception as e:
-                logger.error(f"Error updating embeddings after reprocessing: {e}", exc_info=True)
-                # Don't fail the reprocessing
-        
+        lecture = _rebuild_lecture_content(lecture, current_user, db, use_v2=use_v2, reset_first=False)
         logger.info(f"Successfully reprocessed OCR for lecture {lecture_id}")
         return lecture
         
@@ -399,6 +458,38 @@ async def reprocess_ocr(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error reprocessing OCR: {str(e)}"
+        )
+
+
+@router.post("/{lecture_id}/reprocess", response_model=LectureResponse)
+async def reprocess_lecture_from_scratch(
+    lecture_id: str,
+    use_v2: bool = True,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Fully rebuild a lecture from the original uploaded file, replacing all derived content."""
+    lecture = db.query(Lecture).filter(
+        Lecture.id == lecture_id,
+        Lecture.user_id == current_user.id
+    ).first()
+
+    if not lecture:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lecture not found"
+        )
+
+    try:
+        logger.info(f"Starting full lecture rebuild for {lecture_id}")
+        lecture = _rebuild_lecture_content(lecture, current_user, db, use_v2=use_v2, reset_first=True)
+        logger.info(f"Successfully rebuilt lecture {lecture_id} from scratch")
+        return lecture
+    except Exception as e:
+        logger.error(f"Error rebuilding lecture from scratch: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error rebuilding lecture: {str(e)}"
         )
 
 
