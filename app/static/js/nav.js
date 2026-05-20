@@ -18,6 +18,7 @@ window.syncUserDisplay = async function() {
         } else if (response.status === 401) {
             // Session is invalid, redirect to login
             localStorage.removeItem('user');
+            localStorage.removeItem('token');
             window.location.href = '/login';
         }
     } catch (e) {
@@ -233,6 +234,7 @@ window.confirmLogout = async function () {
     }
 
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     window.location.href = '/login';
 };
 

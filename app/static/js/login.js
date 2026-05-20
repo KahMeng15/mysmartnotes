@@ -211,6 +211,7 @@ async function handleLogin() {
         if (res.ok) {
             const data = await res.json();
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+            if (data.access_token) localStorage.setItem('token', data.access_token);
             showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
             setTimeout(() => { window.location.href = '/dashboard'; }, 800);
         } else {
@@ -303,6 +304,7 @@ async function handleGoogleSignIn() {
             } else {
                 // Existing user - log them in
                 if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+                if (data.access_token) localStorage.setItem('token', data.access_token);
                 
                 // Fetch fresh user data from /auth/me
                 try {
@@ -408,6 +410,7 @@ async function handleGoogleComplete(event) {
                 return;
             }
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
+            if (data.access_token) localStorage.setItem('token', data.access_token);
             showMessageBox('googleRegisterMsg', 'success', 'Welcome! Redirecting…');
             setTimeout(() => { window.location.href = '/dashboard'; }, 800);
         } else {
