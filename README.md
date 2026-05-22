@@ -88,39 +88,45 @@ python main.py
 # Access at http://localhost:8000
 ```
 
-### Option 2: Docker (One Command)
+### Option 2: Docker (GHCR.io)
 
+We provide pre-built Docker images via GitHub Container Registry (GHCR):
+
+- **Main Branch (Stable)**: `ghcr.io/KahMeng15/mysmartnotes:latest`
+- **Dev Branch (Bleeding Edge)**: `ghcr.io/KahMeng15/mysmartnotes:dev`
+
+#### Use Stable (Recommended)
 ```bash
-# Copy environment template
-cp .env.example .env
-# Edit .env: Add your API keys
-
-# Run single container
+# Pull and run the latest stable image
 docker run -d \
   -p 8000:8000 \
   -v $(pwd)/data:/app/data \
   -e GEMINI_API_KEY="your-key" \
-  mysmartnotes:latest
-
-# Access at http://localhost:8000
+  ghcr.io/KahMeng15/mysmartnotes:latest
 ```
 
-### Option 3: Docker Compose
+#### Use Dev (For testing latest features)
+```bash
+# Pull and run the dev image
+docker run -d \
+  -p 8000:8000 \
+  -v $(pwd)/data:/app/data \
+  -e GEMINI_API_KEY="your-key" \
+  ghcr.io/KahMeng15/mysmartnotes:dev
+```
+
+# Access at http://localhost:8000
+
+
+### Option 4: Single-File Deployment (Merged)
+
+If you prefer a single file without a separate `.env`, use the merged version:
 
 ```bash
-# Clone repository
-git clone <repo-url> mysmartnotes
-cd mysmartnotes
-
-# Copy environment template
-cp .env.example .env
-# Edit .env: Add your API keys
-
-# Start single container
-docker-compose up -d
-
-# Access at http://localhost:8000
+# Run using the merged compose file
+docker-compose -f docker-compose.merged.yml up -d
 ```
+*Note: Remember to edit `docker-compose.merged.yml` to add your API keys before running.*
 
 See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed setup and troubleshooting.
 

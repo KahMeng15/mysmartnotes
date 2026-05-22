@@ -1,0 +1,57 @@
+version: "3.8"
+
+services:
+  app:
+    image: ghcr.io/KahMeng15/mysmartnotes:latest
+    container_name: mysmartnotes
+    ports:
+      - "${PORT:-8000}:${PORT:-8000}"
+    environment:
+      # --- General Settings ---
+      - ENVIRONMENT=production
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DEBUG=False
+      - LOG_LEVEL=INFO
+      - APP_NAME=MySmartNotes
+      
+      # --- Database ---
+      - DATABASE_URL=sqlite:///./data/app.db
+      - ALLOW_SQLITE_IN_PRODUCTION=True
+      
+      # --- Security ---
+      - SECRET_KEY=generate-a-strong-secret-key-here
+      - APP_ENCRYPTION_KEY=generate-a-fernet-key-here
+      - CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
+      - COOKIE_SECURE=False # Set to True if using HTTPS
+      
+      # --- Global AI Settings (Admin Managed) ---
+      - GLOBAL_AI_PROVIDER=gemini
+      - GLOBAL_GEMINI_API_KEY=your-gemini-api-key-here
+      - GLOBAL_AI_MODEL=gemini-1.5-flash
+      
+      # --- File Processing ---
+      - MAX_UPLOAD_SIZE_MB=50
+      - OCR_ENABLED=True
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      
+      # --- Firebase (Optional) ---
+      - FIREBASE_API_KEY=your-api-key
+      - FIREBASE_AUTH_DOMAIN=mysmartnotes-965fe.firebaseapp.com
+      - FIREBASE_PROJECT_ID=mysmartnotes-965fe
+      - FIREBASE_STORAGE_BUCKET=mysmartnotes-965fe.firebasestorage.app
+      - FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+      - FIREBASE_APP_ID=your-app-id
+      
+    volumes:
+      - ./data:/app/data
+      - ./generated:/app/generated
+      - ./output:/app/output
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - mysmartnotes-net
+
+networks:
+  mysmartnotes-net:
+    driver: bridge
