@@ -1,7 +1,7 @@
 FROM python:3.11-slim-bookworm
 
 # Add labels for GHCR
-LABEL org.opencontainers.image.source="https://github.com/KahMeng15/mysmartnotes"
+LABEL org.opencontainers.image.source="https://github.com/kahmeng15/mysmartnotes"
 LABEL org.opencontainers.image.description="MySmartNotes - AI-Powered Study Companion"
 LABEL org.opencontainers.image.licenses="MIT"
 

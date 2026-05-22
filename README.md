@@ -92,8 +92,8 @@ python main.py
 
 We provide pre-built Docker images via GitHub Container Registry (GHCR):
 
-- **Main Branch (Stable)**: `ghcr.io/KahMeng15/mysmartnotes:latest`
-- **Dev Branch (Bleeding Edge)**: `ghcr.io/KahMeng15/mysmartnotes:dev`
+- **Main Branch (Stable)**: `ghcr.io/kahmeng15/mysmartnotes:latest`
+- **Dev Branch (Bleeding Edge)**: `ghcr.io/kahmeng15/mysmartnotes:dev`
 
 #### Use Stable (Recommended)
 ```bash
@@ -102,7 +102,7 @@ docker run -d \
   -p 8000:8000 \
   -v $(pwd)/data:/app/data \
   -e GEMINI_API_KEY="your-key" \
-  ghcr.io/KahMeng15/mysmartnotes:latest
+  ghcr.io/kahmeng15/mysmartnotes:latest
 ```
 
 #### Use Dev (For testing latest features)
@@ -112,7 +112,7 @@ docker run -d \
   -p 8000:8000 \
   -v $(pwd)/data:/app/data \
   -e GEMINI_API_KEY="your-key" \
-  ghcr.io/KahMeng15/mysmartnotes:dev
+  ghcr.io/kahmeng15/mysmartnotes:dev
 ```
 
 # Access at http://localhost:8000

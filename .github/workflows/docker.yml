@@ -38,5 +38,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/KahMeng15/mysmartnotes:${{ steps.meta.outputs.tag }}
-            ghcr.io/KahMeng15/mysmartnotes:${{ github.sha }}
+            ghcr.io/kahmeng15/mysmartnotes:${{ steps.meta.outputs.tag }}
+            ghcr.io/kahmeng15/mysmartnotes:${{ github.sha }}

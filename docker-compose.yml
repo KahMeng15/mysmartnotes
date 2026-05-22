@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   app:
-    image: ghcr.io/KahMeng15/mysmartnotes:latest
+    image: ghcr.io/kahmeng15/mysmartnotes:latest
     container_name: mysmartnotes
     ports:
       - "${PORT:-8000}:${PORT:-8000}"
