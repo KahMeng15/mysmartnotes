@@ -33,7 +33,7 @@ def get_pipeline() -> SmartPipeline:
         _pipeline = SmartPipeline(
             use_polish=settings.AI_POLISH_ENABLED,
             gemini_api_key=settings.GLOBAL_GEMINI_API_KEY,
-            gemini_model=settings.GLOBAL_AI_MODEL or "gemini-2.5-flash",
+            gemini_model=settings.GLOBAL_AI_MODEL or "gemini-1.5-flash",
         )
     return _pipeline
 

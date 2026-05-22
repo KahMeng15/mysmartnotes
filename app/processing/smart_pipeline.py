@@ -13,8 +13,10 @@ from typing import Dict, List, Optional
 
 from app.processing.font_extractor import FontAwareExtractor
 from app.processing.signal_merger import SignalMerger, blocks_to_markdown
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class SmartPipeline:
@@ -34,7 +36,7 @@ class SmartPipeline:
         use_layout_detection: bool = False,
         use_table_transformer: bool = False,
         gemini_api_key: Optional[str] = None,
-        gemini_model: str = "gemini-2.5-flash",
+        gemini_model: Optional[str] = None,
         use_polish: bool = False,
         # Legacy kwargs accepted but ignored
         use_vision: bool = False,
@@ -42,7 +44,7 @@ class SmartPipeline:
     ):
         self.use_polish = use_polish and bool(gemini_api_key)
         self.gemini_api_key = gemini_api_key
-        self.gemini_model = gemini_model
+        self.gemini_model = gemini_model or settings.GLOBAL_AI_MODEL or "gemini-1.5-flash"
         self.font_extractor = FontAwareExtractor()
         self.layout_detector = None  # Legacy: disabled
         self.table_detector = None   # Legacy: disabled

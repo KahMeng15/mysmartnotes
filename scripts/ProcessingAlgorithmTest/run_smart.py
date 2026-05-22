@@ -109,7 +109,7 @@ def main():
     # Initialize pipeline
     from app.processing.smart_pipeline import SmartPipeline
     
-    gemini_model = os.getenv("GLOBAL_AI_MODEL") or "gemini-2.5-flash"
+    gemini_model = os.getenv("GLOBAL_AI_MODEL") or "gemini-1.5-flash"
 
     pipeline = SmartPipeline(
         use_polish=use_polish and bool(gemini_key),

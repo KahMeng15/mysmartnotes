@@ -8,6 +8,7 @@ from typing import List, Optional
 import json
 import asyncio
 import uuid
+import logging
 
 from app.models.db import User, Lecture, ChatMessage, Subject, SubjectGroup
 from app.utils.auth import get_current_user
@@ -15,6 +16,8 @@ from app.utils.db import get_db
 from app.utils.quotas import enforce_quota_messages, check_quota_conversations, get_user_conversation_count, get_user_tier_config
 from app.processing.ai_client import AIClient
 from app.processing.embeddings import find_relevant_snippets, combine_snippets
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -111,7 +114,7 @@ _BASE_GUARD = (
 def build_mode_prompt(context: str, question: str, mode: str, output_format: str = "sentence", is_web_search: bool = False, conversation_context: str = "") -> str:
     """Return the full system prompt based on AI mode and output format."""
     if question.strip().lower() in {"hi", "hello", "how are you", "how are you?"}:
-        return f"You are a friendly assistant. Respond warmly to: '{question}'"
+        return f"You are a friendly assistant. Respond warmly and ONLY output the final greeting. Do NOT show your internal reasoning, constraints, or options. Just say 'Hello' or 'Hi' with a friendly follow-up. Question: '{question}'"
 
     # Base mode instructions with STRICTER constraints
     mode_instructions = {
@@ -730,15 +733,18 @@ async def ask_question(
     if ai_client.ai_model_name:
         ai_model_info += f" ({ai_client.ai_model_name})"
 
+    logger.info(f"[chat] Calling {ai_client.provider} with model {ai_client.ai_model_name or 'default'}...")
     try:
+        # Increase timeout from 4.5 to 15 seconds for more robust generation
         response = await asyncio.wait_for(
             ai_client.answer_question(
                 question=request.message,
                 context=context,
                 system_prompt=prompt
             ),
-            timeout=4.5
+            timeout=15.0
         )
+        logger.info(f"[chat] LLM primary response received in {round((time.time() - t_model_start) * 1000.0, 2)}ms")
         
         fallback_duration_ms = 0.0
         # Checking if local context didn't have the answer
@@ -748,14 +754,14 @@ async def ask_question(
             '"i am unable to find any information based on your question."'
         ]
         if response.strip().lower() in fallback_phrases:
-            print(f"[chat] LLM responded with fallback phrase using local context. Trying web search...")
+            logger.info(f"[chat] LLM responded with fallback phrase. Initiating web search...")
             
             t_fallback_start = time.time()
-            web_snippet, web_sources, web_error = await web_search(request.message, timeout=10.0)
+            web_snippet, web_sources, web_error = await web_search(request.message, timeout=12.0)
             fallback_duration_ms = (time.time() - t_fallback_start) * 1000.0
             step_times["step5"] += fallback_duration_ms
             
-            print(f"[chat] web_snippet fetched length: {len(web_snippet)}, error: {web_error}")
+            logger.info(f"[chat] Web search completed in {round(fallback_duration_ms, 2)}ms. Error: {web_error or 'None'}")
             if web_error == "timeout":
                 response = "DuckDuckGo is taking a while to search... Could you try rephrasing your question or check your internet connection?"
                 snippet_sources = ["Web: DuckDuckGo (timeout)"]
@@ -780,22 +786,24 @@ async def ask_question(
                 ]
                 prompt = build_mode_prompt(context, request.message, request.ai_mode, request.output_format, is_web_search=True)
                 
-                # Ask LLM again with web snippet as context
+                logger.info(f"[chat] Calling LLM again with web context...")
+                t_model2_start = time.time()
                 response = await asyncio.wait_for(
                     ai_client.answer_question(
                         question=request.message,
                         context=context,
                         system_prompt=prompt
                     ),
-                    timeout=8.0
+                    timeout=15.0
                 )
-                print(f"[chat] LLM 2nd response: {response}")
+                logger.info(f"[chat] LLM secondary response received in {round((time.time() - t_model2_start) * 1000.0, 2)}ms")
 
     except asyncio.TimeoutError:
+        logger.error(f"[chat] LLM call timed out after 15 seconds")
         response = "I'm thinking… this is taking longer than expected. Could you try rephrasing your question?"
         fallback_duration_ms = 0.0
     except Exception as e:
-        print(f"[chat] LLM call failed: {e}")
+        logger.error(f"[chat] LLM call failed with error: {str(e)}", exc_info=True)
         response = f"I encountered an error: {str(e)[:100]}"
         fallback_duration_ms = 0.0
 

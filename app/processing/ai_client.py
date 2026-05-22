@@ -43,8 +43,8 @@ class AIClient:
             
             if sys_settings:
                 # Use settings from Admin Dashboard (DB)
-                self.provider = sys_settings.global_ai_provider or settings.GLOBAL_AI_PROVIDER
-                self.ai_model_name = sys_settings.global_ai_model or settings.GLOBAL_AI_MODEL or None
+                self.provider = settings.GLOBAL_AI_PROVIDER or sys_settings.global_ai_provider
+                self.ai_model_name = settings.GLOBAL_AI_MODEL or sys_settings.global_ai_model or None
                 global_key = decrypt_secret(sys_settings.global_ai_api_key)
                 self.gemini_key = global_key if self.provider == "gemini" else None
                 self.hf_token = global_key if self.provider == "huggingface" else None
@@ -99,17 +99,18 @@ class AIClient:
 
         for attempt in range(1, self.max_retries + 1):
             try:
-                return await asyncio.wait_for(operation(), timeout=self.request_timeout_seconds)
+                t_start = asyncio.get_event_loop().time()
+                result = await asyncio.wait_for(operation(), timeout=self.request_timeout_seconds)
+                duration = (asyncio.get_event_loop().time() - t_start) * 1000.0
+                logger.info(f"AI provider {operation_name} succeeded in {round(duration, 2)}ms (attempt {attempt})")
+                return result
+            except asyncio.TimeoutError:
+                logger.warning(f"AI provider {operation_name} timed out after {self.request_timeout_seconds}s (attempt {attempt}/{self.max_retries})")
+                last_error = RuntimeError(f"Timeout after {self.request_timeout_seconds}s")
             except Exception as exc:
                 last_error = exc
-                if attempt >= self.max_retries:
-                    break
-
-                # Exponential backoff with jitter to avoid retry storms
-                jitter = random.uniform(0.0, 0.2)
-                delay = (self.retry_base_delay_seconds * (2 ** (attempt - 1))) + jitter
                 logger.warning(
-                    "AI provider call failed; retrying",
+                    f"AI provider {operation_name} failed; retrying",
                     extra={
                         "provider": self.provider,
                         "operation": operation_name,
@@ -118,6 +119,11 @@ class AIClient:
                         "error": str(exc),
                     },
                 )
+            
+            if attempt < self.max_retries:
+                # Exponential backoff with jitter to avoid retry storms
+                jitter = random.uniform(0.0, 0.2)
+                delay = (self.retry_base_delay_seconds * (2 ** (attempt - 1))) + jitter
                 await asyncio.sleep(delay)
 
         raise RuntimeError(
@@ -134,20 +140,23 @@ class AIClient:
                 model_name = self.ai_model_name
             else:
                 # Dynamically find the best model
-                model_name = "gemini-1.5-flash"  # Fallback
+                model_name = settings.GLOBAL_AI_MODEL or "gemini-1.5-flash"  # Fallback to env then hardcoded
                 best_model = None
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        # Prefer 'flash' models that are not preview
-                        if "flash" in m.name and "preview" not in m.name:
-                            best_model = m.name
-                            break # Found a good one
                 
-                if best_model:
-                    model_name = best_model
-                    logger.info(f"Dynamically selected Gemini model: {model_name}")
-                else:
-                    logger.warning(f"Could not dynamically find a suitable model, falling back to {model_name}")
+                # If we don't have a specific model in env, try to find one
+                if model_name == "gemini-1.5-flash":
+                    for m in genai.list_models():
+                        if 'generateContent' in m.supported_generation_methods:
+                            # Prefer 'flash' models that are not preview
+                            if "flash" in m.name and "preview" not in m.name:
+                                best_model = m.name
+                                break # Found a good one
+                    
+                    if best_model:
+                        model_name = best_model
+                        logger.info(f"Dynamically selected Gemini model: {model_name}")
+                    else:
+                        logger.warning(f"Could not dynamically find a suitable model, falling back to {model_name}")
 
             self.model = genai.GenerativeModel(model_name)
             logger.info(f"Gemini AI initialized with model: {self.model.model_name}")
@@ -189,7 +198,25 @@ class AIClient:
                     )
 
                 response = await self._with_retries_and_timeout("gemini.generate_content", _gemini_call)
-                return response.text
+                
+                # Robustly extract text from potentially multi-part response
+                try:
+                    if not response.candidates:
+                        logger.warning(f"Gemini returned no candidates. This usually means the prompt was blocked by safety filters. Response: {response}")
+                        return "[GEMINI] No response generated. The prompt may have been blocked by safety filters or the model is overloaded."
+                    
+                    if response.candidates[0].content.parts:
+                        return "".join(part.text for part in response.candidates[0].content.parts if hasattr(part, 'text')).strip()
+                    
+                    # Fallback to the quick accessor if parts lookup fails for some reason
+                    return response.text
+                except Exception as e:
+                    logger.error(f"Error extracting Gemini response text: {e}")
+                    # Final attempt fallback
+                    try:
+                        return response.text
+                    except Exception:
+                        return f"[GEMINI] Failed to extract text from response: {str(e)}"
             elif self.provider == "huggingface":
                 kwargs = {"max_new_tokens": max_tokens}
                 if self.ai_model_name:

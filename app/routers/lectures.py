@@ -37,9 +37,12 @@ def _get_pipeline_for_user(user: "User") -> SmartPipeline:
     Build a SmartPipeline for the given user using global AI settings.
     Uses local extraction + optional AI polish pass.
     """
+    from app.config import get_settings
+    app_settings = get_settings()
+    
     # Resolve Gemini API key: personal first, then global
     gemini_key = None
-    gemini_model = os.getenv("GLOBAL_AI_MODEL", "gemini-2.5-flash")
+    gemini_model = app_settings.GLOBAL_AI_MODEL or "gemini-1.5-flash"
     if not getattr(user, "use_global_ai_config", False):
         provider = getattr(user, "ai_provider", "") or ""
         if "gemini" in provider.lower():
@@ -53,16 +56,15 @@ def _get_pipeline_for_user(user: "User") -> SmartPipeline:
             from app.utils.db import SessionLocal
             from app.models.db import SystemSettings
             with SessionLocal() as s:
-                settings = s.query(SystemSettings).first()
-                if settings and "gemini" in (settings.global_ai_provider or "").lower():
-                    gemini_key = decrypt_secret(settings.global_ai_api_key)
-                    if settings.global_ai_model:
-                        gemini_model = settings.global_ai_model
+                db_settings = s.query(SystemSettings).first()
+                if db_settings and "gemini" in (db_settings.global_ai_provider or "").lower():
+                    gemini_key = decrypt_secret(db_settings.global_ai_api_key)
+                    gemini_model = app_settings.GLOBAL_AI_MODEL or db_settings.global_ai_model or "gemini-1.5-flash"
         except Exception:
             pass
 
     if not gemini_key:
-        gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GLOBAL_GEMINI_API_KEY")
+        gemini_key = app_settings.GEMINI_API_KEY or app_settings.GLOBAL_GEMINI_API_KEY
 
     return SmartPipeline(
         use_polish=bool(gemini_key),
