@@ -26,7 +26,8 @@ from app.utils.observability import record_request
 from app.routers import auth, subjects, lectures, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+from app.logging_config import setup_logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
@@ -128,11 +129,6 @@ async def lifespan(app: FastAPI):
     
     yield
     # Shutdown
-    try:
-        from app.utils.tasks import task_executor
-        task_executor.shutdown(wait=False, cancel_futures=True)
-    except Exception as e:
-        logger.warning(f"Task executor shutdown warning: {e}")
     logger.info("Shutting down application")
 
 

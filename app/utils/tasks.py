@@ -1,7 +1,6 @@
 """Background task management"""
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from typing import Callable, Any, Optional
+from typing import Any, Optional
 import logging
 import json
 
@@ -12,13 +11,6 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Global thread pool for background tasks
-task_executor = ThreadPoolExecutor(max_workers=5)
-
-# In-memory fallback task tracking (primary tracking is in database)
-tasks_tracking = {}
-
-
 def _serialize_result(value: Any) -> Optional[str]:
     if value is None:
         return None
@@ -26,7 +18,6 @@ def _serialize_result(value: Any) -> Optional[str]:
         return json.dumps(value)
     except TypeError:
         return json.dumps({"value": str(value)})
-
 
 def _deserialize_result(value: Optional[str]) -> Any:
     if not value:
@@ -36,119 +27,52 @@ def _deserialize_result(value: Optional[str]) -> Any:
     except Exception:
         return value
 
-
 class TaskManager:
     """Manage background tasks and processing"""
     
     @staticmethod
     def submit_task(
         task_id: str,
-        task_func: Callable,
-        *args,
-        user_id: Optional[int] = None,
-        task_type: str = "generic",
+        task_type: str,
+        user_id: int,
         **kwargs
     ) -> str:
         """
-        Submit a background task for processing
-        
-        Args:
-            task_id: Unique identifier for task
-            task_func: Function to execute
-            *args: Positional arguments for function
-            **kwargs: Keyword arguments for function
-            
-        Returns:
-            Task ID
+        Submit a background task for processing (stored in DB for worker to pick up)
         """
         try:
-            logger.info(f"Submitting task {task_id}")
+            logger.info(f"Submitting task {task_id} of type {task_type}")
 
-            # Keep compatibility fallback for existing task-status callers.
-            tasks_tracking[task_id] = {
-                "status": "pending",
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
-                "result": None,
-                "error": None,
-                "progress": 0
-            }
-
-            if user_id is not None:
-                db = SessionLocal()
-                try:
-                    task = db.query(Task).filter(Task.task_id == task_id).first()
-                    if not task:
-                        task = Task(
-                            task_id=task_id,
-                            user_id=user_id,
-                            task_type=task_type,
-                            status="pending",
-                            progress=0,
-                            input_data=_serialize_result({"args": args, "kwargs": kwargs}),
-                        )
-                        db.add(task)
-                    else:
-                        task.user_id = user_id
-                        task.task_type = task_type
-                        task.status = "pending"
-                        task.progress = 0
-                        task.input_data = _serialize_result({"args": args, "kwargs": kwargs})
-                        task.result = None
-                        task.error_message = None
-                        task.updated_at = datetime.utcnow()
-                    db.commit()
-                finally:
-                    db.close()
-            
-            # Submit to executor
-            task_executor.submit(
-                TaskManager._execute_task,
-                task_id,
-                task_func,
-                *args,
-                **kwargs
-            )
+            db = SessionLocal()
+            try:
+                task = db.query(Task).filter(Task.task_id == task_id).first()
+                if not task:
+                    task = Task(
+                        task_id=task_id,
+                        user_id=user_id,
+                        task_type=task_type,
+                        status="pending",
+                        progress=0,
+                        input_data=_serialize_result({"kwargs": kwargs}),
+                    )
+                    db.add(task)
+                else:
+                    task.user_id = user_id
+                    task.task_type = task_type
+                    task.status = "pending"
+                    task.progress = 0
+                    task.input_data = _serialize_result({"kwargs": kwargs})
+                    task.result = None
+                    task.error_message = None
+                    task.updated_at = datetime.utcnow()
+                db.commit()
+            finally:
+                db.close()
             
             return task_id
         except Exception as e:
             logger.error(f"Error submitting task {task_id}: {e}")
             raise
-    
-    @staticmethod
-    def _execute_task(
-        task_id: str,
-        task_func: Callable,
-        *args,
-        **kwargs
-    ):
-        """Execute a task and track its status"""
-        try:
-            logger.info(f"Starting task {task_id}")
-            tasks_tracking[task_id]["status"] = "running"
-            tasks_tracking[task_id]["updated_at"] = datetime.utcnow().isoformat()
-
-            TaskManager._update_db_task(task_id, status="running", progress=10)
-            
-            # Execute task
-            result = task_func(*args, **kwargs)
-            
-            # Mark as complete
-            tasks_tracking[task_id]["status"] = "completed"
-            tasks_tracking[task_id]["result"] = result
-            tasks_tracking[task_id]["progress"] = 100
-            tasks_tracking[task_id]["updated_at"] = datetime.utcnow().isoformat()
-
-            TaskManager._update_db_task(task_id, status="completed", result=result, progress=100)
-            
-            logger.info(f"Task {task_id} completed successfully")
-        except Exception as e:
-            logger.error(f"Task {task_id} failed: {e}")
-            tasks_tracking[task_id]["status"] = "failed"
-            tasks_tracking[task_id]["error"] = str(e)
-            tasks_tracking[task_id]["progress"] = 0
-            tasks_tracking[task_id]["updated_at"] = datetime.utcnow().isoformat()
-            TaskManager._update_db_task(task_id, status="failed", error=str(e), progress=0)
 
     @staticmethod
     def _update_db_task(
@@ -205,16 +129,12 @@ class TaskManager:
         finally:
             db.close()
 
-        return tasks_tracking.get(task_id)
+        return None
     
     @staticmethod
     def update_task_progress(task_id: str, progress: int):
         """Update task progress (0-100)"""
         bounded = min(100, max(0, progress))
-        if task_id in tasks_tracking:
-            tasks_tracking[task_id]["progress"] = min(100, max(0, progress))
-            tasks_tracking[task_id]["updated_at"] = datetime.utcnow().isoformat()
-
         TaskManager._update_db_task(task_id, progress=bounded)
 
     @staticmethod
@@ -242,22 +162,13 @@ class TaskManager:
         finally:
             db.close()
 
-
 class OCRTask:
     """OCR processing task"""
-    
     @staticmethod
     def process_file(file_path: str) -> dict:
-        """
-        Process a file for OCR
-        Returns: {"extracted_text": str, "chunks": list}
-        """
         from app.processing.ocr import OCRProcessor
-        
         try:
             logger.info(f"Processing file for OCR: {file_path}")
-            
-            # Determine file type from path
             if file_path.endswith(".pdf"):
                 file_type = "application/pdf"
             elif file_path.endswith(".pptx"):
@@ -266,45 +177,23 @@ class OCRTask:
                 file_type = "image/jpeg"
             else:
                 raise ValueError(f"Unsupported file type: {file_path}")
-            
-            # Extract text
             extracted_text = OCRProcessor.extract_text(file_path, file_type)
-            
-            # Chunk text
             chunks = OCRProcessor.chunk_text(extracted_text)
-            
-            return {
-                "extracted_text": extracted_text,
-                "chunks": chunks,
-                "chunk_count": len(chunks)
-            }
+            return {"extracted_text": extracted_text, "chunks": chunks, "chunk_count": len(chunks)}
         except Exception as e:
             logger.error(f"Error processing file: {e}")
             raise
 
-
 class EmbeddingsTask:
     """Embeddings generation task"""
-    
     @staticmethod
     def generate_embeddings(text_chunks: list) -> dict:
-        """
-        Generate embeddings for text chunks
-        Returns: {"embeddings": list, "metadata": dict}
-        """
         from app.processing.search import EmbeddingsManager
-        
         try:
             logger.info(f"Generating embeddings for {len(text_chunks)} chunks")
-            
             embeddings_mgr = EmbeddingsManager()
             embeddings = embeddings_mgr.embed_texts(text_chunks)
-            
-            return {
-                "embeddings": embeddings.tolist(),  # Convert numpy to list
-                "chunks": text_chunks,
-                "embedding_count": len(embeddings)
-            }
+            return {"embeddings": embeddings.tolist(), "chunks": text_chunks, "embedding_count": len(embeddings)}
         except Exception as e:
             logger.error(f"Error generating embeddings: {e}")
             raise

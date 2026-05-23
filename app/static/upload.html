@@ -455,17 +455,17 @@
 
                 if (response.ok) {
                     const result = await response.json();
-                    
+
                     // Close progress modal and show success
                     document.getElementById('progressModal').classList.remove('active');
                     showSuccessModal('Upload Complete', 'Your lecture has been uploaded and processed successfully!');
-                    
+
                     // Redirect after modal is closed
                     const successModal = document.getElementById('successModal');
                     const handleDone = () => {
                         window.location.href = `/note/${result.id}`;
                     };
-                    
+
                     // Replace the Done button's onclick with redirect
                     const doneBtn = successModal.querySelector('.btn-save');
                     if (doneBtn) {
@@ -473,16 +473,16 @@
                     }
                 } else {
                     document.getElementById('progressModal').classList.remove('active');
+                    const clonedResponse = response.clone();
                     try {
                         const error = await response.json();
                         alert('Upload failed: ' + (error.detail || 'Unknown error'));
                     } catch (e) {
-                        const text = await response.text();
+                        const text = await clonedResponse.text();
                         console.error('Response text:', text);
                         alert('Upload failed: HTTP ' + response.status + ' - ' + (text || 'Unknown error'));
                     }
-                }
-            } catch (error) {
+                }            } catch (error) {
                 document.getElementById('progressModal').classList.remove('active');
                 alert('Error: ' + error.message);
             }

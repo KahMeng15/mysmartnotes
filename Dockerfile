@@ -10,7 +10,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     PORT=8000 \
-    DATABASE_URL=sqlite:///./data/app.db \
     ENVIRONMENT=production
 
 WORKDIR /app

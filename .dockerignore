@@ -35,3 +35,7 @@ instrument_sans.zip
 Dockerfile
 docker-compose.yml
 .dockerignore
+
+# Ignore logs
+logs/
+*.log

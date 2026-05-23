@@ -112,7 +112,7 @@ class Lecture(Base):
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
     file_name = Column(String(255))
-    file_type = Column(String(20))  # pdf, pptx, image
+    file_type = Column(String(128))  # pdf, pptx, image, long MIME types
     file_size = Column(Integer)
     page_count = Column(Integer, default=0)
     extracted_text = Column(Text)

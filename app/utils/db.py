@@ -68,7 +68,7 @@ def _ensure_sqlite_directory() -> None:
 
 # Create engine
 engine_kwargs = {
-    "echo": settings.DEBUG,
+    "echo": os.getenv("SQL_ECHO", "false").lower() == "true",
 }
 
 if is_sqlite:
