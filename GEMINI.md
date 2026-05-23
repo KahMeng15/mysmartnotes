@@ -1,53 +1,75 @@
-
 # MySmartNotes - AI-Powered Study Companion
 
 ## 📖 Project Overview
-MySmartNotes is an AI-powered study companion that converts lecture materials (PDF, PPTX, images) into structured, AI-enhanced study notes. It features a multi-container architecture for scalability, providing RAG-based chat, quiz creation, and progress analytics.
+MySmartNotes is a multi-container web application designed to convert lecture materials (PDF, PPTX, images) into structured, AI-enhanced study notes. It utilizes a sophisticated processing pipeline to extract clean markdown, which then enables features like RAG-based chat, quiz generation, and progress tracking.
 
-## 🛠️ Tech Stack
-- **Backend**: FastAPI (Python 3.9+)
-- **Frontend**: Vanilla JavaScript, HTML5, CSS3 (Served via Nginx)
-- **Worker**: Dedicated Python process for background tasks (OCR, AI, Embeddings)
-- **Database**: PostgreSQL 15 (SQLAlchemy ORM)
-- **Reverse Proxy**: Nginx (Acts as API proxy and static file server)
-- **Vector Search**: Local embeddings (sentence-transformers) stored in PostgreSQL
-- **AI Providers**: Google Gemini (default), Hugging Face, Ollama
-- **Document Processing**: pdfplumber, python-pptx, Tesseract OCR
-- **Deployment**: Docker Compose (Multi-container stack)
+### Architecture & Tech Stack
+- **Backend**: FastAPI (Python 3.11+)
+- **Worker**: Dedicated Python process for background tasks (OCR, AI, Embeddings).
+- **Frontend**: Vanilla JavaScript/HTML/CSS, served via **Nginx** (which also acts as a reverse proxy).
+- **Database**: **PostgreSQL 15** (managed via SQLAlchemy ORM).
+- **AI/LLM**: Supports Google Gemini (default), Hugging Face, and Ollama.
+- **Vector Search**: Local embeddings (`sentence-transformers/all-MiniLM-L6-v2`) stored in PostgreSQL.
+- **Deployment**: Orchestrated via **Docker Compose**.
 
-## 📂 Key Directory Structure
-- `app/`: Core application logic
-  - `models/`: Database models (`db.py`)
-  - `processing/`: Document extraction, OCR, and AI pipeline logic
-  - `routers/`: API endpoints (auth, chat, documents, quizzes, etc.)
-  - `schemas/`: Pydantic models for API validation
-  - `static/`: Frontend assets (HTML, JS, CSS, Fonts)
-  - `utils/`: Shared utilities (auth, db, tasks, websocket)
-  - `main.py`: API entry point
-  - `worker_main.py`: Background worker entry point
-  - `nginx.conf`: Nginx configuration
-- `data/`: Persistent storage (PostgreSQL data and uploaded files)
-- `generated/`: Output location for generated study materials (PDFs, Word docs)
-- `logs/`: Centralized logs for all services
-- `scripts/`: Maintenance, dev, and migration scripts
+## 🚀 Building and Running
 
-## ⚙️ Configuration
-- `.env`: Environment variables (API keys, DB URL, etc.)
-- `app/config.py`: Pydantic settings management. Supports Global AI settings (admin-managed) and per-user personal settings.
+### Development Environment (Local)
+To run the project locally for development with hot-reloading:
+```bash
+# 1. Start the PostgreSQL database
+docker-compose up -d db
 
-## 🔄 Core Workflows
-1. **Document Processing**: `app/processing/smart_pipeline.py` orchestrates extraction, while `app/worker_main.py` handles the heavy lifting in the background.
-2. **Semantic Search (RAG)**: `app/processing/embeddings.py` generates chunks and vectors; `app/processing/search.py` performs similarity search.
-3. **AI Chat**: `app/routers/chat.py` uses `app/processing/ai_client.py` to interact with multiple providers.
-4. **Task Management**: `app/utils/tasks.py` manages a DB-backed task queue processed by the Worker.
+# 2. Setup virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 
-## 📝 Development Guidelines
-- **Database**: Use `app/utils/db.py` for session management. Supports both SQLite (local) and PostgreSQL (containerized).
-- **Background Tasks**: Managed via the `Task` model and processed by the dedicated worker.
-- **Frontend**: Keep it vanilla. JS files are in `app/static/js/`, styles in `app/static/styles/`.
-- **API**: Follow RESTful conventions. Use Pydantic schemas for request/response validation.
+# 3. Configure environment
+cp .env.example .env
+# Edit .env to add your API keys and set DATABASE_URL=postgresql://mysmartnotes:mysmartnotespassword@localhost:5432/mysmartnotes
 
-## 🛡️ Security
-- **Admin Bootstrap**: Configurable via `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env`.
-- **IP Filtering**: Managed via `IPFilter` model and system middleware in `main.py`.
-- **Lockdown Mode**: Restricts access to local network only.
+# 4. Run API and Worker
+./scripts/dev.sh
+```
+
+### Docker Deployment
+The recommended way to deploy the full stack:
+```bash
+docker-compose up -d --build
+```
+- **Web UI**: `http://localhost:8000`
+- **API Docs**: `http://localhost:8000/docs`
+
+### Testing
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=app tests/
+```
+
+## 🛠️ Development Conventions
+
+### Project Structure
+- `app/main.py`: API entry point and middleware configuration.
+- `app/worker_main.py`: Background task consumer.
+- `app/processing/smart_pipeline.py`: Core extraction logic (Font-aware + AI Polish).
+- `app/routers/`: Modular API endpoints.
+- `app/models/db.py`: SQLAlchemy models for PostgreSQL.
+- `app/schemas/schemas.py`: Pydantic models for request/response validation.
+
+### Background Tasks
+Tasks (OCR, AI generation, Embeddings) are managed via a database-backed queue. The API submits a `Task` record, which is then picked up and processed by the dedicated `Worker` service.
+
+### Security & Authentication
+- **JWT Auth**: Uses stateless JSON Web Tokens with a "sliding session" (re-issued on activity).
+- **CSRF Protection**: Enforced for cookie-authenticated sessions.
+- **IP Filtering & Lockdown Mode**: Configurable via the admin dashboard and `IPFilter` model.
+
+### Logging
+The system uses a granular logging configuration (`app/logging_config.py`) that outputs to 15 different log files in the `./logs` directory, separating concerns by API module and worker type.
+
+### UI Development
+The frontend is built with vanilla JavaScript and CSS to avoid build-step complexity. Static assets are served from `app/static/` and proxy-passed through Nginx in production.
