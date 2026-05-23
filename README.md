@@ -1,149 +1,110 @@
 # 🚀 MySmartNotes – Smart AI-Powered Study Companion
 
-A lightweight, single-container web application that intelligently converts lecture slides (PDF/PPTX) into structured study materials using advanced AI. Extract clean markdown with properly formatted tables, ask questions via RAG-based chat, generate quizzes, and organize your learning journey. Perfect for personal use or small study groups (0-10 people).
+A scalable, AI-powered study companion that intelligently converts lecture slides (PDF/PPTX) into structured study materials. Featuring a **Multi-Container Architecture**, it extracts clean markdown with properly formatted tables, provides RAG-based chat, generates quizzes, and organizes your learning journey. Perfect for personal use or small study groups.
 
 ## ✨ Key Features
 
 * **Advanced Document Processing**: Font-aware text extraction + table detection from PDF/PPTX
   - Preserves document structure with proper headings and formatting
   - Automatically detects and converts tables to markdown format
-  - OCR support for scanned documents
+  - OCR support for scanned documents via dedicated background workers
 * **Semantic Q&A Chat**: Ask questions about your notes with RAG (Retrieval Augmented Generation)
   - Pre-computed embeddings for fast semantic search
-  - Vector DB integrated into SQLite (no external services needed)
+  - Vector storage integrated into the database
   - Context-aware LLM responses from multiple AI providers
 * **Study Tools**: Quiz generation and cheat sheets
   - Auto-generate practice quizzes from lecture notes
   - Export notes as PDF or Word documents
 * **Smart Organization**: Subjects grouped by semester/topic with snapshots
-  - Save different versions of lecture notes as snapshots
-  - Track changes and revert to previous versions
-  - Organized by subject groups for semester management
-* **Learning Analytics**: Monitor your study progress
-  - Track study sessions and time spent
-  - View learning patterns and quiz performance
-  - Dashboard with personalized insights
-* **Flexible AI**: Support for multiple AI providers
-  - Gemini API (Google)
-  - Hugging Face Inference API
-  - Self-hosted Ollama (local LLM option)
-  - Per-user or global AI configuration
+* **Learning Analytics**: Monitor your study progress via a dedicated dashboard
+* **Flexible AI**: Support for Gemini API, Hugging Face, and Ollama
+* **Scalable Infrastructure**: Multi-container stack with dedicated API, Worker, and DB services
 * **Real-Time Updates**: WebSocket support for live extraction progress
-* **Private & Simple**: No complex infrastructure - just one command to run
-
-## 🎯 Design Philosophy
-
-* **Simplicity First**: Single container, zero microservices complexity
-* **Cost Effective**: $0 for self-hosted or pay-as-you-go with external APIs (Gemini free tier available)
-* **Minimal Setup**: `python main.py` - that's it! No complex setup required
-* **Small Scale**: Designed for 0-10 users (friends, study groups, small classes)
-* **Privacy-Focused**: All data stored locally in SQLite; embeddings computed locally with sentence-transformers
-* **Zero Server Bloat**: No Redis, Celery, or external services needed; background tasks use ThreadPoolExecutor
 
 ## 🏗️ Architecture
 
-**Simple monolithic FastAPI app** - no microservices, no complex orchestration.
+MySmartNotes uses a **Multi-Container Architecture** to ensure reliable background processing and high availability.
 
 **Stack:**
-- **Backend**: FastAPI + Python 3.9+ (single monolithic app)
-- **Frontend**: HTML5/CSS3/JavaScript (no build step, vanilla JS)
-- **Database**: SQLite with pre-computed vector embeddings (no external vector DB)
-- **Document Processing**: 
-  - pdfplumber (PDF table extraction)
-  - Font-aware text extraction (preserve document structure)
-  - python-pptx (PowerPoint support)
-  - Tesseract OCR (optional, for scanned documents)
-- **AI/LLM Providers**: 
-  - Google Gemini API (default)
-  - Hugging Face Inference API
-  - Self-hosted Ollama
-- **Embeddings**: sentence-transformers (local, CPU-based, no API calls)
-- **Background Tasks**: ThreadPoolExecutor + asyncio (no Redis/Celery)
-- **Deployment**: Docker (single container) or bare metal Python
+- **Frontend**: Nginx (Static assets + Reverse Proxy)
+- **API**: FastAPI (Request handling & Auth)
+- **Worker**: Python (Background processing: OCR, AI, Embeddings)
+- **Database**: PostgreSQL 15 (Persistent storage & Task Queue)
+- **Embeddings**: sentence-transformers (Local, CPU-based)
+- **Deployment**: Docker Compose
 
+## 🚀 Quick Start (Docker Compose)
 
-## 🚀 Quick Start
+The recommended way to run MySmartNotes is using Docker Compose.
 
-### Option 1: Python (Simplest)
-
+### 1. Setup
 ```bash
 # Clone repository
 git clone <repo-url> mysmartnotes
 cd mysmartnotes
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
 # Copy environment template and configure
 cp .env.example .env
-# Edit .env: Add your Gemini API key or Hugging Face token
-
-# Run the app
-python main.py
-
-# Access at http://localhost:8000
+# Edit .env: Add your GEMINI_API_KEY or other provider keys
 ```
 
-### Option 2: Docker (GHCR.io)
-
-We provide pre-built Docker images via GitHub Container Registry (GHCR):
-
-- **Main Branch (Stable)**: `ghcr.io/kahmeng15/mysmartnotes:latest`
-- **Dev Branch (Bleeding Edge)**: `ghcr.io/kahmeng15/mysmartnotes:dev`
-
-#### Use Stable (Recommended)
+### 2. Launch
 ```bash
-# Pull and run the latest stable image
-docker run -d \
-  -p 8000:8000 \
-  -v $(pwd)/data:/app/data \
-  -e GEMINI_API_KEY="your-key" \
-  ghcr.io/kahmeng15/mysmartnotes:latest
+# Start the full stack
+docker-compose up -d
 ```
 
-#### Use Dev (For testing latest features)
-```bash
-# Pull and run the dev image
-docker run -d \
-  -p 8000:8000 \
-  -v $(pwd)/data:/app/data \
-  -e GEMINI_API_KEY="your-key" \
-  ghcr.io/kahmeng15/mysmartnotes:dev
-```
+**Services:**
+- **Web UI**: [http://localhost:8000](http://localhost:8000)
+- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Logs**: View via `docker-compose logs -f` or in the `./logs` directory.
 
-# Access at http://localhost:8000
+---
 
+### Option 2: Python (Local Development)
 
-### Option 4: Single-File Deployment (Merged)
-
-If you prefer a single file without a separate `.env`, use the merged version:
+For faster iteration during development, you can run the services manually:
 
 ```bash
-# Run using the merged compose file
-docker-compose -f docker-compose.merged.yml up -d
-```
-*Note: Remember to edit `docker-compose.merged.yml` to add your API keys before running.*
+# 1. Start Database
+docker-compose up -d db
 
-See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed setup and troubleshooting.
+# 2. Setup Venv
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Run Dev Script (Starts API + Worker)
+./scripts/dev.sh
+```
 
 ## 📚 Documentation
 
-Detailed documentation is available in the `docs/` folder:
+- **[Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)**: Deep dive into the multi-container architecture, data models, and processing pipelines.
+- **[Development Guide](docs/DEVELOPMENT.md)**: Detailed instructions for local setup, testing, and contribution.
+- **[Resource Requirements](docs/RESOURCE_REQUIREMENTS.md)**: Hardware recommendations for the new architecture.
 
-- **[Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)**: Deep dive into the architecture, data models, and core processing pipelines.
-- **[Development Guide](docs/DEVELOPMENT.md)**: Instructions for local setup, testing, and contribution.
-- **[Resource Requirements](docs/RESOURCE_REQUIREMENTS.md)**: Sizing guide and hardware recommendations for different usage scenarios.
+## 🛠️ Tech Stack Details
+
+| Component | Technology | Purpose |
+|-----------|-----------|----------|
+| **Reverse Proxy** | Nginx | Serves UI & routes API traffic |
+| **Backend API** | FastAPI, Python 3.11+ | Web server & API logic |
+| **Worker** | Python (dedicated process) | Background processing (OCR, AI) |
+| **Database** | PostgreSQL 15 | Persistent storage & Task Queue |
+| **Vector Storage** | PostgreSQL + sentence-transformers | Semantic search |
+| **Document Extraction** | pdfplumber, python-pptx | PDF/PPTX parsing |
+| **OCR** | Tesseract + pytesseract | Scanned document support |
+| **AI/LLM** | Gemini / HF Inference / Ollama | Multiple provider support |
+| **Async Tasks** | DB-backed Task Queue | Managed background processing |
+| **Deployment** | Docker Compose | Multi-container orchestration |
 
 ## Production Safety Notes
 
 - Set `ENVIRONMENT=production` in deployment environments.
 - Set a strong `SECRET_KEY` (32+ characters).
 - Configure `CORS_ALLOWED_ORIGINS` to trusted domains only.
-- Use a non-SQLite database for production (`ALLOW_SQLITE_IN_PRODUCTION=false` by default).
+- Use the included PostgreSQL database for production reliability.
 - Set `COOKIE_SECURE=true` behind HTTPS.
 - Set `APP_ENCRYPTION_KEY` to enable encryption for stored API keys.
 - Runtime diagnostics are available at `GET /admin/runtime-metrics` (admin-only).
@@ -158,25 +119,8 @@ Detailed documentation is available in the `docs/` folder:
 
 See [RESOURCE_REQUIREMENTS.md](docs/RESOURCE_REQUIREMENTS.md) for deployment sizing details.
 
-## 🛠️ Tech Stack Details
+##  Workflow Overview
 
-| Component | Technology | Purpose |
-|-----------|-----------|----------|
-| **Backend** | FastAPI, Python 3.9+ | Web server & API |
-| **Frontend** | HTML5, CSS3, Vanilla JS | Zero-build UI |
-| **Database** | SQLite | Local persistent storage |
-| **Vector Storage** | SQLite + sentence-transformers | Semantic search (no external vector DB) |
-| **Document Extraction** | pdfplumber, python-pptx | PDF/PPTX parsing & table detection |
-| **Font Analysis** | FontAwareExtractor | Preserve document structure from PDFs |
-| **OCR** | Tesseract + pytesseract | Scanned document support (optional) |
-| **Markdown Rendering** | marked.js (client-side) | Table + GFM support |
-| **AI/LLM** | Gemini / HF Inference / Ollama | Multiple provider support |
-| **Embeddings** | sentence-transformers | Local CPU embeddings (no API calls) |
-| **Async Tasks** | ThreadPoolExecutor + asyncio | Background processing (no Redis/Celery) |
-| **WebSocket** | Python-websockets | Real-time progress updates |
-| **Deployment** | Docker or bare metal | Single container deployment |
-
-## � Workflow Overview
 
 1. **Upload Lecture**: PDF, PPTX, or images
 2. **Auto Extract**: Font-aware extraction + table detection → clean markdown
