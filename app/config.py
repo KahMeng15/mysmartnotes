@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     GLOBAL_GEMINI_API_KEY: str = ""
     GLOBAL_HUGGINGFACE_TOKEN: str = ""
     GLOBAL_AI_MODEL: str = ""
+    GLOBAL_REASONING_LEVEL: str = "medium"  # Options: low, medium, high
 
     # Fallback AI Settings
     GEMINI_API_KEY: str = ""

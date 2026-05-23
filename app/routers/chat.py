@@ -735,14 +735,14 @@ async def ask_question(
 
     logger.info(f"[chat] Calling {ai_client.provider} with model {ai_client.ai_model_name or 'default'}...")
     try:
-        # Increase timeout from 4.5 to 15 seconds for more robust generation
+        # Increase timeout from 15 to 90 seconds for more robust generation (Gemma 4 needs time to 'think')
         response = await asyncio.wait_for(
             ai_client.answer_question(
                 question=request.message,
                 context=context,
                 system_prompt=prompt
             ),
-            timeout=15.0
+            timeout=90.0
         )
         logger.info(f"[chat] LLM primary response received in {round((time.time() - t_model_start) * 1000.0, 2)}ms")
         
@@ -757,16 +757,16 @@ async def ask_question(
             logger.info(f"[chat] LLM responded with fallback phrase. Initiating web search...")
             
             t_fallback_start = time.time()
-            web_snippet, web_sources, web_error = await web_search(request.message, timeout=12.0)
+            web_snippet, web_sources, web_error = await web_search(request.message, timeout=15.0)
             fallback_duration_ms = (time.time() - t_fallback_start) * 1000.0
             step_times["step5"] += fallback_duration_ms
             
             logger.info(f"[chat] Web search completed in {round(fallback_duration_ms, 2)}ms. Error: {web_error or 'None'}")
             if web_error == "timeout":
-                response = "DuckDuckGo is taking a while to search... Could you try rephrasing your question or check your internet connection?"
+                response = "Search is taking a while... I'm unable to find a clear answer in your notes or on the web at this moment."
                 snippet_sources = ["Web: DuckDuckGo (timeout)"]
             elif web_error == "unavailable":
-                response = "DuckDuckGo is currently unavailable. I wasn't able to find information about this in your notes. Please try again later."
+                response = "Search is currently unavailable. I wasn't able to find information about this in your notes."
                 snippet_sources = ["Web Search: Unavailable"]
             elif web_snippet:
                 # Override context and prompt for web search retry
@@ -794,13 +794,13 @@ async def ask_question(
                         context=context,
                         system_prompt=prompt
                     ),
-                    timeout=15.0
+                    timeout=60.0
                 )
                 logger.info(f"[chat] LLM secondary response received in {round((time.time() - t_model2_start) * 1000.0, 2)}ms")
 
     except asyncio.TimeoutError:
-        logger.error(f"[chat] LLM call timed out after 15 seconds")
-        response = "I'm thinking… this is taking longer than expected. Could you try rephrasing your question?"
+        logger.error(f"[chat] LLM call timed out")
+        response = "The model is taking too long to generate a response (Timeout). This can happen with complex reasoning models like Gemma 4. Please try again or simplify your question."
         fallback_duration_ms = 0.0
     except Exception as e:
         logger.error(f"[chat] LLM call failed with error: {str(e)}", exc_info=True)
