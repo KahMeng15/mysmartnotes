@@ -1,7 +1,7 @@
 """Chat/Q&A endpoints with conversation threading and AI response modes"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, cast, Integer
 from pydantic import BaseModel
 import time
 from typing import List, Optional
@@ -735,14 +735,14 @@ async def ask_question(
 
     logger.info(f"[chat] Calling {ai_client.provider} with model {ai_client.ai_model_name or 'default'}...")
     try:
-        # Increase timeout from 15 to 90 seconds for more robust generation (Gemma 4 needs time to 'think')
+        # Use the configured timeout from ai_client (supports slow reasoning models)
         response = await asyncio.wait_for(
             ai_client.answer_question(
                 question=request.message,
                 context=context,
                 system_prompt=prompt
             ),
-            timeout=90.0
+            timeout=float(ai_client.request_timeout_seconds)
         )
         logger.info(f"[chat] LLM primary response received in {round((time.time() - t_model_start) * 1000.0, 2)}ms")
         
@@ -794,7 +794,7 @@ async def ask_question(
                         context=context,
                         system_prompt=prompt
                     ),
-                    timeout=60.0
+                    timeout=float(ai_client.request_timeout_seconds)
                 )
                 logger.info(f"[chat] LLM secondary response received in {round((time.time() - t_model2_start) * 1000.0, 2)}ms")
 
@@ -909,8 +909,8 @@ async def get_conversations(
             func.max(ChatMessage.lecture_id).label("lecture_id"),
             func.max(ChatMessage.subject_id).label("subject_id"),
             func.max(ChatMessage.group_id).label("group_id"),
-            func.max(ChatMessage.is_pinned).label("is_pinned"),
-            func.max(ChatMessage.is_favourite).label("is_favourite"),
+            func.max(cast(ChatMessage.is_pinned, Integer)).label("is_pinned"),
+            func.max(cast(ChatMessage.is_favourite, Integer)).label("is_favourite"),
         )
         .filter(
             ChatMessage.user_id == current_user.id,
@@ -918,7 +918,7 @@ async def get_conversations(
         )
         .group_by(ChatMessage.conversation_id)
         .order_by(
-            func.max(ChatMessage.is_pinned).desc(),
+            func.max(cast(ChatMessage.is_pinned, Integer)).desc(),
             func.max(ChatMessage.created_at).desc()
         )
         .all()

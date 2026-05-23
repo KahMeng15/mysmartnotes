@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import random
+import re
 from typing import Optional, List, Callable, TypeVar, Awaitable
 from app.config import get_settings
 from app.models.db import User, SystemSettings
@@ -30,9 +31,10 @@ class AIClient:
         self.model = None
         self.client = None
         # Production-safe request controls for external providers
-        self.request_timeout_seconds = 60
+        # Increased to 240s to accommodate slow reasoning models like Gemma 4
+        self.request_timeout_seconds = 240
         self.max_retries = 3
-        self.retry_base_delay_seconds = 0.5
+        self.retry_base_delay_seconds = 1.0
         
         # Determine settings source
         if user and user.use_global_ai_config:
@@ -44,8 +46,8 @@ class AIClient:
             if sys_settings:
                 # Use settings from Admin Dashboard (DB)
                 self.provider = settings.GLOBAL_AI_PROVIDER or sys_settings.global_ai_provider
-                self.ai_model_name = settings.GLOBAL_AI_MODEL or sys_settings.global_ai_model or None
-                self.reasoning_level = settings.GLOBAL_REASONING_LEVEL
+                self.ai_model_name = settings.GLOBAL_AI_MODEL or sys_settings.global_ai_model or "models/gemma-4-31b-it"
+                self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
                 global_key = decrypt_secret(sys_settings.global_ai_api_key)
                 self.gemini_key = global_key if self.provider == "gemini" else None
                 self.hf_token = global_key if self.provider == "huggingface" else None
@@ -61,8 +63,8 @@ class AIClient:
             else:
                 # Use global settings from environment as absolute fallback
                 self.provider = settings.GLOBAL_AI_PROVIDER
-                self.ai_model_name = settings.GLOBAL_AI_MODEL or None
-                self.reasoning_level = settings.GLOBAL_REASONING_LEVEL
+                self.ai_model_name = settings.GLOBAL_AI_MODEL or "models/gemma-4-31b-it"
+                self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
                 self.gemini_key = settings.GLOBAL_GEMINI_API_KEY if self.provider == "gemini" else None
                 self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN if self.provider == "huggingface" else None
                 self.ollama_base_url = None
@@ -71,8 +73,8 @@ class AIClient:
         elif user and user.ai_provider:
             # Use user's personal settings
             self.provider = user.ai_provider
-            self.ai_model_name = user.ai_model or None
-            self.reasoning_level = settings.GLOBAL_REASONING_LEVEL # Use system default for now
+            self.ai_model_name = user.ai_model or "models/gemma-4-31b-it"
+            self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium" # Use system default for now
             user_key = decrypt_secret(user.ai_api_key)
             self.gemini_key = user_key if self.provider == "gemini" else None
             self.hf_token = user_key if self.provider == "huggingface" else None
@@ -81,11 +83,11 @@ class AIClient:
             
         else:
             # Fallback to system defaults (no user or user has no settings)
-            self.provider = settings.AI_PROVIDER
-            self.ai_model_name = None
-            self.reasoning_level = settings.GLOBAL_REASONING_LEVEL
-            self.gemini_key = settings.GEMINI_API_KEY
-            self.hf_token = settings.HUGGINGFACE_TOKEN
+            self.provider = settings.GLOBAL_AI_PROVIDER or settings.AI_PROVIDER
+            self.ai_model_name = settings.GLOBAL_AI_MODEL or "models/gemma-4-31b-it"
+            self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
+            self.gemini_key = settings.GLOBAL_GEMINI_API_KEY or settings.GEMINI_API_KEY
+            self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN or settings.HUGGINGFACE_TOKEN
             self.ollama_base_url = settings.OLLAMA_BASE_URL
             logger.info(f"Using system fallback AI settings: {self.provider}")
         
@@ -133,34 +135,24 @@ class AIClient:
         raise RuntimeError(
             f"{operation_name} failed after {self.max_retries} attempts"
         ) from last_error
+
     def _init_gemini(self):
         """Initialize Gemini API and dynamically select the best model."""
         try:
             import google.generativeai as genai
+            if not self.gemini_key:
+                logger.error("Gemini API key is missing")
+                self.model = None
+                self.connection_error = "[GEMINI] API key is missing. Please check your settings."
+                return
+
             genai.configure(api_key=self.gemini_key)
 
-            if self.ai_model_name:
-                # Use user-specified model
-                model_name = self.ai_model_name
-            else:
-                # Dynamically find the best model
-                model_name = settings.GLOBAL_AI_MODEL or "gemini-1.5-flash"  # Fallback to env then hardcoded
-                best_model = None
-                
-                # If we don't have a specific model in env, try to find one
-                if model_name == "gemini-1.5-flash":
-                    for m in genai.list_models():
-                        if 'generateContent' in m.supported_generation_methods:
-                            # Prefer 'flash' models that are not preview
-                            if "flash" in m.name and "preview" not in m.name:
-                                best_model = m.name
-                                break # Found a good one
-                    
-                    if best_model:
-                        model_name = best_model
-                        logger.info(f"Dynamically selected Gemini model: {model_name}")
-                    else:
-                        logger.warning(f"Could not dynamically find a suitable model, falling back to {model_name}")
+            model_name = self.ai_model_name or settings.GLOBAL_AI_MODEL or "gemini-1.5-flash"
+            
+            # If the model name is an API key (accidental misconfiguration), fallback
+            if model_name.startswith("AIza"):
+                model_name = "gemini-1.5-flash"
 
             self.model = genai.GenerativeModel(model_name)
             logger.info(f"Gemini AI initialized with model: {self.model.model_name}")
@@ -173,6 +165,11 @@ class AIClient:
         """Initialize Hugging Face"""
         try:
             from huggingface_hub import InferenceClient
+            if not self.hf_token:
+                logger.error("Hugging Face token is missing")
+                self.client = None
+                self.connection_error = "[HUGGINGFACE] API token is missing."
+                return
             self.client = InferenceClient(api_key=self.hf_token)
             logger.info("Hugging Face AI initialized")
         except Exception as e:
@@ -180,11 +177,22 @@ class AIClient:
             self.client = None
             self.connection_error = f"[HUGGINGFACE] Connection failed: {e}"
     
-    async def generate_text(self, prompt: str, max_tokens: int = 500) -> str:
-        """Generate text response"""
+    async def generate_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None) -> str:
+        """Generate text response (unary)"""
+        # Internal helper to collect stream if needed
+        full_text = ""
+        async for chunk in self.stream_text(prompt, max_tokens, system_instruction):
+            full_text += chunk
+        return full_text
+
+    async def stream_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None):
+        """Stream text response with optional reasoning filtering"""
         try:
-            # For Gemma 4, inject reasoning depth into the prompt since SDK doesn't support the parameter yet
-            if self.provider == "gemini" and self.model and "gemma-4" in self.model.model_name.lower():
+            is_gemma4 = False
+            if self.provider == "gemini" and self.model:
+                is_gemma4 = "gemma-4" in self.model.model_name.lower()
+                
+            if is_gemma4:
                 reasoning_instruction = f"\nREASONING DEPTH: {self.reasoning_level.upper()}\n"
                 if "===START===" in prompt:
                     prompt = prompt.replace("===START===", reasoning_instruction + "===START===")
@@ -193,138 +201,84 @@ class AIClient:
 
             if self.provider == "gemini":
                 if self.model is None:
-                    return self.connection_error or "[GEMINI] Gemini AI is not properly initialized. Please check your API key."
-                
-                # Add generation config for max_tokens and reasoning
-                generation_config_dict = {}
-                if max_tokens:
-                    generation_config_dict["max_output_tokens"] = max_tokens
-                
-                # NOTE: reasoning_effort is not yet supported in this version of the SDK's GenerationConfig
-                # We will handle reasoning via system prompts if needed, but remove the failing argument.
+                    yield self.connection_error or "[GEMINI] AI not initialized."
+                    return
 
                 import google.generativeai as genai
-                generation_config = genai.types.GenerationConfig(**generation_config_dict)
+                generation_config = genai.types.GenerationConfig(
+                    max_output_tokens=max_tokens if max_tokens else None,
+                    temperature=0.7
+                )
 
-                async def _gemini_call():
-                    # Gemini SDK call is sync; run in thread so event loop is not blocked.
+                # Use temporary model if system instruction provided
+                active_model = self.model
+                if system_instruction:
+                    active_model = genai.GenerativeModel(
+                        self.model.model_name,
+                        system_instruction=system_instruction
+                    )
+
+                # For reasoning models, we need to handle the "Thought Channel"
+                # which often arrives in the first parts of the stream.
+                
+                async def _gemini_stream():
                     return await asyncio.to_thread(
-                        self.model.generate_content,
+                        active_model.generate_content,
                         prompt,
                         generation_config=generation_config,
+                        stream=True
                     )
 
-                response = await self._with_retries_and_timeout("gemini.generate_content", _gemini_call)
+                response_stream = await self._with_retries_and_timeout("gemini.stream_content", _gemini_stream)
                 
-                # Robustly extract text from potentially multi-part response
-                try:
-                    if not response.candidates:
-                        logger.warning(f"Gemini returned no candidates. This usually means the prompt was blocked by safety filters. Response: {response}")
-                        return "[GEMINI] No response generated. The prompt may have been blocked by safety filters or the model is overloaded."
+                reasoning_buffer = ""
+                in_reasoning = False
+                text_started = False
+
+                for chunk in response_stream:
+                    if not chunk.candidates:
+                        continue
                     
-                    parts = response.candidates[0].content.parts
-                    if parts:
-                        # FILTER: For Gemma 4, the first part is often the internal reasoning/thought.
-                        # We identify it by checking if it's NOT the last part and doesn't contain markers
-                        # or specifically looking for thought channel tags.
-                        final_text_parts = []
-                        is_gemma4 = "gemma-4" in self.model.model_name.lower()
+                    candidate = chunk.candidates[0]
+                    if not candidate.content or not candidate.content.parts:
+                        continue
+
+                    for part in candidate.content.parts:
+                        if not hasattr(part, 'text'):
+                            continue
                         
-                        for i, part in enumerate(parts):
-                            if not hasattr(part, 'text'):
+                        text = part.text
+                        
+                        if is_gemma4:
+                            # Detect start/end of reasoning in the stream
+                            if "<|channel|>thought" in text or "<|thought|>" in text:
+                                in_reasoning = True
+                                # If it's a mix, strip the reasoning part
+                                text = re.sub(r'<\|channel\|>thought.*?<channel\|>', '', text, flags=re.DOTALL)
+                                text = re.sub(r'<\|thought\|>.*?</\|thought\|>', '', text, flags=re.DOTALL)
+                            
+                            # If we are in reasoning mode but haven't seen the end tag in THIS part, 
+                            # we might still be buffering reasoning.
+                            # Standard Gemma 4 behavior: Reason is often the first Part.
+                            if not text_started and not text.strip():
                                 continue
-                            
-                            # Logic for Gemma 4 reasoning part identification:
-                            # 1. It contains explicit thought tags
-                            # 2. It is the FIRST part of a multi-part response in Gemma 4
-                            if is_gemma4:
-                                if "<|channel|>thought" in part.text or "<|thought|>" in part.text:
-                                    logger.debug(f"Filtering reasoning part (tags found) from Gemma 4 response")
-                                    continue
-                                
-                                if len(parts) > 1 and i == 0:
-                                    logger.debug(f"Filtering first part of {len(parts)} as probable reasoning from Gemma 4")
-                                    continue
-                            
-                            final_text_parts.append(part.text)
                         
-                        full_response = "".join(final_text_parts).strip()
-                        
-                        # Fallback cleanup: if tags are still in the text, strip them via regex
-                        if is_gemma4 and full_response:
-                            import re
-                            full_response = re.sub(r'<\|channel\|>thought.*?<channel\|>', '', full_response, flags=re.DOTALL)
-                            full_response = re.sub(r'<\|thought\|>.*?</\|thought\|>', '', full_response, flags=re.DOTALL)
-                        
-                        # Fallback: if somehow we filtered everything, try to find the marker ===START===
-                        if not full_response and parts:
-                            all_parts_text = "".join(p.text for p in parts if hasattr(p, 'text'))
-                            if "===START===" in all_parts_text:
-                                full_response = all_parts_text.split("===START===")[-1].strip()
-                        
-                        return full_response if full_response else response.text
-                    
-                    # Fallback to the quick accessor if parts lookup fails for some reason
-                    return response.text
-                except Exception as e:
-                    logger.error(f"Error extracting Gemini response text: {e}")
-                    # Final attempt fallback
-                    try:
-                        return response.text
-                    except Exception:
-                        return f"[GEMINI] Failed to extract text from response: {str(e)}"
+                        if text:
+                            text_started = True
+                            yield text
+
             elif self.provider == "huggingface":
-                kwargs = {"max_new_tokens": max_tokens}
-                if self.ai_model_name:
-                    kwargs["model"] = self.ai_model_name
-
-                async def _huggingface_call():
-                    # HF inference client call is sync; run in thread to prevent blocking.
-                    return await asyncio.to_thread(self.client.text_generation, prompt, **kwargs)
-
-                response = await self._with_retries_and_timeout("huggingface.text_generation", _huggingface_call)
-                return response
+                # Implementation for HF streaming if needed
+                yield await self.generate_text(prompt, max_tokens)
+            
             elif self.provider == "ollama":
-                model_name = self.ai_model_name if self.ai_model_name else "llama3"
-                url = f"{self.ollama_base_url.rstrip('/')}/api/generate"
-                payload = {
-                    "model": model_name,
-                    "prompt": prompt,
-                    "stream": False
-                }
+                # Implementation for Ollama streaming
+                yield await self.generate_text(prompt, max_tokens)
 
-                async def _ollama_call() -> str:
-                    timeout = aiohttp.ClientTimeout(total=self.request_timeout_seconds)
-                    async with aiohttp.ClientSession(timeout=timeout) as session:
-                        async with session.post(url, json=payload) as response:
-                            if response.status == 200:
-                                result = await response.json()
-                                return result.get("response", "")
-
-                            error_text = await response.text()
-                            raise RuntimeError(
-                                f"Ollama API error ({response.status}): {error_text[:300]}"
-                            )
-
-                try:
-                    return await self._with_retries_and_timeout("ollama.generate", _ollama_call)
-                except Exception as ollama_error:
-                    logger.error(
-                        "Ollama provider request failed",
-                        extra={
-                            "provider": self.provider,
-                            "base_url": self.ollama_base_url,
-                            "error": str(ollama_error),
-                        },
-                    )
-                    return f"Provider Error: Failed to generate response from Local Ollama ({str(ollama_error)})"
         except Exception as e:
-            error_msg = f"[{self.provider.upper()}] Connection failed: {str(e)}"
-            if self.provider == "ollama":
-                error_msg = f"[OLLAMA] Failed to connect to {self.ollama_base_url}: {str(e)}. Please ensure Ollama is running at the configured address."
-            logger.error(error_msg)
-            return error_msg
-    
+            logger.error(f"Streaming error: {e}")
+            yield f"[{self.provider.upper()}] Stream failed: {e}"
+
     async def answer_question(self, context: str, question: str, system_prompt: Optional[str] = None) -> str:
         """Answer question based on context with optional custom system prompt"""
         if system_prompt:

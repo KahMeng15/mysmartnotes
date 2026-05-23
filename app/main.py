@@ -3,6 +3,19 @@ import sys
 import os
 import time
 import uuid
+
+# Monkeypatch bcrypt for passlib compatibility (fix for bcrypt 4.1.0+)
+try:
+    import bcrypt
+    if not hasattr(bcrypt, "__about__"):
+        class BcryptAbout:
+            def __init__(self, version):
+                self.__version__ = version
+        bcrypt.__about__ = BcryptAbout(getattr(bcrypt, "__version__", "unknown"))
+except ImportError:
+    pass
+except Exception:
+    pass
 from collections import defaultdict, deque
 from threading import Lock
 

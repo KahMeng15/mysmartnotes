@@ -896,10 +896,11 @@ class SmartPipeline:
         return False
 
     # ── chunk size for AI polish (characters) ──
-    _POLISH_CHUNK_SIZE = 6000
+    # Reduced to 1500 to minimize "stream failed" errors with slow reasoning models
+    _POLISH_CHUNK_SIZE = 1500
 
     def _ai_polish(self, markdown: str) -> str:
-        """Perform a final formatting-only cleanup pass using Gemini/Gemma.
+        """Perform a final formatting-only cleanup pass using AIClient.
         
         Splits the input into manageable chunks to prevent quality degradation
         from long contexts, then reassembles the polished chunks.
@@ -908,36 +909,53 @@ class SmartPipeline:
             return markdown
 
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.gemini_api_key)
-            model = genai.GenerativeModel(self.gemini_model)
+            from app.processing.ai_client import AIClient
+            # Create a mock-like client since we don't have a user here (it's background)
+            # We bypass the user check by using settings directly in AIClient fallback
+            client = AIClient() 
+            # Ensure it uses the key and model passed to pipeline
+            client.gemini_key = self.gemini_api_key
+            client.ai_model_name = self.gemini_model
+            client._init_gemini()
 
             chunks = self._split_into_chunks(markdown)
             num_chunks = len(chunks)
-            logger.info(f"Refining output with {self.gemini_model} ({num_chunks} chunk(s), parallel)...")
+            logger.info(f"Refining output with {self.gemini_model} ({num_chunks} chunk(s), sequential-ish)...")
 
             # ── Parallel chunk processing ──
             from concurrent.futures import ThreadPoolExecutor, as_completed
 
-            def _process_chunk(args):
-                idx, chunk = args
-                return idx, self._polish_chunk(model, chunk, is_first_chunk=(idx == 0))
+            # We need an event loop for async generate_text
+            import asyncio
+            
+            # Ensure debug directory exists for streaming chunks
+            chunk_debug_dir = Path("scripts/ProcessingAlgorithmTest/output/debug_chunks")
+            chunk_debug_dir.mkdir(parents=True, exist_ok=True)
+            
+            def _run_polish_async(idx, chunk, is_first):
+                return asyncio.run(self._polish_chunk(client, idx, chunk, is_first_chunk=is_first, debug_dir=chunk_debug_dir))
 
             polished_chunks = [None] * num_chunks
 
-            with ThreadPoolExecutor(max_workers=min(num_chunks, 4)) as executor:
+            # Reduced max_workers to 2 to prevent overwhelming reasoning models
+            with ThreadPoolExecutor(max_workers=min(num_chunks, 2)) as executor:
                 futures = {
-                    executor.submit(_process_chunk, (i, chunk)): i
+                    executor.submit(_run_polish_async, i, chunk, (i == 0)): i
                     for i, chunk in enumerate(chunks)
                 }
                 for future in as_completed(futures):
-                    idx, result = future.result()
-                    if result:
-                        polished_chunks[idx] = result
-                        logger.info(f"  ✓ Chunk {idx + 1}/{num_chunks} done")
-                    else:
-                        polished_chunks[idx] = chunks[idx]  # fallback to raw
-                        logger.warning(f"  ⚠ Chunk {idx + 1}/{num_chunks} returned empty, using raw")
+                    idx = futures[future]
+                    try:
+                        result = future.result()
+                        if result:
+                            polished_chunks[idx] = result
+                            logger.info(f"  ✓ Chunk {idx + 1}/{num_chunks} done")
+                        else:
+                            polished_chunks[idx] = chunks[idx]
+                            logger.warning(f"  ⚠ Chunk {idx + 1}/{num_chunks} returned empty")
+                    except Exception as e:
+                        polished_chunks[idx] = chunks[idx]
+                        logger.error(f"  ❌ Chunk {idx + 1}/{num_chunks} failed: {e}")
 
             result = "\n\n".join(polished_chunks).strip()
 
@@ -993,8 +1011,8 @@ class SmartPipeline:
 
         return chunks if chunks else [markdown]
 
-    def _polish_chunk(self, model, chunk: str, is_first_chunk: bool = False) -> str:
-        """Polish a single chunk of markdown using the AI model."""
+    async def _polish_chunk(self, client, chunk_idx: int, chunk: str, is_first_chunk: bool = False, debug_dir: Optional[Path] = None) -> str:
+        """Polish a single chunk of markdown using the AI model with streaming."""
         title_instruction = ""
         if is_first_chunk:
             title_instruction = """TITLE: The first heading should be a single H1 that uses the EXACT topic title
@@ -1004,71 +1022,91 @@ from the slides (e.g., "# Topic 3: Inheritance"). Drop institutional names, cour
             title_instruction = """IMPORTANT: Do NOT use H1 (# ) headings in this section. Use only H2 (## ) and H3 (### ).
 """
 
-        prompt = f"""You are a formatting assistant. Restructure the following raw lecture notes into clean Markdown.
+        prompt = f"""Task: Transform raw lecture notes into clean, hierarchical Markdown.
 
-CRITICAL RULES — TEXT INTEGRITY:
-- USE THE EXACT SAME WORDS AND SENTENCES from the input. Do NOT rephrase, paraphrase, reword, or add new words.
-- ONLY fix: heading levels, bullet formatting, code block fences/indentation, and join lines that were clearly broken mid-sentence.
-- Remove: slide numbers, repetitive institutional headers/footers, and "End of Topic/Chapter" slides.
-- MERGE logical formulas: If you see logical symbols (¬, ∧, ∨, →) spread across lines, merge them into a single clean line or block.
-- MERGE "Continuation" sections: If a topic is split by slides (e.g., "(cont.)" or repeated titles), merge the content into the preceding section and remove the repetitive header.
-- RECONSTRUCT tables: If you see text that looks like a group of columns (e.g., truth table numbers 0 1 0...), reconstruct them into a proper Markdown table (| Col 1 | Col 2 |).
-{title_instruction}
-HEADING RULES:
-- There should be ONLY ONE H1 in the entire document (the title). If you see multiple H1s, demote the extras to H2.
-- H2 for major subtopics. H3 for topics within subtopics. H4 for sub-points.
-- Fix capitalization: e.g., "DEFINITION" should be "Definition", "OBJECTIVES" should be "Objectives".
-- Do NOT classify normal sentences as headings. A heading should be a short title, not a full sentence or paragraph.
-- If two consecutive headings appear with no content between them, merge them or remove the redundant one.
+CRITICAL RULES:
+1. NO PREAMBLE: Start directly with the Markdown or the marker ===START===.
+2. USE EXACT WORDS: Never rephrase.
+3. ONE H1: Only the main title is #. Subtitles are ##, ###.
+4. CODE BLOCKS: Use ```java only for actual code.
 
-CODE & QUOTE RULES:
-- Use ```java or ```python ONLY for actual computer programming code.
-- Add proper indentation to code blocks (e.g., 4 spaces for class/method bodies).
-- Use `> ` (Quote block) for philosophical arguments, premises, and conclusions (e.g. "Premise: X", "Conclusion: Y").
-- Do NOT wrap standard sentences in code blocks just because they mention logical variables. Only use logic fences (```logic) for complex standalone formulas if they don't fit in a quote block.
-- Merge scattered code/quote blocks that are part of the SAME argument.
+EXAMPLE:
+--- RAW INPUT ---
+1
+TOPIC 1: JAVA
+- Java is OOP
+--- POLISHED OUTPUT ---
+===START===
+# Topic 1: Java
 
-LIST RULES:
-- Use bullet lists (- ) by default.
-- Convert to Numbered Lists (1. ) if the input uses explicit prefixes like "(i)", "1)", "(a)", or "a)".
-- Preserve indentation for nested sub-bullets.
-
-You MUST begin your output with the exact marker: ===START===
-Output ONLY the cleaned markdown after the marker. No explanations, no meta-talk.
+- Java is OOP
+---
 
 ### INPUT:
 {chunk}
+
+POLISHED OUTPUT:
+===START===
 """
         try:
-            response = model.generate_content(prompt)
+            full_text = ""
+            debug_file = None
+            if debug_dir:
+                debug_file = debug_dir / f"chunk_{chunk_idx}.md"
+                # Clear/create the file
+                with open(debug_file, "w", encoding="utf-8") as f:
+                    f.write(f"--- CHUNK {chunk_idx} START ---\n\n")
 
-            if response and hasattr(response, "candidates") and response.candidates:
-                candidate = response.candidates[0]
-                if candidate.content and candidate.content.parts:
-                    text = "".join(
-                        part.text for part in candidate.content.parts
-                        if hasattr(part, "text")
-                    ).strip()
+            async for text_segment in client.stream_text(prompt, max_tokens=2000):
+                full_text += text_segment
+                if debug_file:
+                    with open(debug_file, "a", encoding="utf-8") as f:
+                        f.write(text_segment)
+                        f.flush()
 
-                    # Extract content after the marker
-                    marker = "===START==="
-                    if marker in text:
-                        text = text.split(marker)[-1].strip()
-                    else:
-                        # Fallback: find first heading
-                        import re
-                        match = re.search(r'^#\s', text, re.MULTILINE)
-                        if match:
-                            text = text[match.start():].strip()
+            if full_text and not full_text.startswith("["): # Check for provider errors
+                # Extract content
+                content = full_text.strip()
+                marker = "===START==="
+                
+                if marker in content:
+                    content = content.split(marker)[-1].strip()
+                
+                import re
+                # 1. Look for headings anywhere. AI often buries them in bullets or text.
+                # Find the first line that starts with one or more '#'
+                # We use re.MULTILINE to allow matching at the start of any line
+                heading_match = re.search(r'^#+\s+', content, re.MULTILINE)
+                if heading_match:
+                    content = content[heading_match.start():].strip()
+                else:
+                    # 2. If no heading found, look for headings nested in bullets: "* # Heading"
+                    nested_match = re.search(r'^\s*\*\s+#+\s+', content, re.MULTILINE)
+                    if nested_match:
+                        content = content[nested_match.start():].strip()
+                
+                # 3. Aggressive line-by-line cleanup if it's all bulleted
+                if content.startswith("*"):
+                    lines = content.split("\n")
+                    cleaned_lines = []
+                    for line in lines:
+                        # Remove leading bullets and backticks
+                        cleaned = re.sub(r'^\s*\*\s*', '', line)
+                        cleaned = cleaned.strip("` ")
+                        cleaned_lines.append(cleaned)
+                    content = "\n".join(cleaned_lines).strip()
+                
+                # 4. Final strip of any backtick wrapping
+                content = content.strip("` ").strip()
 
-                    # Strip outer markdown fences if AI wrapped everything
-                    lines = text.split("\n")
-                    if len(lines) > 2 and lines[0].strip().startswith("```") and lines[-1].strip() == "```":
-                        text = "\n".join(lines[1:-1]).strip()
+                # Strip outer markdown fences
+                lines = content.split("\n")
+                if len(lines) > 2 and lines[0].strip().startswith("```") and lines[-1].strip() == "```":
+                    content = "\n".join(lines[1:-1]).strip()
 
-                    return text
+                return content
         except Exception as e:
-            logger.warning(f"AI Polish chunk failed: {e}")
+            logger.warning(f"AI Polish chunk {chunk_idx} failed: {e}")
 
         return None
 
