@@ -209,9 +209,10 @@ async def reprocess_smart(
         # Convert markdown to structured segments for compatibility with existing UI
         structured_segments = _markdown_to_segments(markdown)
 
-        # Update lecture record
-        lecture.extracted_text = markdown
-        lecture.extracted_content_structured = json.dumps(structured_segments)
+        # Update lecture record (save to file storage)
+        StorageManager.save_lecture_text(lecture_id, markdown)
+        StorageManager.save_lecture_json(lecture_id, "structured", structured_segments)
+        
         lecture.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(lecture)

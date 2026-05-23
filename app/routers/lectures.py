@@ -13,6 +13,7 @@ from app.models.db import User, Lecture, Subject, Summary
 from app.schemas.schemas import LectureResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
+from app.utils.storage import StorageManager
 from app.utils.quotas import enforce_quota_notes, enforce_quota_storage
 from app.utils.crypto import decrypt_secret
 from app.processing.ocr import OCRProcessor
@@ -124,9 +125,7 @@ def _rebuild_lecture_content(
         )
 
     if reset_first:
-        lecture.extracted_text = None
-        lecture.extracted_content_structured = None
-        lecture.extracted_images_metadata = None
+        StorageManager.delete_lecture_files(lecture.id)
         lecture.processing_time_ms = None
         lecture.updated_at = datetime.utcnow()
         db.commit()
@@ -150,6 +149,12 @@ def _rebuild_lecture_content(
                 logger.info(f"Extracted {len(images_data)} images during lecture rebuild")
             except Exception as e:
                 logger.warning(f"Image extraction failed during lecture rebuild: {e}")
+        
+        # Save to file storage
+        StorageManager.save_lecture_text(lecture.id, raw_text)
+        StorageManager.save_lecture_json(lecture.id, "structured", structured_content)
+        StorageManager.save_lecture_json(lecture.id, "images", images_data)
+
     else:
         logger.info(f"Rebuilding lecture {lecture.id} with OCR fallback")
         ocr_result = OCRProcessor.extract_text(
@@ -161,11 +166,13 @@ def _rebuild_lecture_content(
         raw_text = ocr_result.get("raw_text", "")
         structured_content = ocr_result.get("structured_content", [])
         images_data = ocr_result.get("images", [])
+        
+        # Save to file storage
+        StorageManager.save_lecture_text(lecture.id, raw_text)
+        StorageManager.save_lecture_json(lecture.id, "structured", structured_content)
+        StorageManager.save_lecture_json(lecture.id, "images", images_data)
 
     lecture.processing_time_ms = int((time.time() - start_time) * 1000)
-    lecture.extracted_text = raw_text
-    lecture.extracted_content_structured = json.dumps(structured_content)
-    lecture.extracted_images_metadata = json.dumps(images_data)
     lecture.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(lecture)
@@ -300,8 +307,9 @@ async def upload_lecture(
             markdown = _extract_markdown_for_user(current_user, file_path)
             structured_segments = _markdown_to_segments(markdown)
             
-            db_lecture.extracted_text = markdown
-            db_lecture.extracted_content_structured = json.dumps(structured_segments)
+            # Save to file storage
+            StorageManager.save_lecture_text(db_lecture.id, markdown)
+            StorageManager.save_lecture_json(db_lecture.id, "structured", structured_segments)
             
             # Auto-title detection from H1
             if auto_detect_title:
@@ -378,9 +386,22 @@ async def get_lecture(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lecture not found"
         )
-    
-    logger.info(f"GET lecture {lecture_id}: extracted_text length = {len(lecture.extracted_text) if lecture.extracted_text else 'NULL'}")
-    return lecture
+
+    # Manually populate text fields from storage for the response
+    lecture_data = LectureResponse.from_orm(lecture)
+    lecture_data.extracted_text = StorageManager.get_lecture_text(lecture_id)
+
+    # Get structured content and images
+    structured = StorageManager.get_lecture_json(lecture_id, "structured")
+    if structured:
+        lecture_data.extracted_content_structured = json.dumps(structured)
+
+    images = StorageManager.get_lecture_json(lecture_id, "images")
+    if images:
+        lecture_data.extracted_images_metadata = json.dumps(images)
+
+    logger.info(f"GET lecture {lecture_id}: extracted_text length = {len(lecture_data.extracted_text) if lecture_data.extracted_text else 'NULL'}")
+    return lecture_data
 
 
 @router.put("/{lecture_id}", response_model=LectureResponse)
@@ -520,11 +541,13 @@ async def delete_lecture(
         except Exception as e:
             # Log error but don't fail the request
             logger.warning(f"Error deleting file: {e}")
-    
-    # Delete database record
-    db.delete(lecture)
-    db.commit()
-    
+
+        # Delete storage files (extracted text, etc)
+        StorageManager.delete_lecture_files(lecture.id)
+
+        # Delete database record
+        db.delete(lecture)
+        db.commit()    
     return None
 
 
@@ -987,7 +1010,8 @@ async def update_lecture_content(
             detail="extracted_text is required"
         )
     
-    lecture.extracted_text = new_text
+    StorageManager.save_lecture_text(lecture.id, new_text)
+    StorageManager.save_lecture_json(lecture.id, "structured", _markdown_to_segments(new_text))
     lecture.updated_at = datetime.utcnow()
     
     # Invalidate existing summary when content changes
@@ -1042,3 +1066,4 @@ async def download_original_file(
         filename=lecture.file_name or f"lecture_{lecture_id}",
         media_type=lecture.file_type or "application/octet-stream"
     )
+

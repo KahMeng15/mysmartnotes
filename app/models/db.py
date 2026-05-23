@@ -115,9 +115,6 @@ class Lecture(Base):
     file_type = Column(String(128))  # pdf, pptx, image, long MIME types
     file_size = Column(Integer)
     page_count = Column(Integer, default=0)
-    extracted_text = Column(Text)
-    extracted_content_structured = Column(Text)  # JSON: structured content segments with headers, types, etc.
-    extracted_images_metadata = Column(Text)  # JSON: image extraction metadata
     output_pdf_path = Column(String(512))  # Path to generated OUTPUT.pdf
     processing_time_ms = Column(Integer, nullable=True)  # Processing time in milliseconds
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -544,3 +541,4 @@ def receive_summary_after_delete(mapper, connection, target):
             logger.info(f"Deleted file for summary {target.id}: {target.file_path}")
         except Exception as e:
             logger.warning(f"Error deleting file for summary {target.id}: {e}")
+

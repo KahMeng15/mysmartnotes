@@ -73,12 +73,13 @@ async def semantic_search(
         chunk_metadata = []  # Track which lecture each chunk comes from
         
         for lecture in lectures:
-            if not lecture.extracted_text:
+            text = StorageManager.get_lecture_text(lecture.id)
+            if not text:
                 continue
             
             # Split lecture content into chunks
             from app.processing.ocr import OCRProcessor
-            chunks = OCRProcessor.chunk_text(lecture.extracted_text)
+            chunks = OCRProcessor.chunk_text(text)
             
             for chunk in chunks:
                 all_chunks.append(chunk)
@@ -147,7 +148,8 @@ async def get_similar_lectures(
             Lecture.user_id == current_user.id
         ).first()
         
-        if not source_lecture or not source_lecture.extracted_text:
+        source_text = StorageManager.get_lecture_text(lecture_id)
+        if not source_lecture or not source_text:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Lecture not found or has no content"
@@ -156,16 +158,24 @@ async def get_similar_lectures(
         # Get all other lectures
         other_lectures = db.query(Lecture).filter(
             Lecture.user_id == current_user.id,
-            Lecture.id != lecture_id,
-            Lecture.extracted_text != None
+            Lecture.id != lecture_id
         ).all()
         
-        if not other_lectures:
+        # Filter for lectures that actually have text on disk
+        valid_other_lectures = []
+        other_contents = []
+        for l in other_lectures:
+            text = StorageManager.get_lecture_text(l.id)
+            if text:
+                valid_other_lectures.append(l)
+                other_contents.append(text[:1000])
+
+        if not valid_other_lectures:
             return {"similar_lectures": []}
         
         # Extract first chunk from source lecture as query
         from app.processing.ocr import OCRProcessor
-        source_chunks = OCRProcessor.chunk_text(source_lecture.extracted_text)
+        source_chunks = OCRProcessor.chunk_text(source_text)
         
         if not source_chunks:
             return {"similar_lectures": []}
@@ -175,7 +185,6 @@ async def get_similar_lectures(
         # Search for similar content
         embeddings_mgr = get_embeddings_manager()
         
-        other_contents = [l.extracted_text[:1000] for l in other_lectures]  # First 1000 chars
         results = embeddings_mgr.search(
             query=source_chunk,
             documents=other_contents,
@@ -184,13 +193,14 @@ async def get_similar_lectures(
         
         similar_lectures = []
         for content, score in results:
-            for lecture in other_lectures:
-                if lecture.extracted_text.startswith(content[:500]):
+            for i, text_snippet in enumerate(other_contents):
+                if text_snippet.startswith(content[:500]):
+                    l = valid_other_lectures[i]
                     similar_lectures.append({
-                        "id": lecture.id,
-                        "title": lecture.title,
+                        "id": l.id,
+                        "title": l.title,
                         "similarity_score": float(score),
-                        "subject_id": lecture.subject_id
+                        "subject_id": l.subject_id
                     })
                     break
         
@@ -283,3 +293,4 @@ async def get_lecture_task_status(
             "status": "pending",
             "progress": 0
         }
+

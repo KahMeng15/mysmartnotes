@@ -11,6 +11,7 @@ import string
 from app.models.db import User, Lecture, Summary
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
+from app.utils.storage import StorageManager
 from app.utils.quotas import enforce_quota_summaries
 from app.processing.ai_client import AIClient
 
@@ -123,7 +124,7 @@ async def generate_quiz(
             detail="Lecture not found"
         )
     
-    lecture_content = lecture.extracted_text or ""
+    lecture_content = StorageManager.get_lecture_text(lecture_id) or ""
     if not lecture_content:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -203,7 +204,7 @@ async def generate_summary_endpoint(
             )
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
 
-    lecture_content = lecture.extracted_text or ""
+    lecture_content = StorageManager.get_lecture_text(lecture_id) or ""
     if not lecture_content:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -292,15 +293,14 @@ async def generate_summary_endpoint(
         next_version = max_version + 1
 
         # Save generated summary
+        doc_id = generate_random_id(db, Summary)
         doc = Summary(
-            id=generate_random_id(db, Summary),
+            id=doc_id,
             version=next_version,
             lecture_id=request.lecture_id,
             title=f"{request.mode.capitalize()} in {request.output_format.replace('_', ' ')}",
             summary_type="summary",
             file_path=f"summary_{lecture.id}.md",
-            content=summary_content,
-            quickread=quickread_content,
             mode=request.mode,
             output_format=request.output_format,
             processing_method=request.processing_method,
@@ -310,6 +310,12 @@ async def generate_summary_endpoint(
             model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()
         )
         db.add(doc)
+        
+        # Save to file storage
+        StorageManager.save_summary_text(doc_id, summary_content)
+        if quickread_content:
+            StorageManager.save_summary_text(doc_id, quickread_content, is_quickread=True)
+            
         db.commit()
         db.refresh(doc)
         
@@ -362,7 +368,7 @@ async def generate_cheatsheet(
             detail="Lecture not found"
         )
     
-    lecture_content = lecture.extracted_text or ""
+    lecture_content = StorageManager.get_lecture_text(lecture_id) or ""
     if not lecture_content:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -379,15 +385,21 @@ async def generate_cheatsheet(
         )
         
         # Save generated summary
+        doc_id = generate_random_id(db, Summary)
         doc = Summary(
+            id=doc_id,
             lecture_id=request.lecture_id,
             title=f"Cheatsheet - {lecture.title}",
             summary_type="cheatsheet",
             file_path=f"cheatsheet_{lecture.id}.md"
         )
         db.add(doc)
+
+        # Save to storage
+        StorageManager.save_summary_text(doc_id, content)
+
         db.commit()
-        
+
         return CheatsheetResponse(
             lecture_id=request.lecture_id,
             title=f"Cheatsheet - {lecture.title}",
@@ -424,18 +436,19 @@ async def update_generated_summary(
     if not lecture:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this summary")
         
-    doc.content = request.content
+    # Save to storage
+    StorageManager.save_summary_text(doc.id, request.content)
     if request.title:
         doc.title = request.title
     if request.quickread is not None:
-        doc.quickread = request.quickread
-    
+        StorageManager.save_summary_text(doc.id, request.quickread, is_quickread=True)
+
     # Mark as user edited
     doc.is_user_edited = True
-    
+
     db.commit()
     db.refresh(doc)
-    
+
     return SummaryItemResponse(
         id=doc.id,
         version=doc.version,
@@ -444,8 +457,8 @@ async def update_generated_summary(
         summary_type=doc.summary_type,
         file_path=doc.file_path,
         created_at=format_timestamp(doc.created_at),
-        content=doc.content,
-        quickread=doc.quickread,
+        content=StorageManager.get_summary_text(doc.id),
+        quickread=StorageManager.get_summary_text(doc.id, is_quickread=True),
         mode=doc.mode,
         output_format=doc.output_format,
         processing_method=doc.processing_method,
@@ -455,7 +468,6 @@ async def update_generated_summary(
         model=doc.model,
         is_user_edited=doc.is_user_edited
     )
-
 
 @router.get("", response_model=List[SummaryItemResponse])
 async def list_summaries(
@@ -532,8 +544,8 @@ async def get_summary(
         summary_type=summary.summary_type,
         file_path=summary.file_path,
         created_at=format_timestamp(summary.created_at),
-        content=summary.content,
-        quickread=summary.quickread,
+        content=StorageManager.get_summary_text(summary.id),
+        quickread=StorageManager.get_summary_text(summary.id, is_quickread=True),
         mode=summary.mode,
         output_format=summary.output_format,
         processing_method=summary.processing_method,
@@ -556,16 +568,18 @@ async def delete_summary(
         Summary.id == summary_id,
         Lecture.user_id == current_user.id
     ).first()
-    
+
     if not summary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found"
         )
-    
+
+    # Delete storage files
+    StorageManager.delete_summary_files(summary.id)
+
     db.delete(summary)
     db.commit()
-
 
 @router.post("/{summary_id}/export", response_model=dict)
 async def export_summary(
