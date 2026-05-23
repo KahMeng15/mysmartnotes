@@ -7,7 +7,7 @@ from collections import defaultdict, deque
 from threading import Lock
 
 # Ensure the current directory is in the path for module resolution
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
@@ -443,7 +443,7 @@ try:
 except Exception as e:
     logger.warning(f"Could not mount output files: {e}")
 
-static_dir = os.path.join(os.path.dirname(__file__), "app", "static")
+static_dir = os.path.join(os.path.dirname(__file__), "static")
 
 # Dynamic routes for Note view/edit explicitly serving static files
 @app.get("/note/{id}")

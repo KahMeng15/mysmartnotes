@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/lectures", tags=["lectures"])
 
 # Upload directory - use local temp directory
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "uploads")
-GENERATED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "generated")
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "uploads")
+GENERATED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "generated")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
