@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional
 import secrets
 import random
@@ -11,7 +11,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
 from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken, PasswordChangeConfirmation, IPBlock
-from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, UserUpdate
+from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, UserUpdate, NicknameStr, FullNameStr
 from app.utils.db import get_db
 from app.utils.auth import (
     hash_password, 
@@ -108,8 +108,8 @@ class GoogleLoginRequest(BaseModel):
 class GoogleCompleteRequest(BaseModel):
     """Complete Google registration with additional info"""
     idToken: str
-    nickname: str
-    full_name: Optional[str] = None
+    nickname: NicknameStr
+    full_name: Optional[FullNameStr] = None
     invitation_token: Optional[str] = None
     agree_tos: bool = False
     agree_privacy: bool = False
@@ -1116,7 +1116,7 @@ async def download_data(current_user: User = Depends(get_current_user_from_token
 
 # --- Password Reset ---
 class PasswordResetRequest(BaseModel):
-    email: str
+    email: EmailStr
 
 class PasswordResetSubmit(BaseModel):
     token: str

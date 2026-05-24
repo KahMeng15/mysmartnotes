@@ -1,35 +1,45 @@
 """Request/Response schemas"""
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Annotated
+import re
+
+
+# Constants for validation
+NICKNAME_REGEX = r"^[a-zA-Z0-9_-]+$"
+FULL_NAME_REGEX = r"^[a-zA-Z\s\-\'\.]+$"
+
+# Reusable types with validation
+NicknameStr = Annotated[str, Field(min_length=2, max_length=30, pattern=NICKNAME_REGEX)]
+FullNameStr = Annotated[str, Field(min_length=2, max_length=100, pattern=FULL_NAME_REGEX)]
 
 
 # ========== User Schemas ==========
 class UserBase(BaseModel):
     username: Optional[str] = None
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    nickname: Optional[str] = None
+    email: Optional[EmailStr] = None
+    full_name: Optional[FullNameStr] = None
+    nickname: Optional[NicknameStr] = None
 
 
 class UserCreate(BaseModel):
-    email: str
+    email: EmailStr
     password: str
-    nickname: str
-    full_name: Optional[str] = None
+    nickname: NicknameStr
+    full_name: Optional[FullNameStr] = None
     agree_tos: bool = False
     agree_privacy: bool = False
     agree_fair_use: bool = False
 
 
 class UserLogin(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
-    nickname: Optional[str] = None
+    full_name: Optional[FullNameStr] = None
+    nickname: Optional[NicknameStr] = None
     ai_provider: Optional[str] = None
     ai_model: Optional[str] = None
     ai_base_url: Optional[str] = None
