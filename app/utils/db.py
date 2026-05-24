@@ -100,7 +100,7 @@ def generate_random_id(db: Session, model, length: int = 8) -> str:
     Returns:
         A unique prefixed hex ID derived from UUID4
     """
-    from app.models.db import SubjectGroup, Subject, Lecture, Summary, Quiz, QuizGroup
+    from app.models.db import SubjectGroup, Subject, Lecture, Summary, Quiz, QuizGroup, ChatMessage
     
     prefix = ""
     if model == SubjectGroup:
@@ -110,11 +110,13 @@ def generate_random_id(db: Session, model, length: int = 8) -> str:
     elif model == Lecture:
         prefix = "nt_"
     elif model == Summary:
-        prefix = "sy"
+        prefix = "sy_"
     elif model == Quiz:
         prefix = "qz_"
     elif model == QuizGroup:
         prefix = "qg_"
+    elif model == ChatMessage:
+        prefix = "mg_"
         
     while True:
         needed_chars = length
@@ -125,6 +127,28 @@ def generate_random_id(db: Session, model, length: int = 8) -> str:
         random_part = ''.join(random_chunks)[:length]
         new_id = f"{prefix}{random_part}"
         if not db.query(model).filter(model.id == new_id).first():
+            return new_id
+        length += 1
+
+
+def generate_conversation_id(db: Session, length: int = 8) -> str:
+    """Generate a unique conversation ID with 'cv_' prefix.
+    
+    Checks against ChatMessage.conversation_id for uniqueness.
+    """
+    from app.models.db import ChatMessage
+    prefix = "cv_"
+    
+    while True:
+        needed_chars = length
+        random_chunks = []
+        while needed_chars > 0:
+            random_chunks.append(uuid.uuid4().hex)
+            needed_chars -= 32
+        random_part = ''.join(random_chunks)[:length]
+        new_id = f"{prefix}{random_part}"
+        # Check uniqueness against conversation_id column
+        if not db.query(ChatMessage).filter(ChatMessage.conversation_id == new_id).first():
             return new_id
         length += 1
 
@@ -148,17 +172,85 @@ def init_db():
     except Exception as e:
         logger.error(f"Failed to create database tables: {e}", exc_info=True)
         raise
-    
-    # Apply SQLite auto-migrations for missing columns
-    if is_sqlite:
+
+    # Apply migrations for type changes (e.g. ChatMessage ID change)
+    if not is_sqlite:
+        try:
+            apply_postgresql_migrations()
+        except Exception as e:
+            logger.error(f"Failed to apply PostgreSQL migrations: {e}")
+    else:
         try:
             apply_sqlite_migrations()
         except Exception as e:
             logger.error(f"Failed to apply SQLite migrations: {e}")
-            
+
     logger.info("Database initialized successfully")
 
 
+def apply_postgresql_migrations():
+    """Apply migrations specific to PostgreSQL (e.g. changing column types)"""
+    from sqlalchemy import text
+    try:
+        # Check first without a heavy transaction
+        with engine.connect() as conn:
+            res = conn.execute(text("""
+                SELECT data_type 
+                FROM information_schema.columns 
+                WHERE table_name = 'chat_messages' AND column_name = 'id'
+            """)).fetchone()
+            
+            needs_migration = res and res[0].lower() in ('integer', 'bigint', 'numeric')
+
+        if needs_migration:
+            logger.info(f"Migrating chat_messages table to use string IDs (current type: {res[0]})...")
+            
+            # Now run migration in a proper transaction
+            with engine.begin() as conn:
+                # Find and drop all foreign keys pointing TO or FROM chat_messages
+                fk_res = conn.execute(text("""
+                    SELECT conname, r.relname 
+                    FROM pg_constraint c 
+                    JOIN pg_class r ON c.conrelid = r.oid 
+                    WHERE r.relname = 'chat_messages' AND c.contype = 'f'
+                """)).all()
+                
+                for row in fk_res:
+                    logger.info(f"Dropping constraint {row[0]} on {row[1]}")
+                    conn.execute(text(f'ALTER TABLE "{row[1]}" DROP CONSTRAINT IF EXISTS "{row[0]}"'))
+                
+                fk_ref_res = conn.execute(text("""
+                    SELECT conname, r.relname 
+                    FROM pg_constraint c 
+                    JOIN pg_class r ON c.conrelid = r.oid 
+                    JOIN pg_class t ON c.confrelid = t.oid
+                    WHERE t.relname = 'chat_messages' AND c.contype = 'f'
+                """)).all()
+                
+                for row in fk_ref_res:
+                    logger.info(f"Dropping external constraint {row[0]} on {row[1]}")
+                    conn.execute(text(f'ALTER TABLE "{row[1]}" DROP CONSTRAINT IF EXISTS "{row[0]}"'))
+
+                # Change column types with explicit casting
+                logger.info("Altering column types...")
+                conn.execute(text('ALTER TABLE chat_messages ALTER COLUMN id TYPE VARCHAR(16) USING id::varchar'))
+                conn.execute(text('ALTER TABLE chat_messages ALTER COLUMN reply_to_message_id TYPE VARCHAR(16) USING reply_to_message_id::varchar'))
+                conn.execute(text('ALTER TABLE chat_messages ALTER COLUMN conversation_id TYPE VARCHAR(64) USING conversation_id::varchar'))
+                
+                # Remove default nextval (sequence)
+                conn.execute(text("ALTER TABLE chat_messages ALTER COLUMN id DROP DEFAULT"))
+                
+                # Restore constraints
+                logger.info("Restoring constraints...")
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_reply_to_message_id_fkey FOREIGN KEY (reply_to_message_id) REFERENCES chat_messages(id)'))
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)'))
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_lecture_id_fkey FOREIGN KEY (lecture_id) REFERENCES lectures(id)'))
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES subjects(id)'))
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_group_id_fkey FOREIGN KEY (group_id) REFERENCES subject_groups(id)'))
+                
+            logger.info("Successfully migrated chat_messages to string IDs")
+    except Exception as e:
+        logger.error(f"PostgreSQL migration failed: {e}", exc_info=True)
 def apply_sqlite_migrations():
     """Add missing columns to existing SQLite tables based on models"""
     import sqlite3

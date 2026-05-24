@@ -72,13 +72,17 @@ function buildHierarchyBreadcrumb(type, id) {
     return '';
 }
 
-// ── UUID generator (fallback for older browsers) ──────────────────
-function generateUUID() {
-    if (crypto && crypto.randomUUID) return crypto.randomUUID();
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-        const r = Math.random() * 16 | 0;
-        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
+// ── Navigation helpers ───────────────────────────────────────────
+function updateUrl(convId) {
+    const newPath = convId ? `/chat/${convId}` : '/chat';
+    if (window.location.pathname !== newPath) {
+        window.history.pushState({ convId }, '', newPath);
+    }
+}
+
+// ── ID generator ──────────────────
+function generateConversationId() {
+    return 'cv_' + Math.random().toString(16).substring(2, 10);
 }
 
 // ── AI Mode helpers ───────────────────────────────────────────────
@@ -221,6 +225,16 @@ function applySavedMode() {
     updateCompactDisplay();
 }
 
+// Handle browser navigation
+window.addEventListener('popstate', (event) => {
+    const convId = event.state ? event.state.convId : null;
+    if (convId) {
+        loadConversation(convId);
+    } else {
+        createNewChat();
+    }
+});
+
 // ── Bootstrap ─────────────────────────────────────────────────────
 window.addEventListener('load', () => {
     applySavedMode();
@@ -245,24 +259,32 @@ async function loadData() {
         renderConversationList();
         populateGroupSelect();
 
-        // URL param pre-selection
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlNoteId = urlParams.get('lecture_id') || urlParams.get('note_id');
-        if (urlNoteId) {
-            const note = allLectures.find(l => l.id == urlNoteId);
-            if (note) { setScope('note', note.id, `Note: ${note.title}`); }
-            else { openScopeModal(); }
+        // Check for conversation ID in URL path: /chat/cv_xxx
+        const pathParts = window.location.pathname.split('/');
+        const pathConvId = pathParts.length > 2 && pathParts[1] === 'chat' ? pathParts[2] : null;
+
+        if (pathConvId && pathConvId.startsWith('cv_')) {
+            loadConversation(pathConvId);
         } else {
-            const savedScope = loadSavedScope();
-            if (savedScope && savedScope.type && savedScope.id) {
-                let exists = false;
-                if (savedScope.type === 'note') exists = allLectures.some(l => l.id == savedScope.id);
-                if (savedScope.type === 'subject') exists = allSubjects.some(s => s.id == savedScope.id);
-                if (savedScope.type === 'group') exists = allGroups.some(g => g.id == savedScope.id);
-                if (exists) { setScope(savedScope.type, savedScope.id, savedScope.title); }
-                else { localStorage.removeItem('chatScope'); openScopeModal(); }
+            // URL param pre-selection
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlNoteId = urlParams.get('lecture_id') || urlParams.get('note_id');
+            if (urlNoteId) {
+                const note = allLectures.find(l => l.id == urlNoteId);
+                if (note) { setScope('note', note.id, `Note: ${note.title}`); }
+                else { openScopeModal(); }
             } else {
-                openScopeModal();
+                const savedScope = loadSavedScope();
+                if (savedScope && savedScope.type && savedScope.id) {
+                    let exists = false;
+                    if (savedScope.type === 'note') exists = allLectures.some(l => l.id == savedScope.id);
+                    if (savedScope.type === 'subject') exists = allSubjects.some(s => s.id == savedScope.id);
+                    if (savedScope.type === 'group') exists = allGroups.some(g => g.id == savedScope.id);
+                    if (exists) { setScope(savedScope.type, savedScope.id, savedScope.title); }
+                    else { localStorage.removeItem('chatScope'); openScopeModal(); }
+                } else {
+                    openScopeModal();
+                }
             }
         }
     } catch (e) {
@@ -417,6 +439,7 @@ function createNewChat() {
     currentConversationId = null;
     conversationMessages = [];
     isViewingHistory = false;
+    updateUrl(null);
 
     if (window.innerWidth <= 768) {
         const sidebar = document.getElementById('chatSidebar');
@@ -456,7 +479,7 @@ async function sendMessage() {
 
     // Generate conversation ID if this is a new chat
     if (!currentConversationId) {
-        currentConversationId = generateUUID();
+        currentConversationId = generateConversationId();
     }
 
     // Capture reply info before clearing
@@ -543,7 +566,10 @@ async function sendMessage() {
             });
 
             // Update conversation ID (backend may have confirmed it or changed it)
-            if (data.conversation_id) currentConversationId = data.conversation_id;
+            if (data.conversation_id) {
+                currentConversationId = data.conversation_id;
+                updateUrl(currentConversationId);
+            }
 
             // Update meta with question count
             const questionCount = conversationMessages.filter(m => m.role === 'user').length;
@@ -975,6 +1001,7 @@ async function loadConversation(convId) {
 
         currentConversationId = convId;
         isViewingHistory = true;
+        updateUrl(convId);
 
         // Build message list locally from history array
         const historyMessages = [];

@@ -203,10 +203,12 @@ window.toggleMobileMenu = function() {
 
 function setActiveLink() {
     const currentPath = window.location.pathname;
-    const pageName = currentPath.split('/').pop() || 'dashboard';
+    const pathParts = currentPath.split('/');
+    const pageName = pathParts.pop() || 'dashboard';
 
     document.querySelectorAll('.sidebar-nav-link[data-page], .mobile-nav-item[data-page]').forEach(link => {
-        if (link.dataset.page === pageName) {
+        const linkPage = link.dataset.page;
+        if (linkPage === pageName || (linkPage === 'chat' && currentPath.startsWith('/chat'))) {
             link.classList.add('active');
         }
     });

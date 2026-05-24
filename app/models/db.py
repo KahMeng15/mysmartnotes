@@ -307,7 +307,7 @@ class ChatMessage(Base):
     """Chat message history"""
     __tablename__ = "chat_messages"
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=True, index=True)
     subject_id = Column(String(16), ForeignKey("subjects.id"), nullable=True, index=True)
@@ -318,9 +318,9 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Conversation threading
-    conversation_id = Column(String(36), nullable=True, index=True)   # UUID grouping messages into a conversation
+    conversation_id = Column(String(64), nullable=True, index=True)   # cv_ prefix grouping messages into a conversation
     conversation_title = Column(String(255), nullable=True)            # AI-generated or derived title
-    reply_to_message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=True) # ID of the message being replied to
+    reply_to_message_id = Column(String(16), ForeignKey("chat_messages.id"), nullable=True) # ID of the message being replied to
     replies = relationship("ChatMessage", cascade="all, delete-orphan", backref=backref("parent", remote_side=[id]))
     ai_mode = Column(String(50), nullable=True, default="elaborate")   # Which AI response mode was used
     output_format = Column(String(50), nullable=True, default="sentence") # Output format: sentence, pointform, numbered_list, table

@@ -499,6 +499,10 @@ async def serve_mynotes():
 async def serve_chat():
     return FileResponse(os.path.join(static_dir, "chat.html"))
 
+@app.get("/chat/{id}")
+async def serve_chat_with_id(id: str):
+    return FileResponse(os.path.join(static_dir, "chat.html"))
+
 @app.get("/exporttemplates")
 async def serve_export_templates():
     return FileResponse(os.path.join(static_dir, "exporttemplate-selector.html"))

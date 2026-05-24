@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, cast, Integer
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import time
 from typing import List, Optional
 import json
@@ -12,7 +12,7 @@ import logging
 
 from app.models.db import User, Lecture, ChatMessage, Subject, SubjectGroup
 from app.utils.auth import get_current_user
-from app.utils.db import get_db
+from app.utils.db import get_db, generate_random_id, generate_conversation_id
 from app.utils.quotas import enforce_quota_messages, check_quota_conversations, get_user_conversation_count, get_user_tier_config
 from app.processing.ai_client import AIClient
 from app.processing.embeddings import find_relevant_snippets, combine_snippets
@@ -39,7 +39,7 @@ class ChatRequest(BaseModel):
 
 
 class ChatMessageResponse(BaseModel):
-    id: int
+    id: str
     message: str
     response: str
     sources: list = []
@@ -56,6 +56,12 @@ class ChatMessageResponse(BaseModel):
     reply_to_message_id: Optional[str] = None
     timings: Optional[dict] = None
 
+    @field_validator('id', 'conversation_id', 'reply_to_message_id', mode='before')
+    @classmethod
+    def coerce_to_str(cls, v):
+        if v is None: return v
+        return str(v)
+
 
 class ConversationSummary(BaseModel):
     conversation_id: str
@@ -68,6 +74,12 @@ class ConversationSummary(BaseModel):
     scope_type: Optional[str] = None
     is_pinned: bool = False
     is_favourite: bool = False
+
+    @field_validator('conversation_id', mode='before')
+    @classmethod
+    def coerce_to_str(cls, v):
+        if v is None: return v
+        return str(v)
 
 
 class ChatResponse(BaseModel):
@@ -82,6 +94,12 @@ class ChatResponse(BaseModel):
     conversation_id: Optional[str] = None
     conversation_title: Optional[str] = None
     reply_to_message_id: Optional[str] = None
+
+    @field_validator('conversation_id', 'reply_to_message_id', mode='before')
+    @classmethod
+    def coerce_to_str(cls, v):
+        if v is None: return v
+        return str(v)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -626,15 +644,15 @@ async def ask_question(
                         print(f"[chat] Auto-detected conversation continuation. Conv ID: {conv_id}")
                 else:
                     # New topic - start fresh conversation
-                    conv_id = str(uuid.uuid4())
+                    conv_id = generate_conversation_id(db)
                     print(f"[chat] Auto-detected new conversation topic. New Conv ID: {conv_id}")
             except Exception as e:
                 print(f"[chat] Auto-detection failed: {e}, starting new conversation")
-                conv_id = str(uuid.uuid4())
+                conv_id = generate_conversation_id(db)
     
     # If still no conversation ID, create a new one
     if not conv_id:
-        conv_id = str(uuid.uuid4())
+        conv_id = generate_conversation_id(db)
     
     step_times["step2"] = round((time.time() - t_step2_start) * 1000.0, 2)
     t_step3_start = time.time()
@@ -854,6 +872,7 @@ async def ask_question(
         }
         
         chat_msg = ChatMessage(
+            id=generate_random_id(db, ChatMessage),
             user_id=current_user.id,
             lecture_id=request.lecture_id,
             subject_id=request.subject_id,
@@ -1026,7 +1045,7 @@ async def get_all_chat_history(
 
 @router.get("/history/{lecture_id}", response_model=List[ChatMessageResponse])
 async def get_lecture_chat_history(
-    lecture_id: int,
+    lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1122,7 +1141,7 @@ async def toggle_favourite_conversation(
 
 @router.delete("/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_chat_message(
-    message_id: int,
+    message_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
