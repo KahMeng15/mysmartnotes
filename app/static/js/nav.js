@@ -420,6 +420,64 @@ window.closeConfirmModal = function () {
     window._confirmCallback = null;
 };
 
+// Global Modal Keyboard Shortcuts (Enter = Confirm, Esc = Cancel)
+document.addEventListener('keydown', function (e) {
+    // Find the active modal (either via .active class or inline flex display)
+    const allModals = document.querySelectorAll('.modal, .modal-overlay');
+    let activeModal = null;
+    
+    for (const modal of allModals) {
+        if (modal.classList.contains('active') || (modal.style.display === 'flex' && !modal.classList.contains('hidden'))) {
+            activeModal = modal;
+            break;
+        }
+    }
+    
+    if (!activeModal) return;
+
+    // 1. Handle Escape (Cancel/Close)
+    if (e.key === 'Escape') {
+        // Don't close if user is in a dropdown or something that should handle Esc first
+        // But for this app, modals are usually the top layer.
+        
+        // Priority order for close actions
+        const cancelBtn = activeModal.querySelector('.btn-cancel, .modal-close, .btn-secondary, #closeModalBtn');
+        if (cancelBtn) {
+            e.preventDefault();
+            cancelBtn.click();
+        } else {
+            // Fallback: try common close functions or just hide
+            if (typeof closeConfirmModal === 'function' && activeModal.id === 'confirmationModal') closeConfirmModal();
+            else if (typeof closeSuccessModal === 'function' && activeModal.id === 'successModal') closeSuccessModal();
+            else if (typeof closeErrorModal === 'function' && activeModal.id === 'errorModal') closeErrorModal();
+            else if (typeof closeModal === 'function') closeModal(activeModal.id);
+            else {
+                activeModal.classList.remove('active');
+                activeModal.style.display = 'none';
+            }
+        }
+        return;
+    }
+
+    // 2. Handle Enter (Confirm/Save)
+    if (e.key === 'Enter') {
+        // Don't trigger if user is in a textarea (where Enter is for new lines)
+        if (e.target.tagName === 'TEXTAREA') return;
+        
+        // Priority order for confirm actions
+        // We look for save/primary buttons first
+        const confirmBtn = activeModal.querySelector('.btn-save, .btn-primary, #confirmDeleteBtn, #successModalDoneBtn, .btn-confirm, .btn-save-changes, .btn-create');
+        
+        if (confirmBtn) {
+            // Check if button is actually visible and not disabled
+            if (confirmBtn.offsetParent !== null && !confirmBtn.disabled) {
+                e.preventDefault();
+                confirmBtn.click();
+            }
+        }
+    }
+});
+
 // Pomodoro Sidebar Sync & Persistence
 const navSyncChannel = new BroadcastChannel('pomodoro_sync');
 let sidePomoInterval = null;
