@@ -288,7 +288,7 @@ function initUnnecessaryLogins() {
         btn.style.minHeight = '44px';
         btn.innerHTML = `
             <img src="${service.icon}" style="width: 20px; height: 20px; flex-shrink: 0;" alt="${service.name} logo" />
-            <span style="font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Sign in with ${service.name}</span>
+            <span style="font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Log in with ${service.name}</span>
         `;
         btn.style.color = '#333';
         btn.onclick = () => {
@@ -327,11 +327,7 @@ function switchPanel(name) {
     }
 }
 
-function showMessageBox(id, type, text) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.className = 'message-box ' + type;
-    
+function showMessageBox(id, type, text, extraHtml = '') {
     // Handle object/array detail from FastAPI
     let displayMsg = text;
     if (typeof text === 'object' && text !== null) {
@@ -342,9 +338,22 @@ function showMessageBox(id, type, text) {
             displayMsg = text.detail || text.message || JSON.stringify(text);
         }
     }
-    
+
+    if (type === 'error') {
+        showErrorModal('Error', displayMsg, extraHtml);
+    } else if (type === 'success') {
+        showSuccessModal('Success', displayMsg);
+    } else {
+        // For 'info' or other types, we can use success modal with a different title if needed
+        showSuccessModal('Information', displayMsg);
+    }
+
+    // Keep the old message box logic as a fallback/hidden update for compatibility
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'message-box ' + type;
     el.textContent = displayMsg;
-    el.style.display = 'block';
+    el.style.display = 'none'; // Hide the old message box since we use modals now
 }
 
 function showPasswordField() {
@@ -354,8 +363,8 @@ function showPasswordField() {
         return;
     }
     document.getElementById('loginPasswordGroup').style.display = 'block';
-    document.getElementById('loginAuthGrid').style.display = 'none';
-    document.getElementById('loginStep2Btns').style.display = 'block';
+    // document.getElementById('loginAuthGrid').style.display = 'none'; // Keep Google button visible
+    document.getElementById('loginStep2Btns').style.display = 'flex';
     document.getElementById('loginPassword').focus();
 }
 
@@ -384,25 +393,16 @@ async function handleLogin() {
                 showMessageBox('loginMsg', 'error', err.detail || 'Under maintenance.');
                 setTimeout(() => { window.location.href = '/maintenance'; }, 2000);
             } else {
-                showMessageBox('loginMsg', 'error', err.detail || 'Login failed. Please check your credentials.');
+                let extraHtml = '';
                 if (err.detail && err.detail.toLowerCase().includes('not verified')) {
-                    const el = document.getElementById('loginMsg');
-                    if (el) {
-                        const link = document.createElement('a');
-                        link.href = '#';
-                        link.style.marginLeft = '8px';
-                        link.style.color = '#1e40af';
-                        link.style.textDecoration = 'underline';
-                        link.style.fontWeight = '600';
-                        link.style.cursor = 'pointer';
-                        link.textContent = 'Resend link';
-                        link.onclick = (e) => {
-                            e.preventDefault();
-                            handleResendVerification('loginMsg');
-                        };
-                        el.appendChild(link);
-                    }
+                    extraHtml = `
+                        <a href="#" style="color: #1e40af; text-decoration: underline; font-weight: 600; cursor: pointer;" 
+                           onclick="event.preventDefault(); closeErrorModal(); handleResendVerification('loginMsg');">
+                           Resend verification link
+                        </a>
+                    `;
                 }
+                showMessageBox('loginMsg', 'error', err.detail || 'Login failed. Please check your credentials.', extraHtml);
             }
         }
     } catch (e) {
@@ -714,6 +714,9 @@ async function handleResetPassword(event) {
 // Allow Enter key to advance form
 document.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
+        // Skip if a modal is active (utils.js handles modal shortcuts)
+        if (document.querySelector('.modal.active')) return;
+
         if (document.getElementById('loginPanel').classList.contains('active')) {
             if (document.getElementById('loginStep2Btns').style.display === 'block') {
                 handleLogin();

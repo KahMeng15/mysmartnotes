@@ -180,9 +180,9 @@ function openLecture(id) {
 }
 
 function openModal(id) {
-    document.getElementById(id).classList.add('show');
+    document.getElementById(id).classList.add('active');
 }
 
 function closeModal(id) {
-    document.getElementById(id).classList.remove('show');
+    document.getElementById(id).classList.remove('active');
 }

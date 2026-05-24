@@ -92,57 +92,63 @@
         </div>
 
         <!-- Modal for Invitation -->
-        <div id="inviteModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
-            <div style="background:white; padding:30px; border-radius:12px; width:400px; position:relative;">
-                <h3>Invite User</h3>
+        <div id="inviteModal" class="modal">
+            <div class="modal-content">
+                <div class="flex-between margin-bottom-lg">
+                    <h3 style="margin: 0;">Invite User</h3>
+                    <button class="btn-icon" onclick="closeInviteModal()"><i class="ph ph-x"></i></button>
+                </div>
                 <form onsubmit="sendInvite(event)">
-                    <div class="form-group" style="margin-bottom:15px;">
-                        <label>Invitation Method</label>
-                        <div style="display:flex; gap:12px; margin-top:5px;">
-                            <label style="display:flex; align-items:center; gap:6px;">
+                    <div class="form-group">
+                        <label class="form-label">Invitation Method</label>
+                        <div style="display:flex; gap:16px; margin-top:8px;">
+                            <label style="display:flex; align-items:center; gap:8px; cursor: pointer;">
                                 <input type="radio" name="inviteMethod" value="email" checked onchange="setInviteMethod('email')">
-                                Send email (recommended)
+                                <span style="font-size: 14px;">Send email</span>
                             </label>
-                            <label style="display:flex; align-items:center; gap:6px;">
+                            <label style="display:flex; align-items:center; gap:8px; cursor: pointer;">
                                 <input type="radio" name="inviteMethod" value="link" onchange="setInviteMethod('link')">
-                                Generate shareable link
+                                <span style="font-size: 14px;">Shareable link</span>
                             </label>
                         </div>
-                        <small id="inviteMethodHelp" style="display:block; margin-top:6px; color:var(--color-gray); font-size:12px;">Invitations sent via email will notify users automatically.</small>
+                        <small id="inviteMethodHelp" style="display:block; margin-top:8px; color:var(--color-gray); font-size:12px;">Invitations sent via email will notify users automatically.</small>
                     </div>
-                    <div class="form-group" id="inviteEmailGroup" style="margin-bottom:15px;">
-                        <label>Email Address</label>
-                        <input type="email" id="inviteEmail" required placeholder="user@example.com" style="width:100%; padding:8px; margin-top:5px;">
+                    <div class="form-group" id="inviteEmailGroup">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" id="inviteEmail" class="form-input" required placeholder="user@example.com">
                     </div>
-                    <div class="form-group" style="margin-bottom:20px;">
-                        <label>User Tier</label>
-                        <select id="inviteTier" style="width:100%; padding:8px; margin-top:5px;">
+                    <div class="form-group">
+                        <label class="form-label">User Tier</label>
+                        <select id="inviteTier" class="form-input">
                             <option value="unlimited">Unlimited</option>
                             <option value="pro">Pro</option>
                             <option value="early_tester">Early Testers</option>
                             <option value="free">Free</option>
                         </select>
                     </div>
-                    <div style="display:flex; gap:10px;">
-                        <button type="submit" class="btn btn-primary" style="flex:1;">Send Invitation</button>
-                        <button type="button" class="btn btn-outline" onclick="closeInviteModal()" style="flex:1;">Cancel</button>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn btn-primary">Send Invitation</button>
+                        <button type="button" class="btn btn-outline" onclick="closeInviteModal()">Cancel</button>
                     </div>
                 </form>
             </div>
         </div>
 
         <!-- Modal for Changing User Tier -->
-        <div id="changeTierModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
-            <div style="background:white; padding:30px; border-radius:12px; width:400px; position:relative;">
-                <h3>Change User Tier</h3>
+        <div id="changeTierModal" class="modal">
+            <div class="modal-content">
+                <div class="flex-between margin-bottom-lg">
+                    <h3 style="margin: 0;">Change User Tier</h3>
+                    <button class="btn-icon" onclick="closeTierModal()"><i class="ph ph-x"></i></button>
+                </div>
                 <form onsubmit="submitTierChange(event)">
-                    <div class="form-group" style="margin-bottom:15px;">
-                        <label>User Email</label>
-                        <input type="text" id="changeTierUserEmail" disabled style="width:100%; padding:8px; margin-top:5px; background:#f0f0f0;">
+                    <div class="form-group">
+                        <label class="form-label">User Email</label>
+                        <input type="text" id="changeTierUserEmail" class="form-input" disabled style="background: var(--color-light-gray);">
                     </div>
-                    <div class="form-group" style="margin-bottom:20px;">
-                        <label>New Tier</label>
-                        <select id="changeTierSelect" style="width:100%; padding:8px; margin-top:5px;">
+                    <div class="form-group">
+                        <label class="form-label">New Tier</label>
+                        <select id="changeTierSelect" class="form-input" required>
                             <option value="">-- Select Tier --</option>
                             <option value="unlimited">Unlimited</option>
                             <option value="pro">Pro</option>
@@ -150,9 +156,9 @@
                             <option value="free">Free</option>
                         </select>
                     </div>
-                    <div style="display:flex; gap:10px;">
-                        <button type="submit" class="btn btn-primary" style="flex:1;">Change Tier</button>
-                        <button type="button" class="btn btn-outline" onclick="closeTierModal()" style="flex:1;">Cancel</button>
+                    <div class="modal-buttons">
+                        <button type="submit" class="btn btn-primary">Update Tier</button>
+                        <button type="button" class="btn btn-outline" onclick="closeTierModal()">Cancel</button>
                     </div>
                 </form>
             </div>

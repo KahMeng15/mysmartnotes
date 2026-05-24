@@ -96,26 +96,29 @@
     </div>
 
     <!-- Create Subject Modal -->
-    <div id="subjectModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Create New Subject</h3>
-                <button class="modal-close" onclick="closeModal('subjectModal')">&times;</button>
+    <div id="subjectModal" class="modal">
+        <div class="modal-content">
+            <div class="flex-between margin-bottom-lg">
+                <h3 style="margin: 0;">Create New Subject</h3>
+                <button class="btn-icon" onclick="closeModal('subjectModal')"><i class="ph ph-x"></i></button>
             </div>
             <form id="subjectForm" onsubmit="createSubject(event)">
                 <div class="form-group">
-                    <label>Subject Name</label>
-                    <input type="text" id="subjectName" required>
+                    <label class="form-label">Subject Name</label>
+                    <input type="text" id="subjectName" class="form-input" required placeholder="e.g. Calculus I">
                 </div>
                 <div class="form-group">
-                    <label>Description</label>
-                    <textarea id="subjectDescription"></textarea>
+                    <label class="form-label">Description (Optional)</label>
+                    <textarea id="subjectDescription" class="form-input" rows="3" placeholder="Brief overview of the subject"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Color</label>
-                    <input type="color" id="subjectColor" value="#593C8F">
+                    <label class="form-label">Color Tag</label>
+                    <input type="color" id="subjectColor" value="#593C8F" style="width: 100%; height: 40px; border: none; padding: 0; cursor: pointer; border-radius: var(--radius-md);">
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">Create Subject</button>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn btn-primary">Create Subject</button>
+                    <button type="button" class="btn btn-outline" onclick="closeModal('subjectModal')">Cancel</button>
+                </div>
             </form>
         </div>
     </div>

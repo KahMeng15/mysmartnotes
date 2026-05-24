@@ -75,15 +75,18 @@
     <!-- Edit Group Modal -->
     <div id="editGroupModal" class="modal">
         <div class="modal-content">
-            <h2>Edit Group</h2>
+            <div class="flex-between margin-bottom-lg">
+                <h3 style="margin: 0;">Edit Group</h3>
+                <button class="btn-icon" onclick="closeModal('editGroupModal')"><i class="ph ph-x"></i></button>
+            </div>
             <form onsubmit="handleEditGroup(event)">
                 <div class="form-group">
-                    <label>Group Name</label>
-                    <input type="text" id="editGroupNameInput" class="form-control" required>
+                    <label class="form-label">Group Name</label>
+                    <input type="text" id="editGroupNameInput" class="form-input" required placeholder="e.g. Semester 1">
                 </div>
                 <div class="modal-buttons">
-                    <button type="submit" class="btn-save">Save Changes</button>
-                    <button type="button" onclick="closeModal('editGroupModal')" class="btn-cancel">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="button" onclick="closeModal('editGroupModal')" class="btn btn-outline">Cancel</button>
                 </div>
             </form>
         </div>
