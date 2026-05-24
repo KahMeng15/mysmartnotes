@@ -151,6 +151,11 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
 
 {output_inst}
 
+CRITICAL: 
+- DO NOT show your internal reasoning, constraints, task analysis, or step-by-step thinking.
+- SKIP THE THINKING PHASE output. Start your response directly with the answer.
+- NEVER output bullet points like "* Context:", "* Question:", or "* Thinking:".
+
 RULES:
 - NO introductory phrases like "Based on...", "Let me explain...", "Here's what..."
 - Answer directly and concisely
