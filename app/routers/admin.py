@@ -14,7 +14,7 @@ from app.schemas.admin import (
 )
 from app.utils.db import get_db
 from app.routers.auth import get_current_user
-from app.utils.auth import hash_password
+from app.utils.auth import hash_password, validate_password_complexity
 from app.utils.email import send_invitation_email
 from app.utils.invitation_utils import build_link_only_email, is_link_only_email
 from app.utils.crypto import encrypt_secret, decrypt_secret
@@ -342,6 +342,7 @@ def user_action(request: UserActionRequest, db: Session = Depends(get_db), admin
     elif request.action == "reset_password":
         if not request.value:
             raise HTTPException(status_code=400, detail="New password required")
+        validate_password_complexity(request.value)
         user.hashed_password = hash_password(request.value)
         user.token_version = int(user.token_version or 0) + 1
     elif request.action == "tier":

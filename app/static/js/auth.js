@@ -39,32 +39,24 @@
         return decodeURIComponent(cookie.substring(name.length + 1));
     }
 
+    let isRefreshing = false;
+    let refreshSubscribers = [];
+
+    function subscribeTokenRefresh(cb) {
+        refreshSubscribers.push(cb);
+    }
+
+    function onRerfreshed(token) {
+        refreshSubscribers.map(cb => cb(token));
+        refreshSubscribers = [];
+    }
+
     window.fetch = async function (url, options = {}) {
         const isSameOrigin = isSameOriginRequest(url);
         const method = (options.method || 'GET').toUpperCase();
-        const csrfToken = getCookie('csrf_token');
         
-        // Extract Authorization header
-        let authHeaderValue = null;
-        if (options.headers instanceof Headers) {
-            authHeaderValue = options.headers.get('Authorization');
-        } else if (options.headers) {
-            authHeaderValue = options.headers.Authorization || options.headers['Authorization'];
-        }
-
-        const hasInvalidBearer = typeof authHeaderValue === 'string' && /^Bearer\s+(null|undefined)$/i.test(authHeaderValue.trim());
-
-        // Strip ONLY invalid explicit bearer headers (Bearer null/undefined)
-        if (isSameOrigin && hasInvalidBearer) {
-            if (options.headers instanceof Headers) {
-                options.headers.delete('Authorization');
-            } else if (options.headers) {
-                options.headers = { ...options.headers };
-                delete options.headers.Authorization;
-                delete options.headers['Authorization'];
-            }
-        }
-
+        // CSRF handling
+        const csrfToken = getCookie('csrf_token');
         if (isSameOrigin && !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method) && csrfToken) {
             options.headers = {
                 ...options.headers,
@@ -73,14 +65,52 @@
         }
 
         try {
-            const response = await originalFetch(url, options);
+            let response = await originalFetch(url, options);
 
-            // Only handle 401 from our backend
-            if (response.status === 401 && isSameOrigin) {
-                console.error(`❌ 401 Unauthorized on ${url} - clearing session and redirecting to login...`);
-                localStorage.removeItem('user');
-                localStorage.removeItem('token');
-                window.location.href = '/login';
+            // Handle 401 Unauthorized by attempting to refresh token
+            if (response.status === 401 && isSameOrigin && !url.includes('/auth/refresh') && !url.includes('/auth/login')) {
+                if (!isRefreshing) {
+                    isRefreshing = true;
+                    console.debug('🔄 401 detected, attempting to refresh token...');
+                    
+                    try {
+                        const refreshResponse = await originalFetch('/auth/refresh', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': csrfToken
+                            }
+                        });
+
+                        if (refreshResponse.ok) {
+                            const data = await refreshResponse.json();
+                            const newToken = data.access_token;
+                            console.debug('✅ Token refreshed successfully');
+                            
+                            isRefreshing = false;
+                            onRerfreshed(newToken);
+                        } else {
+                            throw new Error('Refresh failed');
+                        }
+                    } catch (err) {
+                        console.error('❌ Session expired and refresh failed. Redirecting to login.');
+                        isRefreshing = false;
+                        localStorage.removeItem('user');
+                        localStorage.removeItem('token');
+                        window.location.href = '/login';
+                        return response;
+                    }
+                }
+
+                // Wait for the token to be refreshed
+                const retryOriginalRequest = new Promise((resolve) => {
+                    subscribeTokenRefresh(() => {
+                        // Re-fetch with same options (the cookies/headers will be handled by the browser)
+                        resolve(originalFetch(url, options));
+                    });
+                });
+                
+                return await retryOriginalRequest;
             }
 
             return response;

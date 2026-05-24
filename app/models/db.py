@@ -32,6 +32,10 @@ class User(Base):
     google_oauth_id = Column(String(255), nullable=True, unique=True)  # Firebase UID for Google OAuth audit trail
     token_version = Column(Integer, default=0, nullable=False)  # Increment to revoke all existing JWT sessions
     
+    # Security/Lockout
+    failed_login_attempts = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime, nullable=True)
+    
     # Pomodoro Preferences
     pomo_study_mins = Column(Integer, default=25)
     pomo_break_mins = Column(Integer, default=5)
@@ -458,6 +462,17 @@ class UserLog(Base):
 
     # Relationships
     user = relationship("User")
+
+
+class IPBlock(Base):
+    """Temporary lockout for specific IP addresses due to failed logins"""
+    __tablename__ = "ip_blocks"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ip_address = Column(String(50), nullable=False, index=True, unique=True)
+    failed_attempts = Column(Integer, default=0, nullable=False)
+    locked_until = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class IPFilter(Base):

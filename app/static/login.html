@@ -12,6 +12,7 @@
     <script type="module" src="/js/firebase.js"></script>
     <link rel="stylesheet" href="/styles/master.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script>
     <script src="/js/login.js"></script>
     <script src="/js/quotes.js"></script>
 </head>
@@ -97,7 +98,13 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="regPassword">Password</label>
-                        <input class="form-input" type="password" id="regPassword" placeholder="••••••••">
+                        <input class="form-input" type="password" id="regPassword" placeholder="••••••••" oninput="updatePasswordChecklist(this.value, 'regChecklist')">
+                        <div id="regChecklist" class="password-checklist" style="margin-top: 8px; font-size: 0.8rem; color: #75757A;">
+                            <div class="checklist-item" data-requirement="length"><i class="ph ph-circle"></i> At least 8 characters</div>
+                            <div class="strength-meter" style="height: 4px; background: #eee; border-radius: 2px; margin-top: 4px; overflow: hidden;">
+                                <div class="strength-bar" style="height: 100%; width: 0%; transition: width 0.3s, background-color 0.3s;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -196,7 +203,13 @@
             <form onsubmit="handleResetPassword(event)">
                 <div class="form-group">
                     <label class="form-label" for="resetPasswordNew">New Password</label>
-                    <input class="form-input" type="password" id="resetPasswordNew" placeholder="••••••••" required>
+                    <input class="form-input" type="password" id="resetPasswordNew" placeholder="••••••••" required oninput="updatePasswordChecklist(this.value, 'resetChecklist')">
+                    <div id="resetChecklist" class="password-checklist" style="margin-top: 8px; font-size: 0.8rem; color: #75757A;">
+                        <div class="checklist-item" data-requirement="length"><i class="ph ph-circle"></i> At least 8 characters</div>
+                        <div class="strength-meter" style="height: 4px; background: #eee; border-radius: 2px; margin-top: 4px; overflow: hidden;">
+                            <div class="strength-bar" style="height: 100%; width: 0%; transition: width 0.3s, background-color 0.3s;"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="resetPasswordConfirm">Confirm Password</label>

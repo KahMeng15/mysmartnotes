@@ -177,6 +177,7 @@ def init_db():
     if not is_sqlite:
         try:
             apply_postgresql_migrations()
+            apply_postgresql_user_security_migrations()
         except Exception as e:
             logger.error(f"Failed to apply PostgreSQL migrations: {e}")
     else:
@@ -251,6 +252,40 @@ def apply_postgresql_migrations():
             logger.info("Successfully migrated chat_messages to string IDs")
     except Exception as e:
         logger.error(f"PostgreSQL migration failed: {e}", exc_info=True)
+
+
+def apply_postgresql_user_security_migrations():
+    """Add security-related columns to users table if they are missing"""
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            # Check for failed_login_attempts
+            res = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'users' AND column_name = 'failed_login_attempts'
+            """)).fetchone()
+            
+            if not res:
+                logger.info("Adding failed_login_attempts column to users table...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0 NOT NULL"))
+            
+            # Check for locked_until
+            res = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'users' AND column_name = 'locked_until'
+            """)).fetchone()
+            
+            if not res:
+                logger.info("Adding locked_until column to users table...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN locked_until TIMESTAMP WITHOUT TIME ZONE"))
+                
+        logger.info("PostgreSQL user security migrations applied successfully")
+    except Exception as e:
+        logger.error(f"PostgreSQL user security migration failed: {e}", exc_info=True)
+
+
 def apply_sqlite_migrations():
     """Add missing columns to existing SQLite tables based on models"""
     import sqlite3
@@ -269,7 +304,9 @@ def apply_sqlite_migrations():
         ("users", [
             ("google_oauth_id", "VARCHAR(255) DEFAULT NULL"),
             ("token_version", "INTEGER DEFAULT 0"),
-            ("note_processing_mode", "VARCHAR(50) DEFAULT 'smart'")
+            ("note_processing_mode", "VARCHAR(50) DEFAULT 'smart'"),
+            ("failed_login_attempts", "INTEGER DEFAULT 0 NOT NULL"),
+            ("locked_until", "DATETIME")
         ]),
         ("system_settings", [
             ("session_length", "INTEGER DEFAULT 24"),

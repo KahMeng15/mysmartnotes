@@ -10,10 +10,18 @@ import random
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken, PasswordChangeConfirmation
+from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken, PasswordChangeConfirmation, IPBlock
 from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, UserUpdate
 from app.utils.db import get_db
-from app.utils.auth import hash_password, verify_password, create_access_token, get_current_user as get_current_user_from_token
+from app.utils.auth import (
+    hash_password, 
+    verify_password, 
+    create_access_token, 
+    create_refresh_token,
+    get_current_user as get_current_user_from_token,
+    validate_password_complexity,
+    pwd_context
+)
 from app.utils.quotas import get_user_quota_status, get_user_tier_config
 from app.utils.email import send_password_reset_email
 from app.config import get_settings
@@ -52,6 +60,20 @@ def _set_auth_cookie(response: Response, access_token: str, expire_minutes: int)
         path="/",
     )
     response.headers[settings.CSRF_HEADER_NAME] = csrf_token
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    # 7 days expiration for refresh tokens
+    max_age = 7 * 24 * 60 * 60
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="Lax", # Lax is generally safer for refresh tokens
+        max_age=max_age,
+        path="/auth/refresh", # Only send this cookie to the refresh endpoint
+    )
 
 
 def _prepare_user_for_response(user: User) -> dict:
@@ -262,6 +284,9 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
         if not is_link_only_email(invitation.email) and invitation.email.lower() != user_data.email.lower():
             raise HTTPException(status_code=403, detail="Invitation token was issued for a different email address.")
 
+    # Validate password complexity
+    validate_password_complexity(user_data.password)
+
     # Check if user exists
     existing_user = db.query(User).filter(func.lower(User.email) == func.lower(user_data.email)).first()
     
@@ -329,12 +354,21 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
         
     email = credentials.get("email")
     password = credentials.get("password")
-    ip_address = request.client.host if request.client else None
+    ip_address = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "Unknown Device")
     
     if not email or not password:
         record_auth_attempt(db, action="login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="missing_credentials", reason="Email or password missing")
         raise HTTPException(status_code=400, detail="Missing email or password")
+
+    # IP Lockout Check
+    ip_block = db.query(IPBlock).filter(IPBlock.ip_address == ip_address).first()
+    if ip_block and ip_block.locked_until and ip_block.locked_until > datetime.utcnow():
+        wait_mins = int((ip_block.locked_until - datetime.utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Too many failed attempts from this IP. Please try again in {wait_mins} minutes."
+        )
 
     # Check maintenance mode
     sys_settings = db.query(SystemSettings).first()
@@ -347,19 +381,61 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
 
     user = db.query(User).filter(func.lower(User.email) == func.lower(email)).first()
     
+    # User Lockout Check
+    if user and user.locked_until and user.locked_until > datetime.utcnow():
+        wait_mins = int((user.locked_until - datetime.utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account temporarily locked due to too many failed attempts. Please try again in {wait_mins} minutes."
+        )
+
     try:
         if not user or not verify_password(password, user.hashed_password):
+            # Record failure and handle lockouts
+            if not ip_block:
+                ip_block = IPBlock(ip_address=ip_address, failed_attempts=1)
+                db.add(ip_block)
+            else:
+                ip_block.failed_attempts += 1
+                if ip_block.failed_attempts >= 10: # IP limit is higher than user limit
+                    ip_block.locked_until = datetime.utcnow() + timedelta(minutes=30)
+            
+            if user:
+                user.failed_login_attempts += 1
+                if user.failed_login_attempts >= 5:
+                    user.locked_until = datetime.utcnow() + timedelta(minutes=30)
+            
+            db.commit()
+
             record_auth_attempt(db, action="login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="invalid_credentials", reason="Invalid email or password", user=user)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid username or password"
             )
-    except ValueError as e:
+        
+        # Success: Reset attempts
+        if ip_block:
+            ip_block.failed_attempts = 0
+            ip_block.locked_until = None
+        
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        
+        # Phase 1: Argon2 Upgrade Path
+        if pwd_context.needs_update(user.hashed_password):
+            user.hashed_password = hash_password(password)
+            logger.info(f"Upgraded password hash to Argon2 for user: {user.email}")
+        
+        db.commit()
+
+    except HTTPException:
+        raise
+    except Exception as e:
         record_auth_attempt(db, action="login_attempt", email=email, ip_address=ip_address, device_info=user_agent, status="verification_error", reason=str(e), user=user)
-        logger.warning("auth.password_verification_error", extra={"email": email, "error": str(e)})
+        logger.error(f"auth.login_error: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during login."
         )
 
     if not user.is_active:
@@ -395,16 +471,23 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
         data={"sub": str(user.id), "tv": int(user.token_version or 0)},
         expires_delta=timedelta(minutes=expire_minutes)
     )
+    
+    refresh_token = create_refresh_token(
+        data={"sub": str(user.id), "tv": int(user.token_version or 0)}
+    )
+    
     _set_auth_cookie(response, access_token, expire_minutes)
+    _set_refresh_cookie(response, refresh_token)
     
     # Log login
-    ip_address = request.client.host if request.client else None
+    ip_address = request.client.host if request.client else "unknown"
     user_agent = request.headers.get("user-agent", "Unknown Device")
     db.add(UserLog(user_id=user.id, action="login", ip_address=ip_address, device_info=user_agent, details=f"email={email}; status=success"))
     db.commit()
     
     return {
         "access_token": access_token, 
+        "refresh_token": refresh_token,
         "token_type": "bearer", 
         "user": {
             "id": user.id,
@@ -414,6 +497,52 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
             "is_admin": user.is_admin
         }
     }
+
+
+@router.post("/refresh")
+async def refresh_token(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Refresh access token using refresh token cookie"""
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token missing")
+    
+    from jose import jwt, JWTError
+    try:
+        payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+            
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+            
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+            
+        from app.utils.auth import token_version_matches_user
+        if not token_version_matches_user(payload, user):
+            raise HTTPException(status_code=401, detail="Session expired")
+            
+        # Create new tokens
+        access_token = create_access_token(
+            data={"sub": str(user.id), "tv": int(user.token_version or 0)}
+        )
+        # Also rotate refresh token
+        new_refresh_token = create_refresh_token(
+            data={"sub": str(user.id), "tv": int(user.token_version or 0)}
+        )
+        
+        _set_auth_cookie(response, access_token, settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        _set_refresh_cookie(response, new_refresh_token)
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": new_refresh_token,
+            "token_type": "bearer"
+        }
+    except (JWTError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
 
 @router.post("/google-login")
@@ -826,8 +955,12 @@ async def change_password(passwords: PasswordChange, current_user: User = Depend
     """Change the user's password"""
     if not current_user.hashed_password:
         raise HTTPException(status_code=400, detail="Cannot change password for OAuth accounts. Please login via Google.")
-        
+
+    # Validate new password complexity
+    validate_password_complexity(passwords.new_password)
+
     try:
+
         if not verify_password(passwords.current_password, current_user.hashed_password):
             raise HTTPException(status_code=400, detail="Incorrect current password")
     except ValueError:
@@ -856,6 +989,9 @@ async def request_password_change(request_data: RequestPasswordChangeConfirmatio
             )
     # If user has no password, current_password check is skipped (first-time setup)
     
+    # Validate new password complexity
+    validate_password_complexity(request_data.new_password)
+
     # Check for too many recent requests (rate limiting)
     recent_confirmations = db.query(PasswordChangeConfirmation).filter(
         PasswordChangeConfirmation.user_id == current_user.id,
@@ -1071,6 +1207,9 @@ def reset_password(reset_data: PasswordResetSubmit, request: Request, db: Sessio
             detail="User not found."
         )
     
+    # Validate new password complexity
+    validate_password_complexity(reset_data.new_password)
+
     # Update password
     user.hashed_password = hash_password(reset_data.new_password)
     user.token_version = int(user.token_version or 0) + 1

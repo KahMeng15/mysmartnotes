@@ -11,22 +11,47 @@ from app.utils.db import get_db
 
 settings = get_settings()
 
+import zxcvbn
+
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    """Hash a password. Bcrypt has a 72-byte limit, so truncate."""
-    # Bcrypt has a 72-byte limit on password length
-    truncated = password[:72]
-    return pwd_context.hash(truncated)
+    """Hash a password using Argon2 (default)."""
+    return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash. Bcrypt has a 72-byte limit, so truncate."""
-    # Bcrypt has a 72-byte limit on password length
-    truncated = plain_password[:72]
-    return pwd_context.verify(truncated, hashed_password)
+    """Verify a password against its hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def validate_password_complexity(password: str) -> bool:
+    """
+    Validate password complexity using zxcvbn.
+    Enforces a minimum score of 3 (Strong) and minimum 8 characters.
+    """
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long."
+        )
+    
+    result = zxcvbn.zxcvbn(password)
+    if result.get("score", 0) < 3:
+        feedback = result.get("feedback", {})
+        warning = feedback.get("warning", "Password is too weak.")
+        suggestions = feedback.get("suggestions", [])
+        detail = warning
+        if suggestions:
+            detail += " Suggestions: " + " ".join(suggestions)
+            
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail
+        )
+    return True
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -37,7 +62,17 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "type": "access"})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
+
+
+def create_refresh_token(data: dict) -> str:
+    """Create a long-lived refresh token"""
+    to_encode = data.copy()
+    # 7 days expiration for refresh tokens
+    expire = datetime.utcnow() + timedelta(days=7)
+    to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 

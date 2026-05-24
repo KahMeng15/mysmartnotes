@@ -84,6 +84,69 @@ function updateSignupLink(signupConfig) {
     }
 }
 
+/**
+ * Real-time password strength checklist using zxcvbn
+ */
+function updatePasswordChecklist(password, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const lengthItem = container.querySelector('[data-requirement="length"]');
+    const strengthItem = container.querySelector('[data-requirement="strength"]');
+    const strengthLabel = container.querySelector('.strength-label');
+    const strengthBar = container.querySelector('.strength-bar');
+
+    // 1. Check Length (Min 8 characters)
+    const isLongEnough = password.length >= 8;
+    updateChecklistItem(lengthItem, isLongEnough);
+
+    // 2. Check Strength (zxcvbn score >= 3)
+    let score = 0;
+    let label = 'Too weak';
+    let color = '#eee';
+    let width = '0%';
+
+    if (password.length > 0) {
+        const result = zxcvbn(password);
+        score = result.score;
+        
+        const labels = ['Too weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
+        const colors = ['#DB5461', '#DB5461', '#E09F3E', '#2A9D5C', '#2A9D5C'];
+        
+        label = labels[score];
+        color = colors[score];
+        width = `${(score + 1) * 20}%`;
+    }
+
+    if (strengthLabel) {
+        strengthLabel.textContent = label;
+        strengthLabel.style.color = password.length > 0 ? color : 'inherit';
+    }
+    
+    if (strengthBar) {
+        strengthBar.style.width = width;
+        strengthBar.style.backgroundColor = color;
+    }
+
+    if (strengthItem) {
+        updateChecklistItem(strengthItem, score >= 3);
+    }
+}
+
+function updateChecklistItem(item, isValid) {
+    if (!item) return;
+    const icon = item.querySelector('i');
+    if (isValid) {
+        item.style.color = '#2A9D5C';
+        icon.className = 'ph ph-check-circle';
+        icon.style.color = '#2A9D5C';
+    } else {
+        item.style.color = '#75757A';
+        icon.className = 'ph ph-circle';
+        icon.style.color = '#75757A';
+    }
+}
+
 
 const UNNECESSARY_SERVICES = [
     { name: 'Microsoft', icon: 'https://cdn-icons-png.flaticon.com/512/732/732221.png' },
