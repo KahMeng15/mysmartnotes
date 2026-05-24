@@ -25,14 +25,37 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    env_file:
-      - .env
     environment:
       - PORT=8000
       - DB_USER=mysmartnotes
       - DB_PASSWORD=mysmartnotespassword
       - DB_HOST=db
+      - DB_PORT=5432
       - DB_NAME=mysmartnotes
+      - ENVIRONMENT=development
+      - SECRET_KEY=your-secret-key-change-in-production
+      - CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
+      - COOKIE_SECURE=false
+      - COOKIE_SAMESITE=lax
+      - CSRF_COOKIE_NAME=csrf_token
+      - CSRF_HEADER_NAME=X-CSRF-Token
+      - TASK_RETENTION_DAYS=14
+      - ADMIN_EMAIL=kahmeng15@gmail.com
+      - GLOBAL_AI_PROVIDER=gemini
+      - GLOBAL_GEMINI_API_KEY=AIzaSyDJBMpyLGVmUbtNzwHteYlcB2rMyIESxu0
+      - GLOBAL_AI_MODEL=models/gemma-4-26b-a4b-it
+      - GLOBAL_REASONING_LEVEL=low
+      - DEBUG=True
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - MAX_UPLOAD_SIZE_MB=50
+      - FIREBASE_API_KEY=AIzaSyCHvRKBDv6Ycu9ejoZEIRwT0kvaNXiL6jY
+      - FIREBASE_AUTH_DOMAIN=mysmartnotes-965fe.firebaseapp.com
+      - FIREBASE_PROJECT_ID=mysmartnotes-965fe
+      - FIREBASE_STORAGE_BUCKET=mysmartnotes-965fe.firebasestorage.app
+      - FIREBASE_MESSAGING_SENDER_ID=912822914070
+      - FIREBASE_APP_ID=1:912822914070:web:ca5abd538c80e61449b937
+      - FIREBASE_MEASUREMENT_ID=G-DYKN2CZXDG
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -47,13 +70,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    env_file:
-      - .env
     environment:
       - DB_USER=mysmartnotes
       - DB_PASSWORD=mysmartnotespassword
       - DB_HOST=db
+      - DB_PORT=5432
       - DB_NAME=mysmartnotes
+      - ENVIRONMENT=development
+      - SECRET_KEY=your-secret-key-change-in-production
+      - GLOBAL_AI_PROVIDER=gemini
+      - GLOBAL_GEMINI_API_KEY=AIzaSyDJBMpyLGVmUbtNzwHteYlcB2rMyIESxu0
+      - GLOBAL_AI_MODEL=models/gemma-4-26b-a4b-it
+      - GLOBAL_REASONING_LEVEL=low
+      - DEBUG=True
+      - LOG_LEVEL=INFO
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -79,5 +109,3 @@ services:
 networks:
   mysmartnotes-net:
     driver: bridge
-
-

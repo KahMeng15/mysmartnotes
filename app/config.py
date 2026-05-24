@@ -4,24 +4,39 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 
+# Hardcoded constants (not configurable via environment)
+APP_NAME = "MySmartNotes"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ALLOWED_EXTENSIONS = "pdf,pptx,png,jpg,jpeg"
+OCR_ENABLED = True
+AI_POLISH_ENABLED = True
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+# Database defaults
+DB_POOL_SIZE = 20
+DB_MAX_OVERFLOW = 40
+DB_POOL_TIMEOUT_SECONDS = 30
+DB_POOL_RECYCLE_SECONDS = 1800
+
+
 class Settings(BaseSettings):
     """Application settings from environment variables."""
 
-    # Database
-    DATABASE_URL: str = "sqlite:///./data/app.db"
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 40
-    DB_POOL_TIMEOUT_SECONDS: int = 30
-    DB_POOL_RECYCLE_SECONDS: int = 1800
+    # Database Configuration
+    # Use these to construct the PostgreSQL connection string
+    DB_USER: str = "mysmartnotes"
+    DB_PASSWORD: str = ""
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
+    DB_NAME: str = "mysmartnotes"
 
     # Runtime Environment
     ENVIRONMENT: str = "development"  # development, staging, production
-    ALLOW_SQLITE_IN_PRODUCTION: bool = False
 
     # JWT Security
+    # Generate a secure key with: openssl rand -hex 32
     SECRET_KEY: str = ""
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # CORS
     CORS_ALLOWED_ORIGINS: str = "http://localhost:8000,http://127.0.0.1:8000"
@@ -32,7 +47,8 @@ class Settings(BaseSettings):
     CSRF_COOKIE_NAME: str = "csrf_token"
     CSRF_HEADER_NAME: str = "X-CSRF-Token"
 
-    # Encryption for secrets stored in DB (Fernet key, URL-safe base64-encoded 32-byte key)
+    # Encryption for secrets stored in DB (Fernet key)
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     APP_ENCRYPTION_KEY: str = ""
 
     # Background task retention
@@ -40,7 +56,6 @@ class Settings(BaseSettings):
 
     # Admin Bootstrap
     ADMIN_EMAIL: str = ""
-    ADMIN_PASSWORD: str = ""
 
     # Global AI Configuration (Administrator-managed)
     GLOBAL_AI_PROVIDER: str = "gemini"  # Options: gemini, huggingface, ollama
@@ -65,7 +80,6 @@ class Settings(BaseSettings):
     FIREBASE_MEASUREMENT_ID: str = ""
 
     # App Settings
-    APP_NAME: str = "MySmartNotes"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 
@@ -75,12 +89,56 @@ class Settings(BaseSettings):
 
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 50
-    ALLOWED_EXTENSIONS: str = "pdf,pptx,png,jpg,jpeg"
 
-    # Processing
-    OCR_ENABLED: bool = True
-    AI_POLISH_ENABLED: bool = True
-    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+    # Expose hardcoded constants through settings for backward compatibility
+    @property
+    def APP_NAME(self) -> str:
+        return APP_NAME
+
+    @property
+    def ALGORITHM(self) -> str:
+        return ALGORITHM
+
+    @property
+    def ACCESS_TOKEN_EXPIRE_MINUTES(self) -> int:
+        return ACCESS_TOKEN_EXPIRE_MINUTES
+
+    @property
+    def ALLOWED_EXTENSIONS(self) -> str:
+        return ALLOWED_EXTENSIONS
+
+    @property
+    def OCR_ENABLED(self) -> bool:
+        return OCR_ENABLED
+
+    @property
+    def EMBEDDING_MODEL(self) -> str:
+        return EMBEDDING_MODEL
+
+    @property
+    def AI_POLISH_ENABLED(self) -> bool:
+        return AI_POLISH_ENABLED
+
+    @property
+    def DB_POOL_SIZE(self) -> int:
+        return DB_POOL_SIZE
+
+    @property
+    def DB_MAX_OVERFLOW(self) -> int:
+        return DB_MAX_OVERFLOW
+
+    @property
+    def DB_POOL_TIMEOUT_SECONDS(self) -> int:
+        return DB_POOL_TIMEOUT_SECONDS
+
+    @property
+    def DB_POOL_RECYCLE_SECONDS(self) -> int:
+        return DB_POOL_RECYCLE_SECONDS
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """Construct SQLAlchemy database URL"""
+        return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     class Config:
         env_file = ".env"

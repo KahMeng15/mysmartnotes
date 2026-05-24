@@ -64,8 +64,8 @@ def _validate_production_settings() -> None:
     if not settings.SECRET_KEY or len(settings.SECRET_KEY) < 32:
         raise RuntimeError("Production startup blocked: SECRET_KEY must be set to at least 32 characters")
 
-    if "sqlite" in settings.DATABASE_URL and not settings.ALLOW_SQLITE_IN_PRODUCTION:
-        raise RuntimeError("Production startup blocked: sqlite is not allowed. Set a production database URL or explicitly enable ALLOW_SQLITE_IN_PRODUCTION=true")
+    if "postgresql" not in settings.DATABASE_URL:
+        raise RuntimeError("Production startup blocked: Only PostgreSQL is supported.")
 
     if "*" in _parse_cors_origins():
         raise RuntimeError("Production startup blocked: wildcard CORS origin is not allowed")
@@ -108,28 +108,16 @@ async def lifespan(app: FastAPI):
             db.commit()
 
         # Bootstrap Admin
-        if settings.ADMIN_EMAIL and settings.ADMIN_PASSWORD:
+        if settings.ADMIN_EMAIL:
             from app.models.db import User
-            from app.utils.auth import hash_password
             admin_user = db.query(User).filter(User.email == settings.ADMIN_EMAIL).first()
-            if not admin_user:
-                logger.info(f"Creating default admin user: {settings.ADMIN_EMAIL}")
-                new_admin = User(
-                    username=settings.ADMIN_EMAIL,
-                    email=settings.ADMIN_EMAIL,
-                    hashed_password=hash_password(settings.ADMIN_PASSWORD),
-                    is_admin=True,
-                    is_active=True,
-                    is_approved=True,
-                    full_name="System Administrator",
-                    nickname="Admin"
-                )
-                db.add(new_admin)
-                db.commit()
-            elif not admin_user.is_admin:
-                logger.info(f"Elevating user to admin: {settings.ADMIN_EMAIL}")
-                admin_user.is_admin = True
-                db.commit()
+            if admin_user:
+                if not admin_user.is_admin:
+                    logger.info(f"Elevating user to admin: {settings.ADMIN_EMAIL}")
+                    admin_user.is_admin = True
+                    db.commit()
+            else:
+                logger.debug(f"Admin bootstrap: User {settings.ADMIN_EMAIL} not found. Register this account to enable admin access.")
                 
         db.close()
     except Exception as e:
