@@ -89,8 +89,9 @@ def _background_process_lecture(lecture_id: str, user_id: int, file_path: str, a
     """Background task to process a lecture and update its Task status"""
     task_id = f"ocr_{user_id}_{lecture_id}"
     
-    # Initialize task in DB
+    # Initialize task in DB as 'running' so the worker ignores it
     TaskManager.submit_task(task_id, "lecture_processing", user_id, lecture_id=lecture_id)
+    TaskManager._update_db_task(task_id, status="running", progress=5)
     
     db = SessionLocal()
     try:
@@ -547,20 +548,32 @@ async def delete_lecture(
             detail="Lecture not found"
         )
     
-    # Delete file
+    # 1. Delete the actual uploaded file if it exists
     if lecture.file_path and os.path.exists(lecture.file_path):
         try:
             os.remove(lecture.file_path)
         except Exception as e:
             # Log error but don't fail the request
-            logger.warning(f"Error deleting file: {e}")
+            logger.warning(f"Error deleting original file: {e}")
 
-        # Delete storage files (extracted text, etc)
+    # 2. Delete storage files (extracted text, structured JSON, images)
+    try:
         StorageManager.delete_lecture_files(lecture.id)
+    except Exception as e:
+        logger.warning(f"Error deleting storage files: {e}")
 
-        # Delete database record
+    # 3. Delete database record (cascades to related objects)
+    try:
         db.delete(lecture)
-        db.commit()    
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting lecture from database: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database deletion failed: {str(e)}"
+        )
+    
     return None
 
 

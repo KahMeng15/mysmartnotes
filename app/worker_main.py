@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 TASK_REGISTRY = {
     "ocr": OCRTask.process_file,
     "embedding": EmbeddingsTask.generate_embeddings,
-    # Add other task handlers as needed
+    # This task is handled directly by FastAPI BackgroundTasks in the API router,
+    # but we register it here as a no-op so the worker doesn't fail when it sees it in the DB.
+    "lecture_processing": lambda **kwargs: {"status": "handled_by_api_background_task"},
 }
 
 def process_next_task():
@@ -28,7 +30,11 @@ def process_next_task():
         # or rely on Postgres row locking if we detect it.
         
         # We will attempt to find a pending task
-        task = db.query(Task).filter(Task.status == "pending").first()
+        # IMPORTANT: We skip 'lecture_processing' because it's handled by the API's BackgroundTasks
+        task = db.query(Task).filter(
+            Task.status == "pending",
+            Task.task_type != "lecture_processing"
+        ).first()
         if not task:
             return False
 

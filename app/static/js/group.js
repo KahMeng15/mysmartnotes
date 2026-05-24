@@ -154,16 +154,9 @@ async function deleteGroup() {
                 method: 'DELETE'
             });
             if (res.ok) {
-                showSuccessModal('Group Deleted', 'The group has been deleted successfully!');
-                // Redirect after modal is closed
-                const successModal = document.getElementById('successModal');
-                const handleDone = () => {
+                showSuccessModal('Group Deleted', 'The group has been deleted successfully!', () => {
                     window.location.href = 'mynotes.html';
-                };
-                const doneBtn = successModal.querySelector('.btn-save');
-                if (doneBtn) {
-                    doneBtn.onclick = handleDone;
-                }
+                });
             } else {
                 alert('Failed to delete group');
             }

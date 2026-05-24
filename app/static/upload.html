@@ -456,18 +456,11 @@
                     // 2. Start Polling for AI Processing
                     await pollUploadProgress(lecture.id);
 
-                    // Close progress modal and show success
+                    // Close progress modal and show success with redirection callback
                     document.getElementById('progressModal').classList.remove('active');
-                    showSuccessModal('Upload Complete', 'Your lecture has been uploaded and processed successfully!');
-
-                    // Redirect after modal is closed
-                    const successModal = document.getElementById('successModal');
-                    const handleDone = () => {
+                    showSuccessModal('Upload Complete', 'Your lecture has been uploaded and processed successfully!', () => {
                         window.location.href = `/note/${lecture.id}`;
-                    };
-
-                    const doneBtn = successModal.querySelector('.btn-save');
-                    if (doneBtn) doneBtn.onclick = handleDone;
+                    });
                 } else {
                     document.getElementById('progressModal').classList.remove('active');
                     const error = await response.json();

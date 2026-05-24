@@ -175,17 +175,9 @@ async function handleEditSubject(e) {
 
         if (res.ok) {
             closeModal('editSubjectModal');
-            showSuccessModal('Subject Updated', 'Your subject has been updated successfully!');
-            // Set up done button to reload details
-            const successModal = document.getElementById('successModal');
-            const handleDone = () => {
-                closeSuccessModal();
+            showSuccessModal('Subject Updated', 'Your subject has been updated successfully!', () => {
                 loadSubjectDetails();
-            };
-            const doneBtn = successModal.querySelector('.btn-save');
-            if (doneBtn) {
-                doneBtn.onclick = handleDone;
-            }
+            });
         } else {
             alert('Failed to update subject');
         }
@@ -201,16 +193,9 @@ async function deleteSubject() {
                 method: 'DELETE'
             });
             if (response.ok) {
-                showSuccessModal('Subject Deleted', 'The subject has been deleted successfully!');
-                // Redirect after modal is closed
-                const successModal = document.getElementById('successModal');
-                const handleDone = () => {
+                showSuccessModal('Subject Deleted', 'The subject has been deleted successfully!', () => {
                     window.location.href = 'mynotes.html';
-                };
-                const doneBtn = successModal.querySelector('.btn-save');
-                if (doneBtn) {
-                    doneBtn.onclick = handleDone;
-                }
+                });
             } else {
                 alert('Failed to delete subject');
             }
@@ -227,16 +212,9 @@ async function deleteLecture(id) {
                 method: 'DELETE'
             });
             if (response.ok) {
-                showSuccessModal('Lecture Deleted', 'The lecture has been deleted successfully!');
-                // Reload after modal is closed
-                const successModal = document.getElementById('successModal');
-                const handleDone = () => {
+                showSuccessModal('Lecture Deleted', 'The lecture has been deleted successfully!', () => {
                     loadLectures();
-                };
-                const doneBtn = successModal.querySelector('.btn-save');
-                if (doneBtn) {
-                    doneBtn.onclick = handleDone;
-                }
+                });
             } else {
                 alert('Failed to delete lecture');
             }

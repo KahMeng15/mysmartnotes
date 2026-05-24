@@ -187,10 +187,10 @@ async def generate_summary_endpoint(
             return SummaryResponse(
                 lecture_id=request.lecture_id,
                 title=existing_summary.title,
-                content=existing_summary.content,
+                content=StorageManager.get_summary_text(existing_summary.id) or "",
                 is_cached=True,
                 summary_type=existing_summary.summary_type,
-                quickread=existing_summary.quickread,
+                quickread=StorageManager.get_summary_text(existing_summary.id, is_quickread=True),
                 mode=existing_summary.mode or "elaborate",
                 output_format=existing_summary.output_format or "sentence",
                 processing_method=existing_summary.processing_method or "whole",
@@ -621,17 +621,19 @@ async def export_summary(
     segments = []
     
     # Add Quickread as a special section if it exists
-    if doc.quickread:
+    quickread = StorageManager.get_summary_text(doc.id, is_quickread=True)
+    if quickread:
         segments.append(ContentSegment(
-            content=doc.quickread,
+            content=quickread,
             content_type=ContentType.H2,
             page_number=1,
             metadata={"title": "Quickread"}
         ))
         
     # Add the main content
+    summary_text = StorageManager.get_summary_text(doc.id) or ""
     segments.append(ContentSegment(
-        content=doc.content,
+        content=summary_text,
         content_type=ContentType.BODY,
         page_number=1,
         metadata={"title": doc.title or "Summary"}

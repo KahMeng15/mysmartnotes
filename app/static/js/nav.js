@@ -293,7 +293,7 @@ window.cancelLogout = function () {
     }
 };
 
-window.showSuccessModal = function (title, message) {
+window.showSuccessModal = function (title, message, callback) {
     // Create success modal if it doesn't exist
     let successModal = document.getElementById('successModal');
     if (!successModal) {
@@ -312,10 +312,18 @@ window.showSuccessModal = function (title, message) {
             <h3>${title || 'Success!'}</h3>
             <p style="color: var(--color-gray); margin-bottom: var(--spacing-lg);">${message || 'Operation completed successfully.'}</p>
             <div class="modal-buttons">
-                <button type="button" class="btn-save" onclick="closeSuccessModal()">Done</button>
+                <button type="button" class="btn-save" id="successModalDoneBtn">Done</button>
             </div>
         </div>
     `;
+
+    const doneBtn = document.getElementById('successModalDoneBtn');
+    doneBtn.onclick = function() {
+        closeSuccessModal();
+        if (typeof callback === 'function') {
+            callback();
+        }
+    };
 
     // Show the modal
     successModal.classList.add('active');
