@@ -204,7 +204,7 @@ async def request_observability_middleware(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; frame-src https://mysmartnotes-965fe.firebaseapp.com https://accounts.google.com; connect-src 'self' https://www.googleapis.com https://apis.google.com https://identitytoolkit.googleapis.com https://mysmartnotes-965fe.firebaseapp.com"
+    response.headers["Content-Security-Policy"] = f"default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; frame-src https://{settings.FIREBASE_AUTH_DOMAIN} https://accounts.google.com; connect-src 'self' https://www.googleapis.com https://apis.google.com https://identitytoolkit.googleapis.com https://{settings.FIREBASE_AUTH_DOMAIN}"
 
     if _is_production():
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -547,50 +547,6 @@ async def redirect_upload_html():
 async def serve_pomodoro_popout():
     return FileResponse(os.path.join(static_dir, "pomodoro_popout.html"))
 
-@app.get("/")
-async def root():
-        # Decide landing page based on client-side auth token state.
-        # Tokens are stored in localStorage, so server cannot reliably inspect auth on this request.
-        return HTMLResponse(
-                """
-<!DOCTYPE html>
-<html lang=\"en\">
-<head>
-    <meta charset=\"UTF-8\" />
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
-    <title>Redirecting...</title>
-</head>
-<body>
-    <script>
-        (async function () {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.location.replace('/login');
-                return;
-            }
-
-            try {
-                const res = await fetch('/auth/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (res.ok) {
-                    window.location.replace('/dashboard');
-                    return;
-                }
-            } catch (e) {
-                // Network issue or transient error, fall through to login.
-            }
-
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.replace('/login');
-        })();
-    </script>
-</body>
-</html>
-                """
-        )
 
 # Serve static files and templates
 if os.path.exists(static_dir):
