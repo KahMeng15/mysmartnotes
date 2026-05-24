@@ -52,6 +52,7 @@ class User(UserBase):
     is_active: Optional[bool] = True
     is_admin: bool = False
     is_approved: bool = True
+    is_verified: bool = False
     tier: str = "free"
     ai_provider: str = "gemini"
     ai_model: Optional[str] = None

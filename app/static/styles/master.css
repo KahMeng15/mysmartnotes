@@ -2815,6 +2815,7 @@ body.auth-page {
 .message-box { padding: 12px 14px; border-radius: 8px; font-size: 0.875rem; margin-bottom: 16px; display: none; }
 .message-box.success { display: block; background: rgba(42, 157, 92, 0.12); color: #1a6e3f; }
 .message-box.error { display: block; background: rgba(219, 84, 97, 0.1); color: #a02030; }
+.message-box.info { display: block; background: rgba(59, 130, 246, 0.1); color: #1e40af; }
 
 @media (max-width: 700px) {
   .auth-left { display: none; }

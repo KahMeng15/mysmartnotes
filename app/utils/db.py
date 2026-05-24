@@ -280,6 +280,19 @@ def apply_postgresql_user_security_migrations():
             if not res:
                 logger.info("Adding locked_until column to users table...")
                 conn.execute(text("ALTER TABLE users ADD COLUMN locked_until TIMESTAMP WITHOUT TIME ZONE"))
+            
+            # Check for is_verified
+            res = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'users' AND column_name = 'is_verified'
+            """)).fetchone()
+            
+            if not res:
+                logger.info("Adding is_verified column to users table...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE"))
+                # Existing users might already be "verified" by virtue of being active
+                conn.execute(text("UPDATE users SET is_verified = TRUE WHERE is_active = TRUE"))
                 
         logger.info("PostgreSQL user security migrations applied successfully")
     except Exception as e:
@@ -306,7 +319,8 @@ def apply_sqlite_migrations():
             ("token_version", "INTEGER DEFAULT 0"),
             ("note_processing_mode", "VARCHAR(50) DEFAULT 'smart'"),
             ("failed_login_attempts", "INTEGER DEFAULT 0 NOT NULL"),
-            ("locked_until", "DATETIME")
+            ("locked_until", "DATETIME"),
+            ("is_verified", "BOOLEAN DEFAULT 0")
         ]),
         ("system_settings", [
             ("session_length", "INTEGER DEFAULT 24"),
@@ -374,6 +388,8 @@ def apply_sqlite_migrations():
                 logger.info(f"Adding column {col_name} to table {table_name}")
                 try:
                     cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def}")
+                    if col_name == "is_verified":
+                        cursor.execute(f"UPDATE users SET is_verified = 1 WHERE is_active = 1")
                 except sqlite3.OperationalError as e:
                     logger.error(f"Error adding column {col_name} to {table_name}: {e}")
     

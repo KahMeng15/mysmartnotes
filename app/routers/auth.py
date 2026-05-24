@@ -10,7 +10,7 @@ import random
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken, PasswordChangeConfirmation, IPBlock
+from app.models.db import User, SystemSettings, UserInvitation, PasswordResetToken, EmailVerificationToken, PasswordChangeConfirmation, IPBlock
 from app.schemas.schemas import UserCreate, UserLogin, User as UserSchema, UserUpdate, NicknameStr, FullNameStr
 from app.utils.db import get_db
 from app.utils.auth import (
@@ -23,7 +23,7 @@ from app.utils.auth import (
     pwd_context
 )
 from app.utils.quotas import get_user_quota_status, get_user_tier_config
-from app.utils.email import send_password_reset_email
+from app.utils.email import send_password_reset_email, send_verification_email
 from app.config import get_settings
 from sqlalchemy import func
 from app.models.db import Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserLog
@@ -87,6 +87,7 @@ def _prepare_user_for_response(user: User) -> dict:
         "is_active": user.is_active,
         "is_admin": user.is_admin,
         "is_approved": user.is_approved,
+        "is_verified": user.is_verified,
         "tier": user.tier,
         "ai_provider": user.ai_provider,
         "ai_model": user.ai_model,
@@ -321,12 +322,36 @@ def register(user_data: UserCreate, request: Request, token: Optional[str] = Non
             hashed_password=hash_password(user_data.password),
             is_admin=is_admin,
             is_approved=is_approved,
+            is_verified=True if is_admin else False, # Admins auto-verified
             tier=invitation.tier if invitation else "free"
         )
         db.add(user)
 
     # Ensure new users have an ID before we set invitation.used_by
     db.flush()
+
+    # Create verification token for new non-admin users
+    if not user.is_verified:
+        verification_token = EmailVerificationToken(
+            user_id=user.id,
+            email=user.email,
+            token=secrets.token_urlsafe(32),
+            expires_at=datetime.utcnow() + timedelta(hours=24)
+        )
+        db.add(verification_token)
+        db.commit()
+        db.refresh(verification_token)
+
+        # Build verification link
+        sys_settings = db.query(SystemSettings).first()
+        domain = sys_settings.domain_url if sys_settings and sys_settings.domain_url else "http://localhost:8000"
+        if not domain.startswith("http"):
+            domain = f"http://{domain}"
+        
+        verify_link = f"{domain.rstrip('/')}/login?verify_token={verification_token.token}"
+        
+        # Send verification email
+        send_verification_email(db, user.email, verify_link)
     
     if invitation:
         invitation.is_used = True
@@ -451,6 +476,12 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User account is pending approval by administrator"
         )
+    
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email not verified. Please check your inbox for the verification link."
+        )
         
     # Auto-elevate admin matching settings
     if settings.ADMIN_EMAIL and user.email.lower() == settings.ADMIN_EMAIL.lower() and not user.is_admin:
@@ -489,13 +520,7 @@ async def login(request: Request, response: Response, db: Session = Depends(get_
         "access_token": access_token, 
         "refresh_token": refresh_token,
         "token_type": "bearer", 
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "username": user.username,
-            "nickname": user.nickname,
-            "is_admin": user.is_admin
-        }
+        "user": _prepare_user_for_response(user)
     }
 
 
@@ -786,6 +811,7 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, res
             is_active=True,
             is_admin=is_admin,
             is_approved=is_approved,
+            is_verified=True,  # Google users are pre-verified
             tier=tier,
             google_oauth_id=google_user_id  # Store Firebase user ID
         )
@@ -1239,6 +1265,131 @@ def check_reset_token_validity(token: str, db: Session = Depends(get_db)):
         return {"valid": False, "message": "Token has expired"}
     
     return {"valid": True, "message": "Token is valid"}
+
+# --- Email Verification ---
+
+class EmailVerifySubmit(BaseModel):
+    token: str
+
+@router.post("/verify-email")
+def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session = Depends(get_db)):
+    """Verify email with valid token"""
+    
+    # Find the verification token
+    verify_token = db.query(EmailVerificationToken).filter(
+        EmailVerificationToken.token == verify_data.token,
+        EmailVerificationToken.is_used == False
+    ).first()
+    
+    if not verify_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or already-used verification link."
+        )
+    
+    # Check if token has expired
+    if verify_token.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification link has expired. Please request a new one by trying to log in."
+        )
+    
+    # Get user
+    user = db.query(User).filter(User.id == verify_token.user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not found."
+        )
+    
+    # Update verification status
+    user.is_verified = True
+    verify_token.is_used = True
+    
+    # Log action
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    db.add(UserLog(user_id=user.id, action="email_verified", ip_address=ip_address, device_info=user_agent))
+    
+    db.commit()
+    
+    return {"message": "Email verified successfully! You can now log in."}
+
+@router.get("/email-verification-token-valid")
+def check_verification_token_validity(token: str, db: Session = Depends(get_db)):
+    """Check if an email verification token is still valid"""
+    verify_token = db.query(EmailVerificationToken).filter(
+        EmailVerificationToken.token == token,
+        EmailVerificationToken.is_used == False
+    ).first()
+    
+    if not verify_token:
+        return {"valid": False, "message": "Invalid or already-used link"}
+    
+    if verify_token.expires_at < datetime.utcnow():
+        return {"valid": False, "message": "Link has expired"}
+    
+    return {"valid": True, "message": "Link is valid"}
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+@router.post("/resend-verification")
+def resend_verification(resend_request: ResendVerificationRequest, request: Request, db: Session = Depends(get_db)):
+    """Resend email verification link. Rate limited."""
+    email = resend_request.email.lower().strip()
+    
+    # Find user
+    user = db.query(User).filter(func.lower(User.email) == email).first()
+    if not user:
+        # Security: Don't reveal email existence
+        return {"message": "If your account is not verified, a new verification link has been sent."}
+    
+    if user.is_verified:
+        return {"message": "Your account is already verified. You can sign in."}
+
+    # Rate limiting: Check for too many recent resends
+    recent_tokens = db.query(EmailVerificationToken).filter(
+        EmailVerificationToken.email == email,
+        EmailVerificationToken.is_used == False,
+        EmailVerificationToken.expires_at > datetime.utcnow()
+    ).all()
+    
+    if len(recent_tokens) >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please wait before requesting another link."
+        )
+    
+    # Create new token
+    verification_token = EmailVerificationToken(
+        user_id=user.id,
+        email=user.email,
+        token=secrets.token_urlsafe(32),
+        expires_at=datetime.utcnow() + timedelta(hours=24)
+    )
+    db.add(verification_token)
+    db.commit()
+    db.refresh(verification_token)
+
+    # Build verification link
+    sys_settings = db.query(SystemSettings).first()
+    domain = sys_settings.domain_url if sys_settings and sys_settings.domain_url else "http://localhost:8000"
+    if not domain.startswith("http"):
+        domain = f"http://{domain}"
+    
+    verify_link = f"{domain.rstrip('/')}/login?verify_token={verification_token.token}"
+    
+    # Send email
+    send_verification_email(db, user.email, verify_link)
+    
+    # Log action
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "Unknown Device")
+    db.add(UserLog(user_id=user.id, action="verification_resend", ip_address=ip_address, device_info=user_agent))
+    db.commit()
+    
+    return {"message": "A new verification link has been sent to your email."}
 
 
 # --- Google Account Linking ---

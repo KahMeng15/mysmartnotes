@@ -39,12 +39,15 @@
                 <input class="form-input" type="email" id="loginEmail" placeholder="you@example.com"
                     autocomplete="email">
             </div>
-            <div class="form-group" id="loginPasswordGroup" style="display:none;">
+            <div class="form-group" id="loginPasswordGroup">
                 <label class="form-label" for="loginPassword">Password</label>
                 <input class="form-input" type="password" id="loginPassword" placeholder="••••••••"
                     autocomplete="current-password">
             </div>
-            <div id="loginAuthGrid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px;">
+            <div id="loginStep2Btns">
+                <button class="btn btn-next btn-block" onclick="handleLogin()">Sign In</button>
+            </div>
+            <div id="loginAuthGrid" style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px;">
                 <button id="googleLoginBtn" class="btn btn-google btn-login" onclick="handleGoogleSignIn()" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
                     <svg class="google-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 20px; height: 20px;">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -54,10 +57,6 @@
                     </svg>
                     <span style="font-size: 13px; font-weight: 600;">Sign in with Google</span>
                 </button>
-                <button id="nextLoginBtn" class="btn btn-next" onclick="showPasswordField()">Next</button>
-            </div>
-            <div style="display:none;" id="loginStep2Btns">
-                <button class="btn btn-next btn-block" onclick="handleLogin()">Sign In</button>
             </div>
             <p class="toggle-link" id="signupLink">Don't have an account? <a onclick="switchPanel('register')">Sign up</a></p>
             <p class="toggle-link" style="margin-top: 8px;"><a onclick="switchPanel('forgotPassword')" style="color: #3b82f6; cursor: pointer; text-decoration: none;">Forgot password?</a></p>
@@ -133,6 +132,24 @@
             </div>
             <button class="btn btn-next btn-block" style="margin-top: 24px;" onclick="handleRegister()">Create Account</button>
             <p class="toggle-link">Already have an account? <a onclick="switchPanel('login')">Sign in</a></p>
+        </div>
+
+        <!-- Registration Success Panel -->
+        <div class="panel" id="accountCreatedPanel">
+            <div style="text-align: left; padding: 20px 0;">
+                <div class="icon-circle" style="background-color: #ecfdf5; color: #10b981; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 0 24px 0; font-size: 2.5rem;">
+                    <i class="ph ph-check-circle"></i>
+                </div>
+                <h2 style="font-size: 1.8rem; margin-bottom: 12px; color: #111827;">Account Created!</h2>
+                <p style="color: #4b5563; margin-bottom: 12px; font-size: 1rem; line-height: 1.5;">
+                    Welcome to MySmartNotes! We've sent a verification link to your email address. Please click the link to verify your account and get started.
+                </p>
+                <p style="color: #6b7280; font-size: 0.875rem; margin-bottom: 32px;">
+                    Don't see the email? Check your spam folder or <a href="#" onclick="event.preventDefault(); handleResendVerification('resendRegisterMsg')" style="color: #3b82f6; text-decoration: underline; font-weight: 600;">resend the link</a>.
+                </p>
+                <div id="resendRegisterMsg" class="message-box" style="margin-bottom: 16px;"></div>
+                <button class="btn btn-next btn-block" onclick="switchPanel('login')">Back to Login</button>
+            </div>
         </div>
 
         <!-- Google Registration Panel -->
@@ -219,6 +236,35 @@
                 <p class="toggle-link"><a onclick="switchPanel('login')">Back to login</a></p>
             </form>
         </div>
+
+        <!-- Email Verification Panel -->
+        <div class="panel" id="verifyEmailPanel">
+            <div id="verifyEmailMsg" class="message-box"></div>
+            <div style="text-align: center; padding: 20px 0;">
+                <div class="icon-circle" style="background-color: #eff6ff; color: #3b82f6; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 2.5rem;">
+                    <i class="ph ph-envelope-simple-open"></i>
+                </div>
+                <h2 style="font-size: 1.5rem; margin-bottom: 8px;">Email Verification</h2>
+                <p id="verifyEmailStatus" style="color: #75757A; margin-bottom: 24px; font-size: 0.9rem;">
+                    We're validating your email verification link. Please wait...
+                </p>
+                
+                <div id="verifyEmailSuccessContent" style="display: none; text-align: center;">
+                    <p style="margin-bottom: 24px; color: #10b981; font-weight: 500;">
+                        Your email has been successfully verified!
+                    </p>
+                    <button class="btn btn-next btn-block" onclick="switchPanel('login')">Go to Login</button>
+                </div>
+
+                <div id="verifyEmailErrorContent" style="display: none; text-align: center;">
+                    <p style="margin-bottom: 24px; color: #ef4444;">
+                        Verification failed. The link may be invalid or expired.
+                    </p>
+                    <button class="btn btn-next btn-block" onclick="switchPanel('login')">Back to Login</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 </body>
 

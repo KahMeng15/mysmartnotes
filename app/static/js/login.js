@@ -70,7 +70,87 @@ window.addEventListener('load', async () => {
             switchPanel('login');
         }
     }
+
+    // Check for email verification token in URL
+    const verifyToken = params.get('verify_token');
+    if (verifyToken) {
+        handleVerifyEmail(verifyToken);
+    }
 });
+
+async function handleResendVerification(msgBoxId) {
+    // Get email from login input or registration success context (we'll try to find it)
+    let email = '';
+    if (msgBoxId === 'loginMsg') {
+        email = document.getElementById('loginEmail').value.trim();
+    } else {
+        // For registration success, it might have been cleared, but we can try to get it if we store it
+        // Or just let the user re-enter it at login if they lose it.
+        // For simplicity, if it's cleared, we'll ask them to go to login.
+        // But let's try to get it from a global variable if we set it.
+        email = window.lastRegisteredEmail || '';
+    }
+
+    if (!email) {
+        showMessageBox(msgBoxId, 'error', 'Please enter your email address at the login screen first.');
+        if (msgBoxId === 'loginMsg') document.getElementById('loginEmail').focus();
+        return;
+    }
+
+    try {
+        const res = await fetch('/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+            showMessageBox(msgBoxId, 'success', data.message);
+            // Hide the resend button after success to prevent spam
+            const container = document.getElementById('loginResendContainer');
+            if (container) container.style.display = 'none';
+            const resendBtn = document.getElementById('resendBtn');
+            if (resendBtn) resendBtn.style.display = 'none';
+        } else {
+            showMessageBox(msgBoxId, 'error', data.detail || 'Failed to resend link.');
+        }
+    } catch (e) {
+        showMessageBox(msgBoxId, 'error', 'Connection error. Please try again.');
+    }
+}
+
+async function handleVerifyEmail(token) {
+    switchPanel('verifyEmail');
+    const statusEl = document.getElementById('verifyEmailStatus');
+    const successContent = document.getElementById('verifyEmailSuccessContent');
+    const errorContent = document.getElementById('verifyEmailErrorContent');
+    
+    try {
+        const res = await fetch('/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok) {
+            statusEl.style.display = 'none';
+            successContent.style.display = 'block';
+            showMessageBox('verifyEmailMsg', 'success', data.message);
+        } else {
+            statusEl.style.display = 'none';
+            errorContent.style.display = 'block';
+            showMessageBox('verifyEmailMsg', 'error', data.detail || 'Verification failed.');
+        }
+    } catch (e) {
+        console.error('Verification error:', e);
+        statusEl.style.display = 'none';
+        errorContent.style.display = 'block';
+        showMessageBox('verifyEmailMsg', 'error', 'Connection error. Please try again.');
+    }
+}
 
 function updateSignupLink(signupConfig) {
     const signupLink = document.getElementById('signupLink');
@@ -230,6 +310,13 @@ function initUnnecessaryLogins() {
 }
 
 function switchPanel(name) {
+    // Clear all message boxes
+    document.querySelectorAll('.message-box').forEach(el => {
+        el.textContent = '';
+        el.style.display = 'none';
+        el.className = 'message-box';
+    });
+
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById(name + 'Panel').classList.add('active');
     
@@ -242,8 +329,22 @@ function switchPanel(name) {
 
 function showMessageBox(id, type, text) {
     const el = document.getElementById(id);
+    if (!el) return;
     el.className = 'message-box ' + type;
-    el.textContent = text;
+    
+    // Handle object/array detail from FastAPI
+    let displayMsg = text;
+    if (typeof text === 'object' && text !== null) {
+        if (Array.isArray(text)) {
+            // Pick first error message if it's a validation error list
+            displayMsg = text[0]?.msg || text[0]?.message || JSON.stringify(text);
+        } else {
+            displayMsg = text.detail || text.message || JSON.stringify(text);
+        }
+    }
+    
+    el.textContent = displayMsg;
+    el.style.display = 'block';
 }
 
 function showPasswordField() {
@@ -284,6 +385,24 @@ async function handleLogin() {
                 setTimeout(() => { window.location.href = '/maintenance'; }, 2000);
             } else {
                 showMessageBox('loginMsg', 'error', err.detail || 'Login failed. Please check your credentials.');
+                if (err.detail && err.detail.toLowerCase().includes('not verified')) {
+                    const el = document.getElementById('loginMsg');
+                    if (el) {
+                        const link = document.createElement('a');
+                        link.href = '#';
+                        link.style.marginLeft = '8px';
+                        link.style.color = '#1e40af';
+                        link.style.textDecoration = 'underline';
+                        link.style.fontWeight = '600';
+                        link.style.cursor = 'pointer';
+                        link.textContent = 'Resend link';
+                        link.onclick = (e) => {
+                            e.preventDefault();
+                            handleResendVerification('loginMsg');
+                        };
+                        el.appendChild(link);
+                    }
+                }
             }
         }
     } catch (e) {
@@ -322,8 +441,16 @@ async function handleRegister() {
             body: JSON.stringify(body)
         });
         if (res.ok) {
-            showMessageBox('registerMsg', 'success', 'Account created! Please sign in.');
-            setTimeout(() => switchPanel('login'), 1500);
+            window.lastRegisteredEmail = email;
+            switchPanel('accountCreated');
+            // Reset registration form
+            document.getElementById('regEmail').value = '';
+            document.getElementById('regPassword').value = '';
+            document.getElementById('regNickname').value = '';
+            document.getElementById('regFullName').value = '';
+            document.getElementById('regAgreeTos').checked = false;
+            document.getElementById('regAgreePrivacy').checked = false;
+            document.getElementById('regAgreeFairUse').checked = false;
         } else {
             const err = await res.json();
             showMessageBox('registerMsg', 'error', err.detail || 'Registration failed.');

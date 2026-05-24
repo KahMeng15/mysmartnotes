@@ -23,6 +23,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     is_approved = Column(Boolean, default=True) # Manual approval flow
+    is_verified = Column(Boolean, default=False) # Email verification flow
     tier = Column(String(50), default="free") # free, pro, etc.
     ai_provider = Column(String(50), default="gemini") # gemini, chatgpt, claude, huggingface, openrouter, local
     ai_model = Column(String(100), nullable=True)
@@ -405,6 +406,22 @@ class UserInvitation(Base):
 class PasswordResetToken(Base):
     """Password reset tokens for users who forgot their password"""
     __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    token = Column(String(100), nullable=False, unique=True, index=True)
+    is_used = Column(Boolean, default=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+
+class EmailVerificationToken(Base):
+    """Email verification tokens for new users"""
+    __tablename__ = "email_verification_tokens"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)

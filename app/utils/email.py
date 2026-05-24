@@ -66,6 +66,27 @@ def send_invitation_email(db: Session, recipient_email: str, invitation_link: st
     """
     return send_email(db, recipient_email, subject, body, is_html=True)
 
+def send_verification_email(db: Session, recipient_email: str, verification_link: str) -> bool:
+    """Send an email verification link to a new user"""
+    subject = "Verify Your Email - MySmartNotes"
+    body = f"""
+    <html>
+        <body>
+            <h2>Verify Your Email</h2>
+            <p>Welcome to MySmartNotes! Please verify your email address to complete your registration.</p>
+            <p>Click the link below to verify your account:</p>
+            <p><a href="{verification_link}" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">Verify Email</a></p>
+            <p>Or copy and paste this link in your browser:</p>
+            <p><small>{verification_link}</small></p>
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">This link will expire in 24 hours.</p>
+            <p style="color: #666; font-size: 14px;">If you didn't create an account, you can safely ignore this email.</p>
+            <br>
+            <p>Best regards,<br>The MySmartNotes Team</p>
+        </body>
+    </html>
+    """
+    return send_email(db, recipient_email, subject, body, is_html=True)
+
 def send_password_reset_email(db: Session, recipient_email: str, reset_link: str) -> bool:
     """Send a password reset email to a user"""
     subject = "Password Reset Request - MySmartNotes"
