@@ -3,9 +3,9 @@ services:
     image: postgres:15-alpine
     container_name: mysmartnotes_db
     environment:
-      POSTGRES_USER: mysmartnotes
-      POSTGRES_PASSWORD: mysmartnotespassword
-      POSTGRES_DB: mysmartnotes
+      POSTGRES_USER: your-db-user
+      POSTGRES_PASSWORD: your-db-password
+      POSTGRES_DB: your-db-name
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     ports:
@@ -13,7 +13,7 @@ services:
     networks:
       - mysmartnotes-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mysmartnotes"]
+      test: ["CMD-SHELL", "pg_isready -U your-db-user"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,11 +27,11 @@ services:
         condition: service_healthy
     environment:
       - PORT=8000
-      - DB_USER=mysmartnotes
-      - DB_PASSWORD=mysmartnotespassword
+      - DB_USER=your-db-user
+      - DB_PASSWORD=your-db-password
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=mysmartnotes
+      - DB_NAME=your-db-name
       - ENVIRONMENT=development
       - SECRET_KEY=your-secret-key-change-in-production
       - CORS_ALLOWED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
@@ -39,23 +39,24 @@ services:
       - COOKIE_SAMESITE=lax
       - CSRF_COOKIE_NAME=csrf_token
       - CSRF_HEADER_NAME=X-CSRF-Token
+      - APP_ENCRYPTION_KEY=
       - TASK_RETENTION_DAYS=14
-      - ADMIN_EMAIL=kahmeng15@gmail.com
+      - ADMIN_EMAIL=admin@example.com
       - GLOBAL_AI_PROVIDER=gemini
       - GLOBAL_GEMINI_API_KEY=your-gemini-api-key
-      - GLOBAL_AI_MODEL=models/gemma-4-26b-a4b-it
-      - GLOBAL_REASONING_LEVEL=low
+      - GLOBAL_AI_MODEL=gemini-1.5-flash
+      - GLOBAL_REASONING_LEVEL=medium
       - DEBUG=True
       - LOG_LEVEL=INFO
       - HOST=0.0.0.0
       - MAX_UPLOAD_SIZE_MB=50
       - FIREBASE_API_KEY=your-firebase-api-key
-      - FIREBASE_AUTH_DOMAIN=
-      - FIREBASE_PROJECT_ID=
-      - FIREBASE_STORAGE_BUCKET=
-      - FIREBASE_MESSAGING_SENDER_ID=
-      - FIREBASE_APP_ID=
-      - FIREBASE_MEASUREMENT_ID=
+      - FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+      - FIREBASE_PROJECT_ID=your-project-id
+      - FIREBASE_STORAGE_BUCKET=your-project-id.firebasestorage.app
+      - FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+      - FIREBASE_APP_ID=your-app-id
+      - FIREBASE_MEASUREMENT_ID=your-measurement-id
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -71,17 +72,18 @@ services:
       db:
         condition: service_healthy
     environment:
-      - DB_USER=mysmartnotes
-      - DB_PASSWORD=mysmartnotespassword
+      - DB_USER=your-db-user
+      - DB_PASSWORD=your-db-password
       - DB_HOST=db
       - DB_PORT=5432
-      - DB_NAME=mysmartnotes
+      - DB_NAME=your-db-name
       - ENVIRONMENT=development
       - SECRET_KEY=your-secret-key-change-in-production
+      - APP_ENCRYPTION_KEY=
       - GLOBAL_AI_PROVIDER=gemini
       - GLOBAL_GEMINI_API_KEY=your-gemini-api-key
-      - GLOBAL_AI_MODEL=models/gemma-4-26b-a4b-it
-      - GLOBAL_REASONING_LEVEL=low
+      - GLOBAL_AI_MODEL=gemini-1.5-flash
+      - GLOBAL_REASONING_LEVEL=medium
       - DEBUG=True
       - LOG_LEVEL=INFO
     volumes:
