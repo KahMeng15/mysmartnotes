@@ -32,7 +32,6 @@ def _prepare_system_settings_response(settings: SystemSettings) -> dict:
         "domain_url": settings.domain_url,
         "global_ai_provider": settings.global_ai_provider,
         "global_ai_model": settings.global_ai_model,
-        "global_ai_api_key": decrypt_secret(settings.global_ai_api_key),
         "global_ai_base_url": settings.global_ai_base_url,
         "ai_limit_per_user": settings.ai_limit_per_user,
         "session_length": settings.session_length,
@@ -67,8 +66,7 @@ def get_system_settings(db: Session = Depends(get_db), admin: User = Depends(get
     if not settings:
         settings = SystemSettings(
             global_ai_provider=app_settings.GLOBAL_AI_PROVIDER,
-            global_ai_model=app_settings.GLOBAL_AI_MODEL,
-            global_ai_api_key=encrypt_secret(app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GLOBAL_HUGGINGFACE_TOKEN),
+            global_ai_model=app_settings.GLOBAL_AI_MODEL
         )
         db.add(settings)
         db.commit()
@@ -81,9 +79,6 @@ def get_system_settings(db: Session = Depends(get_db), admin: User = Depends(get
             updated = True
         if not settings.global_ai_model:
             settings.global_ai_model = app_settings.GLOBAL_AI_MODEL
-            updated = True
-        if not settings.global_ai_api_key:
-            settings.global_ai_api_key = encrypt_secret(app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GLOBAL_HUGGINGFACE_TOKEN)
             updated = True
         
         if updated:
@@ -101,7 +96,7 @@ def update_system_settings(update_data: SystemSettingsSchema, db: Session = Depe
     
     for key, value in update_data.model_dump().items():
         if key == "global_ai_api_key":
-            setattr(settings, key, encrypt_secret(value))
+            continue
         else:
             setattr(settings, key, value)
     
@@ -317,7 +312,7 @@ def get_all_users(db: Session = Depends(get_db), admin: User = Depends(get_curre
         
         user_dict = u.__dict__.copy()
         user_dict["ai_api_key"] = None
-        user_dict["ai_api_key_configured"] = bool(u.ai_api_key)
+        user_dict["ai_api_key_configured"] = False
         user_dict.update({
             "notes_count": notes_count,
             "subjects_count": subjects_count,

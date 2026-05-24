@@ -44,45 +44,43 @@ class AIClient:
                 sys_settings = db.query(SystemSettings).first()
             
             if sys_settings:
-                # Use settings from Admin Dashboard (DB)
+                # Use settings from Admin Dashboard (DB) for model/provider selection,
+                # but ALWAYS pull keys from environment variables for security.
                 self.provider = settings.GLOBAL_AI_PROVIDER or sys_settings.global_ai_provider
                 self.ai_model_name = settings.GLOBAL_AI_MODEL or sys_settings.global_ai_model or "models/gemma-4-31b-it"
                 self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
-                global_key = decrypt_secret(sys_settings.global_ai_api_key)
-                self.gemini_key = global_key if self.provider == "gemini" else None
-                self.hf_token = global_key if self.provider == "huggingface" else None
-                self.ollama_base_url = sys_settings.global_ai_base_url if self.provider == "ollama" else None
                 
-                # Fallback check: if DB key is empty, use .env key
-                if self.provider == "gemini" and not self.gemini_key:
-                    self.gemini_key = settings.GLOBAL_GEMINI_API_KEY
-                if self.provider == "huggingface" and not self.hf_token:
-                    self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN
+                # Force environment variable keys regardless of what's in the DB
+                self.gemini_key = settings.GLOBAL_GEMINI_API_KEY
+                self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN
+                self.ollama_base_url = sys_settings.global_ai_base_url if self.provider == "ollama" else settings.OLLAMA_BASE_URL
                 
-                logger.info(f"[User {user.id}] Using Global AI settings (DB/Admin managed): {self.provider}")
+                logger.info(f"[User {user.id}] Using Global AI settings (DB/Admin managed): {self.provider} (Keys from ENV)")
             else:
                 # Use global settings from environment as absolute fallback
                 self.provider = settings.GLOBAL_AI_PROVIDER
                 self.ai_model_name = settings.GLOBAL_AI_MODEL or "models/gemma-4-31b-it"
                 self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
-                self.gemini_key = settings.GLOBAL_GEMINI_API_KEY if self.provider == "gemini" else None
-                self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN if self.provider == "huggingface" else None
-                self.ollama_base_url = None
+                self.gemini_key = settings.GLOBAL_GEMINI_API_KEY
+                self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN
+                self.ollama_base_url = settings.OLLAMA_BASE_URL
                 logger.info(f"[User {user.id}] Using Global AI settings (.env managed): {self.provider}")
             
         elif user and user.ai_provider:
-            # Use user's personal settings
+            # Use user's personal settings for model/provider, but still enforce system keys
+            # unless we specifically want to allow users to provide their own keys (which usually stay in ENV too)
             self.provider = user.ai_provider
             self.ai_model_name = user.ai_model or "models/gemma-4-31b-it"
-            self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium" # Use system default for now
-            user_key = decrypt_secret(user.ai_api_key)
-            self.gemini_key = user_key if self.provider == "gemini" else None
-            self.hf_token = user_key if self.provider == "huggingface" else None
-            self.ollama_base_url = user.ai_base_url if self.provider == "ollama" else None
-            logger.info(f"[User {user.id}] Using personal AI settings: {self.provider}")
+            self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
+            
+            # For security, even personal settings use environment keys for now
+            self.gemini_key = settings.GLOBAL_GEMINI_API_KEY or settings.GEMINI_API_KEY
+            self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN or settings.HUGGINGFACE_TOKEN
+            self.ollama_base_url = user.ai_base_url if self.provider == "ollama" else settings.OLLAMA_BASE_URL
+            logger.info(f"[User {user.id}] Using personal model settings: {self.provider} (Keys from ENV)")
             
         else:
-            # Fallback to system defaults (no user or user has no settings)
+            # Fallback to system defaults
             self.provider = settings.GLOBAL_AI_PROVIDER or settings.AI_PROVIDER
             self.ai_model_name = settings.GLOBAL_AI_MODEL or "models/gemma-4-31b-it"
             self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"

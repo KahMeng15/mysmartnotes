@@ -227,12 +227,14 @@ function loadSettings() {
                 const aiModelEl = document.getElementById('aiModel');
                 const aiBaseUrlEl = document.getElementById('aiBaseUrl');
                 const aiApiKeyEl = document.getElementById('aiApiKey');
-                window.hasStoredAiApiKey = !!(user.ai_api_key_configured || user.ai_api_key);
-                
                 if (aiProviderEl) aiProviderEl.value = user.ai_provider || 'gemini';
                 if (aiModelEl) aiModelEl.value = user.ai_model || '';
                 if (aiBaseUrlEl) aiBaseUrlEl.value = user.ai_base_url || '';
-                if (aiApiKeyEl) aiApiKeyEl.value = ''; // Never show saved API keys
+                
+                // Keys are no longer stored in DB, handled via .env only
+                if (aiApiKeyEl) aiApiKeyEl.style.display = 'none'; // Hide the input
+                const apiKeyLabel = document.querySelector('label[for="aiApiKey"]');
+                if (apiKeyLabel) apiKeyLabel.innerHTML = '<span style="color: var(--text-secondary); font-size: 12px;">(API Keys are managed by administrator via .env file)</span>';
             }
         }
 
@@ -368,29 +370,17 @@ async function saveAiConfiguration(event) {
 
         if (!useGlobal) {
             const provider = document.getElementById('aiProvider').value;
-            const apiKey = document.getElementById('aiApiKey').value.trim();
             const baseUrl = document.getElementById('aiBaseUrl').value.trim();
             const model = document.getElementById('aiModel').value.trim();
 
-            const requiresBaseUrl = ['ollama', 'local_modal'].includes(provider);
-            const requiresApiKey = ['gemini', 'huggingface', 'chatgpt', 'claude', 'openrouter'].includes(provider);
-            const hasAnyApiKey = apiKey.length > 0 || window.hasStoredAiApiKey;
-
-            if (requiresBaseUrl && !baseUrl) {
+            if (['ollama', 'local_modal'].includes(provider) && !baseUrl) {
                 showErrorModal('Validation Error', `Base URL is required for ${provider}`);
-                return;
-            }
-            if (requiresApiKey && !hasAnyApiKey) {
-                showErrorModal('Validation Error', `API Key is required for ${provider}`);
                 return;
             }
 
             payload.ai_provider = provider;
             payload.ai_model = model || null;
             payload.ai_base_url = baseUrl || null;
-            if (apiKey) {
-                payload.ai_api_key = apiKey;
-            }
         }
 
         // Include note processing mode in payload before sending
@@ -410,9 +400,6 @@ async function saveAiConfiguration(event) {
         if (response.ok) {
             const updatedUser = await response.json();
             localStorage.setItem('user', JSON.stringify(updatedUser));
-            if (payload.ai_api_key) {
-                window.hasStoredAiApiKey = true;
-            }
             showSuccessModal('AI Configuration Saved', 'Your AI settings have been updated successfully.');
         } else {
             const error = await response.json();

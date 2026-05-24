@@ -442,19 +442,19 @@
                 document.getElementById('progressModal').classList.add('active');
                 document.getElementById('progressFill').style.width = '0%';
                 document.getElementById('progressPercent').textContent = '0';
-
+                
+                // 1. Initial Upload
                 const response = await fetch('/lectures/upload', {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
 
-                // Simulate progress to 100% when response received
-                document.getElementById('progressFill').style.width = '100%';
-                document.getElementById('progressPercent').textContent = '100';
-
                 if (response.ok) {
-                    const result = await response.json();
+                    const lecture = await response.json();
+                    
+                    // 2. Start Polling for AI Processing
+                    await pollUploadProgress(lecture.id);
 
                     // Close progress modal and show success
                     document.getElementById('progressModal').classList.remove('active');
@@ -463,29 +463,58 @@
                     // Redirect after modal is closed
                     const successModal = document.getElementById('successModal');
                     const handleDone = () => {
-                        window.location.href = `/note/${result.id}`;
+                        window.location.href = `/note/${lecture.id}`;
                     };
 
-                    // Replace the Done button's onclick with redirect
                     const doneBtn = successModal.querySelector('.btn-save');
-                    if (doneBtn) {
-                        doneBtn.onclick = handleDone;
-                    }
+                    if (doneBtn) doneBtn.onclick = handleDone;
                 } else {
                     document.getElementById('progressModal').classList.remove('active');
-                    const clonedResponse = response.clone();
-                    try {
-                        const error = await response.json();
-                        alert('Upload failed: ' + (error.detail || 'Unknown error'));
-                    } catch (e) {
-                        const text = await clonedResponse.text();
-                        console.error('Response text:', text);
-                        alert('Upload failed: HTTP ' + response.status + ' - ' + (text || 'Unknown error'));
-                    }
-                }            } catch (error) {
+                    const error = await response.json();
+                    alert('Upload failed: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
                 document.getElementById('progressModal').classList.remove('active');
                 alert('Error: ' + error.message);
             }
+        }
+
+        async function pollUploadProgress(lectureId) {
+            const fill = document.getElementById('progressFill');
+            const percent = document.getElementById('progressPercent');
+            
+            return new Promise((resolve, reject) => {
+                const interval = setInterval(async () => {
+                    try {
+                        const res = await fetch(`/search/task?lecture_id=${lectureId}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        
+                        if (res.ok) {
+                            const task = await res.json();
+                            const p = task.progress || 0;
+                            
+                            fill.style.width = p + '%';
+                            percent.textContent = p;
+
+                            if (task.status === 'completed' || p >= 100) {
+                                clearInterval(interval);
+                                resolve();
+                            } else if (task.status === 'failed') {
+                                clearInterval(interval);
+                                reject(new Error(task.error || 'Processing failed'));
+                            }
+                        } else if (res.status === 404) {
+                            // Task might not be created yet, just wait
+                        } else {
+                            clearInterval(interval);
+                            reject(new Error('Failed to check progress'));
+                        }
+                    } catch (err) {
+                        console.error('Polling error:', err);
+                    }
+                }, 1000);
+            });
         }
 
         function logout() {

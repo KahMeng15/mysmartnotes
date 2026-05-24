@@ -347,7 +347,7 @@ async function loadSystemSettings() {
         document.getElementById('footerText').value = s.footer_text || '';
         document.getElementById('globalAiProvider').value = s.global_ai_provider || 'gemini';
         document.getElementById('globalAiModel').value = s.global_ai_model || '';
-        document.getElementById('globalAiKey').value = s.global_ai_api_key ? '********' : '';
+        // Global keys are now managed via .env only
         document.getElementById('globalAiUrl').value = s.global_ai_base_url || '';
         document.getElementById('aiLimitPerUser').value = s.ai_limit_per_user || 'unlimited';
         
@@ -384,9 +384,6 @@ async function saveSystemSettings(e) {
         max_quiz_questions: parseInt(document.getElementById('maxQuizQuestions').value),
         unnecessary_logins_enabled: document.getElementById('unnecessaryLoginsToggle').classList.contains('active')
     };
-    const key = document.getElementById('globalAiKey').value;
-    if (key && key !== '********') payload.global_ai_api_key = key;
-
     try {
         await apiCall('/admin/system-settings', 'PUT', payload);
         alert('Settings saved!');

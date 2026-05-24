@@ -101,13 +101,8 @@ async def lifespan(app: FastAPI):
             logger.info("Initializing SystemSettings from .env defaults")
             sys_settings = SystemSettings(
                 global_ai_provider=settings.GLOBAL_AI_PROVIDER,
-                global_ai_model=settings.GLOBAL_AI_MODEL,
-                global_ai_api_key=encrypt_secret(settings.GLOBAL_GEMINI_API_KEY or settings.GLOBAL_HUGGINGFACE_TOKEN),
-                # Note: We prioritize Gemini key if provider is gemini, else HF
+                global_ai_model=settings.GLOBAL_AI_MODEL
             )
-            # If specifically huggingface, use that token
-            if settings.GLOBAL_AI_PROVIDER == "huggingface":
-                sys_settings.global_ai_api_key = encrypt_secret(settings.GLOBAL_HUGGINGFACE_TOKEN)
                 
             db.add(sys_settings)
             db.commit()

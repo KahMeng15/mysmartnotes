@@ -11,7 +11,6 @@ class SystemSettingsSchema(BaseModel):
     domain_url: Optional[str] = None
     global_ai_provider: str
     global_ai_model: Optional[str] = None
-    global_ai_api_key: Optional[str] = None
     global_ai_base_url: Optional[str] = None
     ai_limit_per_user: str
     session_length: int = 24

@@ -70,7 +70,7 @@ def _prepare_user_for_response(user: User) -> dict:
         "ai_model": user.ai_model,
         "ai_base_url": user.ai_base_url,
         "ai_api_key": None,
-        "ai_api_key_configured": bool(user.ai_api_key),
+        "ai_api_key_configured": False,
         "use_global_ai_config": user.use_global_ai_config,
         "note_processing_mode": user.note_processing_mode or "smart",
         "created_at": user.created_at,
@@ -754,7 +754,7 @@ async def update_profile(user_update: UserUpdate, current_user: User = Depends(g
     if user_update.ai_base_url is not None:
         current_user.ai_base_url = user_update.ai_base_url
     if user_update.ai_api_key is not None:
-        current_user.ai_api_key = encrypt_secret(user_update.ai_api_key)
+        pass # Keys are no longer stored in DB
     if user_update.use_global_ai_config is not None:
         current_user.use_global_ai_config = user_update.use_global_ai_config
     if user_update.note_processing_mode is not None:

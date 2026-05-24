@@ -9,7 +9,7 @@ import os
 import re
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable, Any
 
 from app.processing.font_extractor import FontAwareExtractor
 from app.processing.signal_merger import SignalMerger, blocks_to_markdown
@@ -50,7 +50,7 @@ class SmartPipeline:
         self.table_detector = None   # Legacy: disabled
         self.merger = SignalMerger()
 
-    def process(self, file_path: str) -> str:
+    def process(self, file_path: str, progress_callback: Optional[Callable[[int], None]] = None) -> str:
         """
         Process a PDF or PPTX file and return clean Markdown.
         """
@@ -63,11 +63,19 @@ class SmartPipeline:
 
         markdown = ""
         try:
+            if progress_callback:
+                progress_callback(10) # 10%: Started local process
+
             markdown = self._local_process(file_path, ext)
 
             # Final AI Polish Pass
             if self.use_polish and markdown:
-                markdown = self._ai_polish(markdown)
+                if progress_callback:
+                    progress_callback(30) # 30%: Local done, starting AI
+                markdown = self._ai_polish(markdown, progress_callback=progress_callback)
+
+            if progress_callback:
+                progress_callback(100) # 100%: All done
 
             # Quality metrics (final)
             lines = [l for l in markdown.split("\n") if l.strip()]
@@ -899,7 +907,7 @@ class SmartPipeline:
     # Reduced to 1500 to minimize "stream failed" errors with slow reasoning models
     _POLISH_CHUNK_SIZE = 1500
 
-    def _ai_polish(self, markdown: str) -> str:
+    def _ai_polish(self, markdown: str, progress_callback: Optional[Callable[[int], None]] = None) -> str:
         """Perform a final formatting-only cleanup pass using AIClient.
         
         Splits the input into manageable chunks to prevent quality degradation
@@ -936,6 +944,7 @@ class SmartPipeline:
                 return asyncio.run(self._polish_chunk(client, idx, chunk, is_first_chunk=is_first, debug_dir=chunk_debug_dir))
 
             polished_chunks = [None] * num_chunks
+            completed_chunks = 0
 
             # Reduced max_workers to 2 to prevent overwhelming reasoning models
             with ThreadPoolExecutor(max_workers=min(num_chunks, 2)) as executor:
@@ -947,6 +956,13 @@ class SmartPipeline:
                     idx = futures[future]
                     try:
                         result = future.result()
+                        completed_chunks += 1
+                        
+                        # Update progress: AI starts at 30%, ends at 95%
+                        if progress_callback:
+                            ai_progress = 30 + int((completed_chunks / num_chunks) * 65)
+                            progress_callback(ai_progress)
+
                         if result:
                             polished_chunks[idx] = result
                             logger.info(f"  ✓ Chunk {idx + 1}/{num_chunks} done")

@@ -3,16 +3,17 @@ import os
 import json
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
-from typing import List
+from typing import List, Optional, Callable
 import uuid
 
-from app.models.db import User, Lecture, Subject, Summary
+from app.models.db import User, Lecture, Subject, Summary, Task
 from app.schemas.schemas import LectureResponse
 from app.utils.auth import get_current_user
-from app.utils.db import get_db, generate_random_id
+from app.utils.db import get_db, generate_random_id, SessionLocal
+from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
 from app.utils.quotas import enforce_quota_notes, enforce_quota_storage
 from app.utils.crypto import decrypt_secret
@@ -34,38 +35,17 @@ os.makedirs(GENERATED_DIR, exist_ok=True)
 
 
 def _get_pipeline_for_user(user: "User") -> SmartPipeline:
-    """
-    Build a SmartPipeline for the given user using global AI settings.
-    Uses local extraction + optional AI polish pass.
-    """
+    """Get a SmartPipeline instance with the appropriate settings for this user."""
     from app.config import get_settings
     app_settings = get_settings()
     
-    # Resolve Gemini API key: personal first, then global
-    gemini_key = None
-    gemini_model = app_settings.GLOBAL_AI_MODEL or "gemini-1.5-flash"
+    # Resolve Gemini API key: ALWAYS pull from environment variables for security
+    gemini_key = app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GEMINI_API_KEY
+    gemini_model = app_settings.GLOBAL_AI_MODEL or "models/gemma-4-31b-it"
+
     if not getattr(user, "use_global_ai_config", False):
-        provider = getattr(user, "ai_provider", "") or ""
-        if "gemini" in provider.lower():
-            gemini_key = decrypt_secret(getattr(user, "ai_api_key", None))
-            if getattr(user, "ai_model", None):
-                gemini_model = user.ai_model
-
-    if not gemini_key:
-        # Try global admin settings
-        try:
-            from app.utils.db import SessionLocal
-            from app.models.db import SystemSettings
-            with SessionLocal() as s:
-                db_settings = s.query(SystemSettings).first()
-                if db_settings and "gemini" in (db_settings.global_ai_provider or "").lower():
-                    gemini_key = decrypt_secret(db_settings.global_ai_api_key)
-                    gemini_model = app_settings.GLOBAL_AI_MODEL or db_settings.global_ai_model or "gemini-1.5-flash"
-        except Exception:
-            pass
-
-    if not gemini_key:
-        gemini_key = app_settings.GEMINI_API_KEY or app_settings.GLOBAL_GEMINI_API_KEY
+        if getattr(user, "ai_model", None):
+            gemini_model = user.ai_model
 
     return SmartPipeline(
         use_polish=bool(gemini_key),
@@ -84,14 +64,14 @@ def _ensure_valid_markdown_result(markdown: str) -> str:
     return markdown
 
 
-def _extract_markdown_for_user(user: "User", file_path: str) -> str:
+def _extract_markdown_for_user(user: "User", file_path: str, progress_callback: Optional[Callable] = None) -> str:
     """
     Process a lecture with the configured SmartPipeline. If the AI polish pass
     fails, retry once with local extraction only so uploads still complete.
     """
     pipeline = _get_pipeline_for_user(user)
     try:
-        return _ensure_valid_markdown_result(pipeline.process(file_path))
+        return _ensure_valid_markdown_result(pipeline.process(file_path, progress_callback=progress_callback))
     except Exception:
         if not getattr(pipeline, "use_polish", False):
             raise
@@ -102,7 +82,96 @@ def _extract_markdown_for_user(user: "User", file_path: str) -> str:
             exc_info=True,
         )
         fallback_pipeline = SmartPipeline(use_polish=False)
-        return _ensure_valid_markdown_result(fallback_pipeline.process(file_path))
+        return _ensure_valid_markdown_result(fallback_pipeline.process(file_path, progress_callback=progress_callback))
+
+
+def _background_process_lecture(lecture_id: str, user_id: int, file_path: str, auto_detect_title: bool):
+    """Background task to process a lecture and update its Task status"""
+    task_id = f"ocr_{user_id}_{lecture_id}"
+    
+    # Initialize task in DB
+    TaskManager.submit_task(task_id, "lecture_processing", user_id, lecture_id=lecture_id)
+    
+    db = SessionLocal()
+    try:
+        lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
+        user = db.query(User).filter(User.id == user_id).first()
+        
+        if not lecture or not user:
+            logger.error(f"Background process failed: Lecture {lecture_id} or User {user_id} not found")
+            TaskManager._update_db_task(task_id, status="failed", error="Lecture or User not found")
+            return
+
+        def progress_callback(percent):
+            TaskManager.update_task_progress(task_id, percent)
+
+        import time
+        start_time = time.time()
+        file_ext = os.path.splitext(file_path)[1].lower()
+
+        if file_ext in ('.pdf', '.pptx'):
+            logger.info(f"Background processing lecture {lecture_id}")
+            markdown = _extract_markdown_for_user(user, file_path, progress_callback=progress_callback)
+            structured_segments = _markdown_to_segments(markdown)
+            
+            # Save to file storage
+            StorageManager.save_lecture_text(lecture.id, markdown)
+            StorageManager.save_lecture_json(lecture.id, "structured", structured_segments)
+            
+            # Auto-title detection from H1
+            if auto_detect_title:
+                for line in markdown.split('\n'):
+                    if line.strip().startswith('# '):
+                        detected_title = line.strip()[2:].strip()
+                        if detected_title:
+                            lecture.title = detected_title
+                            break
+            
+            lecture.processing_time_ms = int((time.time() - start_time) * 1000)
+            lecture.updated_at = datetime.utcnow()
+            db.commit()
+            
+            # Update task to 95% before embeddings
+            TaskManager.update_task_progress(task_id, 95)
+            
+            # STEP 4: Compute and store embeddings
+            if markdown and markdown.strip():
+                try:
+                    from app.processing.embeddings import update_lecture_embeddings
+                    update_lecture_embeddings(lecture.id, markdown, db)
+                except Exception as e:
+                    logger.error(f"Error updating embeddings: {e}")
+
+            TaskManager._update_db_task(task_id, status="completed", progress=100)
+            logger.info(f"Background processing complete for lecture {lecture_id}")
+
+        else:
+            # Fallback to OCR for images
+            progress_callback(20)
+            ocr_result = OCRProcessor.extract_text(file_path, lecture.file_type, lecture_id=lecture.id)
+            progress_callback(80)
+            
+            lecture.extracted_text = ocr_result.get("raw_text", "")
+            lecture.extracted_content_structured = json.dumps(ocr_result.get("structured_content", []))
+            lecture.extracted_images_metadata = json.dumps(ocr_result.get("images", []))
+            lecture.processing_time_ms = int((time.time() - start_time) * 1000)
+            lecture.updated_at = datetime.utcnow()
+            db.commit()
+            
+            if lecture.extracted_text:
+                try:
+                    from app.processing.embeddings import update_lecture_embeddings
+                    update_lecture_embeddings(lecture.id, lecture.extracted_text, db)
+                except Exception as e:
+                    logger.error(f"Error updating embeddings: {e}")
+
+            TaskManager._update_db_task(task_id, status="completed", progress=100)
+
+    except Exception as e:
+        logger.error(f"Error in background processing: {e}", exc_info=True)
+        TaskManager._update_db_task(task_id, status="failed", error=str(e))
+    finally:
+        db.close()
 
 
 def _rebuild_lecture_content(
@@ -210,6 +279,7 @@ async def get_lectures(
 
 @router.post("/upload", response_model=LectureResponse, status_code=status.HTTP_201_CREATED)
 async def upload_lecture(
+    background_tasks: BackgroundTasks,
     subject_id: str = Form(...),
     file: UploadFile = File(...),
     title: str = Form(None),
@@ -295,73 +365,16 @@ async def upload_lecture(
     db.commit()
     db.refresh(db_lecture)
     
-    # Process content extraction immediately
-    try:
-        import time
-        start_time = time.time()
-        file_ext = os.path.splitext(file_path)[1].lower()
-
-        if file_ext in ('.pdf', '.pptx'):
-            # Use SmartPipeline for PDF/PPTX — produces clean Markdown
-            logger.info(f"Processing lecture {db_lecture.id}")
-            markdown = _extract_markdown_for_user(current_user, file_path)
-            structured_segments = _markdown_to_segments(markdown)
-            
-            # Save to file storage
-            StorageManager.save_lecture_text(db_lecture.id, markdown)
-            StorageManager.save_lecture_json(db_lecture.id, "structured", structured_segments)
-            
-            # Auto-title detection from H1
-            if auto_detect_title:
-                for line in markdown.split('\n'):
-                    if line.strip().startswith('# '):
-                        detected_title = line.strip()[2:].strip()
-                        if detected_title:
-                            db_lecture.title = detected_title
-                            logger.info(f"Auto-detected title: {detected_title}")
-                            break
-            
-            db_lecture.processing_time_ms = int((time.time() - start_time) * 1000)
-            db_lecture.updated_at = datetime.utcnow()
-            db.commit()
-            db.refresh(db_lecture)
-            
-            lines = markdown.split("\n")
-            headings = len([l for l in lines if l.startswith("#")])
-            list_items = len([l for l in lines if l.strip().startswith("- ")])
-            logger.info(f"Smart pipeline: {len(markdown)} chars, {headings} headings, {list_items} list items")
-        else:
-            # Fallback to OCR for images and other file types
-            logger.info(f"Starting OCR processing for lecture {db_lecture.id}")
-            ocr_result = OCRProcessor.extract_text(file_path, db_lecture.file_type, lecture_id=db_lecture.id)
-            
-            db_lecture.extracted_text = ocr_result.get("raw_text", "")
-            db_lecture.extracted_content_structured = json.dumps(ocr_result.get("structured_content", []))
-            db_lecture.extracted_images_metadata = json.dumps(ocr_result.get("images", []))
-            db_lecture.processing_time_ms = int((time.time() - start_time) * 1000)
-            db_lecture.updated_at = datetime.utcnow()
-            db.commit()
-            db.refresh(db_lecture)
-            
-            logger.info(f"OCR extracted {len(db_lecture.extracted_text)} chars")
-        
-        # STEP 4: Compute and store embeddings in background
-        if db_lecture.extracted_text and db_lecture.extracted_text.strip():
-            try:
-                from app.processing.embeddings import compute_and_store_embeddings
-                compute_and_store_embeddings(db_lecture.id, db_lecture.extracted_text, db)
-                logger.info(f"Embeddings computed for lecture {db_lecture.id}")
-            except Exception as e:
-                logger.error(f"Error computing embeddings: {e}", exc_info=True)
-                # Don't fail the upload, embeddings can be computed later
-        
-    except Exception as e:
-        logger.error(f"Error processing lecture: {e}", exc_info=True)
-        # Continue anyway, content can be extracted later via reprocess
+    # STEP 3: Process content extraction in background
+    background_tasks.add_task(
+        _background_process_lecture,
+        lecture_id=db_lecture.id,
+        user_id=current_user.id,
+        file_path=file_path,
+        auto_detect_title=auto_detect_title
+    )
     
-    # Return lecture
-    response = LectureResponse.from_orm(db_lecture)
-    return response
+    return db_lecture
 
 
 @router.get("/{lecture_id}", response_model=LectureResponse)
