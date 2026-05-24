@@ -40,8 +40,8 @@ def _get_pipeline_for_user(user: "User") -> SmartPipeline:
     app_settings = get_settings()
     
     # Resolve Gemini API key: ALWAYS pull from environment variables for security
-    gemini_key = app_settings.GLOBAL_GEMINI_API_KEY or app_settings.GEMINI_API_KEY
-    gemini_model = app_settings.GLOBAL_AI_MODEL or "models/gemma-4-31b-it"
+    gemini_key = app_settings.GLOBAL_AI_TIER1_API_KEY or app_settings.GEMINI_API_KEY
+    gemini_model = app_settings.GLOBAL_AI_TIER1_MODEL
 
     if not getattr(user, "use_global_ai_config", False):
         if getattr(user, "ai_model", None):

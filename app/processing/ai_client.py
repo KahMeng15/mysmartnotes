@@ -3,6 +3,7 @@ import asyncio
 import logging
 import random
 import re
+import httpx
 from typing import Optional, List, Callable, TypeVar, Awaitable
 from app.config import get_settings
 from app.models.db import User, SystemSettings
@@ -12,54 +13,120 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 T = TypeVar("T")
 
+class AITier:
+    """Configuration for an AI tier"""
+    def __init__(self, provider: str, model_name: str, api_key: str, reasoning_level: str, base_url: Optional[str] = None):
+        self.provider = provider
+        self.model_name = model_name
+        self.api_key = api_key
+        self.reasoning_level = reasoning_level
+        self.base_url = base_url
+        self.model = None # For Gemini/HF clients
 
 class AIClient:
-    """Unified AI client for Gemini, Hugging Face, and local Ollama"""
+    """Unified AI client with 3-tier fallback system (Gemini -> Gemini -> Ollama)"""
     
     def __init__(self, user: Optional[User] = None, db: Optional[Session] = None):
         self.user = user
         self.db = db
-        self.connection_error = None
-        self.model = None
-        self.client = None
         self.request_timeout_seconds = 240
-        self.max_retries = 3
+        self.max_retries = 2 # Retries per tier
         self.retry_base_delay_seconds = 1.0
         
-        # Settings resolution
-        if user and user.use_global_ai_config:
-            sys_settings = db.query(SystemSettings).first() if db else None
-            if sys_settings:
-                self.provider = settings.GLOBAL_AI_PROVIDER or sys_settings.global_ai_provider
-                self.ai_model_name = settings.GLOBAL_AI_MODEL or sys_settings.global_ai_model or "models/gemma-4-31b-it"
-                self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
-                self.gemini_key = settings.GLOBAL_GEMINI_API_KEY
-                self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN
-                self.ollama_base_url = sys_settings.global_ai_base_url if self.provider == "ollama" else settings.OLLAMA_BASE_URL
-            else:
-                self.provider = settings.GLOBAL_AI_PROVIDER
-                self.ai_model_name = settings.GLOBAL_AI_MODEL or "models/gemma-4-31b-it"
-                self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
-                self.gemini_key = settings.GLOBAL_GEMINI_API_KEY
-                self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN
-                self.ollama_base_url = settings.OLLAMA_BASE_URL
-        elif user and user.ai_provider:
-            self.provider = user.ai_provider
-            self.ai_model_name = user.ai_model or "models/gemma-4-31b-it"
-            self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
-            self.gemini_key = settings.GLOBAL_GEMINI_API_KEY or settings.GEMINI_API_KEY
-            self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN or settings.HUGGINGFACE_TOKEN
-            self.ollama_base_url = user.ai_base_url if self.provider == "ollama" else settings.OLLAMA_BASE_URL
-        else:
-            self.provider = settings.GLOBAL_AI_PROVIDER or settings.AI_PROVIDER
-            self.ai_model_name = settings.GLOBAL_AI_MODEL or "models/gemma-4-31b-it"
-            self.reasoning_level = settings.GLOBAL_REASONING_LEVEL or "medium"
-            self.gemini_key = settings.GLOBAL_GEMINI_API_KEY or settings.GEMINI_API_KEY
-            self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN or settings.HUGGINGFACE_TOKEN
-            self.ollama_base_url = settings.OLLAMA_BASE_URL
+        # 1. Start with 3-tier defaults from .env settings
+        self.tiers: List[AITier] = [
+            AITier(
+                provider=settings.GLOBAL_AI_TIER1_PROVIDER,
+                model_name=settings.GLOBAL_AI_TIER1_MODEL,
+                api_key=settings.GLOBAL_AI_TIER1_API_KEY,
+                reasoning_level=settings.GLOBAL_AI_TIER1_REASONING_LEVEL
+            ),
+            AITier(
+                provider=settings.GLOBAL_AI_TIER2_PROVIDER,
+                model_name=settings.GLOBAL_AI_TIER2_MODEL,
+                api_key=settings.GLOBAL_AI_TIER2_API_KEY,
+                reasoning_level=settings.GLOBAL_AI_TIER2_REASONING_LEVEL
+            ),
+            AITier(
+                provider=settings.GLOBAL_AI_TIER3_PROVIDER,
+                model_name=settings.GLOBAL_AI_TIER3_MODEL,
+                api_key=settings.GLOBAL_AI_TIER3_API_KEY,
+                reasoning_level=settings.GLOBAL_AI_TIER3_REASONING_LEVEL,
+                base_url=settings.GLOBAL_AI_TIER3_BASE_URL
+            )
+        ]
         
-        if self.provider == "gemini": self._init_gemini()
-        elif self.provider == "huggingface": self._init_huggingface()
+        # 2. User-specific override (Legacy/Personal)
+        # If user has a personal provider configured and is NOT using global config,
+        # we treat it as an additional Tier 0 (top priority).
+        if user and not user.use_global_ai_config and user.ai_provider:
+            user_tier = AITier(
+                provider=user.ai_provider,
+                model_name=user.ai_model or settings.GLOBAL_AI_TIER1_MODEL,
+                api_key=settings.GLOBAL_AI_TIER1_API_KEY or settings.GEMINI_API_KEY,
+                reasoning_level="medium",
+                base_url=user.ai_base_url
+            )
+            self.tiers.insert(0, user_tier)
+        
+        self._init_tiers()
+
+    @property
+    def provider(self) -> str:
+        return self.tiers[0].provider if self.tiers else "unknown"
+
+    @provider.setter
+    def provider(self, value: str):
+        if self.tiers:
+            self.tiers[0].provider = value
+
+    @property
+    def gemini_key(self) -> Optional[str]:
+        return self.tiers[0].api_key if self.tiers and self.tiers[0].provider == "gemini" else None
+
+    @gemini_key.setter
+    def gemini_key(self, value: str):
+        if self.tiers and self.tiers[0].provider == "gemini":
+            self.tiers[0].api_key = value
+
+    @property
+    def ai_model_name(self) -> str:
+        return self.tiers[0].model_name if self.tiers else "default"
+
+    @ai_model_name.setter
+    def ai_model_name(self, value: str):
+        if self.tiers:
+            self.tiers[0].model_name = value
+
+    def _init_gemini(self):
+        """Legacy re-initialization for Tier 1 if it's Gemini"""
+        if self.tiers and self.tiers[0].provider == "gemini":
+            self._init_gemini_tier(self.tiers[0])
+
+    def _init_tiers(self):
+        """Initialize clients for each tier"""
+        for tier in self.tiers:
+            if tier.provider == "gemini":
+                self._init_gemini_tier(tier)
+            elif tier.provider == "huggingface":
+                self._init_huggingface_tier(tier)
+
+    def _init_gemini_tier(self, tier: AITier):
+        try:
+            import google.generativeai as genai
+            if not tier.api_key: return
+            genai.configure(api_key=tier.api_key)
+            tier.model = genai.GenerativeModel(tier.model_name)
+        except Exception as e:
+            logger.error(f"Failed to init Gemini tier ({tier.model_name}): {e}")
+
+    def _init_huggingface_tier(self, tier: AITier):
+        try:
+            from huggingface_hub import InferenceClient
+            if not tier.api_key: return
+            tier.model = InferenceClient(api_key=tier.api_key)
+        except Exception as e:
+            logger.error(f"Failed to init HuggingFace tier ({tier.model_name}): {e}")
 
     async def _with_retries_and_timeout(self, operation_name: str, operation: Callable[[], Awaitable[T]]) -> T:
         last_error: Optional[Exception] = None
@@ -68,24 +135,32 @@ class AIClient:
                 return await asyncio.wait_for(operation(), timeout=self.request_timeout_seconds)
             except Exception as exc:
                 last_error = exc
+                logger.warning(f"{operation_name} attempt {attempt} failed: {exc}")
                 if attempt < self.max_retries:
                     await asyncio.sleep(self.retry_base_delay_seconds * (2 ** (attempt - 1)))
-        raise RuntimeError(f"{operation_name} failed") from last_error
+        raise last_error or RuntimeError(f"{operation_name} failed")
 
-    def _init_gemini(self):
-        try:
-            import google.generativeai as genai
-            if not self.gemini_key: return
-            genai.configure(api_key=self.gemini_key)
-            self.model = genai.GenerativeModel(self.ai_model_name)
-        except Exception: self.model = None
-
-    def _init_huggingface(self):
-        try:
-            from huggingface_hub import InferenceClient
-            if not self.hf_token: return
-            self.client = InferenceClient(api_key=self.hf_token)
-        except Exception: self.client = None
+    async def _call_ollama(self, tier: AITier, prompt: str, system_instruction: Optional[str] = None) -> str:
+        """Call local Ollama server"""
+        if not tier.base_url:
+            raise ValueError("Ollama base URL not configured")
+        
+        url = f"{tier.base_url.rstrip('/')}/api/generate"
+        payload = {
+            "model": tier.model_name,
+            "prompt": prompt,
+            "system": system_instruction,
+            "stream": False,
+            "options": {
+                "temperature": 0.7
+            }
+        }
+        
+        async with httpx.AsyncClient(timeout=self.request_timeout_seconds) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            return data.get("response", "")
 
     def _extract_polished_answer(self, text: str) -> str:
         """Surgically extract the final answer from reasoning/meta-talk."""
@@ -124,66 +199,117 @@ class AIClient:
 
         return text.strip()
 
-    async def generate_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None) -> str:
-        """Unary generation - SDK call followed by structural cleanup."""
-        try:
-            is_gemma4 = self.provider == "gemini" and self.model and "gemma-4" in self.model.model_name.lower()
-            if is_gemma4:
-                instr = f"\nREASONING DEPTH: {self.reasoning_level.upper()}\n"
-                prompt = prompt.replace("===START===", instr + "===START===") if "===START===" in prompt else instr + prompt
+    async def _generate_with_tier(self, tier: AITier, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None) -> str:
+        """Helper to generate text using a specific tier"""
+        # Validation
+        if tier.provider == "gemini" and not tier.model:
+            raise ValueError(f"Gemini model not initialized for {tier.model_name}")
+        
+        # Reasoning handling
+        is_reasoning = "gemma-4" in tier.model_name.lower() or tier.reasoning_level == "high"
+        if tier.provider == "gemini" and is_reasoning:
+            instr = f"\nREASONING DEPTH: {tier.reasoning_level.upper()}\n"
+            modified_prompt = prompt.replace("===START===", instr + "===START===") if "===START===" in prompt else instr + prompt
+        else:
+            modified_prompt = prompt
 
-            if self.provider == "gemini":
-                import google.generativeai as genai
-                cfg = genai.types.GenerationConfig(max_output_tokens=max_tokens, temperature=0.7)
-                active_model = genai.GenerativeModel(self.model.model_name, system_instruction=system_instruction) if system_instruction else self.model
-                
-                async def _gemini_call():
-                    return await asyncio.to_thread(active_model.generate_content, prompt, generation_config=cfg)
-
-                res = await self._with_retries_and_timeout("gemini.generate_content", _gemini_call)
-                if res.candidates and res.candidates[0].content.parts:
-                    parts = res.candidates[0].content.parts
-                    # If multi-part, take last. Else take all joined.
-                    text = parts[-1].text if len(parts) > 1 else "".join(p.text for p in parts if hasattr(p, 'text'))
-                    return self._extract_polished_answer(text)
+        if tier.provider == "gemini":
+            import google.generativeai as genai
+            cfg = genai.types.GenerationConfig(max_output_tokens=max_tokens, temperature=0.7)
+            active_model = genai.GenerativeModel(tier.model.model_name, system_instruction=system_instruction) if system_instruction else tier.model
             
-            return "" # Fallback
-        except Exception as e:
-            logger.error(f"Generate failed: {e}")
-            return ""
+            async def _gemini_call():
+                return await asyncio.to_thread(active_model.generate_content, modified_prompt, generation_config=cfg)
+
+            res = await self._with_retries_and_timeout(f"gemini_{tier.model_name}", _gemini_call)
+            if res.candidates and res.candidates[0].content.parts:
+                parts = res.candidates[0].content.parts
+                text = parts[-1].text if len(parts) > 1 else "".join(p.text for p in parts if hasattr(p, 'text'))
+                return self._extract_polished_answer(text)
+        
+        elif tier.provider == "ollama":
+            async def _ollama_call():
+                return await self._call_ollama(tier, modified_prompt, system_instruction)
+            
+            res = await self._with_retries_and_timeout(f"ollama_{tier.model_name}", _ollama_call)
+            return self._extract_polished_answer(res)
+
+        elif tier.provider == "huggingface" and tier.model:
+            async def _hf_call():
+                return tier.model.text_generation(modified_prompt, max_new_tokens=max_tokens, system_instruction=system_instruction)
+            
+            res = await self._with_retries_and_timeout(f"hf_{tier.model_name}", _hf_call)
+            return self._extract_polished_answer(res)
+        
+        return ""
+
+    async def generate_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None) -> str:
+        """Unary generation with 3-tier fallback logic."""
+        last_error = None
+        
+        for i, tier in enumerate(self.tiers):
+            try:
+                logger.info(f"Attempting generation with Tier {i+1} ({tier.provider}: {tier.model_name})")
+                return await self._generate_with_tier(tier, prompt, max_tokens, system_instruction)
+            except Exception as e:
+                logger.error(f"Tier {i+1} ({tier.provider}) failed: {e}")
+                last_error = e
+                continue # Try next tier
+        
+        logger.error("All AI tiers failed to generate text.")
+        return ""
 
     async def stream_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None):
-        """Stream generation - yields the polished result once at the end for reasoning models."""
-        try:
-            is_gemma4 = self.provider == "gemini" and self.model and "gemma-4" in self.model.model_name.lower()
-            if is_gemma4:
-                instr = f"\nREASONING DEPTH: {self.reasoning_level.upper()}\n"
-                prompt = prompt.replace("===START===", instr + "===START===") if "===START===" in prompt else instr + prompt
-
-            if self.provider == "gemini":
-                import google.generativeai as genai
-                cfg = genai.types.GenerationConfig(max_output_tokens=max_tokens, temperature=0.7)
-                active_model = genai.GenerativeModel(self.model.model_name, system_instruction=system_instruction) if system_instruction else self.model
+        """Stream generation with 3-tier fallback logic."""
+        last_error = None
+        
+        for i, tier in enumerate(self.tiers):
+            try:
+                logger.info(f"Attempting stream with Tier {i+1} ({tier.provider}: {tier.model_name})")
                 
-                async def _gemini_stream():
-                    return await asyncio.to_thread(active_model.generate_content, prompt, generation_config=cfg, stream=True)
+                # Special handling for streaming-capable providers
+                if tier.provider == "gemini":
+                    if not tier.model: raise ValueError("Gemini model not initialized")
+                    
+                    is_reasoning = "gemma-4" in tier.model_name.lower() or tier.reasoning_level == "high"
+                    if is_reasoning:
+                        instr = f"\nREASONING DEPTH: {tier.reasoning_level.upper()}\n"
+                        modified_prompt = prompt.replace("===START===", instr + "===START===") if "===START===" in prompt else instr + prompt
+                    else:
+                        modified_prompt = prompt
 
-                response_stream = await self._with_retries_and_timeout("gemini.stream_content", _gemini_stream)
-                all_parts = []
-                for chunk in response_stream:
-                    if chunk.candidates and chunk.candidates[0].content.parts:
-                        for part in chunk.candidates[0].content.parts:
-                            if hasattr(part, 'text'): all_parts.append(part.text)
+                    import google.generativeai as genai
+                    cfg = genai.types.GenerationConfig(max_output_tokens=max_tokens, temperature=0.7)
+                    active_model = genai.GenerativeModel(tier.model.model_name, system_instruction=system_instruction) if system_instruction else tier.model
+                    
+                    async def _gemini_stream():
+                        return await asyncio.to_thread(active_model.generate_content, modified_prompt, generation_config=cfg, stream=True)
 
-                if is_gemma4 and len(all_parts) > 1:
-                    yield self._extract_polished_answer(all_parts[-1])
-                else:
+                    response_stream = await self._with_retries_and_timeout(f"Tier{i+1}_gemini_stream", _gemini_stream)
+                    all_parts = []
+                    for chunk in response_stream:
+                        if chunk.candidates and chunk.candidates[0].content.parts:
+                            for part in chunk.candidates[0].content.parts:
+                                if hasattr(part, 'text'): all_parts.append(part.text)
+                    
                     yield self._extract_polished_answer("".join(all_parts))
+                    return # Success!
 
-            else: yield await self.generate_text(prompt, max_tokens)
-        except Exception as e:
-            logger.error(f"Stream failed: {e}")
-            yield f"Stream failed: {e}"
+                else:
+                    # For non-streaming or fallback, use the tier-specific unary call
+                    res = await self._generate_with_tier(tier, prompt, max_tokens, system_instruction)
+                    if res:
+                        yield res
+                        return
+                    else:
+                        raise ValueError("Empty response from tier")
+
+            except Exception as e:
+                logger.error(f"Tier {i+1} stream failed: {e}")
+                last_error = e
+                continue
+        
+        yield f"Error: All AI tiers failed. Last error: {last_error}"
 
     async def answer_question(self, context: str, question: str, system_prompt: Optional[str] = None) -> str:
         prompt = system_prompt if system_prompt else f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"

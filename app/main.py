@@ -100,8 +100,8 @@ async def lifespan(app: FastAPI):
         if not sys_settings:
             logger.info("Initializing SystemSettings from .env defaults")
             sys_settings = SystemSettings(
-                global_ai_provider=settings.GLOBAL_AI_PROVIDER,
-                global_ai_model=settings.GLOBAL_AI_MODEL
+                global_ai_provider=settings.GLOBAL_AI_TIER1_PROVIDER,
+                global_ai_model=settings.GLOBAL_AI_TIER1_MODEL
             )
                 
             db.add(sys_settings)

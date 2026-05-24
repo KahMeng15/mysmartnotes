@@ -57,14 +57,27 @@ class Settings(BaseSettings):
     # Admin Bootstrap
     ADMIN_EMAIL: str = ""
 
-    # Global AI Configuration (Administrator-managed)
-    GLOBAL_AI_PROVIDER: str = "gemini"  # Options: gemini, huggingface, ollama
-    GLOBAL_GEMINI_API_KEY: str = ""
-    GLOBAL_HUGGINGFACE_TOKEN: str = ""
-    GLOBAL_AI_MODEL: str = ""
-    GLOBAL_REASONING_LEVEL: str = "medium"  # Options: low, medium, high
+    # Global AI Configuration (3-Tier Fallback System)
+    # Tier 1 (Primary - Gemini)
+    GLOBAL_AI_TIER1_PROVIDER: str = "gemini"
+    GLOBAL_AI_TIER1_MODEL: str = "models/gemma-4-31b-it"
+    GLOBAL_AI_TIER1_API_KEY: str = ""
+    GLOBAL_AI_TIER1_REASONING_LEVEL: str = "high"
 
-    # Fallback AI Settings
+    # Tier 2 (Secondary - Gemini)
+    GLOBAL_AI_TIER2_PROVIDER: str = "gemini"
+    GLOBAL_AI_TIER2_MODEL: str = "models/gemma-4-26b-a4b-it"
+    GLOBAL_AI_TIER2_API_KEY: str = ""
+    GLOBAL_AI_TIER2_REASONING_LEVEL: str = "high"
+
+    # Tier 3 (Local Fallback - Ollama)
+    GLOBAL_AI_TIER3_PROVIDER: str = "ollama"
+    GLOBAL_AI_TIER3_MODEL: str = "llama3"
+    GLOBAL_AI_TIER3_API_KEY: str = "" 
+    GLOBAL_AI_TIER3_REASONING_LEVEL: str = "low"
+    GLOBAL_AI_TIER3_BASE_URL: str = "http://localhost:11434"
+
+    # Legacy/Individual Fallback Settings
     GEMINI_API_KEY: str = ""
     HUGGINGFACE_TOKEN: str = ""
     AI_PROVIDER: str = "gemini"

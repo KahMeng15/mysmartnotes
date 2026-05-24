@@ -42,9 +42,9 @@ class SmartPipeline:
         use_vision: bool = False,
         inter_call_delay_s: float = 0.0,
     ):
-        self.use_polish = use_polish and bool(gemini_api_key)
+        self.use_polish = use_polish and (bool(gemini_api_key) or bool(settings.GLOBAL_AI_TIER1_API_KEY))
         self.gemini_api_key = gemini_api_key
-        self.gemini_model = gemini_model or settings.GLOBAL_AI_MODEL or "gemini-1.5-flash"
+        self.gemini_model = gemini_model or settings.GLOBAL_AI_TIER1_MODEL
         self.font_extractor = FontAwareExtractor()
         self.layout_detector = None  # Legacy: disabled
         self.table_detector = None   # Legacy: disabled
@@ -918,13 +918,14 @@ class SmartPipeline:
 
         try:
             from app.processing.ai_client import AIClient
-            # Create a mock-like client since we don't have a user here (it's background)
-            # We bypass the user check by using settings directly in AIClient fallback
+            # Create a client which will automatically use the 3-tier fallback system
             client = AIClient() 
-            # Ensure it uses the key and model passed to pipeline
-            client.gemini_key = self.gemini_api_key
-            client.ai_model_name = self.gemini_model
-            client._init_gemini()
+            
+            # If a specific key was provided to the pipeline, we can override Tier 1
+            if self.gemini_api_key:
+                client.tiers[0].api_key = self.gemini_api_key
+                client.tiers[0].model_name = self.gemini_model
+                client._init_gemini_tier(client.tiers[0])
 
             chunks = self._split_into_chunks(markdown)
             num_chunks = len(chunks)

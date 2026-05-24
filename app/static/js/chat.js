@@ -86,7 +86,7 @@ function generateConversationId() {
 }
 
 // ── AI Mode helpers ───────────────────────────────────────────────
-const MODE_META = {
+const CHAT_MODE_META = {
     quick: { label: 'Quick', icon: 'ph-lightning' },
     simple: { label: 'Simple', icon: 'ph-text-a-underline' },
     normal: { label: 'Normal', icon: 'ph-stack' },
@@ -94,7 +94,7 @@ const MODE_META = {
     eli5: { label: 'ELI5', icon: 'ph-smiley' },
 };
 
-const OUTPUT_FORMAT_META = {
+const CHAT_OUTPUT_FORMAT_META = {
     sentence: { label: 'Sentence', icon: 'ph-text-t' },
     pointform: { label: 'Pointform', icon: 'ph-list-bullets' },
     numbered_list: { label: 'Numbered List', icon: 'ph-list-numbers' },
@@ -204,8 +204,8 @@ function updateOutputButtons() {
 }
 
 function updateCompactDisplay() {
-    const mode = MODE_META[currentAiMode] || { label: currentAiMode, icon: 'ph-sparkle' };
-    const output = OUTPUT_FORMAT_META[currentOutputFormat] || { label: currentOutputFormat, icon: 'ph-text-t' };
+    const mode = CHAT_MODE_META[currentAiMode] || { label: currentAiMode, icon: 'ph-sparkle' };
+    const output = CHAT_OUTPUT_FORMAT_META[currentOutputFormat] || { label: currentOutputFormat, icon: 'ph-text-t' };
 
     const modeIcon = document.getElementById('chatModeIcon');
     const modeLabel = document.getElementById('chatModeLabel');
@@ -665,7 +665,7 @@ function displayMessages() {
         // AI mode badge (will be moved to metadata section)
         let modeMeta = null;
         if (msg.role === 'ai' && !msg.loading && msg.ai_mode) {
-            modeMeta = MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
+            modeMeta = CHAT_MODE_META[msg.ai_mode] || { label: msg.ai_mode, icon: 'ph-sparkle' };
         }
 
         // Thinking section
