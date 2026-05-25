@@ -1,5 +1,6 @@
 import json
 import logging
+import hashlib
 from typing import Optional, Any, Union, Callable
 from functools import wraps
 import redis.asyncio as redis_async
@@ -163,8 +164,7 @@ def cache_response(ttl: int = None, user_specific: bool = True):
                     # Fallback to authorization header if user not in kwargs
                     auth = request.headers.get("Authorization", "")
                     if auth:
-                        import hashlib
-                        auth_hash = hashlib.md5(auth.encode()).hexdigest()
+                        auth_hash = hashlib.sha256(auth.encode()).hexdigest()
                         cache_key = f"{cache_key}:auth{auth_hash}"
 
             cached_val = await get_cache_async(cache_key)
