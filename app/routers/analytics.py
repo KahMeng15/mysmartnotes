@@ -54,7 +54,9 @@ class CompletionResponse(BaseModel):
 
 
 @router.get("/progress", response_model=ProgressResponse)
+@cache_response(ttl=300)
 async def get_learning_progress(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -96,7 +98,9 @@ async def get_learning_progress(
 
 
 @router.get("/time-spent", response_model=TimeSpentResponse)
+@cache_response(ttl=300)
 async def get_time_spent_analytics(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -152,7 +156,9 @@ async def get_time_spent_analytics(
 
 
 @router.get("/completion", response_model=CompletionResponse)
+@cache_response(ttl=300)
 async def get_completion_rates(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -204,7 +210,9 @@ async def get_completion_rates(
 
 
 @router.get("/dashboard-summary", response_model=DashboardSummary)
+@cache_response(ttl=300)
 async def get_dashboard_summary(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

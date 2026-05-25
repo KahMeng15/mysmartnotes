@@ -14,7 +14,9 @@ router = APIRouter(prefix="/subjects", tags=["subjects"])
 
 
 @router.get("", response_model=List[SubjectResponse])
+@cache_response(ttl=3600)
 async def get_subjects(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

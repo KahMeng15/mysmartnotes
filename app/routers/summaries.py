@@ -477,7 +477,9 @@ async def update_generated_summary(
     )
 
 @router.get("", response_model=List[SummaryItemResponse])
+@cache_response(ttl=3600)
 async def list_summaries(
+    request: Request,
     lecture_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -514,7 +516,9 @@ async def list_summaries(
 
 
 @router.get("/{summary_id}", response_model=SummaryItemResponse)
+@cache_response(ttl=3600)
 async def get_summary(
+    request: Request,
     summary_id: str,
     lecture_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),

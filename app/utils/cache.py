@@ -169,7 +169,7 @@ def cache_response(ttl: int = None, user_specific: bool = True):
 
             cached_val = await get_cache_async(cache_key)
             if cached_val is not None:
-                logger.debug(f"Cache hit for {cache_key}")
+                logger.info(f"Cache hit for {cache_key}")
                 return cached_val
 
             result = await func(*args, **kwargs)

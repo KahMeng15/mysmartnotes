@@ -13,7 +13,7 @@ router = APIRouter(prefix="/snapshots", tags=["snapshots"])
 
 @router.get("/{lecture_id}", response_model=List[NoteSnapshotResponse])
 async def list_snapshots(
-    lecture_id: int,
+    lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -36,7 +36,7 @@ async def list_snapshots(
 
 @router.post("/{lecture_id}", response_model=NoteSnapshotResponse, status_code=201)
 async def create_snapshot(
-    lecture_id: int,
+    lecture_id: str,
     body: NoteSnapshotCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -64,7 +64,7 @@ async def create_snapshot(
 
 @router.get("/{lecture_id}/{snapshot_id}", response_model=NoteSnapshotResponse)
 async def get_snapshot(
-    lecture_id: int,
+    lecture_id: str,
     snapshot_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -82,7 +82,7 @@ async def get_snapshot(
 
 @router.delete("/{lecture_id}/{snapshot_id}", status_code=204)
 async def delete_snapshot(
-    lecture_id: int,
+    lecture_id: str,
     snapshot_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

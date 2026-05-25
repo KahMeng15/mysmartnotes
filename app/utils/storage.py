@@ -54,7 +54,7 @@ class StorageManager:
         cache_key = f"lecture_text:{lecture_id}"
         cached = get_cache_sync(cache_key)
         if cached:
-            logger.debug(f"Cache hit for lecture text: {lecture_id}")
+            logger.info(f"Cache hit for lecture text: {lecture_id}")
             return cached
 
         path = StorageManager._get_note_path(lecture_id)
@@ -93,7 +93,7 @@ class StorageManager:
         cache_key = f"lecture_json:{lecture_id}:{suffix}"
         cached = get_cache_sync(cache_key)
         if cached:
-            logger.debug(f"Cache hit for lecture json: {lecture_id}:{suffix}")
+            logger.info(f"Cache hit for lecture json: {lecture_id}:{suffix}")
             return cached
 
         path = StorageManager._get_note_path(lecture_id, suffix=f"_{suffix}", extension="json")
@@ -136,7 +136,7 @@ class StorageManager:
         cache_key = f"summary_text:{summary_id}{suffix}"
         cached = get_cache_sync(cache_key)
         if cached:
-            logger.debug(f"Cache hit for summary text: {summary_id}{suffix}")
+            logger.info(f"Cache hit for summary text: {summary_id}{suffix}")
             return cached
 
         path = StorageManager._get_summary_path(summary_id, suffix=suffix)

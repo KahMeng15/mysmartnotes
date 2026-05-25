@@ -12,7 +12,9 @@ from app.utils.cache import cache_response, clear_cache_pattern_sync
 router = APIRouter(prefix="/groups", tags=["groups"])
 
 @router.get("", response_model=List[SubjectGroupResponse])
+@cache_response(ttl=3600)
 async def get_groups(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
