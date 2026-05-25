@@ -5,6 +5,7 @@ from functools import wraps
 import redis.asyncio as redis_async
 import redis as redis_sync
 from fastapi import Request, Response
+from fastapi.encoders import jsonable_encoder
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,10 @@ async def set_cache_async(key: str, value: Any, ttl: int = None):
         client = await get_redis_async()
         if ttl is None:
             ttl = settings.CACHE_TTL_SECONDS
-        await client.set(key, json.dumps(value), ex=ttl)
+        
+        # Ensure value is JSON serializable
+        serializable_value = jsonable_encoder(value)
+        await client.set(key, json.dumps(serializable_value), ex=ttl)
     except Exception as e:
         logger.error(f"Redis set_cache_async error for key {key}: {e}")
 
@@ -100,7 +104,10 @@ def set_cache_sync(key: str, value: Any, ttl: int = None):
         client = get_redis_sync()
         if ttl is None:
             ttl = settings.CACHE_TTL_SECONDS
-        client.set(key, json.dumps(value), ex=ttl)
+        
+        # Ensure value is JSON serializable
+        serializable_value = jsonable_encoder(value)
+        client.set(key, json.dumps(serializable_value), ex=ttl)
     except Exception as e:
         logger.debug(f"Redis set_cache_sync error for key {key}: {e}")
 

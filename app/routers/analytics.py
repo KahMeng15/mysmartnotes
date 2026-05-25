@@ -1,5 +1,6 @@
 """Analytics and statistics endpoints"""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from app.utils.cache import cache_response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List

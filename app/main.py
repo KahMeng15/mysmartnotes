@@ -212,7 +212,19 @@ async def request_observability_middleware(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = f"default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; frame-src https://{settings.FIREBASE_AUTH_DOMAIN} https://accounts.google.com; connect-src 'self' https://www.googleapis.com https://apis.google.com https://identitytoolkit.googleapis.com https://{settings.FIREBASE_AUTH_DOMAIN}"
+    
+    # Updated CSP with more allowed sources
+    csp = (
+        "default-src 'self'; "
+        "img-src 'self' data: https:; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://unpkg.com https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+        "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; "
+        "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; "
+        "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com; "
+        "media-src 'self' https://assets.mixkit.co"
+    )
+    response.headers["Content-Security-Policy"] = csp
 
     if _is_production():
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -270,6 +282,7 @@ async def csrf_protection_middleware(request: Request, call_next):
         "/auth/register",
         "/auth/password-reset-request",
         "/auth/password-reset",
+        "/auth/logout",
     }
     if request.url.path in csrf_exempt_paths:
         return await call_next(request)
@@ -402,6 +415,19 @@ async def system_settings_middleware(request: Request, call_next):
                                 max_age=expire_minutes * 60,
                                 path="/",
                             )
+                            
+                            # Also refresh CSRF token cookie to keep it in sync
+                            csrf_token = request.cookies.get(settings.CSRF_COOKIE_NAME)
+                            if csrf_token:
+                                response.set_cookie(
+                                    key=settings.CSRF_COOKIE_NAME,
+                                    value=csrf_token,
+                                    httponly=False, # Must be False for JS to read
+                                    secure=settings.COOKIE_SECURE,
+                                    samesite=settings.COOKIE_SAMESITE,
+                                    max_age=expire_minutes * 60,
+                                    path="/",
+                                )
                 except Exception as e:
                     pass # Silently fail for token re-issue
 

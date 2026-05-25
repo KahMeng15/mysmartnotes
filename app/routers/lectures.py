@@ -128,9 +128,7 @@ def _rebuild_lecture_content(
 
 
 @router.get("", response_model=List[LectureResponse])
-@cache_response(ttl=3600)
 async def get_lectures(
-    request: Request,
     subject_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -250,9 +248,7 @@ async def upload_lecture(
 
 
 @router.get("/{lecture_id}", response_model=LectureResponse)
-@cache_response(ttl=3600)
 async def get_lecture(
-    request: Request,
     lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
