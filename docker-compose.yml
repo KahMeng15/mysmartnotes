@@ -18,12 +18,28 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:alpine
+    container_name: mysmartnotes_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - mysmartnotes-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     image: ghcr.io/kahmeng15/mysmartnotes:latest
     container_name: mysmartnotes_api
     command: ["python", "-m", "app.main"]
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     env_file:
       - .env
@@ -33,6 +49,7 @@ services:
       - DB_PASSWORD=mysmartnotespassword
       - DB_HOST=db
       - DB_NAME=mysmartnotes
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -47,6 +64,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     environment:
@@ -54,6 +73,7 @@ services:
       - DB_PASSWORD=mysmartnotespassword
       - DB_HOST=db
       - DB_NAME=mysmartnotes
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

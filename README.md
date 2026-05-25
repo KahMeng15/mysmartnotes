@@ -30,6 +30,7 @@ MySmartNotes uses a **Multi-Container Architecture** to ensure reliable backgrou
 - **API**: FastAPI (Request handling & Auth)
 - **Worker**: Python (Background processing: OCR, AI, Embeddings)
 - **Database**: PostgreSQL 15 (Persistent storage & Task Queue)
+- **Cache**: Redis (In-memory caching)
 - **Embeddings**: sentence-transformers (Local, CPU-based)
 - **Deployment**: Docker Compose
 
@@ -66,8 +67,8 @@ docker-compose up -d
 For faster iteration during development, you can run the services manually:
 
 ```bash
-# 1. Start Database
-docker-compose up -d db
+# 1. Start Infrastructure (Database + Redis)
+docker-compose up -d db redis
 
 # 2. Setup Venv
 python -m venv venv
@@ -92,6 +93,7 @@ pip install -r requirements.txt
 | **Backend API** | FastAPI, Python 3.11+ | Web server & API logic |
 | **Worker** | Python (dedicated process) | Background processing (OCR, AI) |
 | **Database** | PostgreSQL 15 | Persistent storage & Task Queue |
+| **Cache** | Redis | In-memory caching (Notes, DB, API) |
 | **Vector Storage** | PostgreSQL + sentence-transformers | Semantic search |
 | **Document Extraction** | pdfplumber, python-pptx | PDF/PPTX parsing |
 | **OCR** | Tesseract + pytesseract | Scanned document support |

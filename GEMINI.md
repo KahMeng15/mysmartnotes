@@ -17,8 +17,8 @@ MySmartNotes is a multi-container web application designed to convert lecture ma
 ### Development Environment (Local)
 To run the project locally for development with hot-reloading:
 ```bash
-# 1. Start the PostgreSQL database
-docker-compose up -d db
+# 1. Start Infrastructure (Database + Redis)
+docker-compose up -d db redis
 
 # 2. Setup virtual environment
 python -m venv venv

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -7,11 +7,14 @@ from app.schemas.schemas import SubjectGroupCreate, SubjectGroupUpdate, SubjectG
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
 from app.utils.quotas import enforce_quota_groups
+from app.utils.cache import cache_response, clear_cache_pattern_sync
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
 @router.get("", response_model=List[SubjectGroupResponse])
+@cache_response(ttl=3600)
 async def get_groups(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -37,6 +40,10 @@ async def create_group(
     db.add(db_group)
     db.commit()
     db.refresh(db_group)
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/groups*:u{current_user.id}*")
+    
     return db_group
 
 @router.put("/{group_id}", response_model=SubjectGroupResponse)
@@ -63,6 +70,10 @@ async def update_group(
     
     db.commit()
     db.refresh(db_group)
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/groups*:u{current_user.id}*")
+    
     return db_group
 
 @router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -85,4 +96,8 @@ async def delete_group(
     
     db.delete(db_group)
     db.commit()
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/groups*:u{current_user.id}*")
+    
     return None

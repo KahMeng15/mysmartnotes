@@ -3,7 +3,8 @@ import os
 import json
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks, Request
+from app.utils.cache import cache_response, clear_cache_pattern_sync
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Callable
@@ -127,7 +128,9 @@ def _rebuild_lecture_content(
 
 
 @router.get("", response_model=List[LectureResponse])
+@cache_response(ttl=3600)
 async def get_lectures(
+    request: Request,
     subject_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -230,6 +233,9 @@ async def upload_lecture(
     db.commit()
     db.refresh(db_lecture)
     
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/lectures*:u{current_user.id}*")
+    
     # STEP 3: Process content extraction in background (Offloaded to Worker)
     task_id = f"ocr_{current_user.id}_{db_lecture.id}"
     TaskManager.submit_task(
@@ -244,7 +250,9 @@ async def upload_lecture(
 
 
 @router.get("/{lecture_id}", response_model=LectureResponse)
+@cache_response(ttl=3600)
 async def get_lecture(
+    request: Request,
     lecture_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -322,8 +330,12 @@ async def update_lecture(
     lecture.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(lecture)
-    
+
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/lectures*:u{current_user.id}*")
+
     return lecture
+
 
 
 @router.post("/{lecture_id}/reprocess-ocr", response_model=LectureResponse)
@@ -431,6 +443,9 @@ async def delete_lecture(
     try:
         db.delete(lecture)
         db.commit()
+        
+        # Clear cache
+        clear_cache_pattern_sync(f"cache_resp:/lectures*:u{current_user.id}*")
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting lecture from database: {e}", exc_info=True)
@@ -913,6 +928,9 @@ async def update_lecture_content(
     
     db.commit()
     db.refresh(lecture)
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/lectures*:u{current_user.id}*")
     
     # Update embeddings to stay in sync
     if new_text and new_text.strip():

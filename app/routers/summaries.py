@@ -1,5 +1,6 @@
 """Document generation endpoints"""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from app.utils.cache import cache_response, clear_cache_pattern_sync
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional
@@ -319,6 +320,9 @@ async def generate_summary_endpoint(
         db.commit()
         db.refresh(doc)
         
+        # Clear cache
+        clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
+        
         return SummaryResponse(
             lecture_id=request.lecture_id,
             title=f"Summary - {lecture.title}",
@@ -448,7 +452,10 @@ async def update_generated_summary(
 
     db.commit()
     db.refresh(doc)
-
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
+    
     return SummaryItemResponse(
         id=doc.id,
         version=doc.version,
@@ -470,7 +477,9 @@ async def update_generated_summary(
     )
 
 @router.get("", response_model=List[SummaryItemResponse])
+@cache_response(ttl=3600)
 async def list_summaries(
+    request: Request,
     lecture_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -507,7 +516,9 @@ async def list_summaries(
 
 
 @router.get("/{summary_id}", response_model=SummaryItemResponse)
+@cache_response(ttl=3600)
 async def get_summary(
+    request: Request,
     summary_id: str,
     lecture_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
@@ -580,6 +591,9 @@ async def delete_summary(
 
     db.delete(summary)
     db.commit()
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
 
 @router.post("/{summary_id}/export", response_model=dict)
 async def export_summary(

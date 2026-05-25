@@ -18,6 +18,20 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:alpine
+    container_name: mysmartnotes_redis_dev
+    restart: unless-stopped
+    networks:
+      - mysmartnotes-net-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build: .
     container_name: mysmartnotes_api_dev
@@ -25,11 +39,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       - PORT=8000
       - DATABASE_URL=postgresql://mysmartnotes:mysmartnotespassword@db:5432/mysmartnotes
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - .:/app # Mount entire workspace for live-reload
     restart: unless-stopped
@@ -43,10 +60,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       - DATABASE_URL=postgresql://mysmartnotes:mysmartnotespassword@db:5432/mysmartnotes
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - .:/app # Mount entire workspace for live-reload
     restart: unless-stopped

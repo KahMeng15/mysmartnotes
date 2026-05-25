@@ -6,11 +6,12 @@ This guide is for developers who want to contribute to MySmartNotes or run it lo
 
 ## 🏗️ Architecture Overview
 
-The system consists of 4 primary services:
+The system consists of 5 primary services:
 1.  **Frontend (Nginx):** Serves static files (HTML/JS/CSS) and acts as a reverse proxy for the API.
 2.  **API (FastAPI):** Handles HTTP requests, authentication, and database operations.
 3.  **Worker (Python):** Processes background tasks like OCR, AI processing, and embedding generation.
 4.  **Database (PostgreSQL):** Persistent storage for application data and the task queue.
+5.  **Cache (Redis):** High-speed in-memory caching for files and API responses.
 
 ---
 
@@ -46,10 +47,10 @@ docker-compose -f docker-compose.dev.yml up --build
 
 If you prefer to run the Python code directly on your host machine for faster debugging:
 
-### 1. Start the Database Only
-The application requires a PostgreSQL database. Keep the DB container running:
+### 1. Start Infrastructure
+The application requires PostgreSQL and Redis. Keep these containers running:
 ```bash
-docker-compose up -d db
+docker-compose up -d db redis
 ```
 
 ### 2. Install Local Dependencies
