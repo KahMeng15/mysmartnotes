@@ -158,6 +158,7 @@ class AIClient:
             raise ValueError("Ollama base URL not configured")
         
         url = f"{tier.base_url.rstrip('/')}/api/generate"
+        logger.info(f"OLLAMA: Calling {url} with model {tier.model_name}")
         payload = {
             "model": tier.model_name,
             "prompt": prompt,
@@ -168,11 +169,17 @@ class AIClient:
             }
         }
         
-        async with httpx.AsyncClient(timeout=self.request_timeout_seconds) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            return data.get("response", "")
+        try:
+            async with httpx.AsyncClient(timeout=self.request_timeout_seconds) as client:
+                response = await client.post(url, json=payload)
+                if response.status_code != 200:
+                    logger.error(f"OLLAMA ERROR: Server returned status {response.status_code}: {response.text}")
+                response.raise_for_status()
+                data = response.json()
+                return data.get("response", "")
+        except Exception as e:
+            logger.error(f"OLLAMA CRITICAL ERROR: {str(e)}")
+            raise
 
     def _extract_polished_answer(self, text: str) -> str:
         """Surgically extract the final answer from reasoning/meta-talk."""

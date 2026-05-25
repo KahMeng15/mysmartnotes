@@ -752,6 +752,11 @@ async def ask_question(
     t_model_start = time.time()
     t_step7_start = time.time()
 
+    # Initialize with default to prevent UnboundLocalError if all tiers fail
+    ai_model_info = f"{ai_client.provider.upper()}"
+    if ai_client.ai_model_name:
+        ai_model_info += f" ({ai_client.ai_model_name})"
+
     logger.info(f"[chat] Calling AI client (with fallback system)...")
     try:
         # Use the configured timeout from ai_client (supports slow reasoning models)
