@@ -239,12 +239,6 @@ function loadSettings() {
         }
 
         toggleAIFields();
-
-        // Load note processing mode
-        const noteProcessingModeEl = document.getElementById('noteProcessingMode');
-        if (noteProcessingModeEl) {
-            noteProcessingModeEl.value = user.note_processing_mode || 'smart';
-        }
     } catch(error) {
         console.error('Error in loadSettings:', error);
     }
@@ -381,12 +375,6 @@ async function saveAiConfiguration(event) {
             payload.ai_provider = provider;
             payload.ai_model = model || null;
             payload.ai_base_url = baseUrl || null;
-        }
-
-        // Include note processing mode in payload before sending
-        const noteProcessingModeEl = document.getElementById('noteProcessingMode');
-        if (noteProcessingModeEl) {
-            payload.note_processing_mode = noteProcessingModeEl.value;
         }
 
         const response = await fetch('/auth/profile', {

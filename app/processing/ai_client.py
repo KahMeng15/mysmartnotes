@@ -32,6 +32,7 @@ class AIClient:
         self.request_timeout_seconds = 240
         self.max_retries = 2 # Retries per tier
         self.retry_base_delay_seconds = 1.0
+        self.last_successful_tier: Optional[AITier] = None
         
         # 1. Start with 3-tier defaults from .env settings
         self.tiers: List[AITier] = [
@@ -56,14 +57,15 @@ class AIClient:
             )
         ]
         
-        # 2. User-specific override (Legacy/Personal)
+        # 3. User-specific override (Legacy/Personal)
         # If user has a personal provider configured and is NOT using global config,
         # we treat it as an additional Tier 0 (top priority).
         if user and not user.use_global_ai_config and user.ai_provider:
+            logger.info(f"Applying User-specific AI override: {user.ai_provider} ({user.ai_model})")
             user_tier = AITier(
                 provider=user.ai_provider,
                 model_name=user.ai_model or settings.GLOBAL_AI_TIER1_MODEL,
-                api_key=settings.GLOBAL_AI_TIER1_API_KEY or settings.GEMINI_API_KEY,
+                api_key=settings.GLOBAL_AI_TIER1_API_KEY,
                 reasoning_level="medium",
                 base_url=user.ai_base_url
             )
@@ -73,7 +75,8 @@ class AIClient:
 
     @property
     def provider(self) -> str:
-        return self.tiers[0].provider if self.tiers else "unknown"
+        tier = self.last_successful_tier or (self.tiers[0] if self.tiers else None)
+        return tier.provider if tier else "unknown"
 
     @provider.setter
     def provider(self, value: str):
@@ -82,7 +85,8 @@ class AIClient:
 
     @property
     def gemini_key(self) -> Optional[str]:
-        return self.tiers[0].api_key if self.tiers and self.tiers[0].provider == "gemini" else None
+        tier = self.last_successful_tier or (self.tiers[0] if self.tiers else None)
+        return tier.api_key if tier and tier.provider == "gemini" else None
 
     @gemini_key.setter
     def gemini_key(self, value: str):
@@ -91,7 +95,8 @@ class AIClient:
 
     @property
     def ai_model_name(self) -> str:
-        return self.tiers[0].model_name if self.tiers else "default"
+        tier = self.last_successful_tier or (self.tiers[0] if self.tiers else None)
+        return tier.model_name if tier else "default"
 
     @ai_model_name.setter
     def ai_model_name(self, value: str):
@@ -114,7 +119,14 @@ class AIClient:
     def _init_gemini_tier(self, tier: AITier):
         try:
             import google.generativeai as genai
-            if not tier.api_key: return
+            if not tier.api_key:
+                logger.warning(f"!!! No API key provided for Gemini tier ({tier.model_name}) !!!")
+                return
+            
+            # Diagnostic: Show first and last 2 chars to help user verify without leaking secret
+            key_preview = f"{tier.api_key[:2]}...{tier.api_key[-2:]}" if len(tier.api_key) > 4 else tier.api_key
+            logger.info(f"INIT: Configuring Gemini ({tier.model_name}) with key: [{key_preview}] (len: {len(tier.api_key)})")
+            
             genai.configure(api_key=tier.api_key)
             tier.model = genai.GenerativeModel(tier.model_name)
         except Exception as e:
@@ -215,6 +227,10 @@ class AIClient:
 
         if tier.provider == "gemini":
             import google.generativeai as genai
+            # CRITICAL: Re-configure with THIS tier's key to prevent leakage from other tiers
+            if tier.api_key:
+                genai.configure(api_key=tier.api_key)
+            
             cfg = genai.types.GenerationConfig(max_output_tokens=max_tokens, temperature=0.7)
             active_model = genai.GenerativeModel(tier.model.model_name, system_instruction=system_instruction) if system_instruction else tier.model
             
@@ -225,6 +241,8 @@ class AIClient:
             if res.candidates and res.candidates[0].content.parts:
                 parts = res.candidates[0].content.parts
                 text = parts[-1].text if len(parts) > 1 else "".join(p.text for p in parts if hasattr(p, 'text'))
+                self.last_successful_tier = tier
+                logger.info(f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})")
                 return self._extract_polished_answer(text)
         
         elif tier.provider == "ollama":
@@ -232,6 +250,8 @@ class AIClient:
                 return await self._call_ollama(tier, modified_prompt, system_instruction)
             
             res = await self._with_retries_and_timeout(f"ollama_{tier.model_name}", _ollama_call)
+            self.last_successful_tier = tier
+            logger.info(f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})")
             return self._extract_polished_answer(res)
 
         elif tier.provider == "huggingface" and tier.model:
@@ -239,6 +259,7 @@ class AIClient:
                 return tier.model.text_generation(modified_prompt, max_new_tokens=max_tokens, system_instruction=system_instruction)
             
             res = await self._with_retries_and_timeout(f"hf_{tier.model_name}", _hf_call)
+            self.last_successful_tier = tier
             return self._extract_polished_answer(res)
         
         return ""
@@ -279,19 +300,24 @@ class AIClient:
                         modified_prompt = prompt
 
                     import google.generativeai as genai
+                    # CRITICAL: Re-configure with THIS tier's key to prevent leakage from other tiers
+                    if tier.api_key:
+                        genai.configure(api_key=tier.api_key)
+
                     cfg = genai.types.GenerationConfig(max_output_tokens=max_tokens, temperature=0.7)
                     active_model = genai.GenerativeModel(tier.model.model_name, system_instruction=system_instruction) if system_instruction else tier.model
                     
                     async def _gemini_stream():
                         return await asyncio.to_thread(active_model.generate_content, modified_prompt, generation_config=cfg, stream=True)
 
-                    response_stream = await self._with_retries_and_timeout(f"Tier{i+1}_gemini_stream", _gemini_stream)
+                    res = await self._with_retries_and_timeout(f"Tier{i+1}_gemini_stream", _gemini_stream)
                     all_parts = []
                     for chunk in response_stream:
                         if chunk.candidates and chunk.candidates[0].content.parts:
                             for part in chunk.candidates[0].content.parts:
                                 if hasattr(part, 'text'): all_parts.append(part.text)
                     
+                    self.last_successful_tier = tier
                     yield self._extract_polished_answer("".join(all_parts))
                     return # Success!
 

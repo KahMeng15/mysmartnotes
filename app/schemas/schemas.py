@@ -43,8 +43,8 @@ class UserUpdate(BaseModel):
     ai_provider: Optional[str] = None
     ai_model: Optional[str] = None
     ai_base_url: Optional[str] = None
+    ai_api_key: Optional[str] = None # Ignored by backend, but accepted from frontend
     use_global_ai_config: Optional[bool] = None
-    note_processing_mode: Optional[str] = None  # fast | smart | smart_throttled
 
 
 class User(UserBase):
@@ -58,8 +58,7 @@ class User(UserBase):
     ai_model: Optional[str] = None
     ai_base_url: Optional[str] = None
     ai_api_key_configured: bool = False
-    use_global_ai_config: bool = False
-    note_processing_mode: str = "smart"
+    use_global_ai_config: bool = True
     created_at: Optional[datetime] = None
     
     class Config:

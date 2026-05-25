@@ -752,11 +752,7 @@ async def ask_question(
     t_model_start = time.time()
     t_step7_start = time.time()
 
-    ai_model_info = f"{ai_client.provider.upper()}"
-    if ai_client.ai_model_name:
-        ai_model_info += f" ({ai_client.ai_model_name})"
-
-    logger.info(f"[chat] Calling {ai_client.provider} with model {ai_client.ai_model_name or 'default'}...")
+    logger.info(f"[chat] Calling AI client (with fallback system)...")
     try:
         # Use the configured timeout from ai_client (supports slow reasoning models)
         response = await asyncio.wait_for(
@@ -768,6 +764,11 @@ async def ask_question(
             timeout=float(ai_client.request_timeout_seconds)
         )
         logger.info(f"[chat] LLM primary response received in {round((time.time() - t_model_start) * 1000.0, 2)}ms")
+        
+        # Resolve model info AFTER the call so it reflects the actual successful tier
+        ai_model_info = f"{ai_client.provider.upper()}"
+        if ai_client.ai_model_name:
+            ai_model_info += f" ({ai_client.ai_model_name})"
         
         fallback_duration_ms = 0.0
         # Checking if local context didn't have the answer

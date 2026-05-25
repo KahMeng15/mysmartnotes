@@ -28,8 +28,7 @@ class User(Base):
     ai_provider = Column(String(50), default="gemini") # gemini, chatgpt, claude, huggingface, openrouter, local
     ai_model = Column(String(100), nullable=True)
     ai_base_url = Column(String(255), nullable=True)
-    use_global_ai_config = Column(Boolean, default=False)  # Whether to use global settings instead of personal
-    note_processing_mode = Column(String(50), default="smart")  # fast | smart | smart_throttled
+    use_global_ai_config = Column(Boolean, default=True)  # Whether to use global settings instead of personal
     google_oauth_id = Column(String(255), nullable=True, unique=True)  # Firebase UID for Google OAuth audit trail
     token_version = Column(Integer, default=0, nullable=False)  # Increment to revoke all existing JWT sessions
     
