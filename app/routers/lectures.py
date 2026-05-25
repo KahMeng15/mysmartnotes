@@ -21,7 +21,12 @@ from app.processing.ocr import OCRProcessor
 from app.processing.image_extractor import ImageExtractor
 from app.processing.text_processor import ContentType
 from app.processing.smart_pipeline import SmartPipeline
-from app.routers.processing import _markdown_to_segments
+from app.processing.lecture_processor import (
+    get_pipeline_for_user,
+    extract_markdown_for_user,
+    markdown_to_segments,
+    process_lecture_task
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,147 +37,6 @@ UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "upload
 GENERATED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "generated")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(GENERATED_DIR, exist_ok=True)
-
-
-def _get_pipeline_for_user(user: "User") -> SmartPipeline:
-    """Get a SmartPipeline instance with the appropriate settings for this user."""
-    from app.config import get_settings
-    app_settings = get_settings()
-    
-    # Resolve Gemini API key: ALWAYS pull from environment variables for security
-    gemini_key = app_settings.GLOBAL_AI_TIER1_API_KEY or app_settings.GEMINI_API_KEY
-    gemini_model = app_settings.GLOBAL_AI_TIER1_MODEL
-
-    if not getattr(user, "use_global_ai_config", False):
-        if getattr(user, "ai_model", None):
-            gemini_model = user.ai_model
-
-    return SmartPipeline(
-        use_polish=bool(gemini_key),
-        gemini_api_key=gemini_key,
-        gemini_model=gemini_model,
-    )
-
-
-def _ensure_valid_markdown_result(markdown: str) -> str:
-    """
-    SmartPipeline returns an error string on failure; treat that as a real failure
-    so uploads do not silently store broken content as extracted notes.
-    """
-    if isinstance(markdown, str) and markdown.startswith("Error:"):
-        raise RuntimeError(markdown)
-    return markdown
-
-
-def _extract_markdown_for_user(user: "User", file_path: str, progress_callback: Optional[Callable] = None) -> str:
-    """
-    Process a lecture with the configured SmartPipeline. If the AI polish pass
-    fails, retry once with local extraction only so uploads still complete.
-    """
-    pipeline = _get_pipeline_for_user(user)
-    try:
-        return _ensure_valid_markdown_result(pipeline.process(file_path, progress_callback=progress_callback))
-    except Exception:
-        if not getattr(pipeline, "use_polish", False):
-            raise
-
-        logger.warning(
-            "Smart pipeline with AI polish failed; retrying with local extraction only",
-            extra={"file_path": file_path},
-            exc_info=True,
-        )
-        fallback_pipeline = SmartPipeline(use_polish=False)
-        return _ensure_valid_markdown_result(fallback_pipeline.process(file_path, progress_callback=progress_callback))
-
-
-def _background_process_lecture(lecture_id: str, user_id: int, file_path: str, auto_detect_title: bool):
-    """Background task to process a lecture and update its Task status"""
-    task_id = f"ocr_{user_id}_{lecture_id}"
-    
-    # Initialize task in DB as 'running' so the worker ignores it
-    TaskManager.submit_task(task_id, "lecture_processing", user_id, lecture_id=lecture_id)
-    TaskManager._update_db_task(task_id, status="running", progress=5)
-    
-    db = SessionLocal()
-    try:
-        lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
-        user = db.query(User).filter(User.id == user_id).first()
-        
-        if not lecture or not user:
-            logger.error(f"Background process failed: Lecture {lecture_id} or User {user_id} not found")
-            TaskManager._update_db_task(task_id, status="failed", error="Lecture or User not found")
-            return
-
-        def progress_callback(percent):
-            TaskManager.update_task_progress(task_id, percent)
-
-        import time
-        start_time = time.time()
-        file_ext = os.path.splitext(file_path)[1].lower()
-
-        if file_ext in ('.pdf', '.pptx'):
-            logger.info(f"Background processing lecture {lecture_id}")
-            markdown = _extract_markdown_for_user(user, file_path, progress_callback=progress_callback)
-            structured_segments = _markdown_to_segments(markdown)
-            
-            # Save to file storage
-            StorageManager.save_lecture_text(lecture.id, markdown)
-            StorageManager.save_lecture_json(lecture.id, "structured", structured_segments)
-            
-            # Auto-title detection from H1
-            if auto_detect_title:
-                for line in markdown.split('\n'):
-                    if line.strip().startswith('# '):
-                        detected_title = line.strip()[2:].strip()
-                        if detected_title:
-                            lecture.title = detected_title
-                            break
-            
-            lecture.processing_time_ms = int((time.time() - start_time) * 1000)
-            lecture.updated_at = datetime.utcnow()
-            db.commit()
-            
-            # Update task to 95% before embeddings
-            TaskManager.update_task_progress(task_id, 95)
-            
-            # STEP 4: Compute and store embeddings
-            if markdown and markdown.strip():
-                try:
-                    from app.processing.embeddings import update_lecture_embeddings
-                    update_lecture_embeddings(lecture.id, markdown, db)
-                except Exception as e:
-                    logger.error(f"Error updating embeddings: {e}")
-
-            TaskManager._update_db_task(task_id, status="completed", progress=100)
-            logger.info(f"Background processing complete for lecture {lecture_id}")
-
-        else:
-            # Fallback to OCR for images
-            progress_callback(20)
-            ocr_result = OCRProcessor.extract_text(file_path, lecture.file_type, lecture_id=lecture.id)
-            progress_callback(80)
-            
-            lecture.extracted_text = ocr_result.get("raw_text", "")
-            lecture.extracted_content_structured = json.dumps(ocr_result.get("structured_content", []))
-            lecture.extracted_images_metadata = json.dumps(ocr_result.get("images", []))
-            lecture.processing_time_ms = int((time.time() - start_time) * 1000)
-            lecture.updated_at = datetime.utcnow()
-            db.commit()
-            
-            if lecture.extracted_text:
-                try:
-                    from app.processing.embeddings import update_lecture_embeddings
-                    update_lecture_embeddings(lecture.id, lecture.extracted_text, db)
-                except Exception as e:
-                    logger.error(f"Error updating embeddings: {e}")
-
-            TaskManager._update_db_task(task_id, status="completed", progress=100)
-
-    except Exception as e:
-        logger.error(f"Error in background processing: {e}", exc_info=True)
-        TaskManager._update_db_task(task_id, status="failed", error=str(e))
-    finally:
-        db.close()
 
 
 def _rebuild_lecture_content(
@@ -207,8 +71,8 @@ def _rebuild_lecture_content(
 
     if file_ext in ('.pdf', '.pptx'):
         logger.info(f"Rebuilding lecture {lecture.id} with SmartPipeline from scratch")
-        raw_text = _extract_markdown_for_user(current_user, lecture.file_path)
-        structured_content = _markdown_to_segments(raw_text)
+        raw_text = extract_markdown_for_user(current_user, lecture.file_path)
+        structured_content = markdown_to_segments(raw_text)
 
         images_data = []
         if file_ext == '.pdf':
@@ -366,12 +230,13 @@ async def upload_lecture(
     db.commit()
     db.refresh(db_lecture)
     
-    # STEP 3: Process content extraction in background
-    background_tasks.add_task(
-        _background_process_lecture,
-        lecture_id=db_lecture.id,
-        user_id=current_user.id,
-        file_path=file_path,
+    # STEP 3: Process content extraction in background (Offloaded to Worker)
+    task_id = f"ocr_{current_user.id}_{db_lecture.id}"
+    TaskManager.submit_task(
+        task_id, 
+        "lecture_processing", 
+        current_user.id, 
+        lecture_id=db_lecture.id, 
         auto_detect_title=auto_detect_title
     )
     

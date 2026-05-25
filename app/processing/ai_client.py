@@ -317,7 +317,7 @@ class AIClient:
                     async def _gemini_stream():
                         return await asyncio.to_thread(active_model.generate_content, modified_prompt, generation_config=cfg, stream=True)
 
-                    res = await self._with_retries_and_timeout(f"Tier{i+1}_gemini_stream", _gemini_stream)
+                    response_stream = await self._with_retries_and_timeout(f"Tier{i+1}_gemini_stream", _gemini_stream)
                     all_parts = []
                     for chunk in response_stream:
                         if chunk.candidates and chunk.candidates[0].content.parts:

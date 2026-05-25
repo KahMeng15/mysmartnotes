@@ -18,178 +18,49 @@ LOGGING_CONFIG = {
             "formatter": "standard",
             "level": "INFO",
         },
-        "all_api": {
+        "api_file": {
             "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "2-All-API.log"),
+            "filename": os.path.join(LOGS_DIR, "api.log"),
             "formatter": "standard",
             "level": "INFO",
         },
-        "auth_api": {
+        "worker_file": {
             "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "3-Auth-API.log"),
+            "filename": os.path.join(LOGS_DIR, "worker.log"),
             "formatter": "standard",
             "level": "INFO",
         },
-        "notes_api": {
+        "error_file": {
             "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "4-Notes-API.log"),
+            "filename": os.path.join(LOGS_DIR, "errors.log"),
             "formatter": "standard",
-            "level": "INFO",
-        },
-        "summary_api": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "5-Summary-API.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "quiz_api": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "6-Quiz-API.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "pomodoro_api": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "7-Pomodoro-API.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "chat_api": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "8-Chat-API.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "other_api": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "9-Other-API.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "chat_worker": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "10-Chat-Worker.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "upload_worker": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "11-Upload-Worker.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "database_worker": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "12-Database-Worker.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "quiz_worker": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "13-Quiz-Worker.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "pomodoro_worker": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "14-Pomodoro-Worker.log"),
-            "formatter": "standard",
-            "level": "INFO",
-        },
-        "summary_worker": {
-            "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "15-Summary-Worker.log"),
-            "formatter": "standard",
-            "level": "INFO",
+            "level": "ERROR",
         },
     },
     "loggers": {
-        # Catch-all for API
+        "app": {
+            "handlers": ["console", "api_file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "app.worker_main": {
+            "handlers": ["console", "worker_file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "fastapi": {
-            "handlers": ["console", "all_api"],
+            "handlers": ["console", "api_file", "error_file"],
             "level": "INFO",
             "propagate": False,
         },
         "uvicorn": {
-            "handlers": ["console", "all_api"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.routers": {
-            "handlers": ["other_api", "all_api"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.routers.auth": {
-            "handlers": ["auth_api", "all_api"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.routers.lectures": {
-            "handlers": ["notes_api", "all_api"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.routers.summaries": {
-            "handlers": ["summary_api", "all_api"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.routers.quiz": {
-            "handlers": ["quiz_api", "all_api"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.routers.study_sessions": {
-            "handlers": ["pomodoro_api", "all_api"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.routers.chat": {
-            "handlers": ["chat_api", "all_api"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        # Workers
-        "app.worker_main.chat": {
-            "handlers": ["console", "chat_worker"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.worker_main.upload": {
-            "handlers": ["console", "upload_worker"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.worker_main.database": {
-            "handlers": ["console", "database_worker"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.worker_main.quiz": {
-            "handlers": ["console", "quiz_worker"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.worker_main.pomodoro": {
-            "handlers": ["console", "pomodoro_worker"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "app.worker_main.summary": {
-            "handlers": ["console", "summary_worker"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        # General worker fallback
-        "app.worker_main": {
-            "handlers": ["console", "database_worker"],
+            "handlers": ["console", "api_file", "error_file"],
             "level": "INFO",
             "propagate": False,
         },
     },
     "root": {
-        "handlers": ["console", "all_api"],
+        "handlers": ["console", "api_file", "error_file"],
         "level": "INFO",
     }
 }

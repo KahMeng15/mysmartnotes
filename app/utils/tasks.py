@@ -53,7 +53,7 @@ class TaskManager:
                         task_type=task_type,
                         status="pending",
                         progress=0,
-                        input_data=_serialize_result({"kwargs": kwargs}),
+                        input_data=_serialize_result({"kwargs": {**kwargs, "user_id": user_id}}),
                     )
                     db.add(task)
                 else:
@@ -61,7 +61,7 @@ class TaskManager:
                     task.task_type = task_type
                     task.status = "pending"
                     task.progress = 0
-                    task.input_data = _serialize_result({"kwargs": kwargs})
+                    task.input_data = _serialize_result({"kwargs": {**kwargs, "user_id": user_id}})
                     task.result = None
                     task.error_message = None
                     task.updated_at = datetime.utcnow()

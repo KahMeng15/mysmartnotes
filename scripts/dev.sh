@@ -8,6 +8,8 @@ mkdir -p logs
 
 # 2. Start the Background Worker in the background
 echo "Starting Background Worker..."
+# Kill any existing zombie workers first
+pkill -f "python3 -m app.worker_main" || true
 python3 -m app.worker_main > logs/worker_stdout.log 2>&1 &
 WORKER_PID=$!
 
