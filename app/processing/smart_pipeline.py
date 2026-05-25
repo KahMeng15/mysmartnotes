@@ -280,9 +280,9 @@ class SmartPipeline:
 
     def _clean_code_text(self, text: str) -> str:
         """Remove slide numbering prefixes that should not appear inside code samples."""
-        cleaned = (text or "").strip()
-        if re.match(r"^\d+\.\s+(?:public|private|protected|class|interface|enum)\b", cleaned):
-            cleaned = re.sub(r"^\d+\.\s+", "", cleaned)
+        cleaned = (text or "").rstrip()
+        if re.match(r"^\s*\d+\.\s+(?:public|private|protected|class|interface|enum)\b", cleaned):
+            cleaned = re.sub(r"^\s*\d+\.\s+", "", cleaned)
         return cleaned
 
     def _split_mixed_code_and_prose(self, text: str) -> Optional[tuple]:
@@ -648,25 +648,25 @@ class SmartPipeline:
 
                 for para_idx, paragraph in enumerate(shape.text_frame.paragraphs):
                     # Fix PowerPoint in-shape line breaks (\x0b = vertical tab)
-                    raw_text = paragraph.text.replace("\x0b", " ").strip()
+                    raw_text = paragraph.text.replace("\x0b", " ").rstrip()
                     # 1.2 Normalize text (symbols, capitalization)
-                    raw_text = self._normalize_text(raw_text).strip()
-                    if not raw_text:
+                    raw_text = self._normalize_text(raw_text).rstrip()
+                    if not raw_text.strip():
                         continue
 
                     # 1.3 Skip bare slide-number lines (short pure-digit strings)
-                    if raw_text.isdigit() and len(raw_text) <= 3:
-                        logger.debug(f"Skip slide number literal: '{raw_text}'")
+                    if raw_text.strip().isdigit() and len(raw_text.strip()) <= 3:
+                        logger.debug(f"Skip slide number literal: '{raw_text.strip()}'")
                         continue
 
                     # 1.6 Skip URLs
-                    if raw_text.startswith(("http://", "https://")):
-                        logger.debug(f"Skip URL: '{raw_text[:60]}'")
+                    if raw_text.strip().startswith(("http://", "https://")):
+                        logger.debug(f"Skip URL: '{raw_text.strip()[:60]}'")
                         continue
 
                     # 1.6 Skip institutional metadata on cover slide
-                    if self._is_metadata_shape(raw_text, slide_num):
-                        logger.debug(f"Skip metadata shape on slide 1: '{raw_text[:60]}'")
+                    if self._is_metadata_shape(raw_text.strip(), slide_num):
+                        logger.debug(f"Skip metadata shape on slide 1: '{raw_text.strip()[:60]}'")
                         continue
 
                     text = raw_text
@@ -687,14 +687,14 @@ class SmartPipeline:
 
                     # Determine block type
                     # Long text (>120 chars) is always body regardless of size.
-                    is_long_text = len(text) > 120
+                    is_long_text = len(text.strip()) > 120
 
                     # Title placeholder: ONLY the first paragraph gets h1.
                     # Subsequent paragraphs in the same shape are sub-content (body/list).
                     is_title_first_para = (shape_role == "title" and level == 0 and para_idx == 0)
 
                     if self._is_probable_pptx_noise(text):
-                        logger.debug(f"Skip low-value PPTX artifact: '{text[:60]}'")
+                        logger.debug(f"Skip low-value PPTX artifact: '{text.strip()[:60]}'")
                         continue
 
                     mixed_code_prose = self._split_mixed_code_and_prose(text)
@@ -707,7 +707,7 @@ class SmartPipeline:
                         })
                         slide_blocks.append({
                             "type": "body",
-                            "text": prose_text,
+                            "text": prose_text.lstrip(),
                             "indent": level,
                         })
                         continue
@@ -716,24 +716,32 @@ class SmartPipeline:
                         block_type = "code"
                     elif is_title_first_para:
                         block_type = "h1"
+                        text = text.lstrip()
                     elif not is_long_text and max_size >= h1_threshold and self._is_probable_heading(text):
                         block_type = "h1"
+                        text = text.lstrip()
                     elif not is_long_text and max_size >= h2_threshold and self._is_probable_heading(text):
                         block_type = "h2"
+                        text = text.lstrip()
                     elif not is_long_text and max_size >= h3_threshold and is_bold and self._is_probable_heading(text):
                         block_type = "h3"
+                        text = text.lstrip()
                     elif level > 0:
                         block_type = "list"
+                        text = text.lstrip()
                     else:
                         # Check for common list text patterns used in slides
-                        first_char = text[0] if text else ""
-                        if first_char in BULLET_CHARS or text.startswith("- "):
+                        first_char = text.lstrip()[0] if text.lstrip() else ""
+                        if first_char in BULLET_CHARS or text.lstrip().startswith("- "):
                             # Strip the bullet char so the list marker isn't duplicated
                             if first_char in BULLET_CHARS:
-                                text = text[1:].strip()
+                                text = text.lstrip()[1:].strip()
+                            else:
+                                text = text.lstrip()[2:].strip()
                             block_type = "list"
                         else:
                             block_type = "body"
+                            text = text.lstrip()
 
                     # Capture the title of the slide (first paragraph of title placeholder)
                     if is_title_first_para:
@@ -825,7 +833,8 @@ class SmartPipeline:
                         
                         md_parts.append(f"```{lang}")
                         in_code_block = True
-                    md_parts.append(text)
+                    prefix = "    " * indent
+                    md_parts.append(f"{prefix}{text}")
                 else:
                     if in_code_block:
                         md_parts.append("```")
