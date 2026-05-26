@@ -396,12 +396,13 @@ async function saveSystemSettings(e) {
 async function loadRateLimits() {
     try {
         const s = await apiCall('/admin/rate-limits');
-        
+
         // precise mapping
         document.getElementById('rlPerUser').value = s.per_user_api || 0;
         document.getElementById('rlGlobal').value = s.global_api || 0;
         document.getElementById('rlChat').value = s.chat_api || 0;
         document.getElementById('rlProcessing').value = s.processing_api || 0;
+        document.getElementById('rlConcurrentTasks').value = s.concurrent_tasks_per_user || 1;
         document.getElementById('rlSessions').value = s.sessions || 0;
     } catch(e) {}
 }
@@ -414,12 +415,12 @@ async function saveRateLimits(e) {
             global_api: parseInt(document.getElementById('rlGlobal').value),
             chat_api: parseInt(document.getElementById('rlChat').value),
             processing_api: parseInt(document.getElementById('rlProcessing').value),
+            concurrent_tasks_per_user: parseInt(document.getElementById('rlConcurrentTasks').value),
             sessions: parseInt(document.getElementById('rlSessions').value),
         });
         alert('Rate limits saved');
     } catch(err) { alert(err.message); }
 }
-
 // ========================
 // EMAIL CONFIG
 // ========================

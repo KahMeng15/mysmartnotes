@@ -4,7 +4,8 @@ import json
 import traceback
 from datetime import datetime
 
-from app.models.db import Task
+from sqlalchemy import func
+from app.models.db import Task, RateLimitConfig
 from app.utils.db import SessionLocal
 from app.utils.tasks import TaskManager, OCRTask, EmbeddingsTask
 
@@ -24,15 +25,34 @@ TASK_REGISTRY = {
 def process_next_task():
     db = SessionLocal()
     try:
-        # Use simple locking/polling. For Postgres, row-level locking would be better:
-        # task = db.query(Task).filter(Task.status == "pending").with_for_update(skip_locked=True).first()
-        # But to be safe across SQLite/Postgres compatibility we do a simple lock approach for now
-        # or rely on Postgres row locking if we detect it.
-        
-        # We will attempt to find a pending task
-        task = db.query(Task).filter(
-            Task.status == "pending"
-        ).first()
+        # Load per-user concurrency limit
+        rate_limits = db.query(RateLimitConfig).first()
+        max_concurrent = rate_limits.concurrent_tasks_per_user if rate_limits else 1
+
+        # Base query for pending tasks
+        pending_query = db.query(Task).filter(Task.status == "pending")
+
+        # Apply per-user concurrency limit if not unlimited (unlimited = 0 or -1)
+        if max_concurrent > 0:
+            # Find users who have already reached their concurrent task limit
+            # These are users with >= max_concurrent tasks in 'running' status
+            running_users_subquery = db.query(
+                Task.user_id
+            ).filter(
+                Task.status == "running"
+            ).group_by(
+                Task.user_id
+            ).having(
+                func.count(Task.id) >= max_concurrent
+            ).subquery()
+
+            pending_query = pending_query.filter(
+                ~Task.user_id.in_(db.query(running_users_subquery.c.user_id))
+            )
+
+        # Find the oldest eligible pending task
+        task = pending_query.order_by(Task.created_at.asc()).first()
+
         if not task:
             return False
 

@@ -82,6 +82,7 @@ class RateLimitConfigSchema(BaseModel):
     global_api: int
     chat_api: int
     processing_api: int
+    concurrent_tasks_per_user: int
     sessions: int
 
     class Config:

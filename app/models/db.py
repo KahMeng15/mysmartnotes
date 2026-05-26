@@ -511,6 +511,7 @@ class RateLimitConfig(Base):
     global_api = Column(Integer, default=0)
     chat_api = Column(Integer, default=0)
     processing_api = Column(Integer, default=0)
+    concurrent_tasks_per_user = Column(Integer, default=1)
     sessions = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
