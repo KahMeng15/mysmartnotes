@@ -243,24 +243,24 @@
         <!-- Email Verification Panel -->
         <div class="panel" id="verifyEmailPanel">
             <div id="verifyEmailMsg" class="message-box"></div>
-            <div style="text-align: center; padding: 20px 0;">
-                <div class="icon-circle" style="background-color: #eff6ff; color: #3b82f6; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 2.5rem;">
+            <div style="text-align: left; padding: 20px 0;">
+                <div class="icon-circle" style="background-color: #eff6ff; color: #3b82f6; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 0 24px 0; font-size: 2.5rem;">
                     <i class="ph ph-envelope-simple-open"></i>
                 </div>
-                <h2 style="font-size: 1.5rem; margin-bottom: 8px;">Email Verification</h2>
-                <p id="verifyEmailStatus" style="color: #75757A; margin-bottom: 24px; font-size: 0.9rem;">
+                <h2 style="font-size: 1.8rem; margin-bottom: 12px; color: #111827;">Email Verification</h2>
+                <p id="verifyEmailStatus" style="color: #4b5563; margin-bottom: 12px; font-size: 1rem; line-height: 1.5;">
                     We're validating your email verification link. Please wait...
                 </p>
                 
-                <div id="verifyEmailSuccessContent" style="display: none; text-align: center;">
-                    <p style="margin-bottom: 24px; color: #10b981; font-weight: 500;">
-                        Your email has been successfully verified!
+                <div id="verifyEmailSuccessContent" style="display: none;">
+                    <p style="margin-bottom: 32px; color: #10b981; font-weight: 500; font-size: 1rem; line-height: 1.5;">
+                        Your email has been successfully verified! You can now access all features.
                     </p>
                     <button class="btn btn-next btn-block" onclick="switchPanel('login')">Go to Login</button>
                 </div>
 
-                <div id="verifyEmailErrorContent" style="display: none; text-align: center;">
-                    <p style="margin-bottom: 24px; color: #ef4444;">
+                <div id="verifyEmailErrorContent" style="display: none;">
+                    <p style="margin-bottom: 32px; color: #ef4444; font-size: 1rem; line-height: 1.5;">
                         Verification failed. The link may be invalid or expired.
                     </p>
                     <button class="btn btn-next btn-block" onclick="switchPanel('login')">Back to Login</button>
