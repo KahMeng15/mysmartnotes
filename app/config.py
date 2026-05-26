@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     # Admin Bootstrap
     ADMIN_EMAIL: str = ""
 
+    # SMTP Configuration
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_SENDER_NAME: str = "MySmartNotes"
+    SMTP_TLS: bool = True
+
     # Global AI Configuration (3-Tier Fallback System)
     # Tier 1 (Primary - Gemini)
     GLOBAL_AI_TIER1_PROVIDER: str = "gemini"

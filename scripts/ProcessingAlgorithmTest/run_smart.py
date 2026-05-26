@@ -101,7 +101,7 @@ def main():
             cli_key = arg.split("=", 1)[1].strip()
             break
 
-    gemini_key = cli_key or os.getenv("GEMINI_API_KEY") or os.getenv("GLOBAL_GEMINI_API_KEY")
+    gemini_key = cli_key or os.getenv("GEMINI_API_KEY") or os.getenv("GLOBAL_GEMINI_API_KEY") or os.getenv("GLOBAL_AI_TIER1_API_KEY")
     
     if use_polish and not gemini_key:
         logging.warning("⚠️  --polish requested but no GEMINI_API_KEY found. Skipping AI refinement.")

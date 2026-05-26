@@ -606,25 +606,23 @@
         <!-- EMAIL CONFIG TAB -->
         <div id="tab-email" class="admin-section">
             <h3>Email Configuration</h3>
-            <form id="emailConfigForm" onsubmit="saveEmailConfig(event)" class="settings-grid">
+            <p style="color: var(--color-gray); margin-bottom: 15px; font-size: 0.95rem;">These settings are managed via your <code>.env</code> file for security.</p>
+            <form id="emailConfigForm" class="settings-grid">
                 <div class="form-group">
                     <label>SMTP Provider URL</label>
-                    <input type="text" id="smtpProvider" placeholder="smtp.gmail.com">
+                    <input type="text" id="smtpProvider" readonly style="background: #f9fafb;">
                 </div>
                 <div class="form-group">
                     <label>Email Address</label>
-                    <input type="email" id="emailAddress" placeholder="no-reply@mysmartnotes.com">
+                    <input type="email" id="emailAddress" readonly style="background: #f9fafb;">
                 </div>
                 <div class="form-group">
                     <label>Sender Name</label>
-                    <input type="text" id="senderName" placeholder="MySmartNotes">
+                    <input type="text" id="senderName" readonly style="background: #f9fafb;">
                 </div>
                 <div class="form-group">
                     <label>App Password</label>
-                    <input type="password" id="appPassword" placeholder="Your App Password">
-                </div>
-                <div style="grid-column: 1/-1; margin-top: 10px;">
-                    <button type="submit" class="btn btn-primary">Save Email Config</button>
+                    <input type="password" id="appPassword" readonly style="background: #f9fafb;">
                 </div>
             </form>
 

@@ -430,24 +430,8 @@ async function loadEmailConfig() {
         document.getElementById('smtpProvider').value = s.smtp_provider || '';
         document.getElementById('emailAddress').value = s.email_address || '';
         document.getElementById('senderName').value = s.sender_name || '';
-        document.getElementById('appPassword').value = s.app_password ? '********' : '';
+        document.getElementById('appPassword').value = s.app_password || '';
     } catch(e) {}
-}
-
-async function saveEmailConfig(e) {
-    e.preventDefault();
-    const payload = {
-        smtp_provider: document.getElementById('smtpProvider').value,
-        email_address: document.getElementById('emailAddress').value,
-        sender_name: document.getElementById('senderName').value,
-    };
-    const key = document.getElementById('appPassword').value;
-    if (key && key !== '********') payload.app_password = key;
-
-    try {
-        await apiCall('/admin/email-config', 'PUT', payload);
-        alert('Email Config saved');
-    } catch(err) { alert(err.message); }
 }
 
 async function sendTestEmail(e) {

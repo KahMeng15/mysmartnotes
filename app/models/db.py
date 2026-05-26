@@ -451,19 +451,6 @@ class PasswordChangeConfirmation(Base):
     user = relationship("User")
 
 
-class EmailConfig(Base):
-    """SMTP Email Configuration"""
-    __tablename__ = "email_config"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    smtp_provider = Column(String(100), nullable=True)
-    email_address = Column(String(255), nullable=True)
-    sender_name = Column(String(100), nullable=True)
-    app_password = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
 class UserLog(Base):
     """Audit logs for actions"""
     __tablename__ = "user_logs"

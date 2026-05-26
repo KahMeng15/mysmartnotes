@@ -7,7 +7,7 @@ from app.utils.quotas import ensure_default_tier_configs
 import datetime
 import secrets
 
-from app.models.db import User, SystemSettings, EmailConfig, IPFilter, RateLimitConfig, UserLog, Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation, TierConfig
+from app.models.db import User, SystemSettings, IPFilter, RateLimitConfig, UserLog, Lecture, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation, TierConfig
 from app.schemas.admin import (
     SystemSettingsSchema, EmailConfigSchema, IPFilterSchema, IPFilterCreate, RateLimitConfigSchema, UserLogSchema, UserAdminResponse, UserActionRequest,
     UserInvitationCreate, UserInvitationResponse, TierConfigSchema
@@ -19,8 +19,10 @@ from app.utils.email import send_invitation_email
 from app.utils.invitation_utils import build_link_only_email, is_link_only_email
 from app.utils.crypto import encrypt_secret, decrypt_secret
 from app.utils.observability import get_runtime_metrics_snapshot
+from app.config import get_settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+settings = get_settings()
 
 
 def _prepare_system_settings_response(settings: SystemSettings) -> dict:
@@ -107,40 +109,26 @@ def update_system_settings(update_data: SystemSettingsSchema, db: Session = Depe
 
 # --- Email Config ---
 @router.get("/email-config", response_model=EmailConfigSchema)
-def get_email_config(db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
-    config = db.query(EmailConfig).first()
-    if not config:
-        config = EmailConfig()
-        db.add(config)
-        db.commit()
-        db.refresh(config)
-    return config
-
-@router.put("/email-config", response_model=EmailConfigSchema)
-def update_email_config(update_data: EmailConfigSchema, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
-    config = db.query(EmailConfig).first()
-    if not config:
-        config = EmailConfig()
-        db.add(config)
-    
-    for key, value in update_data.model_dump().items():
-        setattr(config, key, value)
-    
-    config.updated_at = datetime.datetime.utcnow()
-    db.commit()
-    db.refresh(config)
-    return config
+def get_email_config(admin: User = Depends(get_current_admin_user)):
+    """Get SMTP configuration (read-only from environment)"""
+    return {
+        "smtp_provider": f"{settings.SMTP_HOST}:{settings.SMTP_PORT}",
+        "email_address": settings.SMTP_USER,
+        "sender_name": settings.SMTP_SENDER_NAME,
+        "app_password": "********" if settings.SMTP_PASSWORD else None
+    }
 
 @router.post("/email-config/test")
 def test_email_config(request_body: dict, request: Request, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
     """Send a test email to verify email configuration is working"""
     from app.utils.email import send_email
-    from pydantic import BaseModel, validator
+    from pydantic import BaseModel, field_validator
     
     class TestEmailRequest(BaseModel):
         test_email: str
         
-        @validator('test_email')
+        @field_validator('test_email')
+        @classmethod
         def validate_email(cls, v):
             if not v or '@' not in v:
                 raise ValueError('Invalid email address')
@@ -152,12 +140,11 @@ def test_email_config(request_body: dict, request: Request, db: Session = Depend
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid email: {str(e)}")
     
-    # Get email config
-    config = db.query(EmailConfig).first()
-    if not config or not config.smtp_provider or not config.email_address or not config.app_password:
+    # Check if settings are complete
+    if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         raise HTTPException(
             status_code=400, 
-            detail="Email configuration is incomplete. Please configure SMTP settings first."
+            detail="Email configuration is incomplete in .env. Please configure SMTP settings there."
         )
     
     # Send test email

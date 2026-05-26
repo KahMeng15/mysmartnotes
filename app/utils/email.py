@@ -4,9 +4,11 @@ from email.mime.multipart import MIMEMultipart
 import logging
 from typing import Optional
 from sqlalchemy.orm import Session
-from app.models.db import EmailConfig
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+settings = get_settings()
 
 def send_email(
     db: Session,
@@ -15,30 +17,29 @@ def send_email(
     body: str,
     is_html: bool = False
 ) -> bool:
-    """Send an email using the configured SMTP settings in the database"""
-    config = db.query(EmailConfig).first()
-    if not config or not config.smtp_provider or not config.email_address or not config.app_password:
-        logger.error("Email configuration is incomplete")
+    """Send an email using the configured SMTP settings in environment variables"""
+    if not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        logger.error("Email configuration is incomplete in environment variables")
         return False
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = f"{config.sender_name or 'MySmartNotes'} <{config.email_address}>"
+        msg['From'] = f"{settings.SMTP_SENDER_NAME} <{settings.SMTP_USER}>"
         msg['To'] = recipient_email
         msg['Subject'] = subject
 
         msg.attach(MIMEText(body, 'html' if is_html else 'plain'))
 
-        # Split provider into host and port if needed
-        host = config.smtp_provider
-        port = 587 # Default TLS port
-        if ":" in host:
-            host, port_str = host.split(":")
-            port = int(port_str)
+        host = settings.SMTP_HOST
+        port = settings.SMTP_PORT
 
-        server = smtplib.SMTP(host, port)
-        server.starttls()
-        server.login(config.email_address, config.app_password)
+        if settings.SMTP_TLS:
+            server = smtplib.SMTP(host, port)
+            server.starttls()
+        else:
+            server = smtplib.SMTP_SSL(host, port)
+
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.send_message(msg)
         server.quit()
         
