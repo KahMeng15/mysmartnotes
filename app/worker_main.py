@@ -1,3 +1,4 @@
+import asyncio
 import time
 import logging
 import json
@@ -7,7 +8,7 @@ from datetime import datetime
 from sqlalchemy import func
 from app.models.db import Task, RateLimitConfig
 from app.utils.db import SessionLocal
-from app.utils.tasks import TaskManager, OCRTask, EmbeddingsTask
+from app.utils.tasks import TaskManager, OCRTask, EmbeddingsTask, QuizTask, SummaryTask, ChatTask
 
 from app.logging_config import setup_logging
 setup_logging()
@@ -15,14 +16,17 @@ logger = logging.getLogger(__name__)
 
 from app.processing.lecture_processor import process_lecture_task
 
-# Registry of supported tasks
+# Registry of supported tasks (can be sync or async)
 TASK_REGISTRY = {
     "ocr": OCRTask.process_file,
     "embedding": EmbeddingsTask.generate_embeddings,
     "lecture_processing": process_lecture_task,
+    "quiz_generation": QuizTask.generate,
+    "summary_generation": SummaryTask.generate,
+    "chat_response": ChatTask.respond,
 }
 
-def process_next_task():
+async def process_next_task():
     db = SessionLocal()
     try:
         # Load per-user concurrency limit
@@ -83,8 +87,11 @@ def process_next_task():
 
         TaskManager.update_task_progress(task_id, 10)
         
-        # Execute task
-        result = handler(**kwargs)
+        # Execute task (handle both sync and async)
+        if asyncio.iscoroutinefunction(handler):
+            result = await handler(**kwargs)
+        else:
+            result = handler(**kwargs)
 
         # Mark complete
         TaskManager._update_db_task(task_id, status="completed", result=result, progress=100)
@@ -101,19 +108,19 @@ def process_next_task():
     finally:
         db.close()
 
-def main():
-    logger.info("Starting background worker...")
+async def main():
+    logger.info("Starting background worker (async mode)...")
     while True:
         try:
-            processed = process_next_task()
+            processed = await process_next_task()
             if not processed:
-                time.sleep(2)  # Wait before polling again
+                await asyncio.sleep(2)  # Wait before polling again
         except KeyboardInterrupt:
             logger.info("Worker shutting down...")
             break
         except Exception as e:
             logger.error(f"Worker loop error: {e}")
-            time.sleep(5)
+            await asyncio.sleep(5)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

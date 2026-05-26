@@ -703,11 +703,47 @@ async function generateSummary() {
             })
         });
 
-        clearInterval(progressInterval);
-
         if (res.ok) {
-            updateSummaryProgress(100, 'Complete!', 'Done');
             const data = await res.json();
+
+            if (data.task_id) {
+                // Background task submitted, wait for WebSocket
+                WSManager.subscribe(data.task_id, (update) => {
+                    if (update.status === 'completed') {
+                        clearInterval(progressInterval);
+                        updateSummaryProgress(100, 'Complete!', 'Done');
+
+                        const result = update.result;
+                        summaryData = result.content;
+                        quickreadData = result.quickread || null;
+                        currentSummaryMode = result.mode || 'elaborate';
+                        currentSummaryFormat = result.output_format || 'sentence';
+                        currentProcessingMethod = result.processing_method || 'whole';
+                        currentSplitLevel = result.split_level || null;
+                        currentProcessingTime = result.processing_time || null;
+                        currentProcessingTimeMs = result.processing_time_ms || null;
+                        currentAIModel = result.model || null;
+                        isUserEdited = result.is_user_edited || false;
+                        currentVersionId = result.id;
+
+                        setTimeout(() => {
+                            document.getElementById('summaryProgressModal').classList.remove('active');
+                            displaySummary();
+                            loadSummaryVersions();
+                            loadNoteMetadata();
+                            isRegeneratingSummary = false;
+                        }, 600);
+                    } else if (update.status === 'failed') {
+                        clearInterval(progressInterval);
+                        document.getElementById('summaryProgressModal').classList.remove('active');
+                        alert('Summary generation failed: ' + (update.error || 'Unknown error'));
+                    }
+                });
+                return; // Wait for WS
+            }
+
+            clearInterval(progressInterval);
+            updateSummaryProgress(100, 'Complete!', 'Done');
             summaryData = data.content;
             quickreadData = data.quickread || null;
             currentSummaryMode = data.mode || 'elaborate';
@@ -719,7 +755,7 @@ async function generateSummary() {
             currentAIModel = data.model || null;
             isUserEdited = data.is_user_edited || false;
             currentVersionId = data.id;
-            
+
             setTimeout(() => {
                 document.getElementById('summaryProgressModal').classList.remove('active');
                 displaySummary();
@@ -728,10 +764,10 @@ async function generateSummary() {
                 isRegeneratingSummary = false;
             }, 600);
         } else {
+            clearInterval(progressInterval);
             document.getElementById('summaryProgressModal').classList.remove('active');
             alert('Failed to generate summary');
-        }
-    } catch (e) {
+        }    } catch (e) {
         clearInterval(progressInterval);
         document.getElementById('summaryProgressModal').classList.remove('active');
         alert('Error: ' + e.message);

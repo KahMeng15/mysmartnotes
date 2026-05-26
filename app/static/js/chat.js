@@ -547,12 +547,57 @@ async function sendMessage() {
             body: JSON.stringify(payload)
         });
 
-        clearInterval(loadingInterval);
-        conversationMessages.pop(); // remove loading
-
         if (resp.ok) {
-            const data = await resp.json();
+            const initialData = await resp.json();
+            
+            if (initialData.task_id) {
+                // Background task, wait for WS
+                WSManager.subscribe(initialData.task_id, (update) => {
+                    if (update.status === 'completed') {
+                        clearInterval(loadingInterval);
+                        conversationMessages.pop(); // remove loading
+                        
+                        const data = update.result;
+                        conversationMessages.push({
+                            role: 'ai',
+                            content: data.response,
+                            time: new Date(),
+                            sources: data.sources,
+                            ai_model: data.ai_model,
+                            ai_mode: data.ai_mode || currentAiMode,
+                            detailed_sources: data.detailed_sources || [],
+                            thinking: data.thinking || null,
+                            timings: data.timings,
+                        });
 
+                        if (data.conversation_id) {
+                            currentConversationId = data.conversation_id;
+                            updateUrl(currentConversationId);
+                        }
+
+                        const questionCount = conversationMessages.filter(m => m.role === 'user').length;
+                        document.getElementById('chatMeta').textContent = `${questionCount} question(s)`;
+                        document.getElementById('chatMeta').style.display = 'block';
+
+                        displayMessages();
+                        fetchConversations();
+                    } else if (update.status === 'failed') {
+                        clearInterval(loadingInterval);
+                        conversationMessages.pop();
+                        conversationMessages.push({
+                            role: 'ai',
+                            content: `Generation failed: ${update.error || 'Unknown error'}`,
+                            time: new Date()
+                        });
+                        displayMessages();
+                    }
+                });
+                return; // Let WS handle display
+            }
+
+            clearInterval(loadingInterval);
+            conversationMessages.pop(); // remove loading
+            const data = initialData;
             conversationMessages.push({
                 role: 'ai',
                 content: data.response,
@@ -578,6 +623,8 @@ async function sendMessage() {
 
             await fetchConversations(); // refresh sidebar
         } else {
+            clearInterval(loadingInterval);
+            conversationMessages.pop(); // remove loading
             conversationMessages.push({
                 role: 'ai',
                 content: `Sorry, I encountered an error (${resp.status}). Please try again.`,
@@ -586,7 +633,9 @@ async function sendMessage() {
         }
     } catch (err) {
         clearInterval(loadingInterval);
-        conversationMessages.pop();
+        if (conversationMessages[conversationMessages.length-1].loading) {
+            conversationMessages.pop();
+        }
         conversationMessages.push({ role: 'ai', content: 'Network error: ' + err.message, time: new Date() });
     }
 

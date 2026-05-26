@@ -213,33 +213,30 @@ def delete_quiz(
     db.commit()
     return {"success": True}
 
-@router.post("/generate", response_model=QuizResponse)
+@router.post("/generate", response_model=dict)
 async def generate_quiz_ai(
     request: QuizGenerateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate a quiz using AI."""
+    """Generate a quiz using AI as a background task."""
     # Enforce tier quotas
     enforce_quota_quizzes(current_user, db)
     
-    ai_client = get_ai_client(user=current_user, db=db)
+    task_id = f"quiz_{current_user.id}_{int(time.time())}"
+    TaskManager.submit_task(
+        task_id,
+        "quiz_generation",
+        current_user.id,
+        title=request.title,
+        scope_type=request.scope_type,
+        scope_id=request.scope_id,
+        question_types=request.question_types,
+        num_questions=request.number_of_questions,
+        quiz_group_id=request.quiz_group_id
+    )
     
-    try:
-        quiz = await generate_advanced_quiz(
-            db=db,
-            user=current_user,
-            ai_client=ai_client,
-            title=request.title,
-            scope_type=request.scope_type,
-            scope_id=request.scope_id,
-            question_types=request.question_types,
-            num_questions=request.number_of_questions,
-            quiz_group_id=request.quiz_group_id
-        )
-        return quiz
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return {"task_id": task_id, "status": "pending"}
 
 @router.post("/import", response_model=QuizResponse)
 async def import_quiz_endpoint(

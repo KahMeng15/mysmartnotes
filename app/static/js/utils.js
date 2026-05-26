@@ -1,4 +1,93 @@
 /**
+ * ─── WebSocket Management ──────────────────────────────────────────
+ */
+const WSManager = {
+    socket: null,
+    listeners: new Map(),
+    reconnectInterval: 5000,
+    maxRetries: 5,
+    retries: 0,
+
+    init: function() {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) return;
+        
+        const token = this._getCookie('access_token');
+        if (!token) {
+            console.warn('WSManager: No access token found, skipping WebSocket init');
+            return;
+        }
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/${token}`;
+        
+        console.log('WSManager: Connecting to', wsUrl);
+        this.socket = new WebSocket(wsUrl);
+
+        this.socket.onopen = () => {
+            console.log('WSManager: WebSocket connected');
+            this.retries = 0;
+        };
+
+        this.socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('WSManager: Received message', data);
+                this._emit(data.task_id, data);
+            } catch (e) {
+                console.error('WSManager: Error parsing message', e);
+            }
+        };
+
+        this.socket.onclose = () => {
+            console.log('WSManager: WebSocket disconnected');
+            this._reconnect();
+        };
+
+        this.socket.onerror = (error) => {
+            console.error('WSManager: WebSocket error', error);
+        };
+    },
+
+    _reconnect: function() {
+        if (this.retries < this.maxRetries) {
+            this.retries++;
+            setTimeout(() => this.init(), this.reconnectInterval);
+        }
+    },
+
+    _getCookie: function(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    },
+
+    subscribe: function(taskId, callback) {
+        if (!this.listeners.has(taskId)) {
+            this.listeners.set(taskId, []);
+        }
+        this.listeners.get(taskId).push(callback);
+    },
+
+    unsubscribe: function(taskId) {
+        this.listeners.delete(taskId);
+    },
+
+    _emit: function(taskId, data) {
+        if (this.listeners.has(taskId)) {
+            this.listeners.get(taskId).forEach(callback => callback(data));
+        }
+    }
+};
+
+// Initialize WebSocket on page load if logged in
+document.addEventListener('DOMContentLoaded', () => {
+    if (WSManager._getCookie('access_token')) {
+        WSManager.init();
+    }
+});
+
+/**
  * ─── TOAST NOTIFICATION SYSTEM ─────────────────────────────────────
  * Modern, non-blocking notifications to replace browser alert()
  */

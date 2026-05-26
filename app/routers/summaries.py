@@ -12,6 +12,7 @@ import string
 from app.models.db import User, Lecture, Summary
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
+from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
 from app.utils.quotas import enforce_quota_summaries
 from app.processing.ai_client import AIClient
@@ -153,7 +154,7 @@ async def generate_quiz(
         )
 
 
-@router.post("/summary", response_model=SummaryResponse)
+@router.post("/summary", response_model=dict)
 async def generate_summary_endpoint(
     request: SummaryRequest,
     current_user: User = Depends(get_current_user),
@@ -185,168 +186,39 @@ async def generate_summary_endpoint(
         ).order_by(Summary.created_at.desc()).first()
 
         if existing_summary:
-            return SummaryResponse(
-                lecture_id=request.lecture_id,
-                title=existing_summary.title,
-                content=StorageManager.get_summary_text(existing_summary.id) or "",
-                is_cached=True,
-                summary_type=existing_summary.summary_type,
-                quickread=StorageManager.get_summary_text(existing_summary.id, is_quickread=True),
-                mode=existing_summary.mode or "elaborate",
-                output_format=existing_summary.output_format or "sentence",
-                processing_method=existing_summary.processing_method or "whole",
-                split_level=existing_summary.split_level,
-                processing_time=existing_summary.processing_time,
-                processing_time_ms=existing_summary.processing_time_ms,
-                model=existing_summary.model,
-                is_user_edited=existing_summary.is_user_edited or False,
-                id=existing_summary.id,
-                version=existing_summary.version
-            )
+            return {
+                "lecture_id": request.lecture_id,
+                "title": existing_summary.title,
+                "content": StorageManager.get_summary_text(existing_summary.id) or "",
+                "is_cached": True,
+                "summary_type": existing_summary.summary_type,
+                "quickread": StorageManager.get_summary_text(existing_summary.id, is_quickread=True),
+                "mode": existing_summary.mode or "elaborate",
+                "output_format": existing_summary.output_format or "sentence",
+                "processing_method": existing_summary.processing_method or "whole",
+                "split_level": existing_summary.split_level,
+                "processing_time": existing_summary.processing_time,
+                "processing_time_ms": existing_summary.processing_time_ms,
+                "model": existing_summary.model,
+                "is_user_edited": existing_summary.is_user_edited or False,
+                "id": existing_summary.id,
+                "version": existing_summary.version,
+                "status": "completed"
+            }
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
 
-    lecture_content = StorageManager.get_lecture_text(lecture_id) or ""
-    if not lecture_content:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Lecture content not available yet. Please wait for processing."
-        )
-    
-    ai_client = AIClient(current_user, db=db)
-    quickread_content = None
-    
-    # Track processing time
     import time
-    start_time = time.time()
+    task_id = f"summary_{current_user.id}_{request.lecture_id}_{int(time.time())}"
+    TaskManager.submit_task(
+        task_id,
+        "summary_generation",
+        current_user.id,
+        lecture_id=request.lecture_id,
+        mode=request.mode,
+        output_format=request.output_format
+    )
     
-    try:
-        if request.processing_method == "whole":
-            summary_content = await ai_client.generate_summary(
-                content=lecture_content,
-                mode=request.mode,
-                output_format=request.output_format
-            )
-            # Note: quickread is only generated for section-by-section processing
-            quickread_content = None
-        else:
-            # Section by section logic
-            import re
-            # Split by chosen level (e.g. h1 = # , h2 = ## , h3 = ### )
-            # If h2 is chosen, we split by H1 and H2.
-            level_map = {"h1": r"^# ", "h2": r"^#{1,2} ", "h3": r"^#{1,3} "}
-            split_pattern = level_map.get(request.split_level, r"^# ")
-            
-            # Split lines but keep headers
-            lines = lecture_content.split("\n")
-            sections = [] # List of tuples: (title, content)
-            current_title = "Introduction"
-            current_content = []
-            
-            for line in lines:
-                match = re.match(split_pattern, line)
-                if match:
-                    if current_content:
-                        sections.append((current_title, "\n".join(current_content)))
-                    # Extract title from header (remove # symbols)
-                    current_title = line.lstrip("#").strip()
-                    current_content = []
-                    continue  # Skip adding the header line to content
-                current_content.append(line)
-            
-            if current_content:
-                sections.append((current_title, "\n".join(current_content)))
-            
-            # Summarize each section
-            summarized_sections = []
-            for title, content in sections:
-                # Only summarize if there's actual body text beyond the header
-                body_lines = [l for l in content.split("\n") if not re.match(split_pattern, l) and l.strip()]
-                if not body_lines:
-                    continue
-                    
-                section_summary = await ai_client.generate_summary(
-                    content=content,
-                    mode=request.mode,
-                    output_format=request.output_format
-                )
-                summarized_sections.append(f"## {title}\n\n{section_summary}")
-            
-            summary_content = "\n\n".join(summarized_sections)
-            
-            # Generate quickread if requested
-            if request.include_quickread:
-                quickread_content = await ai_client.generate_summary(
-                    content=lecture_content,
-                    mode=request.mode,
-                    output_format="pointform"
-                )
-        
-        # Calculate processing time
-        end_time = time.time()
-        processing_time = end_time - start_time
-        processing_time_ms = int(processing_time * 1000)
-
-        # Calculate next version for this lecture
-        from sqlalchemy import func
-        max_version = db.query(func.max(Summary.version)).filter(
-            Summary.lecture_id == request.lecture_id
-        ).scalar() or 0
-        next_version = max_version + 1
-
-        # Save generated summary
-        doc_id = generate_random_id(db, Summary)
-        doc = Summary(
-            id=doc_id,
-            version=next_version,
-            lecture_id=request.lecture_id,
-            title=f"{request.mode.capitalize()} in {request.output_format.replace('_', ' ')}",
-            summary_type="summary",
-            file_path=f"summary_{lecture.id}.md",
-            mode=request.mode,
-            output_format=request.output_format,
-            processing_method=request.processing_method,
-            split_level=request.split_level if request.processing_method == "section" else None,
-            processing_time=processing_time,
-            processing_time_ms=processing_time_ms,
-            model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()
-        )
-        db.add(doc)
-        
-        # Save to file storage
-        StorageManager.save_summary_text(doc_id, summary_content)
-        if quickread_content:
-            StorageManager.save_summary_text(doc_id, quickread_content, is_quickread=True)
-            
-        db.commit()
-        db.refresh(doc)
-        
-        # Clear cache
-        clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
-        
-        return SummaryResponse(
-            lecture_id=request.lecture_id,
-            title=f"Summary - {lecture.title}",
-            content=summary_content,
-            is_cached=False,
-            summary_type="summary",
-            quickread=quickread_content,
-            mode=request.mode,
-            output_format=request.output_format,
-            processing_method=request.processing_method,
-            split_level=request.split_level if request.processing_method == "section" else None,
-            processing_time=processing_time,
-            processing_time_ms=processing_time_ms,
-            model=doc.model,
-            is_user_edited=False,
-            id=doc.id,
-            version=doc.version
-        )
-    except Exception as e:
-        logger.error(f"Error generating summary: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error generating summary: {str(e)}"
-        )
+    return {"task_id": task_id, "status": "pending"}
 
 
 @router.post("/cheatsheet", response_model=CheatsheetResponse)

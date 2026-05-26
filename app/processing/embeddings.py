@@ -4,7 +4,6 @@ import json
 import os
 from typing import List
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -17,6 +16,7 @@ def get_embeddings_model():
     """Get or load embeddings model"""
     global embedding_model
     if embedding_model is None:
+        from sentence_transformers import SentenceTransformer
         try:
             embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
             logger.info("Embeddings model loaded")

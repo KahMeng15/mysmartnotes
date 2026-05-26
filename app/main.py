@@ -36,7 +36,7 @@ from app.config import get_settings
 from app.utils.db import init_db
 from app.utils.crypto import encrypt_secret
 from app.utils.observability import record_request
-from app.routers import auth, subjects, lectures, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support
+from app.routers import auth, subjects, lectures, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support, ws
 
 # Configure logging
 from app.logging_config import setup_logging
@@ -452,6 +452,7 @@ app.include_router(templates.router)
 app.include_router(admin.router)
 app.include_router(quiz.router)
 app.include_router(support.router)
+app.include_router(ws.router)
 
 # Serve generated files (images, PDFs, etc.)
 generated_dir = os.path.join(os.path.dirname(__file__), "generated")

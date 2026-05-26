@@ -98,11 +98,24 @@ class TaskManager:
                 db_task.progress = min(100, max(0, progress))
             db_task.updated_at = datetime.utcnow()
             db.commit()
+
+            # Publish WebSocket update if task is completed or failed
+            if status in ["completed", "failed"]:
+                from app.utils.websocket import manager
+                payload = {
+                    "task_id": task_id,
+                    "status": status,
+                    "result": result if status == "completed" else None,
+                    "error": error if status == "failed" else None,
+                    "progress": 100 if status == "completed" else 0
+                }
+                manager.publish_update(db_task.user_id, payload)
+
         except Exception as exc:
             logger.error(f"Failed to update DB task {task_id}: {exc}")
         finally:
             db.close()
-    
+
     @staticmethod
     def get_task_status(task_id: str, user_id: Optional[int] = None) -> Optional[dict]:
         """Get status of a task"""
@@ -161,6 +174,119 @@ class TaskManager:
             return 0
         finally:
             db.close()
+
+class QuizTask:
+    """Quiz generation task"""
+    @staticmethod
+    async def generate(**kwargs) -> dict:
+        from app.processing.quiz_generator import generate_advanced_quiz
+        from app.processing.ai_client import get_ai_client
+        from app.models.db import User
+        
+        db = SessionLocal()
+        try:
+            user_id = kwargs.get("user_id")
+            user = db.query(User).filter(User.id == user_id).first()
+            ai_client = get_ai_client(user=user, db=db)
+            
+            quiz = await generate_advanced_quiz(
+                db=db,
+                user=user,
+                ai_client=ai_client,
+                title=kwargs.get("title"),
+                scope_type=kwargs.get("scope_type"),
+                scope_id=kwargs.get("scope_id"),
+                question_types=kwargs.get("question_types"),
+                num_questions=kwargs.get("num_questions"),
+                quiz_group_id=kwargs.get("quiz_group_id")
+            )
+            # Quiz model to dict (simplified for result)
+            return {"quiz_id": quiz.id, "title": quiz.title}
+        finally:
+            db.close()
+
+class SummaryTask:
+    """Summary generation task"""
+    @staticmethod
+    async def generate(**kwargs) -> dict:
+        from app.processing.ai_client import AIClient
+        from app.models.db import User, Lecture, Summary
+        from app.utils.storage import StorageManager
+        from app.utils.db import generate_random_id
+        from sqlalchemy import func
+        import time
+
+        db = SessionLocal()
+        try:
+            user_id = kwargs.get("user_id")
+            lecture_id = kwargs.get("lecture_id")
+            mode = kwargs.get("mode", "elaborate")
+            output_format = kwargs.get("output_format", "sentence")
+            
+            user = db.query(User).filter(User.id == user_id).first()
+            lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
+            
+            lecture_content = StorageManager.get_lecture_text(lecture_id) or ""
+            ai_client = AIClient(user, db=db)
+            
+            start_time = time.time()
+            summary_content = await ai_client.generate_summary(
+                content=lecture_content,
+                mode=mode,
+                output_format=output_format
+            )
+            
+            processing_time = time.time() - start_time
+            
+            # Versioning
+            max_version = db.query(func.max(Summary.version)).filter(
+                Summary.lecture_id == lecture_id
+            ).scalar() or 0
+            next_version = max_version + 1
+
+            doc_id = generate_random_id(db, Summary)
+            doc = Summary(
+                id=doc_id,
+                version=next_version,
+                user_id=user_id,
+                lecture_id=lecture_id,
+                title=f"Summary - {lecture.title}",
+                summary_type="summary",
+                mode=mode,
+                output_format=output_format,
+                processing_time=processing_time,
+                processing_time_ms=int(processing_time * 1000),
+                model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()
+            )
+            db.add(doc)
+            db.commit()
+            
+            StorageManager.save_summary_text(doc_id, summary_content)
+            
+            return {
+                "id": doc_id,
+                "lecture_id": lecture_id,
+                "title": doc.title,
+                "content": summary_content,
+                "mode": mode,
+                "output_format": output_format,
+                "processing_time": processing_time,
+                "processing_time_ms": int(processing_time * 1000),
+                "model": doc.model,
+                "version": next_version,
+                "status": "completed"
+            }
+        finally:
+            db.close()
+
+class ChatTask:
+    """Chat response task"""
+    @staticmethod
+    async def respond(**kwargs) -> dict:
+        # This will be more complex as it needs to duplicate most of chat.py logic
+        # For now, let's keep it minimal or plan to refactor chat.py to be more modular
+        from app.routers.chat import ask_question_logic
+        return await ask_question_logic(**kwargs)
 
 class OCRTask:
     """OCR processing task"""

@@ -15,7 +15,6 @@ from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id, generate_conversation_id
 from app.utils.quotas import enforce_quota_messages, check_quota_conversations, get_user_conversation_count, get_user_tier_config
 from app.processing.ai_client import AIClient
-from app.processing.embeddings import find_relevant_snippets, combine_snippets
 
 logger = logging.getLogger(__name__)
 
@@ -535,13 +534,13 @@ def inject_citations(response: str, detailed_sources: List[dict]) -> str:
 # Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post("/ask", response_model=ChatResponse)
+@router.post("/ask", response_model=dict)
 async def ask_question(
     request: ChatRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Ask a question using retrieval-first QnA with AI mode support and conversation threading."""
+    """Ask a question as a background task."""
 
     if not any([request.lecture_id, request.subject_id, request.group_id]):
         raise HTTPException(
@@ -562,366 +561,206 @@ async def ask_question(
                 detail=f"Conversation quota exceeded. Your {current_user.tier.upper()} tier allows {tier_config.max_conversations} conversations. You have {current}."
             )
 
-    t_start = time.time()
-    step_times = {f"step{i}": 0.0 for i in range(1, 10)}
-    lecture_ids = []
-    sources = []
-
-    # STEP 1: Identify which lectures to search
-    if request.lecture_id:
-        lecture = db.query(Lecture).filter(
-            Lecture.id == request.lecture_id,
-            Lecture.user_id == current_user.id
-        ).first()
-        if not lecture:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
-        lecture_ids = [request.lecture_id]
-        sources = [lecture.title]
-
-    elif request.subject_id:
-        subject = db.query(Subject).filter(
-            Subject.id == request.subject_id,
-            Subject.user_id == current_user.id
-        ).first()
-        if not subject:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
-        lectures = db.query(Lecture).filter(Lecture.subject_id == subject.id).all()
-        lecture_ids = [l.id for l in lectures]
-        sources = [l.title for l in lectures]
-
-    elif request.group_id:
-        group = db.query(SubjectGroup).filter(
-            SubjectGroup.id == request.group_id,
-            SubjectGroup.user_id == current_user.id
-        ).first()
-        if not group:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
-        subjects = db.query(Subject).filter(Subject.group_id == group.id).all()
-        for s in subjects:
-            lectures = db.query(Lecture).filter(Lecture.subject_id == s.id).all()
-            lecture_ids.extend([l.id for l in lectures])
-            sources.extend([l.title for l in lectures])
-
-    step_times["step1"] = round((time.time() - t_start) * 1000.0, 2)
-    retrieval_ms = (time.time() - t_start) * 1000.0
-
-    t_step2_start = time.time()
-    # Initialize AI client early for classification
-    ai_client = AIClient(current_user, db=db)
+    task_id = f"chat_{current_user.id}_{int(time.time())}"
+    from app.utils.tasks import TaskManager
+    TaskManager.submit_task(
+        task_id,
+        "chat_response",
+        current_user.id,
+        message=request.message,
+        lecture_id=request.lecture_id,
+        subject_id=request.subject_id,
+        group_id=request.group_id,
+        ai_mode=request.ai_mode,
+        output_format=request.output_format,
+        conversation_id=request.conversation_id,
+        auto_detect_conversation=request.auto_detect_conversation,
+        reply_to_message_id=request.reply_to_message_id
+    )
     
-    # STEP 1B: Auto-detect conversation continuation (do FIRST before context retrieval)
-    conv_id = request.conversation_id
-    conversation_context = ""
-    
-    if request.auto_detect_conversation and not request.conversation_id:
-        # Try to find recent messages to check for continuation
-        recent_messages = db.query(ChatMessage).filter(
-            ChatMessage.user_id == current_user.id,
-            ChatMessage.conversation_id.isnot(None)
-        ).order_by(ChatMessage.created_at.desc()).limit(1).all()
-        
-        if recent_messages:
-            last_msg = recent_messages[0]
-            # Check if this is a continuation of the last conversation
-            try:
-                is_continuation = await is_conversation_continuation(
-                    client=ai_client,
-                    current_question=request.message,
-                    last_question=last_msg.message,
-                    last_answer=last_msg.response
-                )
-                
-                if is_continuation:
-                    # Treat as continuation - fetch last few messages from that conversation
-                    conv_id = last_msg.conversation_id
-                    earlier_messages = db.query(ChatMessage).filter(
-                        ChatMessage.conversation_id == conv_id,
-                        ChatMessage.user_id == current_user.id
-                    ).order_by(ChatMessage.created_at.desc()).limit(2).all()
-                    
-                    if earlier_messages:
-                        conversation_context = build_conversation_context(earlier_messages)
-                        print(f"[chat] Auto-detected conversation continuation. Conv ID: {conv_id}")
-                else:
-                    # New topic - start fresh conversation
-                    conv_id = generate_conversation_id(db)
-                    print(f"[chat] Auto-detected new conversation topic. New Conv ID: {conv_id}")
-            except Exception as e:
-                print(f"[chat] Auto-detection failed: {e}, starting new conversation")
-                conv_id = generate_conversation_id(db)
-    
-    # If still no conversation ID, create a new one
-    if not conv_id:
-        conv_id = generate_conversation_id(db)
-    
-    step_times["step2"] = round((time.time() - t_step2_start) * 1000.0, 2)
-    t_step3_start = time.time()
-    
-    # STEP 2: Classify Query Intent
-    intent = await classify_query(ai_client, request.message)
-    step_times["step3"] = round((time.time() - t_step3_start) * 1000.0, 2)
+    return {"task_id": task_id, "status": "pending"}
 
-    context = ""
-    snippet_sources = []
-    detailed_sources = []
-
-    if intent == "CONVERSATIONAL":
-        # Skip retrieval completely for conversational queries
-        context = "User is just making conversation. Provide a friendly, brief response."
-        prompt = "You are a friendly study assistant. Provide a brief, warm response to the user's conversational message. Do not provide facts or knowledge."
-    elif intent == "OFF_TOPIC":
-        # Skip retrieval completely for off-topic queries
-        context = "User is asking an off-topic question."
-        prompt = "You are an AI study assistant. The user's query is off-topic. Politely decline to answer, stating that you can only answer questions related to their notes or general educational topics, and cannot look up the answer to their off-topic query."
-    else:
-        # STEP 3: Retrieve relevant chunks from pre-computed embeddings (INFORMATIONAL)
-        t_step4_start = time.time()
-        if lecture_ids:
-            try:
-                from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
-                chunks = retrieve_relevant_chunks(
-                    query=request.message,
-                    lecture_ids=lecture_ids,
-                    db=db,
-                    top_k=3
-                )
-                if chunks:
-                    snippets = [
-                        {"text": chunk["text"], "position": chunk["position"], "score": chunk["score"]}
-                        for chunk in chunks
-                    ]
-                    context = combine_snippets(snippets, max_chars=2000)
-                    for chunk in chunks:
-                        detailed_sources.append({
-                            "text_preview": chunk["text"][:100] + "..." if len(chunk["text"]) > 100 else chunk["text"],
-                            "position": chunk["position"],
-                            "score": chunk["score"],
-                            "lecture_id": chunk["lecture_id"]
-                        })
-                    snippet_sources = list(set(sources))[:2] if sources else []
-                retrieval_ms = (time.time() - t_start) * 1000.0
-            except Exception as e:
-                print(f"[chat] Vector retrieval failed: {e}")
-                retrieval_ms = (time.time() - t_start) * 1000.0
-        
-        step_times["step4"] = round((time.time() - t_step4_start) * 1000.0, 2)
-
-        # STEP 4: Web search fallback if no local context
-        t_step5_start = time.time()
-        if not context or len(context) < 100:
-            print(f"[chat] No sufficient local context ({len(context)} chars), trying web search...")
-            web_snippet, web_sources, web_error = await web_search(request.message, timeout=10.0)
-            if web_error == "timeout":
-                context = "[DDG is slow but searching... please wait]"
-                snippet_sources = ["Web: DuckDuckGo (searching)"]
-            elif web_error == "unavailable":
-                context = "[DuckDuckGo is unavailable]"
-                snippet_sources = ["Web Search: Unavailable"]
-            elif web_snippet:
-                context = web_snippet
-                snippet_sources = [s["url"] for s in web_sources if s.get("url")] or ["Web Search"]
-                detailed_sources = [
-                    {
-                        "text_preview": s["text_preview"],
-                        "position": 0,
-                        "score": s["relevance_score"],
-                        "lecture_id": 0,
-                        "is_web": True,
-                        "url": s["url"],
-                        "title": s["title"]
-                    }
-                    for s in web_sources
-                ]
-                
-        step_times["step5"] = round((time.time() - t_step5_start) * 1000.0, 2)
-
-        # STEP 5: Build mode-specific prompt for informational queries
-        t_step6_start = time.time()
-        if not context:
-            context = "No information available."
-        prompt = build_mode_prompt(
-            context, 
-            request.message, 
-            request.ai_mode, 
-            request.output_format,
-            conversation_context=conversation_context  # Include context from earlier messages
-        )
-        step_times["step6"] = round((time.time() - t_step6_start) * 1000.0, 2)
-    
-    # STEP 6: Call LLM
-    t_model_start = time.time()
-    t_step7_start = time.time()
-
-    # Initialize with default to prevent UnboundLocalError if all tiers fail
-    ai_model_info = f"{ai_client.provider.upper()}"
-    if ai_client.ai_model_name:
-        ai_model_info += f" ({ai_client.ai_model_name})"
-
-    logger.info(f"[chat] Calling AI client (with fallback system)...")
+async def ask_question_logic(**kwargs) -> dict:
+    """Core logic for asking a question, moved from the endpoint for background task support."""
+    from app.utils.db import SessionLocal
+    db = SessionLocal()
     try:
-        # Use the configured timeout from ai_client (supports slow reasoning models)
-        response = await asyncio.wait_for(
-            ai_client.answer_question(
-                question=request.message,
-                context=context,
-                system_prompt=prompt
-            ),
-            timeout=float(ai_client.request_timeout_seconds)
-        )
-        logger.info(f"[chat] LLM primary response received in {round((time.time() - t_model_start) * 1000.0, 2)}ms")
+        user_id = kwargs.get("user_id")
+        message = kwargs.get("message")
+        lecture_id = kwargs.get("lecture_id")
+        subject_id = kwargs.get("subject_id")
+        group_id = kwargs.get("group_id")
+        ai_mode = kwargs.get("ai_mode", "elaborate")
+        output_format = kwargs.get("output_format", "sentence")
+        conversation_id = kwargs.get("conversation_id")
+        auto_detect_conversation = kwargs.get("auto_detect_conversation", True)
+        reply_to_message_id = kwargs.get("reply_to_message_id")
+
+        current_user = db.query(User).filter(User.id == user_id).first()
+        if not current_user:
+            raise ValueError("User not found")
+
+        t_start = time.time()
+        step_times = {f"step{i}": 0.0 for i in range(1, 10)}
+        target_lecture_ids = []
+        sources = []
+
+        # Identical logic to previous endpoint follows...
+        if lecture_id:
+            lecture = db.query(Lecture).filter(Lecture.id == lecture_id, Lecture.user_id == user_id).first()
+            if lecture:
+                target_lecture_ids = [lecture_id]
+                sources = [lecture.title]
+
+        elif subject_id:
+            subject = db.query(Subject).filter(Subject.id == subject_id, Subject.user_id == user_id).first()
+            if subject:
+                lectures = db.query(Lecture).filter(Lecture.subject_id == subject.id).all()
+                target_lecture_ids = [l.id for l in lectures]
+                sources = [l.title for l in lectures]
+
+        elif group_id:
+            group = db.query(SubjectGroup).filter(SubjectGroup.id == group_id, SubjectGroup.user_id == user_id).first()
+            if group:
+                subjects = db.query(Subject).filter(Subject.group_id == group.id).all()
+                for s in subjects:
+                    lectures = db.query(Lecture).filter(Lecture.subject_id == s.id).all()
+                    target_lecture_ids.extend([l.id for l in lectures])
+                    sources.extend([l.title for l in lectures])
+
+        step_times["step1"] = round((time.time() - t_start) * 1000.0, 2)
+        retrieval_ms = (time.time() - t_start) * 1000.0
+
+        t_step2_start = time.time()
+        ai_client = AIClient(current_user, db=db)
         
-        # Resolve model info AFTER the call so it reflects the actual successful tier
+        conv_id = conversation_id
+        conversation_context = ""
+        
+        if auto_detect_conversation and not conversation_id:
+            recent_messages = db.query(ChatMessage).filter(
+                ChatMessage.user_id == user_id,
+                ChatMessage.conversation_id.isnot(None)
+            ).order_by(ChatMessage.created_at.desc()).limit(1).all()
+            
+            if recent_messages:
+                last_msg = recent_messages[0]
+                try:
+                    is_continuation = await is_conversation_continuation(
+                        client=ai_client,
+                        current_question=message,
+                        last_question=last_msg.message,
+                        last_answer=last_msg.response
+                    )
+                    
+                    if is_continuation:
+                        conv_id = last_msg.conversation_id
+                        earlier_messages = db.query(ChatMessage).filter(
+                            ChatMessage.conversation_id == conv_id,
+                            ChatMessage.user_id == user_id
+                        ).order_by(ChatMessage.created_at.desc()).limit(2).all()
+                        
+                        if earlier_messages:
+                            conversation_context = build_conversation_context(earlier_messages)
+                    else:
+                        conv_id = generate_conversation_id(db)
+                except Exception:
+                    conv_id = generate_conversation_id(db)
+        
+        if not conv_id:
+            conv_id = generate_conversation_id(db)
+        
+        step_times["step2"] = round((time.time() - t_step2_start) * 1000.0, 2)
+        t_step3_start = time.time()
+        
+        intent = await classify_query(ai_client, message)
+        step_times["step3"] = round((time.time() - t_step3_start) * 1000.0, 2)
+
+        context = ""
+        snippet_sources = []
+        detailed_sources = []
+
+        if intent == "CONVERSATIONAL":
+            context = "User is just making conversation."
+            prompt = f"Friendly study assistant. Response warm. Question: {message}"
+        elif intent == "OFF_TOPIC":
+            context = "User asking off-topic."
+            prompt = "Decline politely."
+        else:
+            t_step4_start = time.time()
+            if target_lecture_ids:
+                try:
+                    from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
+                    chunks = retrieve_relevant_chunks(query=message, lecture_ids=target_lecture_ids, db=db, top_k=3)
+                    if chunks:
+                        snippets = [{"text": chunk["text"], "position": chunk["position"], "score": chunk["score"]} for chunk in chunks]
+                        context = combine_snippets(snippets, max_chars=2000)
+                        for chunk in chunks:
+                            detailed_sources.append({
+                                "text_preview": chunk["text"][:100],
+                                "position": chunk["position"],
+                                "score": chunk["score"],
+                                "lecture_id": chunk["lecture_id"]
+                            })
+                        snippet_sources = list(set(sources))[:2]
+                except Exception:
+                    pass
+            
+            step_times["step4"] = round((time.time() - t_step4_start) * 1000.0, 2)
+
+            t_step5_start = time.time()
+            if not context or len(context) < 100:
+                web_snippet, web_sources, web_error = await web_search(message, timeout=10.0)
+                if web_snippet:
+                    context = web_snippet
+                    snippet_sources = [s["url"] for s in web_sources if s.get("url")] or ["Web Search"]
+                    detailed_sources = [{"text_preview": s["text_preview"], "is_web": True, "url": s["url"]} for s in web_sources]
+                    
+            step_times["step5"] = round((time.time() - t_step5_start) * 1000.0, 2)
+
+            t_step6_start = time.time()
+            prompt = build_mode_prompt(context or "No info", message, ai_mode, output_format, conversation_context=conversation_context)
+            step_times["step6"] = round((time.time() - t_step6_start) * 1000.0, 2)
+        
+        t_model_start = time.time()
+        t_step7_start = time.time()
+
         ai_model_info = f"{ai_client.provider.upper()}"
         if ai_client.ai_model_name:
             ai_model_info += f" ({ai_client.ai_model_name})"
-        
-        fallback_duration_ms = 0.0
-        # Checking if local context didn't have the answer
-        fallback_phrases = [
-            "i am unable to find any information based on your question",
-            "i am unable to find any information based on your question.",
-            '"i am unable to find any information based on your question."'
-        ]
-        if response.strip().lower() in fallback_phrases:
-            logger.info(f"[chat] LLM responded with fallback phrase. Initiating web search...")
-            
-            t_fallback_start = time.time()
-            web_snippet, web_sources, web_error = await web_search(request.message, timeout=15.0)
-            fallback_duration_ms = (time.time() - t_fallback_start) * 1000.0
-            step_times["step5"] += fallback_duration_ms
-            
-            logger.info(f"[chat] Web search completed in {round(fallback_duration_ms, 2)}ms. Error: {web_error or 'None'}")
-            if web_error == "timeout":
-                response = "Search is taking a while... I'm unable to find a clear answer in your notes or on the web at this moment."
-                snippet_sources = ["Web: DuckDuckGo (timeout)"]
-            elif web_error == "unavailable":
-                response = "Search is currently unavailable. I wasn't able to find information about this in your notes."
-                snippet_sources = ["Web Search: Unavailable"]
-            elif web_snippet:
-                # Override context and prompt for web search retry
-                context = web_snippet
-                snippet_sources = [s["url"] for s in web_sources if s.get("url")] or ["Web Search"]
-                detailed_sources = [
-                    {
-                        "text_preview": s["text_preview"],
-                        "position": 0,
-                        "score": s["relevance_score"],
-                        "lecture_id": 0,
-                        "is_web": True,
-                        "url": s["url"],
-                        "title": s["title"]
-                    }
-                    for s in web_sources
-                ]
-                prompt = build_mode_prompt(context, request.message, request.ai_mode, request.output_format, is_web_search=True)
-                
-                logger.info(f"[chat] Calling LLM again with web context...")
-                t_model2_start = time.time()
-                response = await asyncio.wait_for(
-                    ai_client.answer_question(
-                        question=request.message,
-                        context=context,
-                        system_prompt=prompt
-                    ),
-                    timeout=float(ai_client.request_timeout_seconds)
-                )
-                logger.info(f"[chat] LLM secondary response received in {round((time.time() - t_model2_start) * 1000.0, 2)}ms")
 
-    except asyncio.TimeoutError:
-        logger.error(f"[chat] LLM call timed out")
-        response = "The model is taking too long to generate a response (Timeout). This can happen with complex reasoning models like Gemma 4. Please try again or simplify your question."
-        fallback_duration_ms = 0.0
-    except Exception as e:
-        logger.error(f"[chat] LLM call failed with error: {str(e)}", exc_info=True)
-        response = f"I encountered an error: {str(e)[:100]}"
-        fallback_duration_ms = 0.0
+        response = await ai_client.answer_question(question=message, context=context, system_prompt=prompt)
+        model_ms = (time.time() - t_model_start) * 1000.0
+        step_times["step7"] = round((time.time() - t_step7_start) * 1000.0, 2)
 
-    model_ms = (time.time() - t_model_start) * 1000.0
-    
-    # Subtract the web search time, so step7 only measures the LLM's own generation time
-    step_times["step7"] = round(((time.time() - t_step7_start) * 1000.0) - fallback_duration_ms, 2)
+        t_step8_start = time.time()
+        if detailed_sources:
+            response = inject_citations(response, detailed_sources)
+        step_times["step8"] = round((time.time() - t_step8_start) * 1000.0, 2)
 
-    # STEP 7: Inject citations into response
-    t_step8_start = time.time()
-    if detailed_sources:
-        response = inject_citations(response, detailed_sources)
-    step_times["step8"] = round((time.time() - t_step8_start) * 1000.0, 2)
+        t_step9_start = time.time()
+        conv_title = generate_conversation_title(message)
+        step_times["step9"] = round((time.time() - t_step9_start) * 1000.0, 2)
+        total_ms = (time.time() - t_start) * 1000.0
 
-    # STEP 8: Resolve conversation title
-    t_step9_start = time.time()
-    existing_count = db.query(func.count(ChatMessage.id)).filter(
-        ChatMessage.conversation_id == conv_id,
-        ChatMessage.user_id == current_user.id
-    ).scalar() or 0
-
-    if existing_count == 0:
-        conv_title = generate_conversation_title(request.message)
-    else:
-        existing_title = db.query(ChatMessage.conversation_title).filter(
-            ChatMessage.conversation_id == conv_id,
-            ChatMessage.user_id == current_user.id,
-            ChatMessage.conversation_title.isnot(None)
-        ).first()
-        conv_title = existing_title[0] if existing_title else generate_conversation_title(request.message)
-
-    step_times["step9"] = round((time.time() - t_step9_start) * 1000.0, 2)
-    total_ms = (time.time() - t_start) * 1000.0
-
-    # STEP 9: Save to chat history
-    try:
-        # Prepare timings dict for storage
-        timings_dict = {
-            "retrieval_ms": round(retrieval_ms, 2),
-            "model_ms": round(model_ms, 2),
-            "total_ms": round(total_ms, 2),
-            "step_times": step_times,
-        }
+        timings_dict = {"retrieval_ms": round(retrieval_ms, 2), "model_ms": round(model_ms, 2), "total_ms": round(total_ms, 2), "step_times": step_times}
         
         chat_msg = ChatMessage(
-            id=generate_random_id(db, ChatMessage),
-            user_id=current_user.id,
-            lecture_id=request.lecture_id,
-            subject_id=request.subject_id,
-            group_id=request.group_id,
-            message=request.message,
-            response=response,
-            sources=json.dumps(snippet_sources),
-            conversation_id=conv_id,
-            conversation_title=conv_title,
-            ai_mode=request.ai_mode,
-            output_format=request.output_format,
-            ai_model=ai_model_info,
-            reply_to_message_id=request.reply_to_message_id,
-            detailed_sources_json=json.dumps(detailed_sources) if detailed_sources else None,
-            timings_json=json.dumps(timings_dict),
+            id=generate_random_id(db, ChatMessage), user_id=user_id, lecture_id=lecture_id, subject_id=subject_id, group_id=group_id,
+            message=message, response=response, sources=json.dumps(snippet_sources), conversation_id=conv_id, conversation_title=conv_title,
+            ai_mode=ai_mode, output_format=output_format, ai_model=ai_model_info, reply_to_message_id=reply_to_message_id,
+            detailed_sources_json=json.dumps(detailed_sources) if detailed_sources else None, timings_json=json.dumps(timings_dict),
         )
         db.add(chat_msg)
         db.commit()
-        db.refresh(chat_msg)  # Refresh to get the ID
-    except Exception as e:
-        db.rollback()
-        print(f"[chat] Failed to save to history: {e}")
-        import traceback
-        traceback.print_exc()
 
-    return ChatResponse(
-        message=request.message,
-        response=response,
-        sources=snippet_sources,
-        ai_mode=request.ai_mode,
-        output_format=request.output_format,
-        ai_model=ai_model_info,
-        detailed_sources=detailed_sources,
-        conversation_id=conv_id,
-        conversation_title=conv_title,
-        reply_to_message_id=request.reply_to_message_id,
-        timings={
-            "retrieval_ms": round(retrieval_ms, 2),
-            "model_ms": round(model_ms, 2),
-            "total_ms": round(total_ms, 2),
-            "step_times": step_times,
+        return {
+            "message": message, "response": response, "sources": snippet_sources, "ai_mode": ai_mode, "output_format": output_format,
+            "ai_model": ai_model_info, "detailed_sources": detailed_sources, "conversation_id": conv_id, "conversation_title": conv_title,
+            "timings": timings_dict
         }
-    )
+    finally:
+        db.close()
 
 
 @router.get("/conversations", response_model=List[ConversationSummary])

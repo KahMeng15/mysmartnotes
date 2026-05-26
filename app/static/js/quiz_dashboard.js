@@ -712,8 +712,30 @@ async function submitCreateQuiz() {
                         quiz_group_id: quizGroupId || null
                     })
                 });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.task_id) {
+                        // Subscribe to WebSocket for task updates
+                        WSManager.subscribe(data.task_id, (update) => {
+                            if (update.status === 'completed') {
+                                clearInterval(progressInterval);
+                                updateQuizProgress(100, 'Quiz generated successfully!', 'Complete');
+                                setTimeout(() => {
+                                    closeModal('quizProgressModal');
+                                    window.location.href = `/quiz/${update.result.quiz_id}`;
+                                }, 1000);
+                            } else if (update.status === 'failed') {
+                                clearInterval(progressInterval);
+                                showErrorModal('Generation Failed', update.error || 'The AI was unable to generate your quiz.');
+                                closeModal('quizProgressModal');
+                            }
+                        });
+                        return; // Wait for WS
+                    }
+                }
             } finally {
-                clearInterval(progressInterval);
+                if (!response.ok) clearInterval(progressInterval);
             }
             
         } else if (method === 'import') {
