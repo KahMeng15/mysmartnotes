@@ -307,13 +307,18 @@ function toggleAIFields() {
     }
 }
 
+let isUpdatingProfile = false;
 async function updateProfile(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
+    if (isUpdatingProfile) return;
+
     try {
+        isUpdatingProfile = true;
         const fullName = document.getElementById('fullName').value.trim();
         const nickname = document.getElementById('nickname').value.trim();
         if (!fullName || !nickname) {
             showErrorModal('Validation Error', 'Full name and nickname are required.');
+            isUpdatingProfile = false;
             return;
         }
 
@@ -334,12 +339,15 @@ async function updateProfile(event) {
             const updatedUser = await response.json();
             localStorage.setItem('user', JSON.stringify(updatedUser));
             showSuccessModal('Profile Saved', 'Your profile information has been updated successfully.');
+            isUpdatingProfile = false;
         } else {
             const error = await response.json();
             showErrorModal('Error', error.detail || 'Failed to save profile');
+            isUpdatingProfile = false;
         }
     } catch (error) {
         showErrorModal('Error', error.message || 'Failed to update profile');
+        isUpdatingProfile = false;
     }
 }
 
@@ -353,10 +361,13 @@ function toggleNotifications() {
     toggle.classList.toggle('active');
 }
 
+let isSavingAiConfig = false;
 async function saveAiConfiguration(event) {
     if (event) event.preventDefault();
+    if (isSavingAiConfig) return;
 
     try {
+        isSavingAiConfig = true;
         const useGlobal = document.getElementById('globalSettingsToggle').classList.contains('active');
         const payload = {
             use_global_ai_config: useGlobal
@@ -369,6 +380,7 @@ async function saveAiConfiguration(event) {
 
             if (['ollama', 'local_modal'].includes(provider) && !baseUrl) {
                 showErrorModal('Validation Error', `Base URL is required for ${provider}`);
+                isSavingAiConfig = false;
                 return;
             }
 
@@ -389,12 +401,15 @@ async function saveAiConfiguration(event) {
             const updatedUser = await response.json();
             localStorage.setItem('user', JSON.stringify(updatedUser));
             showSuccessModal('AI Configuration Saved', 'Your AI settings have been updated successfully.');
+            isSavingAiConfig = false;
         } else {
             const error = await response.json();
             showErrorModal('Error', error.detail || 'Failed to save AI configuration');
+            isSavingAiConfig = false;
         }
     } catch (error) {
         showErrorModal('Error', error.message || 'Failed to save AI configuration');
+        isSavingAiConfig = false;
     }
 }
 
@@ -410,7 +425,10 @@ function clearCache() {
     }, 2000);
 }
 
+let isRequestingPassChange = false;
 async function changePassword() {
+    if (isRequestingPassChange) return;
+
     if (typeof window.userHasPassword !== 'boolean') {
         await loadConnectedAccounts();
     }
@@ -434,7 +452,17 @@ async function changePassword() {
         return;
     }
 
+    // Complexity validation (Match backend: min 8 chars, score 3)
+    if (newPass.length < 8) {
+        showMessageInElement('passwordMsg', 'error', 'Password must be at least 8 characters long');
+        return;
+    }
+    // Note: zxcvbn is usually available on settings too, but if not we skip score check or load it.
+    // Based on settings.html head, it might not be there. Let's assume it's there or just do length for now
+    // to match reset-password flow's robustness.
+
     try {
+        isRequestingPassChange = true;
         const res = await fetch('/auth/request-password-change', {
             method: 'POST',
             headers: {
@@ -455,15 +483,18 @@ async function changePassword() {
             
             // Show confirmation code modal after 2 seconds
             setTimeout(() => {
+                isRequestingPassChange = false;
                 document.getElementById('passwordChangeConfirmationModal').style.display = 'flex';
                 document.getElementById('passwordChangeCode').focus();
             }, 2000);
         } else {
             const error = await res.json();
             showMessageInElement('passwordMsg', 'error', error.detail || 'Failed to request password change');
+            isRequestingPassChange = false;
         }
     } catch(err) {
         showMessageInElement('passwordMsg', 'error', err.message || 'Failed to request password change');
+        isRequestingPassChange = false;
     }
 }
 
@@ -473,7 +504,10 @@ function showPasswordSetForm() {
     document.getElementById('warningSetPassword').focus();
 }
 
+let isSettingPasswordFromWarning = false;
 async function setPasswordFromWarningModal() {
+    if (isSettingPasswordFromWarning) return;
+
     const newPass = document.getElementById('warningSetPassword').value;
     const confirm = document.getElementById('warningConfirmPassword').value;
     const msgBox = document.getElementById('passwordSetMsg');
@@ -487,8 +521,14 @@ async function setPasswordFromWarningModal() {
         showMessageInBox(msgBox, 'error', 'Passwords do not match');
         return;
     }
+
+    if (newPass.length < 8) {
+        showMessageInBox(msgBox, 'error', 'Password must be at least 8 characters long');
+        return;
+    }
     
     try {
+        isSettingPasswordFromWarning = true;
         // For setting password from warning modal, we don't need current password verification
         // since the user doesn't have one yet. We'll use an empty string.
         const res = await fetch('/auth/request-password-change', {
@@ -511,6 +551,7 @@ async function setPasswordFromWarningModal() {
             document.getElementById('passwordChangeMsg').innerHTML = '';
             document.getElementById('passwordChangeConfirmationModal').style.display = 'flex';
             document.getElementById('passwordChangeCode').focus();
+            isSettingPasswordFromWarning = false;
         } else {
             const error = await res.json();
             
@@ -520,10 +561,12 @@ async function setPasswordFromWarningModal() {
             } else {
                 showMessageInBox(msgBox, 'error', error.detail || 'Failed to set password');
             }
+            isSettingPasswordFromWarning = false;
         }
     } catch(e) {
         console.error('Error setting password:', e);
         showMessageInBox(msgBox, 'error', e.message || 'Failed to set password');
+        isSettingPasswordFromWarning = false;
     }
 }
 
@@ -534,7 +577,10 @@ function closePasswordChangeConfirmationModal(keepFlow = false) {
     }
 }
 
+let isConfirmingPassChange = false;
 async function confirmPasswordChange() {
+    if (isConfirmingPassChange) return;
+
     const code = document.getElementById('passwordChangeCode').value;
     const msgBox = document.getElementById('passwordChangeMsg');
     
@@ -544,6 +590,7 @@ async function confirmPasswordChange() {
     }
     
     try {
+        isConfirmingPassChange = true;
         const res = await fetch('/auth/confirm-password-change', {
             method: 'POST',
             headers: {
@@ -562,6 +609,7 @@ async function confirmPasswordChange() {
             showSuccessModal('Password Updated', 'Your password has been verified and saved successfully.');
             const continueUnlinkFlow = pendingUnlinkAfterPasswordSetup;
             setTimeout(() => {
+                isConfirmingPassChange = false;
                 closePasswordChangeConfirmationModal(true);
                 closeNeedPasswordWarningModal(true);
                 // Clear all password fields
@@ -582,10 +630,12 @@ async function confirmPasswordChange() {
         } else {
             const error = await res.json();
             showMessageInBox(msgBox, 'error', error.detail || 'Failed to confirm password change');
+            isConfirmingPassChange = false;
         }
     } catch(e) {
         console.error('Error confirming password:', e);
         showMessageInBox(msgBox, 'error', e.message || 'Failed to confirm password change');
+        isConfirmingPassChange = false;
     }
 }
 

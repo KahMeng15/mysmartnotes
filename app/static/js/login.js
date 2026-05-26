@@ -368,7 +368,9 @@ function showPasswordField() {
     document.getElementById('loginPassword').focus();
 }
 
+let isLoggingIn = false;
 async function handleLogin() {
+    if (isLoggingIn) return;
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
     if (!email || !password) {
@@ -376,6 +378,7 @@ async function handleLogin() {
         return;
     }
     try {
+        isLoggingIn = true;
         const res = await fetch('/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -386,31 +389,41 @@ async function handleLogin() {
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
             if (data.access_token) localStorage.setItem('token', data.access_token);
             showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
-            setTimeout(() => { window.location.href = '/dashboard'; }, 800);
+            setTimeout(() => { 
+                isLoggingIn = false;
+                window.location.href = '/dashboard'; 
+            }, 800);
         } else {
             const err = await res.json();
             if (res.status === 503) {
                 showMessageBox('loginMsg', 'error', err.detail || 'Under maintenance.');
-                setTimeout(() => { window.location.href = '/maintenance'; }, 2000);
+                setTimeout(() => { 
+                    isLoggingIn = false;
+                    window.location.href = '/maintenance'; 
+                }, 2000);
             } else {
                 let extraHtml = '';
                 if (err.detail && err.detail.toLowerCase().includes('not verified')) {
                     extraHtml = `
-                        <a href="#" style="color: #1e40af; text-decoration: underline; font-weight: 600; cursor: pointer;" 
+                        <a href="#" style="color: #1e40af; text-decoration: underline; font-weight: 600; cursor: pointer;"
                            onclick="event.preventDefault(); closeErrorModal(); handleResendVerification('loginMsg');">
                            Resend verification link
                         </a>
                     `;
                 }
                 showMessageBox('loginMsg', 'error', err.detail || 'Login failed. Please check your credentials.', extraHtml);
+                isLoggingIn = false;
             }
         }
     } catch (e) {
         showMessageBox('loginMsg', 'error', 'Connection error. Please try again.');
+        isLoggingIn = false;
     }
 }
 
+let isRegistering = false;
 async function handleRegister() {
+    if (isRegistering) return;
     const full_name = document.getElementById('regFullName').value.trim();
     const nickname = document.getElementById('regNickname').value.trim();
     const email = document.getElementById('regEmail').value.trim();
@@ -418,23 +431,24 @@ async function handleRegister() {
     const agree_tos = document.getElementById('regAgreeTos').checked;
     const agree_privacy = document.getElementById('regAgreePrivacy').checked;
     const agree_fair_use = document.getElementById('regAgreeFairUse').checked;
-    
+
     if (!full_name || !nickname || !email || !password) {
         showMessageBox('registerMsg', 'error', 'All fields are required.');
         return;
     }
-    
+
     if (!agree_tos || !agree_privacy || !agree_fair_use) {
         showMessageBox('registerMsg', 'error', 'You must agree to all policies to register.');
         return;
     }
-    
+
     try {
+        isRegistering = true;
         const body = { full_name, nickname, email, password, agree_tos, agree_privacy, agree_fair_use };
         const endpoint = window.invitationToken
             ? `/auth/register?token=${encodeURIComponent(window.invitationToken)}`
             : '/auth/register';
-        
+
         const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -451,15 +465,17 @@ async function handleRegister() {
             document.getElementById('regAgreeTos').checked = false;
             document.getElementById('regAgreePrivacy').checked = false;
             document.getElementById('regAgreeFairUse').checked = false;
+            isRegistering = false;
         } else {
             const err = await res.json();
             showMessageBox('registerMsg', 'error', err.detail || 'Registration failed.');
+            isRegistering = false;
         }
     } catch (e) {
         showMessageBox('registerMsg', 'error', 'Connection error. Please try again.');
+        isRegistering = false;
     }
 }
-
 async function handleGoogleSignIn() {
     try {
         // Wait a moment for Firebase to initialize
@@ -550,8 +566,10 @@ function closeGoogleRegisterModal() {
     }
 }
 
+let isCompletingGoogle = false;
 async function handleGoogleComplete(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
+    if (isCompletingGoogle) return;
 
     if (!window.googleIdToken) {
         showMessageBox('loginMsg', 'error', 'Session expired. Please try again.');
@@ -563,8 +581,8 @@ async function handleGoogleComplete(event) {
     const full_name = document.getElementById('googleFullName').value.trim();
     const agree_tos = document.getElementById('googleAgreeTos').checked;
     const agree_privacy = document.getElementById('googleAgreePrivacy').checked;
-    const agree_fair_use = document.getElementById('googleAgreeFairUse').checked;
-    
+    const agree_fair_use = document.getElementById('regAgreeFairUse') ? document.getElementById('regAgreeFairUse').checked : (document.getElementById('googleAgreeFairUse') ? document.getElementById('googleAgreeFairUse').checked : true);
+
     if (!full_name) {
         showMessageBox('googleRegisterMsg', 'error', 'Please enter your full name.');
         return;
@@ -581,6 +599,7 @@ async function handleGoogleComplete(event) {
     }
 
     try {
+        isCompletingGoogle = true;
         const body = { idToken: window.googleIdToken, full_name, nickname, agree_tos, agree_privacy, agree_fair_use };
         if (window.invitationToken) {
             body.invitation_token = window.invitationToken;
@@ -596,25 +615,36 @@ async function handleGoogleComplete(event) {
             const data = await res.json();
             if (data.pending_approval) {
                 showMessageBox('googleRegisterMsg', 'info', data.message || 'Your account is pending approval. Please try signing in once an administrator approves it.');
-                setTimeout(() => switchPanel('login'), 2500);
+                setTimeout(() => {
+                    isCompletingGoogle = false;
+                    switchPanel('login');
+                }, 2500);
                 return;
             }
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
             if (data.access_token) localStorage.setItem('token', data.access_token);
             showMessageBox('googleRegisterMsg', 'success', 'Welcome! Redirecting…');
-            setTimeout(() => { window.location.href = '/dashboard'; }, 800);
+            setTimeout(() => { 
+                isCompletingGoogle = false;
+                window.location.href = '/dashboard'; 
+            }, 800);
         } else {
             const err = await res.json();
             if (res.status === 503) {
                 showMessageBox('googleRegisterMsg', 'error', err.detail || 'Under maintenance.');
-                setTimeout(() => { window.location.href = '/maintenance'; }, 2000);
+                setTimeout(() => { 
+                    isCompletingGoogle = false;
+                    window.location.href = '/maintenance'; 
+                }, 2000);
             } else {
                 showMessageBox('googleRegisterMsg', 'error', err.detail || 'Registration failed.');
+                isCompletingGoogle = false;
             }
         }
     } catch (e) {
         console.error('Google registration error:', e);
         showMessageBox('googleRegisterMsg', 'error', 'An error occurred. Please try again.');
+        isCompletingGoogle = false;
     }
 }
 
@@ -626,8 +656,11 @@ async function handleGoogleSignInWithInvite() {
 }
 
 // --- Password Reset Functions ---
+let isSendingReset = false;
 async function handleForgotPassword(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
+    if (isSendingReset) return;
+
     const email = document.getElementById('forgotPasswordEmail').value.trim();
     
     if (!email) {
@@ -636,6 +669,7 @@ async function handleForgotPassword(event) {
     }
     
     try {
+        isSendingReset = true;
         const res = await fetch('/auth/password-reset-request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -644,7 +678,10 @@ async function handleForgotPassword(event) {
         
         if (res.ok) {
             showMessageBox('forgotPasswordMsg', 'success', 'Check your email for a password reset link. It expires in 24 hours.');
-            setTimeout(() => switchPanel('login'), 3000);
+            setTimeout(() => {
+                isSendingReset = false;
+                switchPanel('login');
+            }, 3000);
         } else {
             const err = await res.json();
             if (res.status === 429) {
@@ -652,15 +689,20 @@ async function handleForgotPassword(event) {
             } else {
                 showMessageBox('forgotPasswordMsg', 'error', err.detail || 'Error processing request. Please try again.');
             }
+            isSendingReset = false;
         }
     } catch (e) {
         console.error('Password reset request error:', e);
         showMessageBox('forgotPasswordMsg', 'error', 'Connection error. Please try again.');
+        isSendingReset = false;
     }
 }
 
+let isResettingPassword = false;
 async function handleResetPassword(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
+    if (isResettingPassword) return;
+
     const newPassword = document.getElementById('resetPasswordNew').value;
     const confirmPassword = document.getElementById('resetPasswordConfirm').value;
     
@@ -674,18 +716,31 @@ async function handleResetPassword(event) {
         return;
     }
     
-    if (newPassword.length < 6) {
-        showMessageBox('resetPasswordMsg', 'error', 'Password must be at least 6 characters long.');
+    // Match backend complexity (min 8 chars, zxcvbn score >= 3)
+    if (newPassword.length < 8) {
+        showMessageBox('resetPasswordMsg', 'error', 'Password must be at least 8 characters long.');
         return;
+    }
+
+    if (typeof zxcvbn === 'function') {
+        const result = zxcvbn(newPassword);
+        if (result.score < 3) {
+            const warning = result.feedback?.warning || 'Password is too weak.';
+            const suggestions = result.feedback?.suggestions?.join(' ') || '';
+            showMessageBox('resetPasswordMsg', 'error', `${warning} ${suggestions}`);
+            return;
+        }
     }
     
     try {
+        isResettingPassword = true;
         // Get token from URL params
         const params = new URLSearchParams(window.location.search);
         const token = params.get('reset_token');
         
         if (!token) {
             showMessageBox('resetPasswordMsg', 'error', 'Invalid reset link. Please request a new password reset.');
+            isResettingPassword = false;
             return;
         }
         
@@ -697,14 +752,19 @@ async function handleResetPassword(event) {
         
         if (res.ok) {
             showMessageBox('resetPasswordMsg', 'success', 'Password reset successfully! Redirecting to login...');
-            setTimeout(() => switchPanel('login'), 2000);
+            setTimeout(() => {
+                isResettingPassword = false;
+                switchPanel('login');
+            }, 2000);
         } else {
             const err = await res.json();
             showMessageBox('resetPasswordMsg', 'error', err.detail || 'Password reset failed.');
+            isResettingPassword = false;
         }
     } catch (e) {
         console.error('Password reset error:', e);
         showMessageBox('resetPasswordMsg', 'error', 'Connection error. Please try again.');
+        isResettingPassword = false;
     }
 }
 

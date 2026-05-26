@@ -128,3 +128,43 @@ def send_password_change_confirmation_email(db: Session, recipient_email: str, c
     </html>
     """
     return send_email(db, recipient_email, subject, body, is_html=True)
+
+def send_welcome_email(db: Session, recipient_email: str, full_name: str) -> bool:
+    """Send a welcome email to a newly registered/verified user"""
+    subject = "Welcome to MySmartNotes!"
+    body = f"""
+    <html>
+        <body>
+            <h2>Welcome to MySmartNotes, {full_name}!</h2>
+            <p>We're thrilled to have you join our community of smart learners.</p>
+            <p>MySmartNotes is designed to help you organize your study materials, generate AI-powered summaries, and practice with smart quizzes.</p>
+            <p>Here are a few things you can do to get started:</p>
+            <ul>
+                <li><strong>Upload Lectures:</strong> Upload your PDFs or PPTX files to get structured notes.</li>
+                <li><strong>Chat with AI:</strong> Ask questions about your materials and get instant clarifications.</li>
+                <li><strong>Take Quizzes:</strong> Test your knowledge with AI-generated questions from your own notes.</li>
+            </ul>
+            <p>If you have any questions or need support, feel free to contact us through the app.</p>
+            <br>
+            <p>Happy studying!<br>The MySmartNotes Team</p>
+        </body>
+    </html>
+    """
+    return send_email(db, recipient_email, subject, body, is_html=True)
+
+def send_password_changed_notification_email(db: Session, recipient_email: str) -> bool:
+    """Send a notification email when a user's password has been successfully changed"""
+    subject = "Security Alert: Your password was changed - MySmartNotes"
+    body = f"""
+    <html>
+        <body>
+            <h2>Your Password was Changed</h2>
+            <p>This is a notification to confirm that the password for your MySmartNotes account has been successfully updated.</p>
+            <p>If you made this change, you can safely ignore this email.</p>
+            <p style="color: #ef4444; font-weight: bold;">If you did NOT change your password, please contact our support team immediately or request a password reset to secure your account.</p>
+            <br>
+            <p>Best regards,<br>The MySmartNotes Team</p>
+        </body>
+    </html>
+    """
+    return send_email(db, recipient_email, subject, body, is_html=True)

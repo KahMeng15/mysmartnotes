@@ -45,11 +45,11 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    subjects = relationship("Subject", back_populates="owner", cascade="all, delete-orphan")
+    subjects = relationship("Subject", back_populates="owner")
     study_sessions = relationship("StudySession", back_populates="user", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
-    subject_groups = relationship("SubjectGroup", back_populates="user", cascade="all, delete-orphan")
-    quiz_groups = relationship("QuizGroup", back_populates="user", cascade="all, delete-orphan")
+    subject_groups = relationship("SubjectGroup", back_populates="user")
+    quiz_groups = relationship("QuizGroup", back_populates="user")
 
 
 class SubjectGroup(Base):
@@ -57,7 +57,7 @@ class SubjectGroup(Base):
     __tablename__ = "subject_groups"
     
     id = Column(String(16), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -74,7 +74,7 @@ class QuizGroup(Base):
     __tablename__ = "quiz_groups"
     
     id = Column(String(16), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -89,7 +89,7 @@ class Subject(Base):
     __tablename__ = "subjects"
     
     id = Column(String(16), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     group_id = Column(String(16), ForeignKey("subject_groups.id"), nullable=True)
     name = Column(String(255), nullable=False)
     description = Column(Text)
@@ -110,7 +110,7 @@ class Lecture(Base):
     __tablename__ = "lectures"
     
     id = Column(String(16), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     subject_id = Column(String(16), ForeignKey("subjects.id"), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
@@ -139,7 +139,7 @@ class ExportTemplate(Base):
     __tablename__ = "export_templates"
     
     id = Column(String(16), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)  # NULL = system default
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)  # NULL = system default
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     is_default = Column(Boolean, default=False)
@@ -197,7 +197,7 @@ class Quiz(Base):
     __tablename__ = "quizzes"
     
     id = Column(String(16), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(255), nullable=False)
     scope_type = Column(String(50))  # "group", "subject" or "lecture"
     group_id = Column(String(16), ForeignKey("subject_groups.id"), nullable=True, index=True)
@@ -224,7 +224,7 @@ class QuizQuestion(Base):
     __tablename__ = "quiz_questions"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    quiz_id = Column(String(16), ForeignKey("quizzes.id"), nullable=False, index=True)
+    quiz_id = Column(String(16), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
     question_text = Column(Text, nullable=False)
     answer_text = Column(Text, nullable=False)
     question_type = Column(String(50), default="subjective")  # objective, subjective, fill_in_the_blank
@@ -245,9 +245,9 @@ class QuizProgress(Base):
     __tablename__ = "quiz_progress"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    quiz_id = Column(String(16), ForeignKey("quizzes.id"), nullable=False, index=True)
-    question_id = Column(Integer, ForeignKey("quiz_questions.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    quiz_id = Column(String(16), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_id = Column(Integer, ForeignKey("quiz_questions.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     is_correct = Column(Boolean, default=False)
     times_tested = Column(Integer, default=0)
     last_tested_at = Column(DateTime, nullable=True) # Legacy
@@ -270,8 +270,8 @@ class StudySession(Base):
     __tablename__ = "study_sessions"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    lecture_id = Column(String(16), ForeignKey("lectures.id", ondelete="SET NULL"), nullable=True, index=True)
     session_type = Column(String(50))  # quiz, chat, pomodoro_study, pomodoro_break, stopwatch
     duration_minutes = Column(Integer)
     questions_attempted = Column(Integer, default=0)
@@ -293,7 +293,7 @@ class Task(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     task_id = Column(String(128), unique=True, nullable=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     task_type = Column(String(100))  # ocr, embedding, generation
     status = Column(String(50), default="pending")  # pending, processing, completed, failed
     progress = Column(Integer, default=0)
@@ -312,10 +312,10 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
     
     id = Column(String(16), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=True, index=True)
-    subject_id = Column(String(16), ForeignKey("subjects.id"), nullable=True, index=True)
-    group_id = Column(String(16), ForeignKey("subject_groups.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    lecture_id = Column(String(16), ForeignKey("lectures.id", ondelete="SET NULL"), nullable=True, index=True)
+    subject_id = Column(String(16), ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True)
+    group_id = Column(String(16), ForeignKey("subject_groups.id", ondelete="SET NULL"), nullable=True, index=True)
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     sources = Column(Text)  # JSON array of sources
@@ -324,7 +324,7 @@ class ChatMessage(Base):
     # Conversation threading
     conversation_id = Column(String(64), nullable=True, index=True)   # cv_ prefix grouping messages into a conversation
     conversation_title = Column(String(255), nullable=True)            # AI-generated or derived title
-    reply_to_message_id = Column(String(16), ForeignKey("chat_messages.id"), nullable=True) # ID of the message being replied to
+    reply_to_message_id = Column(String(16), ForeignKey("chat_messages.id", ondelete="SET NULL"), nullable=True) # ID of the message being replied to
     replies = relationship("ChatMessage", cascade="all, delete-orphan", backref=backref("parent", remote_side=[id]))
     ai_mode = Column(String(50), nullable=True, default="elaborate")   # Which AI response mode was used
     output_format = Column(String(50), nullable=True, default="sentence") # Output format: sentence, pointform, numbered_list, table
@@ -346,8 +346,8 @@ class NoteSnapshot(Base):
     __tablename__ = "note_snapshots"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    lecture_id = Column(String(16), ForeignKey("lectures.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -390,8 +390,8 @@ class UserInvitation(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String(255), nullable=False, unique=True, index=True)
     token = Column(String(100), nullable=False, unique=True, index=True)
-    invited_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    used_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    invited_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    used_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     tier = Column(String(50), default="free")
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime, nullable=False)
@@ -407,7 +407,7 @@ class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     email = Column(String(255), nullable=False, index=True)
     token = Column(String(100), nullable=False, unique=True, index=True)
     is_used = Column(Boolean, default=False)
@@ -423,7 +423,7 @@ class EmailVerificationToken(Base):
     __tablename__ = "email_verification_tokens"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     email = Column(String(255), nullable=False, index=True)
     token = Column(String(100), nullable=False, unique=True, index=True)
     is_used = Column(Boolean, default=False)
@@ -439,7 +439,7 @@ class PasswordChangeConfirmation(Base):
     __tablename__ = "password_change_confirmations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     email = Column(String(255), nullable=False, index=True)
     confirmation_code = Column(String(10), nullable=False, unique=True, index=True)
     new_password_hash = Column(String(255), nullable=False)  # Hash of the new password attempt
@@ -456,7 +456,7 @@ class UserLog(Base):
     __tablename__ = "user_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True) # allow null for failed logins/global actions
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True) # allow null for failed logins/global actions
     action = Column(String(100), nullable=False) # login, signup, page_access, upload, processing, chat, etc.
     ip_address = Column(String(50), nullable=True)
     device_info = Column(Text, nullable=True)

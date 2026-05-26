@@ -102,6 +102,11 @@ class UserLogSchema(BaseModel):
         from_attributes = True
 
 class UserAdminResponse(User):
+    # Overriding fields to plain str to allow viewing users with invalid data formats in admin
+    username: Optional[str] = None
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    nickname: Optional[str] = None
     # Extending User with extra stats
     notes_count: int = 0
     subjects_count: int = 0

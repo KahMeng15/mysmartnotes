@@ -118,10 +118,92 @@ def init_db():
     try:
         apply_postgresql_migrations()
         apply_postgresql_user_security_migrations()
+        apply_content_dissociation_migrations()
     except Exception as e:
         logger.error(f"Failed to apply PostgreSQL migrations: {e}")
 
     logger.info("Database initialized successfully")
+
+
+def apply_content_dissociation_migrations():
+    """Programmatically alter constraints and nullability for account deletion logic"""
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            # 1. Tables where user_id should be NULLABLE for dissociation (SET NULL)
+            dissociate_tables = [
+                'subject_groups', 'quiz_groups', 'subjects', 'lectures', 
+                'quizzes', 'chat_messages', 'note_snapshots', 'export_templates'
+            ]
+            
+            for table in dissociate_tables:
+                # Check if column is NOT NULL
+                res = conn.execute(text(f"""
+                    SELECT is_nullable 
+                    FROM information_schema.columns 
+                    WHERE table_name = '{table}' AND column_name = 'user_id'
+                """)).fetchone()
+                
+                if res and res[0] == 'NO':
+                    logger.info(f"Migration: Making {table}.user_id NULLABLE...")
+                    conn.execute(text(f'ALTER TABLE "{table}" ALTER COLUMN user_id DROP NOT NULL'))
+
+                # Update Foreign Key to ON DELETE SET NULL
+                # First find current constraint name
+                fk_res = conn.execute(text(f"""
+                    SELECT conname 
+                    FROM pg_constraint c 
+                    JOIN pg_class r ON c.conrelid = r.oid 
+                    WHERE r.relname = '{table}' AND c.contype = 'f' 
+                    AND pg_get_constraintdef(c.oid) LIKE '%user_id%REFERENCES users%'
+                """)).fetchone()
+                
+                if fk_res:
+                    fk_name = fk_res[0]
+                    # Check if it already has SET NULL
+                    def_res = conn.execute(text(f"SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = '{fk_name}'")).fetchone()
+                    if def_res and "SET NULL" not in def_res[0]:
+                        logger.info(f"Migration: Updating {table} FK {fk_name} to ON DELETE SET NULL...")
+                        conn.execute(text(f'ALTER TABLE "{table}" DROP CONSTRAINT "{fk_name}"'))
+                        conn.execute(text(f'ALTER TABLE "{table}" ADD CONSTRAINT "{fk_name}" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL'))
+
+            # 2. Tables where data should be CASCADED (Security/Logs/Sessions)
+            cascade_tables = [
+                'user_logs', 'tasks', 'study_sessions', 'user_invitations', 
+                'password_reset_tokens', 'email_verification_tokens', 'password_change_confirmations'
+            ]
+            
+            for table in cascade_tables:
+                # Find FK to users table
+                fk_res = conn.execute(text(f"""
+                    SELECT conname 
+                    FROM pg_constraint c 
+                    JOIN pg_class r ON c.conrelid = r.oid 
+                    WHERE r.relname = '{table}' AND c.contype = 'f' 
+                    AND (pg_get_constraintdef(c.oid) LIKE '%user_id%REFERENCES users%' 
+                         OR pg_get_constraintdef(c.oid) LIKE '%invited_by%REFERENCES users%'
+                         OR pg_get_constraintdef(c.oid) LIKE '%used_by%REFERENCES users%')
+                """)).all()
+                
+                for row in fk_res:
+                    fk_name = row[0]
+                    # Check definition
+                    def_res = conn.execute(text(f"SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = '{fk_name}'")).fetchone()
+                    if def_res and "CASCADE" not in def_res[0]:
+                        logger.info(f"Migration: Updating {table} FK {fk_name} to ON DELETE CASCADE...")
+                        
+                        # Get full definition to know which column it is
+                        full_def = def_res[0]
+                        col_start = full_def.find("(") + 1
+                        col_end = full_def.find(")")
+                        column = full_def[col_start:col_end]
+                        
+                        conn.execute(text(f'ALTER TABLE "{table}" DROP CONSTRAINT "{fk_name}"'))
+                        conn.execute(text(f'ALTER TABLE "{table}" ADD CONSTRAINT "{fk_name}" FOREIGN KEY ({column}) REFERENCES users(id) ON DELETE CASCADE'))
+
+        logger.info("Dissociation migrations applied successfully")
+    except Exception as e:
+        logger.error(f"Dissociation migration failed: {e}", exc_info=True)
 
 
 def apply_postgresql_migrations():

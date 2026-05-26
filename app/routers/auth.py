@@ -829,6 +829,11 @@ def google_complete(google_request: GoogleCompleteRequest, request: Request, res
         if not is_approved:
             log_details = "Google Auth (pending approval)"
         db.add(UserLog(user_id=user.id, action="signup", ip_address=ip_address, device_info=user_agent, details=log_details))
+        
+        # Send welcome email
+        from app.utils.email import send_welcome_email
+        send_welcome_email(db, user.email, user.full_name or user.nickname)
+        
         db.commit()
 
         if not is_approved:
@@ -1092,6 +1097,10 @@ async def confirm_password_change(request_data: ConfirmPasswordChange, request: 
     user_agent = request.headers.get("user-agent", "Unknown Device")
     db.add(UserLog(user_id=current_user.id, action="password_changed", ip_address=ip_address, device_info=user_agent))
     
+    # Send notification email
+    from app.utils.email import send_password_changed_notification_email
+    send_password_changed_notification_email(db, current_user.email)
+    
     db.commit()
     
     return {"message": "Password has been changed successfully!"}
@@ -1241,6 +1250,10 @@ def reset_password(reset_data: PasswordResetSubmit, request: Request, db: Sessio
     user_agent = request.headers.get("user-agent", "Unknown Device")
     db.add(UserLog(user_id=user.id, action="password_reset_complete", ip_address=ip_address, device_info=user_agent))
     
+    # Send notification email
+    from app.utils.email import send_password_changed_notification_email
+    send_password_changed_notification_email(db, user.email)
+    
     db.commit()
     
     return {"message": "Password has been reset successfully. You can now log in with your new password."}
@@ -1305,6 +1318,10 @@ def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session =
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent", "Unknown Device")
     db.add(UserLog(user_id=user.id, action="email_verified", ip_address=ip_address, device_info=user_agent))
+    
+    # Send welcome email
+    from app.utils.email import send_welcome_email
+    send_welcome_email(db, user.email, user.full_name or user.nickname)
     
     db.commit()
     
