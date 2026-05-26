@@ -1041,37 +1041,31 @@ class SmartPipeline:
         """Polish a single chunk of markdown using the AI model with streaming."""
         title_instruction = ""
         if is_first_chunk:
-            title_instruction = """TITLE: The first heading should be a single H1 that uses the EXACT topic title
-from the slides (e.g., "# Topic 3: Inheritance"). Drop institutional names, course codes, and lecturer names.
+            title_instruction = """TITLE RULE: The first line of your output MUST be a single H1 heading (# ) with the 
+EXACT topic title from the slides (e.g., "# Topic 3: Inheritance"). 
+Remove university names, course codes, and lecturer names.
 """
         else:
-            title_instruction = """IMPORTANT: Do NOT use H1 (# ) headings in this section. Use only H2 (## ) and H3 (### ).
+            title_instruction = """HEADING RULE: Do NOT use H1 (# ) headings. Use only H2 (## ) or H3 (### ).
 """
 
-        prompt = f"""Task: Transform raw lecture notes into clean, hierarchical Markdown.
+        prompt = f"""Task: Clean and format the following lecture notes into clean Markdown.
 
 CRITICAL RULES:
-1. NO PREAMBLE: Start directly with the Markdown or the marker ===START===.
-2. USE EXACT WORDS: Never rephrase.
-3. ONE H1: Only the main title is #. Subtitles are ##, ###.
-4. CODE BLOCKS: Use ```java only for actual code.
+1. START WITH THE MARKER ===START===
+2. END WITH THE MARKER ===END===
+3. NO PREAMBLE/INTRO: Output ONLY the markdown between the markers.
+4. NO REASONING: Do not talk to yourself, do not plan, do not list rules.
+5. USE EXACT WORDS: Never rephrase or summarize.
+6. ONE H1: Only the main title is #. Subtitles are ##, ###.
+7. CODE BLOCKS: Use ```java only for actual code.
 
-EXAMPLE:
---- RAW INPUT ---
-1
-TOPIC 1: JAVA
-- Java is OOP
---- POLISHED OUTPUT ---
-===START===
-# Topic 1: Java
+{title_instruction}
 
-- Java is OOP
----
-
-### INPUT:
+INPUT TO PROCESS:
 {chunk}
 
-POLISHED OUTPUT:
+POLISHED MARKDOWN:
 ===START===
 """
         try:
@@ -1083,7 +1077,8 @@ POLISHED OUTPUT:
                 with open(debug_file, "w", encoding="utf-8") as f:
                     f.write(f"--- CHUNK {chunk_idx} START ---\n\n")
 
-            async for text_segment in client.stream_text(prompt, max_tokens=2000):
+            # Use a slightly higher max_tokens to ensure we don't cut off the content
+            async for text_segment in client.stream_text(prompt, max_tokens=3000):
                 full_text += text_segment
                 if debug_file:
                     with open(debug_file, "a", encoding="utf-8") as f:
@@ -1091,44 +1086,49 @@ POLISHED OUTPUT:
                         f.flush()
 
             if full_text and not full_text.startswith("["): # Check for provider errors
-                # Extract content
+                # Clean up the output
                 content = full_text.strip()
-                marker = "===START==="
                 
-                if marker in content:
-                    content = content.split(marker)[-1].strip()
+                # Split by markers
+                if "===START===" in content:
+                    content = content.split("===START===")[-1]
+                if "===END===" in content:
+                    content = content.split("===END===")[0]
+                
+                content = content.strip()
+                
+                # Aggressive line-by-line cleanup to remove leaked reasoning artifacts
+                lines = content.split("\n")
+                cleaned_lines = []
+                REASONING_PATTERNS = [
+                    r'^\s*[\*\-]\s*Rule \d+:',
+                    r'^\s*[\*\-]\s*Segment \d+:',
+                    r'^\s*[\*\-]\s*Main Title \(H1\):',
+                    r'^\s*[\*\-]\s*Potential H\d+',
+                    r'^\s*[\*\-]\s*`# .*` \(Potential H1\)',
+                    r'^\s*Correction on',
+                    r'^\s*Refining the',
+                    r'^\s*Let\'s verify',
+                    r'^\s*Final check',
+                ]
                 
                 import re
-                # 1. Look for headings anywhere. AI often buries them in bullets or text.
-                # Find the first line that starts with one or more '#'
-                # We use re.MULTILINE to allow matching at the start of any line
-                heading_match = re.search(r'^#+\s+', content, re.MULTILINE)
-                if heading_match:
-                    content = content[heading_match.start():].strip()
-                else:
-                    # 2. If no heading found, look for headings nested in bullets: "* # Heading"
-                    nested_match = re.search(r'^\s*\*\s+#+\s+', content, re.MULTILINE)
-                    if nested_match:
-                        content = content[nested_match.start():].strip()
+                for line in lines:
+                    if any(re.match(p, line, re.IGNORECASE) for p in REASONING_PATTERNS):
+                        continue
+                    # Remove markers if they leaked into the line
+                    line = line.replace("===START===", "").replace("===END===", "")
+                    cleaned_lines.append(line)
                 
-                # 3. Aggressive line-by-line cleanup if it's all bulleted
-                if content.startswith("*"):
-                    lines = content.split("\n")
-                    cleaned_lines = []
-                    for line in lines:
-                        # Remove leading bullets and backticks
-                        cleaned = re.sub(r'^\s*\*\s*', '', line)
-                        cleaned = cleaned.strip("` ")
-                        cleaned_lines.append(cleaned)
-                    content = "\n".join(cleaned_lines).strip()
+                content = "\n".join(cleaned_lines).strip()
                 
-                # 4. Final strip of any backtick wrapping
-                content = content.strip("` ").strip()
-
-                # Strip outer markdown fences
-                lines = content.split("\n")
-                if len(lines) > 2 and lines[0].strip().startswith("```") and lines[-1].strip() == "```":
-                    content = "\n".join(lines[1:-1]).strip()
+                # Final strip of any backtick wrapping (common in AI responses)
+                if content.startswith("```markdown"):
+                    content = content[11:].strip()
+                elif content.startswith("```"):
+                    content = content[3:].strip()
+                if content.endswith("```"):
+                    content = content[:-3].strip()
 
                 return content
         except Exception as e:
