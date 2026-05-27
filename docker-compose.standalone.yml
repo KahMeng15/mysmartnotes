@@ -61,19 +61,12 @@ services:
 
   api:
     platform: linux/amd64
-    build:
-      context: .
-      args:
-        - USER_ID=${PUID:-568}
-        - GROUP_ID=${PGID:-568}
     image: ghcr.io/kahmeng15/mysmartnotes:dev
     container_name: mysmartnotes_api
     command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
     environment:
       <<: *common-env
       PORT: 8000
@@ -98,46 +91,26 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+    ports:
+      - "${PORT:-8000}:8000"
     restart: unless-stopped
     networks:
       - mysmartnotes-net
 
   worker:
     platform: linux/amd64
-    build:
-      context: .
-      args:
-        - USER_ID=${PUID:-568}
-        - GROUP_ID=${PGID:-568}
     image: ghcr.io/kahmeng15/mysmartnotes:dev
     container_name: mysmartnotes_worker
     command: ["python", "-m", "app.worker_main"]
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
     environment:
       <<: *common-env
       USER_ID: ${PUID:-568}
       GROUP_ID: ${PGID:-568}
     volumes:
       - ./data:/app/data
-      - ./logs:/app/logs
-    restart: unless-stopped
-    networks:
-      - mysmartnotes-net
-
-  nginx:
-    build:
-      context: ./app
-      dockerfile: Dockerfile.nginx
-    container_name: mysmartnotes_frontend
-    depends_on:
-      - api
-    ports:
-      - "${PORT:-8000}:80"
-    volumes:
       - ./logs:/app/logs
     restart: unless-stopped
     networks:

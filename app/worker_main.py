@@ -124,12 +124,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-oardInterrupt:
-            logger.info("Worker shutting down...")
-            break
-        except Exception as e:
-            logger.error(f"Worker loop error: {e}")
-            await asyncio.sleep(5)
-
-if __name__ == "__main__":
-    asyncio.run(main())
