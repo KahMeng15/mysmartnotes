@@ -14,7 +14,9 @@ window.addEventListener('load', async () => {
     }
 
     try {
+        showLoading();
         const res = await fetch('/auth/public-settings');
+        hideLoading();
         if (res.ok) {
             const settings = await res.json();
             
@@ -25,7 +27,10 @@ window.addEventListener('load', async () => {
                 initUnnecessaryLogins();
             }
         }
-    } catch (e) { console.error('Error loading public settings', e); }
+    } catch (e) { 
+        hideLoading();
+        console.error('Error loading public settings', e); 
+    }
     
     // Check for invitation token in URL (signup with invitation)
     const params = new URLSearchParams(window.location.search);
@@ -52,8 +57,10 @@ window.addEventListener('load', async () => {
     if (resetToken) {
         // Validate token before showing reset form
         try {
+            showLoading();
             const validateRes = await fetch(`/auth/password-reset-token-valid?token=${encodeURIComponent(resetToken)}`);
             const tokenData = await validateRes.json();
+            hideLoading();
             if (tokenData.valid) {
                 switchPanel('resetPassword');
                 // Small delay to ensure DOM is ready
@@ -78,6 +85,16 @@ window.addEventListener('load', async () => {
     }
 });
 
+function showLoading() {
+    const bar = document.getElementById('loadingBar');
+    if (bar) bar.style.display = 'block';
+}
+
+function hideLoading() {
+    const bar = document.getElementById('loadingBar');
+    if (bar) bar.style.display = 'none';
+}
+
 async function handleResendVerification(msgBoxId) {
     // Get email from login input or registration success context (we'll try to find it)
     let email = '';
@@ -98,6 +115,7 @@ async function handleResendVerification(msgBoxId) {
     }
 
     try {
+        showLoading();
         const res = await fetch('/auth/resend-verification', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -105,6 +123,7 @@ async function handleResendVerification(msgBoxId) {
         });
         
         const data = await res.json();
+        hideLoading();
         if (res.ok) {
             showMessageBox(msgBoxId, 'success', data.message);
             // Hide the resend button after success to prevent spam
@@ -127,6 +146,7 @@ async function handleVerifyEmail(token) {
     const errorContent = document.getElementById('verifyEmailErrorContent');
     
     try {
+        showLoading();
         const res = await fetch('/auth/verify-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -134,6 +154,7 @@ async function handleVerifyEmail(token) {
         });
         
         const data = await res.json();
+        hideLoading();
         
         if (res.ok) {
             statusEl.style.display = 'none';
@@ -379,6 +400,7 @@ async function handleLogin() {
     }
     try {
         isLoggingIn = true;
+        showLoading();
         const res = await fetch('/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -388,12 +410,25 @@ async function handleLogin() {
             const data = await res.json();
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
             if (data.access_token) localStorage.setItem('token', data.access_token);
+            
+            // Fetch fresh user data from /auth/me
+            try {
+                const meRes = await fetch('/auth/me');
+                if (meRes.ok) {
+                    const userData = await meRes.json();
+                    localStorage.setItem('user', JSON.stringify(userData));
+                }
+            } catch (e) {
+                console.warn('Failed to fetch user data:', e);
+            }
+            
             showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
             setTimeout(() => { 
                 isLoggingIn = false;
                 window.location.href = '/dashboard'; 
             }, 800);
         } else {
+            hideLoading();
             const err = await res.json();
             if (res.status === 503) {
                 showMessageBox('loginMsg', 'error', err.detail || 'Under maintenance.');
@@ -444,6 +479,7 @@ async function handleRegister() {
 
     try {
         isRegistering = true;
+        showLoading();
         const body = { full_name, nickname, email, password, agree_tos, agree_privacy, agree_fair_use };
         const endpoint = window.invitationToken
             ? `/auth/register?token=${encodeURIComponent(window.invitationToken)}`
@@ -454,6 +490,7 @@ async function handleRegister() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
+        hideLoading();
         if (res.ok) {
             window.lastRegisteredEmail = email;
             switchPanel('accountCreated');
@@ -472,6 +509,7 @@ async function handleRegister() {
             isRegistering = false;
         }
     } catch (e) {
+        hideLoading();
         showMessageBox('registerMsg', 'error', 'Connection error. Please try again.');
         isRegistering = false;
     }
@@ -494,6 +532,7 @@ async function handleGoogleSignIn() {
             payload.invitation_token = window.invitationToken;
         }
 
+        showLoading();
         const res = await fetch('/auth/google-login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -505,6 +544,7 @@ async function handleGoogleSignIn() {
 
             if (data.is_new_user) {
                 // New user - show registration modal
+                hideLoading();
                 window.googleIdToken = idToken; // Store for later
                 showGoogleRegisterModal(data);
             } else {
@@ -523,10 +563,12 @@ async function handleGoogleSignIn() {
                     console.warn('Failed to fetch user data:', e);
                 }
                 
+                hideLoading();
                 showMessageBox('loginMsg', 'success', 'Welcome back! Redirecting…');
                 setTimeout(() => { window.location.href = '/dashboard'; }, 800);
             }
         } else {
+            hideLoading();
             const err = await res.json();
             if (res.status === 503) {
                 showMessageBox('loginMsg', 'error', err.detail || 'Under maintenance.');
@@ -581,7 +623,7 @@ async function handleGoogleComplete(event) {
     const full_name = document.getElementById('googleFullName').value.trim();
     const agree_tos = document.getElementById('googleAgreeTos').checked;
     const agree_privacy = document.getElementById('googleAgreePrivacy').checked;
-    const agree_fair_use = document.getElementById('regAgreeFairUse') ? document.getElementById('regAgreeFairUse').checked : (document.getElementById('googleAgreeFairUse') ? document.getElementById('googleAgreeFairUse').checked : true);
+    const agree_fair_use = document.getElementById('googleAgreeFairUse').checked;
 
     if (!full_name) {
         showMessageBox('googleRegisterMsg', 'error', 'Please enter your full name.');
@@ -600,6 +642,7 @@ async function handleGoogleComplete(event) {
 
     try {
         isCompletingGoogle = true;
+        showLoading();
         const body = { idToken: window.googleIdToken, full_name, nickname, agree_tos, agree_privacy, agree_fair_use };
         if (window.invitationToken) {
             body.invitation_token = window.invitationToken;
@@ -611,6 +654,7 @@ async function handleGoogleComplete(event) {
             body: JSON.stringify(body)
         });
 
+        hideLoading();
         if (res.ok) {
             const data = await res.json();
             if (data.pending_approval) {
@@ -623,11 +667,10 @@ async function handleGoogleComplete(event) {
             }
             if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
             if (data.access_token) localStorage.setItem('token', data.access_token);
-            showMessageBox('googleRegisterMsg', 'success', 'Welcome! Redirecting…');
-            setTimeout(() => { 
-                isCompletingGoogle = false;
-                window.location.href = '/dashboard'; 
-            }, 800);
+            
+            // Instead of redirecting, show the success panel and let the user click login
+            isCompletingGoogle = false;
+            switchPanel('googleAccountCreated');
         } else {
             const err = await res.json();
             if (res.status === 503) {
@@ -642,6 +685,7 @@ async function handleGoogleComplete(event) {
             }
         }
     } catch (e) {
+        hideLoading();
         console.error('Google registration error:', e);
         showMessageBox('googleRegisterMsg', 'error', 'An error occurred. Please try again.');
         isCompletingGoogle = false;
@@ -670,12 +714,14 @@ async function handleForgotPassword(event) {
     
     try {
         isSendingReset = true;
+        showLoading();
         const res = await fetch('/auth/password-reset-request', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
         });
         
+        hideLoading();
         if (res.ok) {
             showMessageBox('forgotPasswordMsg', 'success', 'Check your email for a password reset link. It expires in 24 hours.');
             setTimeout(() => {
@@ -692,6 +738,7 @@ async function handleForgotPassword(event) {
             isSendingReset = false;
         }
     } catch (e) {
+        hideLoading();
         console.error('Password reset request error:', e);
         showMessageBox('forgotPasswordMsg', 'error', 'Connection error. Please try again.');
         isSendingReset = false;
@@ -744,12 +791,14 @@ async function handleResetPassword(event) {
             return;
         }
         
+        showLoading();
         const res = await fetch('/auth/password-reset', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token, new_password: newPassword })
         });
         
+        hideLoading();
         if (res.ok) {
             showMessageBox('resetPasswordMsg', 'success', 'Password reset successfully! Redirecting to login...');
             setTimeout(() => {
@@ -762,6 +811,7 @@ async function handleResetPassword(event) {
             isResettingPassword = false;
         }
     } catch (e) {
+        hideLoading();
         console.error('Password reset error:', e);
         showMessageBox('resetPasswordMsg', 'error', 'Connection error. Please try again.');
         isResettingPassword = false;

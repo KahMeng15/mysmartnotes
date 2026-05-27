@@ -18,6 +18,9 @@
     <script src="/js/quotes.js"></script>
 </head>
 <body class="auth-page">
+    <div id="loadingBar" class="loading-bar-container">
+        <div class="loading-bar"></div>
+    </div>
     <div class="auth-left">
         <div class="quote-container" id="quoteContainer">
             <div class="quote-text-wrapper">
@@ -198,6 +201,20 @@
                 <button type="submit" class="btn btn-next btn-block" style="margin-top:16px;">Create Account</button>
                 <p class="toggle-link">Changed your mind? <a onclick="closeGoogleRegisterModal()">Cancel</a></p>
             </form>
+        </div>
+
+        <!-- Google Account Created Panel -->
+        <div class="panel" id="googleAccountCreatedPanel">
+            <div style="text-align: left; padding: 20px 0;">
+                <div class="icon-circle" style="background-color: #ecfdf5; color: #10b981; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 0 24px 0; font-size: 2.5rem;">
+                    <i class="ph ph-check-circle"></i>
+                </div>
+                <h2 style="font-size: 1.8rem; margin-bottom: 12px; color: #111827;">Account Created!</h2>
+                <p style="color: #4b5563; margin-bottom: 32px; font-size: 1rem; line-height: 1.5;">
+                    Your account has been successfully created with Google. You can now log in to start using MySmartNotes.
+                </p>
+                <button class="btn btn-next btn-block" onclick="window.location.href='/dashboard'">Go to Dashboard</button>
+            </div>
         </div>
 
         <!-- Forgot Password Panel -->
