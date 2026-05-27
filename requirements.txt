@@ -15,6 +15,8 @@ google-auth==2.27.0
 httpx==0.25.2
 pytest==9.0.3
 pytest-asyncio==0.21.1
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
 sentence-transformers>=2.7.0
 huggingface-hub>=0.19.0
 numpy>=1.24.0

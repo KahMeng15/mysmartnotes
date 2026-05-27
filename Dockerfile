@@ -1,6 +1,30 @@
+# --- Stage 1: Builder ---
+FROM python:3.11-slim-bookworm AS builder
+
+# Prevent Python from writing .pyc files and enable unbuffered logging
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a virtual environment to keep dependencies isolated
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+
+# --- Stage 2: Runtime ---
 FROM python:3.11-slim-bookworm
 
-# Add labels for GHCR
 LABEL org.opencontainers.image.source="https://github.com/kahmeng15/mysmartnotes"
 LABEL org.opencontainers.image.description="MySmartNotes - AI-Powered Study Companion"
 LABEL org.opencontainers.image.licenses="MIT"
@@ -8,14 +32,13 @@ LABEL org.opencontainers.image.licenses="MIT"
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
+    PATH="/opt/venv/bin:$PATH" \
     PORT=8000 \
     ENVIRONMENT=production
 
 WORKDIR /app
 
-# Install system dependencies
-# We add curl for healthchecks
+# Install ONLY runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     poppler-utils \
@@ -23,18 +46,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender-dev \
     curl \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies separately to leverage Docker cache
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the virtual environment from the builder stage
+COPY --from=builder /opt/venv /opt/venv
 
-# Copy application code (relying on .dockerignore to filter)
+# Copy application code
 COPY . .
 
 # Create non-root user and setup directories
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
-    && mkdir -p /app/data /app/generated /app/output /app/uploads \
+    && mkdir -p /app/data /app/generated /app/output /app/uploads /app/logs \
     && chown -R appuser:appuser /app
 
 # Expose port
