@@ -39,6 +39,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Install ONLY runtime system dependencies
+# We add gosu for secure privilege dropping
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     poppler-utils \
@@ -46,6 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender-dev \
     curl \
+    gosu \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -65,14 +67,15 @@ RUN groupadd --gid ${GROUP_ID} appgroup \
     && mkdir -p /app/data /app/generated /app/output /app/uploads /app/logs \
     && chown -R appuser:appgroup /app
 
+# Prepare entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Expose port
 EXPOSE 8000
 
-USER appuser
+# Start as root to allow entrypoint to fix permissions
+ENTRYPOINT ["docker-entrypoint.sh"]
 
-# Health check using curl
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
-
-# Run application
-CMD ["python", "-m", "app.main"]
+# Default command (can be overridden in docker-compose)
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
