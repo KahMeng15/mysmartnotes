@@ -55,10 +55,15 @@ COPY --from=builder /opt/venv /opt/venv
 # Copy application code
 COPY . .
 
+# Define build arguments for UID and GID (defaults to TrueNAS 'apps' user)
+ARG USER_ID=568
+ARG GROUP_ID=568
+
 # Create non-root user and setup directories
-RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+RUN groupadd --gid ${GROUP_ID} appgroup \
+    && useradd --create-home --shell /usr/sbin/nologin --uid ${USER_ID} --gid ${GROUP_ID} appuser \
     && mkdir -p /app/data /app/generated /app/output /app/uploads /app/logs \
-    && chown -R appuser:appuser /app
+    && chown -R appuser:appgroup /app
 
 # Expose port
 EXPOSE 8000

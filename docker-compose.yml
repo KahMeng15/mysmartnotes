@@ -34,7 +34,12 @@ services:
 
   api:
     platform: linux/amd64
-    build: .
+    user: "${PUID:-568}:${PGID:-568}"
+    build:
+      context: .
+      args:
+        - USER_ID=${PUID:-568}
+        - GROUP_ID=${PGID:-568}
     image: ghcr.io/kahmeng15/mysmartnotes:dev
     container_name: mysmartnotes_api
     command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -103,5 +108,8 @@ services:
 networks:
   mysmartnotes-net:
     driver: bridge
+
+
+
 
 
