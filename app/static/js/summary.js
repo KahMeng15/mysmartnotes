@@ -680,11 +680,13 @@ async function generateSummary() {
     
     let currentPercent = 5;
     let progressInterval = setInterval(() => {
-        if (currentPercent < 90) {
-            currentPercent += Math.random() * 5;
+        // Only auto-increment if we haven't reached the "wait for AI" threshold
+        // OR if the real progress is already ahead of us
+        if (currentPercent < 85) {
+            currentPercent += Math.random() * 3;
             updateSummaryProgress(Math.floor(currentPercent), 'Summarizing note content...', 'Processing');
         }
-    }, 1500);
+    }, 2000);
 
     try {
         const res = await fetch('/summaries/summary', {
@@ -707,8 +709,16 @@ async function generateSummary() {
             const data = await res.json();
 
             if (data.task_id) {
+                console.log(`[Summary] Task submitted. Task ID: ${data.task_id}`);
                 // Background task submitted, wait for WebSocket
                 WSManager.subscribe(data.task_id, (update) => {
+                    console.log(`[Summary] WS Update for ${data.task_id}:`, update);
+                    if (update.progress !== undefined) {
+                        // Synchronize our local progress with the real one from the server
+                        currentPercent = update.progress;
+                        updateSummaryProgress(Math.floor(currentPercent), update.message || 'Summarizing note content...', 'Processing');
+                    }
+
                     if (update.status === 'completed') {
                         clearInterval(progressInterval);
                         updateSummaryProgress(100, 'Complete!', 'Done');

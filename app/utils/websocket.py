@@ -30,7 +30,6 @@ class ConnectionManager:
     
     async def connect(self, user_id: int, websocket: WebSocket):
         """Register a new WebSocket connection"""
-        await websocket.accept()
         if user_id not in self.active_connections:
             self.active_connections[user_id] = set()
         self.active_connections[user_id].add(websocket)
@@ -60,6 +59,7 @@ class ConnectionManager:
                 if message["type"] == "message":
                     try:
                         data = json.loads(message["data"])
+                        logger.info(f"WS Manager received Redis update: {data}")
                         user_id = data.get("user_id")
                         payload = data.get("payload")
                         if user_id is not None and payload is not None:

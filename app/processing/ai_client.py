@@ -354,9 +354,13 @@ class AIClient:
         try: import json; return json.loads(res)
         except: return []
 
-    async def generate_summary(self, content: str, mode: str = "elaborate", output_format: str = "sentence") -> str:
-        prompt = f"Summarize {mode} as {output_format}:\n{content}"
-        return await self.generate_text(prompt, max_tokens=1000)
+    async def generate_summary(self, content: str, mode: str = "elaborate", output_format: str = "sentence", progress_callback: Optional[Callable[[int], None]] = None) -> str:
+        """
+        Generate a summary using parallel chunked processing via SummaryPipeline.
+        """
+        from app.processing.summary_pipeline import SummaryPipeline
+        pipeline = SummaryPipeline(self)
+        return await pipeline.generate_summary(content, mode, output_format, progress_callback=progress_callback)
 
 def get_ai_client(user: Optional[User] = None, db: Optional[Session] = None) -> AIClient:
     return AIClient(user=user, db=db)

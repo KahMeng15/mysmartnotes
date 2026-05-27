@@ -1,6 +1,7 @@
 """WebSocket router for real-time updates"""
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
 from sqlalchemy.orm import Session
+from typing import Optional
 import logging
 
 from app.utils.db import get_db
@@ -12,19 +13,40 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ws", tags=["websocket"])
 
-@router.websocket("/{token}")
+@router.websocket("/updates")
+@router.websocket("/{token_param}")
 async def websocket_endpoint(
     websocket: WebSocket,
-    token: str,
+    token_param: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
     WebSocket endpoint for real-time task updates.
-    Expects a JWT token in the path for authentication.
+    Accepts immediately to avoid handshake rejections, then validates.
     """
+    await websocket.accept()
+    
+    # Try to get token from various sources
+    token = token_param
+    if token == "updates":
+        token = None
+        
+    if not token:
+        token = websocket.cookies.get("access_token")
+    if not token:
+        token = websocket.query_params.get("token")
+
+    if not token:
+        logger.warning("WebSocket auth failed: No token found")
+        await websocket.send_json({"error": "Unauthorized", "message": "No token found"})
+        await websocket.close(code=1008)
+        return
+
     payload = decode_token(token)
     if not payload:
-        await websocket.close(code=1008) # Policy Violation
+        logger.warning("WebSocket auth failed: Invalid token")
+        await websocket.send_json({"error": "Unauthorized", "message": "Invalid token"})
+        await websocket.close(code=1008)
         return
 
     user_id = payload.get("sub")

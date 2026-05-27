@@ -53,7 +53,7 @@ class TaskManager:
                         task_type=task_type,
                         status="pending",
                         progress=0,
-                        input_data=_serialize_result({"kwargs": {**kwargs, "user_id": user_id}}),
+                        input_data=_serialize_result({"kwargs": {**kwargs, "user_id": user_id, "task_id": task_id}}),
                     )
                     db.add(task)
                 else:
@@ -61,7 +61,7 @@ class TaskManager:
                     task.task_type = task_type
                     task.status = "pending"
                     task.progress = 0
-                    task.input_data = _serialize_result({"kwargs": {**kwargs, "user_id": user_id}})
+                    task.input_data = _serialize_result({"kwargs": {**kwargs, "user_id": user_id, "task_id": task_id}})
                     task.result = None
                     task.error_message = None
                     task.updated_at = datetime.utcnow()
@@ -99,17 +99,16 @@ class TaskManager:
             db_task.updated_at = datetime.utcnow()
             db.commit()
 
-            # Publish WebSocket update if task is completed or failed
-            if status in ["completed", "failed"]:
-                from app.utils.websocket import manager
-                payload = {
-                    "task_id": task_id,
-                    "status": status,
-                    "result": result if status == "completed" else None,
-                    "error": error if status == "failed" else None,
-                    "progress": 100 if status == "completed" else 0
-                }
-                manager.publish_update(db_task.user_id, payload)
+            # Publish WebSocket update
+            from app.utils.websocket import manager
+            payload = {
+                "task_id": task_id,
+                "status": db_task.status,
+                "result": result if status == "completed" else None,
+                "error": error if status == "failed" else None,
+                "progress": db_task.progress or 0
+            }
+            manager.publish_update(db_task.user_id, payload)
 
         except Exception as exc:
             logger.error(f"Failed to update DB task {task_id}: {exc}")
@@ -230,10 +229,17 @@ class SummaryTask:
             ai_client = AIClient(user, db=db)
             
             start_time = time.time()
+            task_id = kwargs.get("task_id")
+            
+            def progress_callback(percent):
+                if task_id:
+                    TaskManager.update_task_progress(task_id, percent)
+
             summary_content = await ai_client.generate_summary(
                 content=lecture_content,
                 mode=mode,
-                output_format=output_format
+                output_format=output_format,
+                progress_callback=progress_callback
             )
             
             processing_time = time.time() - start_time
@@ -248,10 +254,10 @@ class SummaryTask:
             doc = Summary(
                 id=doc_id,
                 version=next_version,
-                user_id=user_id,
                 lecture_id=lecture_id,
                 title=f"Summary - {lecture.title}",
                 summary_type="summary",
+                file_path=f"summary_{lecture.id}_{next_version}.md",
                 mode=mode,
                 output_format=output_format,
                 processing_time=processing_time,
@@ -262,6 +268,9 @@ class SummaryTask:
             db.commit()
             
             StorageManager.save_summary_text(doc_id, summary_content)
+            
+            if task_id:
+                TaskManager.update_task_progress(task_id, 100)
             
             return {
                 "id": doc_id,

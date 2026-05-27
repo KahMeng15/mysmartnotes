@@ -12,13 +12,16 @@ const WSManager = {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) return;
         
         const token = this._getCookie('access_token');
-        if (!token) {
-            console.warn('WSManager: No access token found, skipping WebSocket init');
-            return;
-        }
-
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/${token}`;
+        let wsUrl;
+
+        if (token) {
+            wsUrl = `${protocol}//${window.location.host}/ws/${token}`;
+        } else {
+            // Fallback to cookie-based auth on the server side
+            wsUrl = `${protocol}//${window.location.host}/ws/updates`;
+            console.log('WSManager: No access token in JS, attempting cookie-based connection');
+        }
         
         console.log('WSManager: Connecting to', wsUrl);
         this.socket = new WebSocket(wsUrl);
@@ -82,7 +85,8 @@ const WSManager = {
 
 // Initialize WebSocket on page load if logged in
 document.addEventListener('DOMContentLoaded', () => {
-    if (WSManager._getCookie('access_token')) {
+    // Check for any sign of a session since access_token is HttpOnly
+    if (WSManager._getCookie('csrf_token') || localStorage.getItem('user')) {
         WSManager.init();
     }
 });
