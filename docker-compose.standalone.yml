@@ -34,7 +34,7 @@ services:
       POSTGRES_PASSWORD: mysmartnotespassword
       POSTGRES_DB: mysmartnotes
     volumes:
-      - /mnt/App/Webapps/mysmartnotes-dev/data/postgres:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
@@ -62,7 +62,7 @@ services:
   api:
     platform: linux/amd64
     build:
-      context: /mnt/App/Webapps/mysmartnotes-dev
+      context: .
       args:
         - USER_ID=${PUID:-568}
         - GROUP_ID=${PGID:-568}
@@ -96,8 +96,8 @@ services:
       FIREBASE_APP_ID: your-app-id
       FIREBASE_MEASUREMENT_ID: your-measurement-id
     volumes:
-      - /mnt/App/Webapps/mysmartnotes-dev/data:/app/data
-      - /mnt/App/Webapps/mysmartnotes-dev/logs:/app/logs
+      - ./data:/app/data
+      - ./logs:/app/logs
     restart: unless-stopped
     networks:
       - mysmartnotes-net
@@ -105,7 +105,7 @@ services:
   worker:
     platform: linux/amd64
     build:
-      context: /mnt/App/Webapps/mysmartnotes-dev
+      context: .
       args:
         - USER_ID=${PUID:-568}
         - GROUP_ID=${PGID:-568}
@@ -122,26 +122,29 @@ services:
       USER_ID: ${PUID:-568}
       GROUP_ID: ${PGID:-568}
     volumes:
-      - /mnt/App/Webapps/mysmartnotes-dev/data:/app/data
-      - /mnt/App/Webapps/mysmartnotes-dev/logs:/app/logs
+      - ./data:/app/data
+      - ./logs:/app/logs
     restart: unless-stopped
     networks:
       - mysmartnotes-net
 
   nginx:
     build:
-      context: /mnt/App/Webapps/mysmartnotes-dev
-      dockerfile: app/Dockerfile.nginx
+      context: ./app
+      dockerfile: Dockerfile.nginx
     container_name: mysmartnotes_frontend
     depends_on:
       - api
     ports:
       - "${PORT:-8000}:80"
     volumes:
-      - /mnt/App/Webapps/mysmartnotes-dev/logs:/app/logs
+      - ./logs:/app/logs
     restart: unless-stopped
     networks:
       - mysmartnotes-net
+
+volumes:
+  db_data:
 
 networks:
   mysmartnotes-net:

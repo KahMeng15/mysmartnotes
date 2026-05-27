@@ -7,13 +7,13 @@ services:
       POSTGRES_PASSWORD: mysmartnotespassword
       POSTGRES_DB: mysmartnotes
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
       - mysmartnotes-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mysmartnotes"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,6 +56,8 @@ services:
       - DB_HOST=db
       - DB_NAME=mysmartnotes
       - REDIS_URL=redis://redis:6379/0
+      - USER_ID=${PUID:-568}
+      - GROUP_ID=${PGID:-568}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -82,6 +84,8 @@ services:
       - DB_HOST=db
       - DB_NAME=mysmartnotes
       - REDIS_URL=redis://redis:6379/0
+      - USER_ID=${PUID:-568}
+      - GROUP_ID=${PGID:-568}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -104,14 +108,9 @@ services:
     networks:
       - mysmartnotes-net
 
+volumes:
+  db_data:
+
 networks:
   mysmartnotes-net:
     driver: bridge
-
-
-
-
-
-
-
-
