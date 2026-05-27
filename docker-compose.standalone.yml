@@ -1,13 +1,13 @@
 x-common-env: &common-env
-  DB_USER: your-db-user
-  DB_PASSWORD: your-db-password
+  DB_USER: mysmartnotes
+  DB_PASSWORD: mysmartnotespassword
   DB_HOST: db
   DB_PORT: 5432
-  DB_NAME: your-db-name
+  DB_NAME: mysmartnotes
   REDIS_URL: redis://redis:6379/0
   CACHE_TTL_SECONDS: 3600
   ENVIRONMENT: development
-  SECRET_KEY: your-secret-key-change-in-production
+  SECRET_KEY: change-me-in-production
   APP_ENCRYPTION_KEY: ""
   DEBUG: "True"
   LOG_LEVEL: INFO
@@ -28,18 +28,19 @@ services:
   db:
     image: postgres:15-alpine
     container_name: mysmartnotes_db
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: your-db-user
-      POSTGRES_PASSWORD: your-db-password
-      POSTGRES_DB: your-db-name
+      POSTGRES_USER: mysmartnotes
+      POSTGRES_PASSWORD: mysmartnotespassword
+      POSTGRES_DB: mysmartnotes
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - /mnt/App/Webapps/mysmartnotes-dev/data/postgres:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
       - mysmartnotes-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mysmartnotes"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -61,7 +62,7 @@ services:
   api:
     platform: linux/amd64
     build:
-      context: .
+      context: /mnt/App/Webapps/mysmartnotes-dev
       args:
         - USER_ID=${PUID:-568}
         - GROUP_ID=${PGID:-568}
@@ -76,6 +77,8 @@ services:
     environment:
       <<: *common-env
       PORT: 8000
+      USER_ID: ${PUID:-568}
+      GROUP_ID: ${PGID:-568}
       CORS_ALLOWED_ORIGINS: http://localhost:8000,http://127.0.0.1:8000
       COOKIE_SECURE: "false"
       COOKIE_SAMESITE: lax
@@ -93,17 +96,16 @@ services:
       FIREBASE_APP_ID: your-app-id
       FIREBASE_MEASUREMENT_ID: your-measurement-id
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - /mnt/App/Webapps/mysmartnotes-dev/data:/app/data
+      - /mnt/App/Webapps/mysmartnotes-dev/logs:/app/logs
     restart: unless-stopped
     networks:
       - mysmartnotes-net
 
   worker:
     platform: linux/amd64
-    user: "${PUID:-568}:${PGID:-568}"
     build:
-      context: .
+      context: /mnt/App/Webapps/mysmartnotes-dev
       args:
         - USER_ID=${PUID:-568}
         - GROUP_ID=${PGID:-568}
@@ -117,24 +119,26 @@ services:
         condition: service_healthy
     environment:
       <<: *common-env
+      USER_ID: ${PUID:-568}
+      GROUP_ID: ${PGID:-568}
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - /mnt/App/Webapps/mysmartnotes-dev/data:/app/data
+      - /mnt/App/Webapps/mysmartnotes-dev/logs:/app/logs
     restart: unless-stopped
     networks:
       - mysmartnotes-net
 
   nginx:
     build:
-      context: ./app
-      dockerfile: Dockerfile.nginx
+      context: /mnt/App/Webapps/mysmartnotes-dev
+      dockerfile: app/Dockerfile.nginx
     container_name: mysmartnotes_frontend
     depends_on:
       - api
     ports:
       - "${PORT:-8000}:80"
     volumes:
-      - ./logs:/app/logs
+      - /mnt/App/Webapps/mysmartnotes-dev/logs:/app/logs
     restart: unless-stopped
     networks:
       - mysmartnotes-net
