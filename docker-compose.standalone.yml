@@ -23,6 +23,12 @@ x-common-env: &common-env
   GLOBAL_AI_TIER3_MODEL: gemma4:e2b
   GLOBAL_AI_TIER3_BASE_URL: http://10.0.0.10:30068
   GLOBAL_AI_TIER3_REASONING_LEVEL: low
+  SMTP_HOST: smtp.gmail.com
+  SMTP_PORT: 587
+  SMTP_USER: your-email@gmail.com
+  SMTP_PASSWORD: your-app-password
+  SMTP_SENDER_NAME: MySmartNotes
+  SMTP_TLS: "True"
 
 services:
   db:
