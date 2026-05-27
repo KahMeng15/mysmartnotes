@@ -145,23 +145,17 @@ async def get_lectures(
     return lectures
 
 
-@router.post("/upload", response_model=LectureResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/upload", response_model=List[LectureResponse], status_code=status.HTTP_201_CREATED)
 async def upload_lecture(
     background_tasks: BackgroundTasks,
     subject_id: str = Form(...),
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     title: str = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Upload a lecture file and create lecture record"""
+    """Upload multiple lecture files and create lecture records"""
     
-    # Handle auto-title
-    auto_detect_title = False
-    if not title:
-        title = os.path.splitext(file.filename)[0]
-        auto_detect_title = True
-
     # Validate subject exists and belongs to user
     subject = db.query(Subject).filter(
         Subject.id == subject_id,
@@ -174,7 +168,6 @@ async def upload_lecture(
             detail="Subject not found"
         )
     
-    # Validate file type
     allowed_types = {
         "application/pdf": ".pdf",
         "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
@@ -183,70 +176,94 @@ async def upload_lecture(
         "image/jpeg": ".jpg",
         "image/jpg": ".jpg"
     }
-    
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File type not allowed. Allowed types: {', '.join(allowed_types.keys())}"
+
+    processed_lectures = []
+
+    for file in files:
+        # Handle auto-title per file
+        auto_detect_title = False
+        file_title = title
+        if not file_title:
+            file_title = os.path.splitext(file.filename)[0]
+            auto_detect_title = True
+        
+        # If multiple files and a title is provided, use the filename as title instead of duplicating the same title
+        if len(files) > 1 and title:
+             file_title = f"{title} - {os.path.splitext(file.filename)[0]}"
+
+        if file.content_type not in allowed_types:
+            logger.warning(f"File type not allowed for {file.filename}: {file.content_type}")
+            continue
+        
+        # Validate file size (50MB max)
+        max_size = 50 * 1024 * 1024  # 50MB
+        contents = await file.read()
+        if len(contents) > max_size:
+            logger.warning(f"File too large: {file.filename}")
+            continue
+        
+        # Enforce tier quotas
+        try:
+            enforce_quota_notes(current_user, db)
+            enforce_quota_storage(current_user, len(contents), db)
+        except HTTPException as e:
+            logger.error(f"Quota exceeded: {e.detail}")
+            # If we already processed some, we return them, otherwise raise for the first one
+            if not processed_lectures:
+                raise e
+            break
+        
+        # Create upload directory structure
+        user_upload_dir = os.path.join(UPLOAD_DIR, str(current_user.id))
+        os.makedirs(user_upload_dir, exist_ok=True)
+        
+        # Save file
+        file_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
+        file_path = os.path.join(user_upload_dir, file_name)
+        
+        with open(file_path, "wb") as f:
+            f.write(contents)
+        
+        # Create lecture record
+        db_lecture = Lecture(
+            id=generate_random_id(db, Lecture),
+            title=file_title,
+            subject_id=subject_id,
+            user_id=current_user.id,
+            file_path=file_path,
+            file_name=file.filename,
+            file_size=len(contents),
+            file_type=file.content_type,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
         )
-    
-    # Validate file size (50MB max)
-    max_size = 50 * 1024 * 1024  # 50MB
-    contents = await file.read()
-    if len(contents) > max_size:
-        raise HTTPException(
-            status_code=status.HTTP_413_PAYLOAD_TOO_LARGE,
-            detail="File size exceeds 50MB limit"
+        
+        db.add(db_lecture)
+        db.commit()
+        db.refresh(db_lecture)
+        
+        # STEP 3: Process content extraction in background (Offloaded to Worker)
+        task_id = f"ocr_{current_user.id}_{db_lecture.id}"
+        TaskManager.submit_task(
+            task_id, 
+            "lecture_processing", 
+            current_user.id, 
+            lecture_id=db_lecture.id, 
+            auto_detect_title=auto_detect_title
         )
-    
-    # Enforce tier quotas
-    enforce_quota_notes(current_user, db)
-    enforce_quota_storage(current_user, len(contents), db)
-    
-    # Create upload directory structure
-    user_upload_dir = os.path.join(UPLOAD_DIR, str(current_user.id))
-    os.makedirs(user_upload_dir, exist_ok=True)
-    
-    # Save file
-    file_ext = allowed_types[file.content_type]
-    file_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
-    file_path = os.path.join(user_upload_dir, file_name)
-    
-    with open(file_path, "wb") as f:
-        f.write(contents)
-    
-    # Create lecture record
-    db_lecture = Lecture(
-        id=generate_random_id(db, Lecture),
-        title=title,
-        subject_id=subject_id,
-        user_id=current_user.id,
-        file_path=file_path,
-        file_name=file.filename,
-        file_size=len(contents),
-        file_type=file.content_type,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
-    )
-    
-    db.add(db_lecture)
-    db.commit()
-    db.refresh(db_lecture)
-    
+        processed_lectures.append(db_lecture)
+
     # Clear cache
     clear_cache_pattern_sync(f"cache_resp:/lectures*:u{current_user.id}*")
     
-    # STEP 3: Process content extraction in background (Offloaded to Worker)
-    task_id = f"ocr_{current_user.id}_{db_lecture.id}"
-    TaskManager.submit_task(
-        task_id, 
-        "lecture_processing", 
-        current_user.id, 
-        lecture_id=db_lecture.id, 
-        auto_detect_title=auto_detect_title
-    )
-    
-    return db_lecture
+    if not processed_lectures:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid files were uploaded"
+        )
+
+    return processed_lectures
+
 
 
 @router.get("/{lecture_id}", response_model=LectureResponse)

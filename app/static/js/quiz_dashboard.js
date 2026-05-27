@@ -79,6 +79,9 @@ function renderQuizzes() {
     const searchQuery = document.getElementById('quizSearch')?.value || '';
     const hasActiveSearch = searchQuery.trim().length > 0;
     
+    // Check for active quiz tasks
+    const activeTasks = window.ProgressManager ? Array.from(window.ProgressManager.activeTasks.values()).filter(t => t.task_type === 'quiz_generation') : [];
+
     // Sort overall data first
     let sortedData = [...quizzesData];
     sortedData.sort((a, b) => {
@@ -90,7 +93,7 @@ function renderQuizzes() {
 
     containerEl.innerHTML = '';
 
-    if (sortedData.length === 0 && quizGroups.length === 0) {
+    if (sortedData.length === 0 && quizGroups.length === 0 && activeTasks.length === 0) {
         containerEl.innerHTML = `
             <div class="empty-state" style="padding: 40px; text-align: center;">
                 <i class="ph ph-mask-sad" style="font-size: 48px; color: var(--color-gray); margin-bottom: 16px;"></i>
@@ -105,6 +108,26 @@ function renderQuizzes() {
     const grouped = {};
     quizGroups.forEach(g => grouped[g.id] = []);
     const ungrouped = [];
+
+    // Add active tasks to appropriate groups or ungrouped
+    activeTasks.forEach(task => {
+        const title = task.input_data?.kwargs?.title || 'New Quiz';
+        const quizPlaceholder = {
+            id: `task-${task.task_id}`,
+            title: title,
+            isProcessing: true,
+            progress: task.progress || 0,
+            status: task.status,
+            created_at: task.created_at || new Date().toISOString(),
+            quiz_group_id: task.input_data?.kwargs?.quiz_group_id
+        };
+        
+        if (quizPlaceholder.quiz_group_id && grouped[quizPlaceholder.quiz_group_id]) {
+            grouped[quizPlaceholder.quiz_group_id].push(quizPlaceholder);
+        } else {
+            ungrouped.push(quizPlaceholder);
+        }
+    });
 
     sortedData.forEach(quiz => {
         if (quiz.quiz_group_id && grouped[quiz.quiz_group_id]) {
@@ -142,69 +165,27 @@ function renderQuizzes() {
     }
 }
 
-function createGroupSection(group, quizzes, isUngrouped = false) {
-    const isMinimized = minimizedGroups.has(group.id);
-    
-    const quizzesHtml = quizzes.length > 0 ? `
-        <div class="quiz-grid">
-            ${quizzes.map(quiz => createQuizCardHtml(quiz)).join('')}
-        </div>
-    ` : `
-        <div class="empty-state" style="padding: var(--spacing-lg);">
-            No quizzes in this group.
-        </div>
-    `;
-
-    let actionsHtml = '';
-    if (!isUngrouped) {
-        actionsHtml = `
-            <div class="group-actions">
-                <button onclick="event.stopPropagation(); openCreateModal('${group.id}')" class="btn btn-outline btn-small" title="Add Quiz to Group">
-                    <i class="ph ph-plus"></i>
-                </button>
-                <button onclick="event.stopPropagation(); openEditGroupModal('${group.id}', '${group.name.replace(/'/g, "\\'")}')" class="btn btn-outline btn-small">
-                    <i class="ph ph-pencil-simple"></i>
-                </button>
-                <button onclick="event.stopPropagation(); deleteQuizGroup('${group.id}')" class="btn btn-outline btn-small">
-                    <i class="ph ph-trash"></i>
-                </button>
-            </div>
-        `;
-    } else {
-        actionsHtml = `
-            <div class="group-actions">
-                <button onclick="event.stopPropagation(); openCreateModal('')" class="btn btn-outline btn-small" title="Add Quiz">
-                    <i class="ph ph-plus"></i>
-                </button>
+function createQuizCardHtml(quiz) {
+    if (quiz.isProcessing || quiz.status === 'running') {
+        return `
+            <div class="quiz-card skeleton-card" id="quiz-${quiz.id}">
+                <div class="quiz-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+                    <div class="quiz-card-icon" style="background: var(--color-background); color: var(--color-primary);">
+                        <i class="ph ph-exam"></i>
+                    </div>
+                </div>
+                <div class="quiz-card-body" style="cursor: default; padding: 12px 0;">
+                    <h4 style="margin: 0; font-size: 14px; font-weight: 600;">${quiz.title}</h4>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--color-gray);">Generating questions...</p>
+                </div>
+                <div class="quiz-actions" style="font-size: 11px; font-weight: 600; color: var(--color-primary); margin-top: auto;">
+                    ${quiz.progress}%
+                </div>
+                <div class="skeleton-progress-bar" style="width: ${quiz.progress}%"></div>
             </div>
         `;
     }
 
-    const minimizeButtonHtml = `
-        <button onclick="event.stopPropagation(); toggleGroupMinimize('${group.id}')" class="btn btn-outline btn-small btn-minimize">
-            ${isMinimized ? '<i class="ph ph-caret-right"></i>' : '<i class="ph ph-caret-down"></i>'}
-        </button>
-    `;
-
-    return `
-        <div class="group-section" data-group-id="${group.id}">
-            <div class="group-header ${isMinimized ? 'minimized' : ''}">
-                <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-                    ${minimizeButtonHtml}
-                    <div class="group-title">
-                        ${group.name}
-                    </div>
-                </div>
-                ${actionsHtml}
-            </div>
-            <div class="subjects-grid" style="${isMinimized ? 'display: none;' : 'display: block;'}">
-                ${quizzesHtml}
-            </div>
-        </div>
-    `;
-}
-
-function createQuizCardHtml(quiz) {
     const dateStr = new Date(quiz.created_at).toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
@@ -237,24 +218,22 @@ function createQuizCardHtml(quiz) {
                             <i class="ph ph-arrows-out-simple"></i> Move to Group
                         </button>
                         <button onclick="event.stopPropagation(); deleteQuiz('${quiz.id}')" style="color: var(--color-error);">
-                            <i class="ph ph-trash"></i> Delete
+                            <i class="ph ph-trash"></i> Delete Quiz
                         </button>
                     </div>
                 </div>
             </div>
-            <div class="quiz-card-title">${quiz.title}</div>
-            <div style="font-size: 13px; color: var(--color-gray); margin-bottom: 10px;">
-                ${quiz.questions?.length || 0} Questions
-            </div>
-            <div class="quiz-card-meta">
-                <span class="quiz-card-tag">${scopeLabel}</span>
-                <div class="flex-align-center gap-sm">
-                    <span style="display: flex; align-items: center; gap: 4px; font-size: 12px;"><i class="ph ph-calendar"></i> ${dateStr}</span>
+            <div class="quiz-card-body">
+                <div class="quiz-card-title">${quiz.title}</div>
+                <div class="quiz-card-meta">
+                    <div class="quiz-card-date">${dateStr}</div>
+                    <div class="quiz-card-scope">${scopeLabel}</div>
                 </div>
             </div>
         </div>
     `;
 }
+
 
 function toggleQuizActionMenu(event, quizId) {
     // Close all other menus

@@ -3168,3 +3168,233 @@ body.auth-page {
   .chat-layout { flex-direction: column; height: calc(100vh - 130px); }
   .chat-sidebar { width: 100%; height: 200px; border-right: none; border-bottom: 1px solid var(--color-light-gray); }
 }
+
+/* ─── Global Progress Card ────────────────────────────────────────── */
+.global-progress-card {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 320px;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--color-light-gray);
+  max-height: 60px; /* Collapsed height */
+  display: none; /* Managed by JS */
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.global-progress-card.expanded {
+  max-height: 480px;
+}
+
+.global-progress-card-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  background: white;
+  user-select: none;
+  position: relative;
+  border-bottom: 1px solid transparent;
+  transition: background 0.2s;
+}
+
+.global-progress-card.expanded .global-progress-card-header {
+  border-bottom-color: var(--color-light-gray);
+}
+
+.global-progress-header-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+  z-index: 5;
+}
+
+.global-progress-card.expanded .global-progress-header-bar {
+  display: none;
+}
+
+.global-progress-card-header:hover {
+  background: var(--color-background);
+}
+
+.global-progress-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.global-progress-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-light-gray);
+  border-top: 2px solid var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.global-progress-title {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.global-progress-card-content {
+  padding: 0 16px 16px 16px;
+  overflow-y: auto;
+  max-height: 380px;
+}
+
+.task-item {
+  padding: 12px 0;
+  border-top: 1px solid var(--color-light-gray);
+}
+
+.task-item:first-child {
+  border-top: none;
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.task-name {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.task-cancel-btn {
+  background: none;
+  border: none;
+  color: var(--color-gray);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-cancel-btn:hover {
+  background: #fee2e2;
+  color: var(--color-error);
+}
+
+.task-progress-container {
+  height: 6px;
+  background: var(--color-light-gray);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.task-progress-bar {
+  height: 100%;
+  background: var(--color-primary);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.task-status-text {
+  font-size: 10px;
+  color: var(--color-gray);
+  margin-top: 4px;
+  display: block;
+}
+
+/* ─── Skeleton Loading States ──────────────────────────────────────── */
+.skeleton-card {
+  opacity: 0.7;
+  pointer-events: none;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-background) !important;
+}
+
+.skeleton-card .lecture-info {
+  filter: grayscale(1);
+}
+
+.skeleton-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: var(--color-primary);
+  transition: width 0.3s ease;
+  z-index: 5;
+}
+
+.skeleton-container {
+  padding: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.skeleton-line {
+  height: 16px;
+  background: var(--color-light-gray);
+  border-radius: 4px;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-bar-fixed-bottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--color-light-gray);
+  z-index: 1001;
+}
+
+.loading-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+

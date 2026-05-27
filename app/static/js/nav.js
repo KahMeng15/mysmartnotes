@@ -41,11 +41,26 @@ window.updateDashboardUserName = function() {
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+function initNav() {
     // Sync user data from backend on page load
     window.syncUserDisplay();
     injectSidebar();
-});
+    
+    // Inject Progress Manager if not present
+    if (!document.getElementById('progress-manager-script')) {
+        const script = document.createElement('script');
+        script.id = 'progress-manager-script';
+        script.src = '/js/progress.js';
+        document.head.appendChild(script);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initNav);
+} else {
+    initNav();
+}
+
 
 function injectSidebar() {
     const isNotePage = document.body.classList.contains('note-page');

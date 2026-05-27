@@ -86,7 +86,7 @@ function filterLectures() {
 
 function displayLectures(lectures) {
     const listContainer = document.getElementById('lecturesList');
-    if (!lectures || lectures.length === 0) {
+    if (!lectures || (lectures.length === 0 && (!window.ProgressManager || window.ProgressManager.activeTasks.size === 0))) {
         listContainer.innerHTML = `
             <div class="empty-state">
                 <i class="ph ph-files" style="font-size: 48px; margin-bottom: 1rem;"></i>
@@ -97,28 +97,68 @@ function displayLectures(lectures) {
         return;
     }
 
-    listContainer.innerHTML = lectures.map(lecture => `
-        <div class="lecture-item">
-            <div class="lecture-info" onclick="openLecture('${lecture.id}')" style="cursor: pointer;">
-                <div class="lecture-icon">
-                    <i class="ph ${getIconForType(lecture.file_type)}"></i>
+    const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
+
+    listContainer.innerHTML = lectures.map(lecture => {
+        const taskId = `ocr_${lecture.user_id}_${lecture.id}`;
+        const activeTask = activeTasks.get(taskId);
+        const isProcessing = activeTask && (activeTask.status === 'processing' || activeTask.status === 'pending' || activeTask.status === 'running');
+        const progress = activeTask ? activeTask.progress : 0;
+
+        return `
+            <div class="lecture-item ${isProcessing ? 'skeleton-card' : ''}" id="lecture-${lecture.id}">
+                <div class="lecture-info" onclick="${isProcessing ? '' : `openLecture('${lecture.id}')`}" style="cursor: ${isProcessing ? 'default' : 'pointer'};">
+                    <div class="lecture-icon">
+                        <i class="ph ${getIconForType(lecture.file_type)}"></i>
+                    </div>
+                    <div class="lecture-details">
+                        <h4>${lecture.title}</h4>
+                        <p>${isProcessing ? 'Processing content...' : `${new Date(lecture.created_at).toLocaleDateString()} • ${lecture.file_type ? lecture.file_type.split('/')[1].toUpperCase() : 'FILE'}`}</p>
+                    </div>
                 </div>
-                <div class="lecture-details">
-                    <h4>${lecture.title}</h4>
-                    <p>${new Date(lecture.created_at).toLocaleDateString()} • ${lecture.file_type ? lecture.file_type.split('/')[1].toUpperCase() : 'FILE'}</p>
+                <div class="lecture-actions">
+                    ${isProcessing ? `
+                        <div style="font-size: 11px; font-weight: 600; color: var(--color-primary);">${progress}%</div>
+                    ` : `
+                        <button onclick="openLecture('${lecture.id}')" class="btn btn-outline btn-small">
+                            View
+                        </button>
+                        <button onclick="deleteLecture('${lecture.id}')" class="btn btn-outline btn-small" style="color: var(--color-error);">
+                            <i class="ph ph-trash"></i>
+                        </button>
+                    `}
                 </div>
+                ${isProcessing ? `<div class="skeleton-progress-bar" style="width: ${progress}%"></div>` : ''}
             </div>
-            <div class="lecture-actions">
-                <button onclick="openLecture('${lecture.id}')" class="btn btn-outline btn-small">
-                    View
-                </button>
-                <button onclick="deleteLecture('${lecture.id}')" class="btn btn-outline btn-small" style="color: var(--color-error);">
-                    <i class="ph ph-trash"></i>
-                </button>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
+
+// Listen for task updates to refresh the list in real-time
+window.addEventListener('taskUpdate', (e) => {
+    const task = e.detail;
+    if (task.task_id.startsWith('ocr_')) {
+        // Find the lecture element and update its progress bar
+        const lectureId = task.task_id.split('_').pop();
+        const lectureEl = document.getElementById(`lecture-${lectureId}`);
+        if (lectureEl) {
+            const bar = lectureEl.querySelector('.skeleton-progress-bar');
+            const percentText = lectureEl.querySelector('.lecture-actions div');
+            if (bar) bar.style.width = task.progress + '%';
+            if (percentText) percentText.textContent = task.progress + '%';
+
+            if (task.status === 'completed') {
+                // Refresh the whole list once completed to remove skeleton styles
+                loadLectures();
+            } else if (task.status === 'failed') {
+                lectureEl.classList.remove('skeleton-card');
+                const details = lectureEl.querySelector('.lecture-details p');
+                if (details) details.textContent = 'Processing failed';
+                if (bar) bar.style.display = 'none';
+            }
+        }
+    }
+});
 
 function getIconForType(mimeType) {
     if (!mimeType) return 'ph-file';

@@ -268,6 +268,50 @@ function showNoSummaryUI() {
     const noteHeader = document.getElementById('noteHeader');
     const summaryContainer = document.getElementById('summaryContainer');
     if (!summaryText) return;
+
+    // Check if there is an active summary task for this lecture
+    const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
+    const summaryTask = Array.from(activeTasks.values()).find(t => 
+        t.task_type === 'summary_generation' && t.input_data?.kwargs?.lecture_id === lectureId
+    );
+
+    if (summaryTask && (summaryTask.status === 'processing' || summaryTask.status === 'pending' || summaryTask.status === 'running')) {
+        // Show skeleton loading
+        if (summaryContainer) summaryContainer.classList.remove('flex-centering-active');
+        summaryText.style.display = 'block';
+        summaryText.style.flex = 'none';
+        if (noteHeader) noteHeader.style.display = 'block';
+
+        summaryText.innerHTML = `
+            <div class="skeleton-container" style="padding: 0;">
+                <div class="skeleton-line" style="width: 40%; height: 24px; margin-bottom: 24px;"></div>
+                <div class="skeleton-line" style="width: 100%;"></div>
+                <div class="skeleton-line" style="width: 95%;"></div>
+                <div class="skeleton-line" style="width: 90%;"></div>
+                <div class="skeleton-line" style="width: 85%; margin-bottom: 12px;"></div>
+                <div class="skeleton-line" style="width: 100%;"></div>
+                <div class="skeleton-line" style="width: 98%;"></div>
+                <div class="skeleton-line" style="width: 92%;"></div>
+                <div class="skeleton-line" style="width: 40%;"></div>
+            </div>
+        `;
+
+        // Add fixed bottom progress bar if not present
+        if (!document.getElementById('summaryLoadingBar')) {
+            const bar = document.createElement('div');
+            bar.id = 'summaryLoadingBar';
+            bar.className = 'loading-bar-fixed-bottom';
+            bar.innerHTML = '<div class="loading-bar-fill" id="summaryLoadingBarFill"></div>';
+            document.body.appendChild(bar);
+        }
+        const fill = document.getElementById('summaryLoadingBarFill');
+        if (fill) fill.style.width = summaryTask.progress + '%';
+        return;
+    }
+
+    // Remove loading bar if present
+    const bar = document.getElementById('summaryLoadingBar');
+    if (bar) bar.remove();
     
     // Add class for flex centering
     if (summaryContainer) summaryContainer.classList.add('flex-centering-active');
@@ -292,13 +336,42 @@ function showNoSummaryUI() {
             </button>
         </div>
     `;
-    
-    // Also reset detail values
+
+    resetSummaryDetails();
+}
+
+
+// Listen for task updates to refresh the summary content in real-time
+window.addEventListener('taskUpdate', (e) => {
+    const task = e.detail;
+    if (task.task_type === 'summary_generation' && task.input_data?.kwargs?.lecture_id === lectureId) {
+        const fill = document.getElementById('summaryLoadingBarFill');
+        if (fill) fill.style.width = task.progress + '%';
+
+        if (task.status === 'completed') {
+            const bar = document.getElementById('summaryLoadingBar');
+            if (bar) bar.remove();
+            // Reload summaries and load the latest
+            loadSummaryVersions().then(summaries => {
+                if (summaries && summaries.length > 0) {
+                    loadSummaryVersion(summaries[0].id, false);
+                }
+            });
+        } else if (task.status === 'failed') {
+            const bar = document.getElementById('summaryLoadingBar');
+            if (bar) bar.remove();
+            showNoSummaryUI();
+        }
+    }
+});
+
+function resetSummaryDetails() {
     const details = ['detailsProcessingMode', 'detailsModel', 'detailsFormat', 'detailsProcessingTime'];
     details.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = '—';
     });
+
     const divItem = document.getElementById('detailsDividerItem');
     if (divItem) divItem.style.display = 'none';
     
@@ -310,6 +383,7 @@ function showNoSummaryUI() {
     const quickreadContainer = document.getElementById('quickreadContainer');
     if (quickreadContainer) quickreadContainer.style.display = 'none';
 }
+
 
 async function loadNoteMetadata() {
     try {

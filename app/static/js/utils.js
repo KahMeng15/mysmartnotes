@@ -77,6 +77,11 @@ const WSManager = {
     },
 
     _emit: function(taskId, data) {
+        // Handle wildcard listeners
+        if (this.listeners.has('*')) {
+            this.listeners.get('*').forEach(callback => callback(data));
+        }
+
         if (this.listeners.has(taskId)) {
             this.listeners.get(taskId).forEach(callback => callback(data));
         }

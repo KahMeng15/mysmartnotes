@@ -150,6 +150,71 @@ class TaskManager:
         TaskManager._update_db_task(task_id, progress=bounded)
 
     @staticmethod
+    def get_active_tasks(user_id: int) -> list:
+        """Get all pending/processing tasks for a user, including recently finished ones"""
+        db = SessionLocal()
+        try:
+            # Include tasks that are pending, processing, or running
+            # Also include tasks that finished in the last 5 minutes so they show up in the UI
+            five_minutes_ago = datetime.utcnow() - timedelta(minutes=5)
+            tasks = db.query(Task).filter(
+                Task.user_id == user_id,
+                (Task.status.in_(["pending", "processing", "running"])) |
+                (Task.updated_at >= five_minutes_ago)
+            ).order_by(Task.updated_at.desc()).all()
+
+            return [{
+                "task_id": t.task_id,
+                "task_type": t.task_type,
+                "status": t.status,
+                "progress": t.progress or 0,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+                "input_data": _deserialize_result(t.input_data),
+                "error": t.error_message
+            } for t in tasks]
+        except Exception as exc:
+            logger.error(f"Failed to load active tasks for user {user_id}: {exc}")
+            return []
+        finally:
+            db.close()
+
+    @staticmethod
+    def cancel_task(task_id: str, user_id: int) -> bool:
+        """Cancel a pending/processing task"""
+        db = SessionLocal()
+        try:
+            task = db.query(Task).filter(
+                Task.task_id == task_id,
+                Task.user_id == user_id
+            ).first()
+            if not task:
+                return False
+            
+            if task.status in ["completed", "failed", "cancelled"]:
+                return False
+
+            task.status = "failed"
+            task.error_message = "Cancelled by user"
+            task.updated_at = datetime.utcnow()
+            db.commit()
+
+            # Notify UI
+            from app.utils.websocket import manager
+            manager.publish_update(user_id, {
+                "task_id": task_id,
+                "status": "failed",
+                "error": "Cancelled by user",
+                "progress": task.progress
+            })
+            return True
+        except Exception as exc:
+            logger.error(f"Failed to cancel task {task_id}: {exc}")
+            return False
+        finally:
+            db.close()
+
+    @staticmethod
     def cleanup_old_tasks(retention_days: Optional[int] = None) -> int:
         """Delete completed/failed tasks older than retention period."""
         days = retention_days if retention_days is not None else settings.TASK_RETENTION_DAYS
@@ -306,7 +371,7 @@ class ChatTask:
 class OCRTask:
     """OCR processing task"""
     @staticmethod
-    def process_file(file_path: str) -> dict:
+    def process_file(file_path: str, **kwargs) -> dict:
         from app.processing.ocr import OCRProcessor
         try:
             logger.info(f"Processing file for OCR: {file_path}")
@@ -328,7 +393,7 @@ class OCRTask:
 class EmbeddingsTask:
     """Embeddings generation task"""
     @staticmethod
-    def generate_embeddings(text_chunks: list) -> dict:
+    def generate_embeddings(text_chunks: list, **kwargs) -> dict:
         from app.processing.search import EmbeddingsManager
         try:
             logger.info(f"Generating embeddings for {len(text_chunks)} chunks")

@@ -215,6 +215,32 @@ async def get_similar_lectures(
         )
 
 
+@router.get("/tasks/active")
+async def get_active_tasks(
+    current_user: User = Depends(get_current_user)
+):
+    """Get all currently processing tasks for the user"""
+    from app.utils.tasks import TaskManager
+    tasks = TaskManager.get_active_tasks(current_user.id)
+    return {"tasks": tasks}
+
+
+@router.post("/tasks/{task_id}/cancel")
+async def cancel_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Cancel a background processing task"""
+    from app.utils.tasks import TaskManager
+    success = TaskManager.cancel_task(task_id, current_user.id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Task not found or already finished"
+        )
+    return {"status": "cancelled"}
+
+
 @router.get("/tasks/{task_id}")
 async def get_task_status(
     task_id: str,

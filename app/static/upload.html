@@ -78,20 +78,16 @@
 
                             <div id="uploadPlaceholder">
                                 <div class="upload-icon"><i class="ph ph-folder-open"></i></div>
-                                <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Drag and drop your file
-                                    here
-                                </div>
-                                <div style="color: var(--color-gray); font-size: var(--font-size-sm);">or click to browse
-                                </div>
-                                <div
-                                    style="color: var(--color-gray); font-size: var(--font-size-xs); margin-top: var(--spacing-md);">
-                                    Supported: PDF, PPTX, PNG, JPG (Max 50MB)
+                                <div style="font-weight: 600; margin-bottom: var(--spacing-xs);">Drag and drop your files here</div>
+                                <div style="color: var(--color-gray); font-size: var(--font-size-sm);">or click to browse</div>
+                                <div style="color: var(--color-gray); font-size: var(--font-size-xs); margin-top: var(--spacing-md);">
+                                    Supported: PDF, PPTX, PNG, JPG (Max 50MB per file)
                                 </div>
                             </div>
                             <div id="fileDisplay" style="display: none; width: 100%;"></div>
 
                             <input type="file" id="fileInput" style="display: none;" accept=".pdf,.pptx,.png,.jpg,.jpeg"
-                                onchange="handleFileSelect(event)">
+                                onchange="handleFileSelect(event)" multiple>
                         </div>
                     </div>
 
@@ -163,7 +159,7 @@
 
     <script>
         const token = localStorage.getItem('token');
-        let selectedFile = null;
+        let selectedFiles = [];
         let allSubjects = [];
 
         window.addEventListener('load', () => {
@@ -375,42 +371,64 @@
             document.getElementById('uploadArea').classList.remove('drag-over');
             const files = event.dataTransfer.files;
             if (files.length > 0) {
-                handleFileSelect({ target: { files } });
+                handleFiles(files);
             }
         }
 
         function handleFileSelect(event) {
             const files = event.target.files;
             if (files.length > 0) {
-                selectedFile = files[0];
-                displayFile(selectedFile);
+                handleFiles(files);
             }
         }
 
-        function displayFile(file) {
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
             const placeholder = document.getElementById('uploadPlaceholder');
             const fileDisplay = document.getElementById('fileDisplay');
-            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
 
-            placeholder.style.display = 'none';
-            fileDisplay.style.display = 'block';
+            if (selectedFiles.length > 0) {
+                placeholder.style.display = 'none';
+                fileDisplay.style.display = 'block';
 
-            fileDisplay.innerHTML = `
-                <div class="file-item">
-                    <div style="display: flex; align-items: center; gap: var(--spacing-md);">
-                        <div style="font-size: 2rem; color: var(--color-primary);"><i class="ph ph-file-text"></i></div>
-                        <div>
-                            <div style="font-weight: 600; margin-bottom: 0.25rem;">${file.name}</div>
-                            <div style="font-size: 0.9rem; color: var(--color-gray); text-align: left;">${sizeMB} MB</div>
+                if (selectedFiles.length === 1) {
+                    const file = selectedFiles[0];
+                    const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+                    fileDisplay.innerHTML = `
+                        <div class="file-item">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                <div style="font-size: 2rem; color: var(--color-primary);"><i class="ph ph-file-text"></i></div>
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${file.name}</div>
+                                    <div style="font-size: 0.9rem; color: var(--color-gray); text-align: left;">${sizeMB} MB</div>
+                                </div>
+                            </div>
+                            <button type="button" onclick="event.stopPropagation(); clearFiles()" class="btn btn-outline btn-small">Remove</button>
                         </div>
-                    </div>
-                    <button type="button" onclick="event.stopPropagation(); clearFile()" class="btn btn-outline btn-small">Remove</button>
-                </div>
-            `;
+                    `;
+                } else {
+                    const totalSizeMB = (selectedFiles.reduce((acc, f) => acc + f.size, 0) / 1024 / 1024).toFixed(2);
+                    fileDisplay.innerHTML = `
+                        <div class="file-item">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                <div style="font-size: 2rem; color: var(--color-primary);"><i class="ph ph-files"></i></div>
+                                <div>
+                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${selectedFiles.length} files selected</div>
+                                    <div style="font-size: 0.9rem; color: var(--color-gray); text-align: left;">${totalSizeMB} MB total</div>
+                                </div>
+                            </div>
+                            <button type="button" onclick="event.stopPropagation(); clearFiles()" class="btn btn-outline btn-small">Remove All</button>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 11px; color: var(--color-gray); max-height: 100px; overflow-y: auto; text-align: left; padding: 0 10px;">
+                            ${selectedFiles.map(f => `<div>• ${f.name}</div>`).join('')}
+                        </div>
+                    `;
+                }
+            }
         }
 
-        function clearFile() {
-            selectedFile = null;
+        function clearFiles() {
+            selectedFiles = [];
             document.getElementById('fileInput').value = '';
             document.getElementById('uploadPlaceholder').style.display = 'block';
             document.getElementById('fileDisplay').style.display = 'none';
@@ -421,8 +439,8 @@
         async function handleUpload(event) {
             event.preventDefault();
 
-            if (!selectedFile) {
-                alert('Please select a file');
+            if (selectedFiles.length === 0) {
+                alert('Please select at least one file');
                 return;
             }
 
@@ -433,15 +451,17 @@
             }
 
             const formData = new FormData();
-            formData.append('file', selectedFile);
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
             formData.append('title', document.getElementById('lectureTitle').value);
             formData.append('subject_id', subjectId);
 
             try {
                 // Show progress modal
                 document.getElementById('progressModal').classList.add('active');
-                document.getElementById('progressFill').style.width = '0%';
-                document.getElementById('progressPercent').textContent = '0';
+                document.getElementById('progressFill').style.width = '100%';
+                document.getElementById('progressPercent').textContent = '...';
                 
                 // 1. Initial Upload
                 const response = await fetch('/lectures/upload', {
@@ -451,16 +471,11 @@
                 });
 
                 if (response.ok) {
-                    const lecture = await response.json();
+                    const lectures = await response.json();
                     
-                    // 2. Start Polling for AI Processing
-                    await pollUploadProgress(lecture.id);
-
-                    // Close progress modal and show success with redirection callback
                     document.getElementById('progressModal').classList.remove('active');
-                    showSuccessModal('Upload Complete', 'Your lecture has been uploaded and processed successfully!', () => {
-                        window.location.href = `/note/${lecture.id}`;
-                    });
+                    // Redirect to subject page so they can see the processing cards
+                    window.location.href = `/subject.html?id=${subjectId}`;
                 } else {
                     document.getElementById('progressModal').classList.remove('active');
                     const error = await response.json();
@@ -470,44 +485,6 @@
                 document.getElementById('progressModal').classList.remove('active');
                 alert('Error: ' + error.message);
             }
-        }
-
-        async function pollUploadProgress(lectureId) {
-            const fill = document.getElementById('progressFill');
-            const percent = document.getElementById('progressPercent');
-            
-            return new Promise((resolve, reject) => {
-                const interval = setInterval(async () => {
-                    try {
-                        const res = await fetch(`/search/task?lecture_id=${lectureId}`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
-                        });
-                        
-                        if (res.ok) {
-                            const task = await res.json();
-                            const p = task.progress || 0;
-                            
-                            fill.style.width = p + '%';
-                            percent.textContent = p;
-
-                            if (task.status === 'completed' || p >= 100) {
-                                clearInterval(interval);
-                                resolve();
-                            } else if (task.status === 'failed') {
-                                clearInterval(interval);
-                                reject(new Error(task.error || 'Processing failed'));
-                            }
-                        } else if (res.status === 404) {
-                            // Task might not be created yet, just wait
-                        } else {
-                            clearInterval(interval);
-                            reject(new Error('Failed to check progress'));
-                        }
-                    } catch (err) {
-                        console.error('Polling error:', err);
-                    }
-                }, 1000);
-            });
         }
 
         function logout() {

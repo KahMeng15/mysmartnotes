@@ -254,6 +254,10 @@ function updateExtractedText() {
     document.getElementById('extractionStatus').style.display = 'none';
 
     if (lectureData.extracted_text) {
+        // Remove loading bar if present
+        const bar = document.getElementById('noteLoadingBar');
+        if (bar) bar.remove();
+
         try {
             textContainer.innerHTML = marked.parse(lectureData.extracted_text);
             if (pollingInterval) clearInterval(pollingInterval);
@@ -263,17 +267,60 @@ function updateExtractedText() {
         } catch (e) {
             console.error('marked.js failed:', e);
         }
-    }
-
-    if (lectureData.extracted_text) {
-        textContainer.innerHTML = `<p>${lectureData.extracted_text.replace(/\n/g, '<br>')}</p>`;
     } else {
-        textContainer.innerHTML = '<p class="text-center text-muted">No content extracted yet.</p>';
+        // Show skeleton loading if still processing
+        const taskId = `ocr_${lectureData.user_id}_${lectureData.id}`;
+        const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
+        const activeTask = activeTasks.get(taskId);
+        
+        if (activeTask && (activeTask.status === 'processing' || activeTask.status === 'pending' || activeTask.status === 'running')) {
+            textContainer.innerHTML = `
+                <div class="skeleton-container">
+                    <div class="skeleton-line" style="width: 80%; height: 32px; margin-bottom: 24px;"></div>
+                    <div class="skeleton-line" style="width: 100%;"></div>
+                    <div class="skeleton-line" style="width: 95%;"></div>
+                    <div class="skeleton-line" style="width: 90%;"></div>
+                    <div class="skeleton-line" style="width: 85%; margin-bottom: 12px;"></div>
+                    <div class="skeleton-line" style="width: 100%;"></div>
+                    <div class="skeleton-line" style="width: 98%;"></div>
+                    <div class="skeleton-line" style="width: 92%;"></div>
+                    <div class="skeleton-line" style="width: 40%;"></div>
+                </div>
+            `;
+            
+            // Add fixed bottom progress bar if not present
+            if (!document.getElementById('noteLoadingBar')) {
+                const bar = document.createElement('div');
+                bar.id = 'noteLoadingBar';
+                bar.className = 'loading-bar-fixed-bottom';
+                bar.innerHTML = '<div class="loading-bar-fill" id="noteLoadingBarFill"></div>';
+                document.body.appendChild(bar);
+            }
+            const fill = document.getElementById('noteLoadingBarFill');
+            if (fill) fill.style.width = activeTask.progress + '%';
+        } else {
+            textContainer.innerHTML = '<div class="empty-state">No content found.</div>';
+        }
     }
-    if (pollingInterval) clearInterval(pollingInterval);
-    setupH1Editing();
-    setupStickyHeaderFading();
 }
+
+// Listen for task updates to refresh the note content in real-time
+window.addEventListener('taskUpdate', (e) => {
+    const task = e.detail;
+    if (task.task_id === `ocr_${lectureData.user_id}_${lectureId}`) {
+        const fill = document.getElementById('noteLoadingBarFill');
+        if (fill) fill.style.width = task.progress + '%';
+
+        if (task.status === 'completed') {
+            loadLecture();
+        } else if (task.status === 'failed') {
+            const bar = document.getElementById('noteLoadingBar');
+            if (bar) bar.remove();
+            const textContainer = document.getElementById('extractedText');
+            if (textContainer) textContainer.innerHTML = '<div class="empty-state">Processing failed.</div>';
+        }
+    }
+});
 
 // Extract first h1 and make it editable
 function setupH1Editing() {

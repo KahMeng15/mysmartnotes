@@ -113,9 +113,9 @@ def markdown_to_segments(markdown: str) -> list:
 
     return segments
 
-def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool = False):
+def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool = False, **kwargs):
     """Core logic to process a lecture, used by both worker and (optionally) API."""
-    task_id = f"ocr_{user_id}_{lecture_id}"
+    task_id = kwargs.get("task_id") or f"ocr_{user_id}_{lecture_id}"
     
     db = SessionLocal()
     try:
