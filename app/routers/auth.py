@@ -1032,7 +1032,7 @@ async def request_password_change(request_data: RequestPasswordChangeConfirmatio
         )
     
     # Generate confirmation code (6 digits)
-    confirmation_code = str(random.randint(100000, 999999))
+    confirmation_code = ''.join(secrets.choice('0123456789') for _ in range(6))
     
     # Hash the new password for later verification
     new_password_hash = hash_password(request_data.new_password)

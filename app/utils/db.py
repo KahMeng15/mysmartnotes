@@ -138,11 +138,11 @@ def apply_content_dissociation_migrations():
             
             for table in dissociate_tables:
                 # Check if column is NOT NULL
-                res = conn.execute(text(f"""
+                res = conn.execute(text("""
                     SELECT is_nullable 
                     FROM information_schema.columns 
-                    WHERE table_name = '{table}' AND column_name = 'user_id'
-                """)).fetchone()
+                    WHERE table_name = :table AND column_name = 'user_id'
+                """), {"table": table}).fetchone()
                 
                 if res and res[0] == 'NO':
                     logger.info(f"Migration: Making {table}.user_id NULLABLE...")
@@ -150,18 +150,18 @@ def apply_content_dissociation_migrations():
 
                 # Update Foreign Key to ON DELETE SET NULL
                 # First find current constraint name
-                fk_res = conn.execute(text(f"""
+                fk_res = conn.execute(text("""
                     SELECT conname 
                     FROM pg_constraint c 
                     JOIN pg_class r ON c.conrelid = r.oid 
-                    WHERE r.relname = '{table}' AND c.contype = 'f' 
+                    WHERE r.relname = :table AND c.contype = 'f' 
                     AND pg_get_constraintdef(c.oid) LIKE '%user_id%REFERENCES users%'
-                """)).fetchone()
+                """), {"table": table}).fetchone()
                 
                 if fk_res:
                     fk_name = fk_res[0]
                     # Check if it already has SET NULL
-                    def_res = conn.execute(text(f"SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = '{fk_name}'")).fetchone()
+                    def_res = conn.execute(text("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = :fk_name"), {"fk_name": fk_name}).fetchone()
                     if def_res and "SET NULL" not in def_res[0]:
                         logger.info(f"Migration: Updating {table} FK {fk_name} to ON DELETE SET NULL...")
                         conn.execute(text(f'ALTER TABLE "{table}" DROP CONSTRAINT "{fk_name}"'))
@@ -175,20 +175,20 @@ def apply_content_dissociation_migrations():
             
             for table in cascade_tables:
                 # Find FK to users table
-                fk_res = conn.execute(text(f"""
+                fk_res = conn.execute(text("""
                     SELECT conname 
                     FROM pg_constraint c 
                     JOIN pg_class r ON c.conrelid = r.oid 
-                    WHERE r.relname = '{table}' AND c.contype = 'f' 
+                    WHERE r.relname = :table AND c.contype = 'f' 
                     AND (pg_get_constraintdef(c.oid) LIKE '%user_id%REFERENCES users%' 
                          OR pg_get_constraintdef(c.oid) LIKE '%invited_by%REFERENCES users%'
                          OR pg_get_constraintdef(c.oid) LIKE '%used_by%REFERENCES users%')
-                """)).all()
+                """), {"table": table}).all()
                 
                 for row in fk_res:
                     fk_name = row[0]
                     # Check definition
-                    def_res = conn.execute(text(f"SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = '{fk_name}'")).fetchone()
+                    def_res = conn.execute(text("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = :fk_name"), {"fk_name": fk_name}).fetchone()
                     if def_res and "CASCADE" not in def_res[0]:
                         logger.info(f"Migration: Updating {table} FK {fk_name} to ON DELETE CASCADE...")
                         
