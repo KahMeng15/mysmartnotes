@@ -827,13 +827,16 @@ document.addEventListener('keydown', e => {
         // Skip if a modal is active (utils.js handles modal shortcuts)
         if (document.querySelector('.modal.active')) return;
 
-        if (document.getElementById('loginPanel').classList.contains('active')) {
-            if (document.getElementById('loginStep2Btns').style.display === 'block') {
+        const loginPanel = document.getElementById('loginPanel');
+        if (loginPanel && loginPanel.classList.contains('active')) {
+            const step2Btns = document.getElementById('loginStep2Btns');
+            // Check if step 2 is visible (it uses display: flex)
+            if (step2Btns.style.display === 'flex' || step2Btns.style.display === 'block' || (step2Btns.style.display === '' && window.getComputedStyle(step2Btns).display !== 'none')) {
                 handleLogin();
             } else {
                 showPasswordField();
             }
-        } else {
+        } else if (document.getElementById('registerPanel') && document.getElementById('registerPanel').classList.contains('active')) {
             handleRegister();
         }
     }
