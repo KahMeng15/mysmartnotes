@@ -215,7 +215,9 @@ async def generate_summary_endpoint(
         current_user.id,
         lecture_id=request.lecture_id,
         mode=request.mode,
-        output_format=request.output_format
+        output_format=request.output_format,
+        processing_method=request.processing_method,
+        split_level=request.split_level
     )
     
     return {"task_id": task_id, "status": "pending"}

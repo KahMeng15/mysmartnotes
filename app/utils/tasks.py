@@ -221,6 +221,8 @@ class SummaryTask:
             lecture_id = kwargs.get("lecture_id")
             mode = kwargs.get("mode", "elaborate")
             output_format = kwargs.get("output_format", "sentence")
+            processing_method = kwargs.get("processing_method", "whole")
+            split_level = kwargs.get("split_level", "h2")
             
             user = db.query(User).filter(User.id == user_id).first()
             lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
@@ -239,6 +241,8 @@ class SummaryTask:
                 content=lecture_content,
                 mode=mode,
                 output_format=output_format,
+                processing_method=processing_method,
+                split_level=split_level,
                 progress_callback=progress_callback
             )
             
@@ -260,6 +264,8 @@ class SummaryTask:
                 file_path=f"summary_{lecture.id}_{next_version}.md",
                 mode=mode,
                 output_format=output_format,
+                processing_method=processing_method,
+                split_level=split_level,
                 processing_time=processing_time,
                 processing_time_ms=int(processing_time * 1000),
                 model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()

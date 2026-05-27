@@ -19,25 +19,43 @@ class SummaryPipeline:
     def __init__(self, ai_client):
         self.ai_client = ai_client
 
-    async def generate_summary(self, content: str, mode: str = "elaborate", output_format: str = "sentence", progress_callback: Optional[Callable[[int], None]] = None) -> str:
+    async def generate_summary(
+        self, 
+        content: str, 
+        mode: str = "elaborate", 
+        output_format: str = "sentence", 
+        processing_method: str = "whole",
+        split_level: str = "h2",
+        progress_callback: Optional[Callable[[int], None]] = None
+    ) -> str:
         """
         Orchestrates the chunking, parallel processing, and assembly of a summary.
         """
-        logger.info(f"SummaryPipeline.generate_summary started. Content length: {len(content)}")
+        logger.info(f"SummaryPipeline.generate_summary started. Method: {processing_method}, Mode: {mode}, Format: {output_format}")
         if not content:
             return ""
 
-        chunks = self._split_into_chunks(content)
+        # Determine chunks based on method
+        if processing_method == "section":
+            logger.info(f"Using SECTIONAL processing with split level: {split_level}")
+            chunks = self._split_by_sections(content, split_level)
+            # Sectional summaries usually want to be more elaborate to capture detail
+            actual_mode = mode 
+        else:
+            logger.info("Using WHOLE note chunking...")
+            chunks = self._split_into_chunks(content)
+            actual_mode = mode
+
         num_chunks = len(chunks)
-        logger.info(f"Content split into {num_chunks} chunks.")
+        logger.info(f"Content prepared into {num_chunks} segments.")
         
         if num_chunks == 1:
-            logger.info("Processing single chunk summary...")
-            res = await self._summarize_chunk(0, chunks[0], mode, output_format, is_first=True)
+            logger.info("Processing single segment summary...")
+            res = await self._summarize_chunk(0, chunks[0], actual_mode, output_format, is_first=True)
             if progress_callback: progress_callback(100)
             return res
 
-        logger.info(f"Generating summary with {num_chunks} chunks (parallel, limit=2)...")
+        logger.info(f"Generating summary with {num_chunks} segments (parallel, limit=2)...")
         
         # Limit concurrency to avoid rate limits on reasoning models
         semaphore = asyncio.Semaphore(2)
@@ -45,26 +63,26 @@ class SummaryPipeline:
         
         async def _bounded_summarize(idx, chunk, is_first):
             nonlocal completed_chunks
-            logger.info(f"Chunk {idx+1}: Waiting for semaphore...")
+            logger.info(f"Segment {idx+1}: Waiting for semaphore...")
             async with semaphore:
-                logger.info(f"Chunk {idx+1}: Semaphore acquired. Starting AI call.")
+                logger.info(f"Segment {idx+1}: Semaphore acquired. Starting AI call.")
                 try:
                     # Add a per-chunk timeout of 180 seconds to prevent total hang
                     result = await asyncio.wait_for(
-                        self._summarize_chunk(idx, chunk, mode, output_format, is_first=is_first),
+                        self._summarize_chunk(idx, chunk, actual_mode, output_format, is_first=is_first),
                         timeout=180.0
                     )
                     completed_chunks += 1
                     if progress_callback:
                         progress = 10 + int((completed_chunks / num_chunks) * 85)
-                        logger.info(f"Chunk {idx+1}: Complete. Progress: {progress}%")
+                        logger.info(f"Segment {idx+1}: Complete. Progress: {progress}%")
                         progress_callback(progress)
                     return result
                 except asyncio.TimeoutError:
-                    logger.error(f"Chunk {idx+1}: TIMEOUT during AI processing.")
+                    logger.error(f"Segment {idx+1}: TIMEOUT during AI processing.")
                     return f"\n[Summary of section {idx+1} timed out]\n"
                 except Exception as e:
-                    logger.error(f"Chunk {idx+1}: Unexpected error: {e}", exc_info=True)
+                    logger.error(f"Segment {idx+1}: Unexpected error: {e}", exc_info=True)
                     return f"\n[Error summarizing section {idx+1}]\n"
 
         tasks = [
@@ -78,12 +96,11 @@ class SummaryPipeline:
         valid_chunks = [c for c in summarized_chunks if c]
         
         if not valid_chunks:
-            logger.error("All summary chunks failed.")
+            logger.error("All summary segments failed.")
             return "Error: Could not generate summary."
 
         # Reassemble
-        # For 'sentence' mode, we just join. For 'pointform', we might want double newlines.
-        separator = "\n\n" if output_format in ["pointform", "numbered_list"] else " "
+        separator = "\n\n" if output_format in ["pointform", "numbered_list", "table"] or processing_method == "section" else " "
         final_summary = separator.join(valid_chunks).strip()
         
         # Final cleanup pass if multiple chunks were joined
@@ -92,6 +109,30 @@ class SummaryPipeline:
             
         if progress_callback: progress_callback(100)
         return final_summary
+
+    def _split_by_sections(self, text: str, split_level: str) -> List[str]:
+        """Split text into logical sections based on the requested markdown header level."""
+        level_map = {"h1": 1, "h2": 2, "h3": 3}
+        target_level = level_map.get(split_level.lower(), 2)
+        
+        # Pattern to match headers like #, ##, ###
+        pattern = f"^#{{1,{target_level}}}\\s+"
+        
+        lines = text.split("\n")
+        sections = []
+        current_section = []
+        
+        for line in lines:
+            if re.match(pattern, line):
+                if current_section:
+                    sections.append("\n".join(current_section).strip())
+                    current_section = []
+            current_section.append(line)
+            
+        if current_section:
+            sections.append("\n".join(current_section).strip())
+            
+        return [s for s in sections if s.strip()]
 
     def _split_into_chunks(self, text: str) -> List[str]:
         """Split text into chunks at markdown heading boundaries or paragraph breaks."""
