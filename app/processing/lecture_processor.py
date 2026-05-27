@@ -133,15 +133,25 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             TaskManager._update_db_task(task_id, status="failed", error="File not found on disk")
             return {"status": "error", "message": "File not found on disk"}
 
-        def progress_callback(percent):
-            TaskManager.update_task_progress(task_id, percent)
+        def progress_callback(percent, message=None):
+            TaskManager.update_task_progress(task_id, percent, message=message)
 
         start_time = time.time()
         file_ext = os.path.splitext(file_path)[1].lower()
 
         if file_ext in ('.pdf', '.pptx'):
             logger.info(f"Processing lecture {lecture_id} (SmartPipeline)")
-            markdown = extract_markdown_for_user(user, file_path, progress_callback=progress_callback)
+            progress_callback(15, "Initializing AI pipeline...")
+            
+            # Custom wrapper to pass messages through the pipeline's callback
+            def pipeline_callback(p):
+                msg = "Extracting text..."
+                if p > 30: msg = "Analyzing document structure..."
+                if p > 60: msg = "Polishing with AI..."
+                if p > 85: msg = "Finalizing content..."
+                progress_callback(p, msg)
+
+            markdown = extract_markdown_for_user(user, file_path, progress_callback=pipeline_callback)
             structured_segments = markdown_to_segments(markdown)
             
             # Save to file storage
@@ -161,27 +171,25 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             lecture.updated_at = datetime.utcnow()
             db.commit()
             
-            # Update task progress
-            TaskManager.update_task_progress(task_id, 95)
-            
             # STEP 4: Compute and store embeddings
             if markdown and markdown.strip():
                 try:
+                    progress_callback(95, "Generating search embeddings...")
                     from app.processing.embeddings import update_lecture_embeddings
                     update_lecture_embeddings(lecture.id, markdown, db)
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
-            TaskManager._update_db_task(task_id, status="completed", progress=100)
+            TaskManager._update_db_task(task_id, status="completed", progress=100, message="Note ready")
             logger.info(f"Processing complete for lecture {lecture_id}")
             return {"status": "success", "lecture_id": lecture_id}
 
         else:
             # Fallback to OCR for images
             logger.info(f"Processing lecture {lecture_id} (OCR Fallback)")
-            progress_callback(20)
+            progress_callback(20, "OCR: Analyzing image...")
             ocr_result = OCRProcessor.extract_text(file_path, lecture.file_type, lecture_id=lecture_id)
-            progress_callback(80)
+            progress_callback(80, "Structuring content...")
             
             raw_text = ocr_result.get("raw_text", "")
             structured_content = ocr_result.get("structured_content", [])
@@ -198,12 +206,13 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             
             if raw_text:
                 try:
+                    progress_callback(95, "Generating search embeddings...")
                     from app.processing.embeddings import update_lecture_embeddings
                     update_lecture_embeddings(lecture.id, raw_text, db)
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
-            TaskManager._update_db_task(task_id, status="completed", progress=100)
+            TaskManager._update_db_task(task_id, status="completed", progress=100, message="Note ready")
             return {"status": "success", "lecture_id": lecture_id}
 
     except Exception as e:

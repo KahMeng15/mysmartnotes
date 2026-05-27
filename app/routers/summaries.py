@@ -210,16 +210,18 @@ async def generate_summary_endpoint(
     import time
     task_id = f"summary_{current_user.id}_{request.lecture_id}_{int(time.time())}"
     TaskManager.submit_task(
-        task_id,
-        "summary_generation",
-        current_user.id,
-        lecture_id=request.lecture_id,
+        task_id, 
+        "summary_generation", 
+        current_user.id, 
+        task_id=task_id,
+        lecture_id=db_lecture.id, 
+        user_id=current_user.id,
         mode=request.mode,
         output_format=request.output_format,
         processing_method=request.processing_method,
         split_level=request.split_level
     )
-    
+
     return {"task_id": task_id, "status": "pending"}
 
 

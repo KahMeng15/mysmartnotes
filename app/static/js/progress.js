@@ -18,9 +18,10 @@ const ProgressManager = {
 
         // Subscribe to WebSocket updates
         const setupWS = () => {
-            if (window.WSManager) {
-                console.log('ProgressManager: Subscribing to WS updates');
-                window.WSManager.subscribe('*', (data) => this.handleTaskUpdate(data));
+            const manager = window.WSManager;
+            if (manager) {
+                console.log('ProgressManager: Subscribing to WS updates via window.WSManager');
+                manager.subscribe('*', (data) => this.handleTaskUpdate(data));
                 return true;
             }
             return false;
@@ -30,7 +31,10 @@ const ProgressManager = {
             console.warn('ProgressManager: WSManager not found, retrying...');
             let retries = 0;
             const interval = setInterval(() => {
-                if (setupWS() || retries++ > 10) clearInterval(interval);
+                if (setupWS() || retries++ > 20) {
+                    if (retries > 20) console.error('ProgressManager: Failed to find WSManager after multiple retries.');
+                    clearInterval(interval);
+                }
             }, 500);
         }
 
@@ -47,7 +51,7 @@ const ProgressManager = {
         card.innerHTML = `
             <div class="global-progress-card-header" onclick="ProgressManager.toggleExpand()">
                 <div class="global-progress-info">
-                    <div class="global-progress-spinner"></div>
+                    <i class="ph ph-activity" style="color: var(--color-primary); font-size: 18px;"></i>
                     <span class="global-progress-title" id="progressGlobalTitle">Processing...</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 12px;">
@@ -94,6 +98,7 @@ const ProgressManager = {
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.indexOf("application/json") !== -1) {
                     const data = await response.json();
+                    console.log('ProgressManager: Fetched active tasks', data.tasks.length);
                     
                     data.tasks.forEach(task => {
                         const existing = this.activeTasks.get(task.task_id);
@@ -113,6 +118,7 @@ const ProgressManager = {
 
     handleTaskUpdate: function(data) {
         if (!data || !data.task_id) return;
+        console.log('ProgressManager: Received task update', data.task_id, data.status, data.progress + '%');
 
         const existing = this.activeTasks.get(data.task_id);
         const task = existing || { 
@@ -129,6 +135,7 @@ const ProgressManager = {
         if (data.error) task.error = data.error;
         if (data.task_type) task.task_type = data.task_type;
         if (data.input_data) task.input_data = data.input_data;
+        if (data.message) task.message = data.message;
 
         // Auto-expand if a new task is added or if something starts processing
         if (!existing && !this.isExpanded) {
@@ -150,7 +157,7 @@ const ProgressManager = {
     },
 
     cancelTask: async function(taskId) {
-        if (!confirm('Are you sure you want to cancel this task?')) return;
+        if (!window.confirm('Are you sure you want to cancel this task?')) return;
         
         try {
             const token = localStorage.getItem('token');
@@ -180,17 +187,6 @@ const ProgressManager = {
         if (!content) return;
 
         const allTasks = Array.from(this.activeTasks.values());
-        const activeTasks = allTasks.filter(t => !['completed', 'failed'].includes(t.status));
-        const finishedTasks = allTasks.filter(t => ['completed', 'failed'].includes(t.status));
-
-        // Sort: Active first, then by date
-        const sortedTasks = [...activeTasks, ...finishedTasks].sort((a, b) => {
-            const isAActive = !['completed', 'failed'].includes(a.status);
-            const isBActive = !['completed', 'failed'].includes(b.status);
-            if (isAActive && !isBActive) return -1;
-            if (!isAActive && isBActive) return 1;
-            return new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at);
-        });
 
         if (allTasks.length === 0) {
             content.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--color-gray); font-size: 12px;">No active tasks</div>';
@@ -200,15 +196,18 @@ const ProgressManager = {
             return;
         }
 
-        content.innerHTML = sortedTasks.map(task => {
+        content.innerHTML = allTasks.map(task => {
             const name = this.getTaskName(task);
-            const statusLabel = !['completed', 'failed'].includes(task.status) ? `${task.progress}%` : task.status;
+            const statusLabel = task.message || (!['completed', 'failed'].includes(task.status) ? `${task.progress}%` : task.status);
             const isFinished = task.status === 'completed' || task.status === 'failed';
+            const url = this.getTaskUrl(task);
             
             return `
                 <div class="task-item" id="task-${task.task_id}">
                     <div class="task-header">
-                        <span class="task-name" title="${name}">${name}</span>
+                        <a href="${url || '#'}" class="task-name" title="${name}" style="text-decoration: none; color: inherit; cursor: ${url ? 'pointer' : 'default'};">
+                            ${name}
+                        </a>
                         ${!isFinished ? `
                             <button class="task-cancel-btn" onclick="ProgressManager.cancelTask('${task.task_id}')">
                                 <i class="ph ph-x"></i>
@@ -224,6 +223,8 @@ const ProgressManager = {
         }).join('');
 
         // Update Header
+        const activeTasks = allTasks.filter(t => !['completed', 'failed'].includes(t.status));
+        const finishedTasks = allTasks.filter(t => ['completed', 'failed'].includes(t.status));
         const totalCount = allTasks.length;
         const completeCount = finishedTasks.filter(t => t.status === 'completed').length;
         
@@ -248,14 +249,29 @@ const ProgressManager = {
     },
 
     getTaskName: function(task) {
-        if (task.input_data && task.input_data.kwargs) {
-            const args = task.input_data.kwargs;
-            if (args.title) return args.title;
-            if (task.task_type === 'lecture_processing') return 'Note: ' + (args.lecture_id || 'Document');
-            if (task.task_type === 'summary_generation') return 'Summary: ' + (args.lecture_id || 'Note');
-            if (task.task_type === 'quiz_generation') return 'Quiz: ' + (args.title || 'Generation');
-        }
+        const kwargs = task.input_data?.kwargs || {};
+        if (kwargs.file_name) return kwargs.file_name;
+        if (kwargs.title) return kwargs.title;
+        
+        if (task.task_type === 'lecture_processing') return 'Note: ' + (kwargs.lecture_id || 'Document');
+        if (task.task_type === 'summary_generation') return 'Summary: ' + (kwargs.lecture_id || 'Note');
+        if (task.task_type === 'quiz_generation') return 'Quiz: ' + (kwargs.title || 'Generation');
+        
         return task.task_id.startsWith('ocr_') ? 'Note Processing' : 'Background Task';
+    },
+
+    getTaskUrl: function(task) {
+        const kwargs = task.input_data?.kwargs || {};
+        if (task.task_type === 'lecture_processing' && kwargs.lecture_id) {
+            return `/note.html?id=${kwargs.lecture_id}`;
+        }
+        if (task.task_type === 'summary_generation' && kwargs.lecture_id) {
+            return `/summary.html?lecture_id=${kwargs.lecture_id}`;
+        }
+        if (task.task_type === 'quiz_generation') {
+            return `/quiz_dashboard.html`;
+        }
+        return null;
     },
 
     updateVisibility: function() {

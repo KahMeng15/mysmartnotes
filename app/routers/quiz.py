@@ -225,9 +225,11 @@ async def generate_quiz_ai(
     
     task_id = f"quiz_{current_user.id}_{int(time.time())}"
     TaskManager.submit_task(
-        task_id,
-        "quiz_generation",
-        current_user.id,
+        task_id, 
+        "quiz_generation", 
+        current_user.id, 
+        task_id=task_id,
+        user_id=current_user.id,
         title=request.title,
         scope_type=request.scope_type,
         scope_id=request.scope_id,
@@ -235,7 +237,7 @@ async def generate_quiz_ai(
         num_questions=request.number_of_questions,
         quiz_group_id=request.quiz_group_id
     )
-    
+
     return {"task_id": task_id, "status": "pending"}
 
 @router.post("/import", response_model=QuizResponse)

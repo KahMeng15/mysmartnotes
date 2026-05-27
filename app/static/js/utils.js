@@ -88,6 +88,8 @@ const WSManager = {
     }
 };
 
+window.WSManager = WSManager;
+
 // Initialize WebSocket on page load if logged in
 document.addEventListener('DOMContentLoaded', () => {
     // Check for any sign of a session since access_token is HttpOnly

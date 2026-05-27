@@ -81,6 +81,7 @@ class TaskManager:
         result: Any = None,
         error: Optional[str] = None,
         progress: Optional[int] = None,
+        message: Optional[str] = None
     ) -> None:
         db = SessionLocal()
         try:
@@ -106,7 +107,8 @@ class TaskManager:
                 "status": db_task.status,
                 "result": result if status == "completed" else None,
                 "error": error if status == "failed" else None,
-                "progress": db_task.progress or 0
+                "progress": db_task.progress or 0,
+                "message": message # Pass current step message to UI
             }
             manager.publish_update(db_task.user_id, payload)
 
@@ -144,10 +146,10 @@ class TaskManager:
         return None
     
     @staticmethod
-    def update_task_progress(task_id: str, progress: int):
-        """Update task progress (0-100)"""
+    def update_task_progress(task_id: str, progress: int, message: Optional[str] = None):
+        """Update task progress (0-100) with optional status message"""
         bounded = min(100, max(0, progress))
-        TaskManager._update_db_task(task_id, progress=bounded)
+        TaskManager._update_db_task(task_id, progress=bounded, message=message)
 
     @staticmethod
     def get_active_tasks(user_id: int) -> list:
@@ -161,7 +163,7 @@ class TaskManager:
                 Task.user_id == user_id,
                 (Task.status.in_(["pending", "processing", "running"])) |
                 (Task.updated_at >= five_minutes_ago)
-            ).order_by(Task.updated_at.desc()).all()
+            ).order_by(Task.created_at.asc()).all()
 
             return [{
                 "task_id": t.task_id,
@@ -250,9 +252,18 @@ class QuizTask:
         db = SessionLocal()
         try:
             user_id = kwargs.get("user_id")
+            task_id = kwargs.get("task_id")
             user = db.query(User).filter(User.id == user_id).first()
             ai_client = get_ai_client(user=user, db=db)
             
+            def progress_callback(p):
+                if task_id:
+                    msg = "Generating quiz..."
+                    if p > 30: msg = "Creating questions..."
+                    if p > 70: msg = "Formulating options..."
+                    if p > 90: msg = "Saving quiz..."
+                    TaskManager.update_task_progress(task_id, p, message=msg)
+
             quiz = await generate_advanced_quiz(
                 db=db,
                 user=user,
@@ -262,7 +273,8 @@ class QuizTask:
                 scope_id=kwargs.get("scope_id"),
                 question_types=kwargs.get("question_types"),
                 num_questions=kwargs.get("num_questions"),
-                quiz_group_id=kwargs.get("quiz_group_id")
+                quiz_group_id=kwargs.get("quiz_group_id"),
+                progress_callback=progress_callback
             )
             # Quiz model to dict (simplified for result)
             return {"quiz_id": quiz.id, "title": quiz.title}
@@ -300,7 +312,11 @@ class SummaryTask:
             
             def progress_callback(percent):
                 if task_id:
-                    TaskManager.update_task_progress(task_id, percent)
+                    msg = "Generating summary..."
+                    if percent > 20: msg = "Analyzing note content..."
+                    if percent > 50: msg = "Drafting sections..."
+                    if percent > 80: msg = "Finalizing summary..."
+                    TaskManager.update_task_progress(task_id, percent, message=msg)
 
             summary_content = await ai_client.generate_summary(
                 content=lecture_content,

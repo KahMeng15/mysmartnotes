@@ -48,10 +48,27 @@ function initNav() {
     
     // Inject Progress Manager if not present
     if (!document.getElementById('progress-manager-script')) {
-        const script = document.createElement('script');
-        script.id = 'progress-manager-script';
-        script.src = '/js/progress.js';
-        document.head.appendChild(script);
+        // Wait for WSManager to be ready if it's expected
+        const injectProgress = () => {
+            console.log('nav.js: Injecting Progress Manager');
+            const script = document.createElement('script');
+            script.id = 'progress-manager-script';
+            script.src = '/js/progress.js';
+            document.head.appendChild(script);
+        };
+
+        if (window.WSManager) {
+            injectProgress();
+        } else {
+            console.warn('nav.js: WSManager not found, waiting before injection...');
+            let retries = 0;
+            const interval = setInterval(() => {
+                if (window.WSManager || retries++ > 10) {
+                    injectProgress();
+                    clearInterval(interval);
+                }
+            }, 200);
+        }
     }
 }
 

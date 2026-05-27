@@ -249,6 +249,7 @@ async def upload_lecture(
             "lecture_processing", 
             current_user.id, 
             lecture_id=db_lecture.id, 
+            file_name=file.filename,
             auto_detect_title=auto_detect_title
         )
         processed_lectures.append(db_lecture)

@@ -18,9 +18,13 @@ async def generate_advanced_quiz(
     scope_id: str,
     question_types: List[str],
     num_questions: int = 5,
-    quiz_group_id: str = None
+    quiz_group_id: str = None,
+    progress_callback: Optional[callable] = None
 ) -> Quiz:
     """Generate a quiz with specific question types based on scope content."""
+    
+    if progress_callback:
+        progress_callback(10)
     
     # Retrieve content based on scope
     content = ""
