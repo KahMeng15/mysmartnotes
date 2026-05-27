@@ -7,7 +7,7 @@ from datetime import datetime
 
 from sqlalchemy import func
 from app.models.db import Task, RateLimitConfig
-from app.utils.db import SessionLocal
+from app.utils.db import SessionLocal, init_db
 from app.utils.tasks import TaskManager, OCRTask, EmbeddingsTask, QuizTask, SummaryTask, ChatTask
 
 from app.logging_config import setup_logging
@@ -116,6 +116,15 @@ async def main():
             if not processed:
                 await asyncio.sleep(2)  # Wait before polling again
         except KeyboardInterrupt:
+            logger.info("Worker shutting down...")
+            break
+        except Exception as e:
+            logger.error(f"Worker loop error: {e}")
+            await asyncio.sleep(5)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+oardInterrupt:
             logger.info("Worker shutting down...")
             break
         except Exception as e:
