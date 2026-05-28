@@ -310,7 +310,7 @@ async function loadQuiz(quizId, initialMode) {
         // Update Info Grid
         document.getElementById('infoCount').textContent = currentQuestions.length;
         document.getElementById('infoScope').textContent = currentQuiz.scope_type.charAt(0).toUpperCase() + currentQuiz.scope_type.slice(1);
-        const dateStr = new Date(currentQuiz.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        const dateStr = window.formatDate(currentQuiz.created_at);
         document.getElementById('infoDate').textContent = dateStr;
 
         // AI Metadata

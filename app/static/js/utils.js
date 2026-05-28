@@ -88,6 +88,28 @@ const WSManager = {
     }
 };
 
+/**
+ * Centralized Date Formatting
+ * Formats a date string or object into "D MMM YYYY" (e.g., 28 May 2026)
+ * Uses the user's local timezone.
+ */
+window.formatDate = function(dateInput) {
+    if (!dateInput) return '-';
+    try {
+        const date = new Date(dateInput);
+        if (isNaN(date.getTime())) return '-';
+        
+        return date.toLocaleDateString(undefined, {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+    } catch (e) {
+        console.error('Error formatting date:', e);
+        return '-';
+    }
+};
+
 window.WSManager = WSManager;
 
 // Initialize WebSocket on page load if logged in

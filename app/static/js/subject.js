@@ -124,7 +124,7 @@ function displayLectures(lectures) {
                     </div>
                     <div class="lecture-details">
                         <h4 style="display: flex; align-items: center;">${lecture.title}${statusBadge}</h4>
-                        <p>${isProcessing ? 'Processing content...' : `${new Date(lecture.created_at).toLocaleDateString()} • ${fileTypeLabel}`}</p>
+                        <p>${isProcessing ? 'Processing content...' : `${window.formatDate(lecture.created_at)} • ${fileTypeLabel}`}</p>
                     </div>
                 </div>
                 <div class="lecture-actions">

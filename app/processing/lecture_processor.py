@@ -206,7 +206,7 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
-            TaskManager._update_db_task(task_id, status="completed", progress=100, message="Note ready")
+            TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
             logger.info(f"Processing complete for lecture {lecture_id}")
             return {"status": "success", "lecture_id": lecture_id}
 
@@ -243,7 +243,7 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
-            TaskManager._update_db_task(task_id, status="completed", progress=100, message="Note ready")
+            TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
             return {"status": "success", "lecture_id": lecture_id}
 
     except Exception as e:

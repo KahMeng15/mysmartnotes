@@ -11,6 +11,10 @@ const ProgressManager = {
 
     init: async function() {
         console.log('ProgressManager: Initializing...');
+        
+        // Load dismissed tasks from storage
+        this.loadDismissedTasks();
+
         // Create the progress card element
         this.createUI();
         
@@ -179,7 +183,7 @@ const ProgressManager = {
                     if (task) {
                         task.status = 'failed';
                         task.error = 'Cancelled';
-                        this.renderTasks();
+                        this.dismissTask(taskId); // Auto-dismiss cancelled tasks to keep UI clean
                     }
                 }
             } catch (e) {
@@ -209,7 +213,8 @@ const ProgressManager = {
         content.innerHTML = allTasks.map(task => {
             const name = this.getTaskName(task);
             const isFinished = task.status === 'completed' || task.status === 'failed';
-            const statusLabel = task.message || (isFinished ? task.status : `${task.progress}%`);
+            // Use message if available (e.g. "Completed"), otherwise fallback to % or status
+            const statusLabel = task.message || (isFinished ? (task.status === 'completed' ? 'Completed' : 'failed') : `${task.progress}%`);
             const url = this.getTaskUrl(task);
             
             return `
@@ -290,9 +295,46 @@ const ProgressManager = {
 
     dismissTask: function(taskId) {
         this.activeTasks.delete(taskId);
-        this.dismissedTasks.add(taskId); // Remember that we cleared this
+        this.dismissedTasks.add(taskId);
+        this.saveDismissedTasks(); // Persist to storage
         this.renderTasks();
         this.updateVisibility();
+    },
+
+    loadDismissedTasks: function() {
+        try {
+            const stored = localStorage.getItem('progress_dismissed_tasks');
+            if (stored) {
+                const data = JSON.parse(stored);
+                // Data format: { taskId: timestamp }
+                const now = Date.now();
+                const oneDay = 24 * 60 * 60 * 1000;
+                
+                this.dismissedTasks = new Set();
+                for (const [id, time] of Object.entries(data)) {
+                    // Only keep for 24 hours to keep localStorage clean
+                    if (now - time < oneDay) {
+                        this.dismissedTasks.add(id);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Error loading dismissed tasks:', e);
+            this.dismissedTasks = new Set();
+        }
+    },
+
+    saveDismissedTasks: function() {
+        try {
+            const data = {};
+            const now = Date.now();
+            this.dismissedTasks.forEach(id => {
+                data[id] = now;
+            });
+            localStorage.setItem('progress_dismissed_tasks', JSON.stringify(data));
+        } catch (e) {
+            console.error('Error saving dismissed tasks:', e);
+        }
     },
 
     updateVisibility: function() {
@@ -330,8 +372,9 @@ const ProgressManager = {
                 const allFinished = Array.from(this.activeTasks.keys());
                 allFinished.forEach(id => {
                     this.activeTasks.delete(id);
-                    this.dismissedTasks.add(id); // Also mark as dismissed so they don't return
+                    this.dismissedTasks.add(id);
                 });
+                this.saveDismissedTasks(); // Persist auto-cleared ones
                 this.updateVisibility();
                 this.renderTasks();
             }, 10000); // Wait 10 seconds after all done before clearing

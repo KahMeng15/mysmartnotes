@@ -148,13 +148,7 @@ async function loadSummaryVersions() {
                     label += ' (Edited)';
                 }
                 
-                const dateString = date.toLocaleString(undefined, { 
-                    month: 'short', 
-                    day: 'numeric',
-                    year: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
+                const dateString = window.formatDate(s.created_at);
                 
                 return `
                     <div class="version-item ${isSelected ? 'active' : ''}" onclick="loadSummaryVersion('${s.id}')">

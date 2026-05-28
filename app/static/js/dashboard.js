@@ -117,6 +117,7 @@ function displayRecentLectures(lectures) {
         const subject = window.allSubjects ? window.allSubjects.find(s => s.id == lecture.subject_id) : null;
         const subjectName = subject ? subject.name : 'Unknown Subject';
         const groupName = subject && subject.groupName ? subject.groupName : null;
+        const fileTypeLabel = getFriendlyFileType(lecture.file_type);
 
         return `
             <div class="lecture-item">
@@ -129,7 +130,7 @@ function displayRecentLectures(lectures) {
                         <p>
                             ${subjectName} • 
                             ${groupName ? ` ${groupName} • ` : ''}
-                            ${new Date(lecture.created_at).toLocaleDateString()}
+                            ${window.formatDate(lecture.created_at)} • ${fileTypeLabel}
                         </p>
                     </div>
                 </div>
@@ -141,6 +142,16 @@ function displayRecentLectures(lectures) {
             </div>
         `;
     }).join('') + `</div>`;
+}
+
+function getFriendlyFileType(mimeType) {
+    if (!mimeType) return 'FILE';
+    const type = mimeType.toLowerCase();
+    if (type.includes('pdf')) return 'PDF';
+    if (type.includes('presentation') || type.includes('powerpoint') || type.includes('pptx')) return 'PowerPoint';
+    if (type.includes('image') || type.includes('png') || type.includes('jpeg')) return 'Image';
+    if (type.includes('word') || type.includes('docx')) return 'Word';
+    return type.split('/')[1].toUpperCase();
 }
 
 function getIconForType(mimeType) {

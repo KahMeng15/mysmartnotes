@@ -186,11 +186,7 @@ function createQuizCardHtml(quiz) {
         `;
     }
 
-    const dateStr = new Date(quiz.created_at).toLocaleDateString(undefined, {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-    });
+    const dateStr = window.formatDate(quiz.created_at);
     
     const hue = Array.from(quiz.title).reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360;
     const color = `hsl(${hue}, 60%, 45%)`;

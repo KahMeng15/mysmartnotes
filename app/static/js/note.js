@@ -187,7 +187,7 @@ function displayLecture() {
     // Sidebar info
     document.getElementById('fileName').textContent = lectureData.file_name || '-';
     const uploadDate = new Date(lectureData.created_at);
-    document.getElementById('uploadedDate').textContent = uploadDate.toLocaleString();
+    document.getElementById('uploadedDate').textContent = window.formatDate(lectureData.created_at);
 
     const fileType = lectureData.file_type || '';
     if (fileType.includes('pdf')) document.getElementById('fileType').textContent = 'PDF';
@@ -1307,7 +1307,7 @@ function renderSnapshots(snapshots) {
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-sm);">
                 <div style="flex: 1; min-width: 0;">
                     <div class="snapshot-name" style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(s.name)}</div>
-                    <div class="snapshot-date" style="font-size: var(--font-size-xs); color: var(--color-gray); margin-top: 2px;">${new Date(s.created_at).toLocaleDateString()}</div>
+                    <div class="snapshot-date" style="font-size: var(--font-size-xs); color: var(--color-gray); margin-top: 2px;">${window.formatDate(s.created_at)}</div>
                 </div>
                 <button class="snapshot-delete" onclick="event.stopPropagation(); deleteSnapshot(${s.id})" title="Delete snapshot" style="padding: 4px; background: none; border: none; cursor: pointer; color: var(--color-gray); font-size: 1rem;">
                     <i class="ph ph-trash"></i>
