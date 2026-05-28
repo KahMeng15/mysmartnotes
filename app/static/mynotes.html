@@ -140,6 +140,10 @@
         let minimizedGroups = new Set(); // Track minimized group IDs
 
         window.addEventListener('load', () => {
+            // Load saved sort preference
+            const savedSort = localStorage.getItem('mynotes_sort') || 'name';
+            document.getElementById('sortSelect').value = savedSort;
+            
             fetchData();
         });
 
@@ -159,6 +163,8 @@
                 });
                 if (subjectsRes.ok) subjectsData = await subjectsRes.json();
 
+                // Apply initial sort
+                sortNotes(false);
                 renderNotes();
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -351,8 +357,11 @@
             }
         }
 
-        function sortNotes() {
+        function sortNotes(shouldRender = true) {
             const sortType = document.getElementById('sortSelect').value;
+            // Save preference
+            localStorage.setItem('mynotes_sort', sortType);
+
             // Sort groups and subjects
             if (sortType === 'name') {
                 groupsData.sort((a, b) => a.name.localeCompare(b.name));
@@ -361,7 +370,7 @@
                 groupsData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 subjectsData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             }
-            renderNotes();
+            if (shouldRender) renderNotes();
         }
 
         // --- Modals ---

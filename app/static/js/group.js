@@ -11,18 +11,19 @@ window.addEventListener('load', () => {
         window.location.href = 'notes.html';
         return;
     }
+
+    // Load saved sort preference
+    const savedSort = localStorage.getItem('group_subjects_sort') || 'name';
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) {
+        sortSelect.value = savedSort;
+    }
+
     fetchData();
 });
 
 async function fetchData() {
     try {
-        // Fetch Group Details
-        // Since we don't have a single GET /groups/{id} endpoint exposed in API list (only GET /groups), 
-        // we fetch all and find. Optimally we should add GET /groups/{id} but this works for now.
-        // Wait, checking routers/groups.py in memory: usually standard CRUD.
-        // Let's assume we fetch all groups for now to be safe, or try /groups/{id} if implemented.
-        // Based on previous `notes.html`, we fetched all.
-
         const groupsRes = await fetch(`${API_URL}/groups`);
         if (groupsRes.ok) {
             const groups = await groupsRes.json();
@@ -42,7 +43,7 @@ async function fetchData() {
         if (subjectsRes.ok) {
             const allSubjects = await subjectsRes.json();
             groupSubjects = allSubjects.filter(s => s.group_id == groupId);
-            renderSubjects(groupSubjects);
+            filterSubjects(); // Apply initial filter/sort and render
         }
 
     } catch (error) {
@@ -85,6 +86,9 @@ function filterSubjects() {
 
     // Sort
     const sortType = document.getElementById('sortSelect').value;
+    // Save preference
+    localStorage.setItem('group_subjects_sort', sortType);
+
     if (sortType === 'name') {
         filtered.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortType === 'recent') {

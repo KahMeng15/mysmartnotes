@@ -11,6 +11,14 @@ window.addEventListener('load', () => {
         window.location.href = 'notes.html';
         return;
     }
+    
+    // Load saved sort preference
+    const savedSort = localStorage.getItem('lectures_sort') || 'name';
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) {
+        sortSelect.value = savedSort;
+    }
+
     loadSubjectDetails();
     loadLectures();
 });
@@ -57,7 +65,7 @@ async function loadLectures() {
         if (response.ok) {
             let data = await response.json();
             allLectures = data.filter(l => l.subject_id == subjectId);
-            displayLectures(allLectures);
+            filterLectures(); // Apply sort and display
         }
     } catch (error) {
         console.error('Error:', error);
@@ -66,13 +74,16 @@ async function loadLectures() {
 }
 
 function filterLectures() {
-    let filtered = allLectures;
+    let filtered = [...allLectures];
     const search = document.getElementById('searchInput').value.toLowerCase();
     if (search) {
         filtered = filtered.filter(l => l.title.toLowerCase().includes(search));
     }
 
     const sort = document.getElementById('sortSelect').value;
+    // Save preference
+    localStorage.setItem('lectures_sort', sort);
+
     if (sort === 'recent') {
         filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     } else if (sort === 'oldest') {
