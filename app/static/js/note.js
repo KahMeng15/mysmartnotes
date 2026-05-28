@@ -251,9 +251,13 @@ function updateExtractedText() {
     textContainer.innerHTML = '';
     document.getElementById('progressContainer').style.display = 'none';
     document.getElementById('errorContainerInline').style.display = 'none';
-    document.getElementById('extractionStatus').style.display = 'none';
+    
+    // Always hide extractionStatus initially, we'll show it only if needed (e.g. failed)
+    const extractionStatus = document.getElementById('extractionStatus');
+    if (extractionStatus) extractionStatus.style.display = 'none';
 
     if (lectureData.extracted_text) {
+        // ... (rest of function unchanged)
         // Remove loading bar if present
         const bar = document.getElementById('noteLoadingBar');
         if (bar) bar.remove();
@@ -298,6 +302,9 @@ function updateExtractedText() {
             }
             const fill = document.getElementById('noteLoadingBarFill');
             if (fill) fill.style.width = activeTask.progress + '%';
+            
+            // Exit early so we don't show "No content found"
+            return;
         } else {
             textContainer.innerHTML = '<div class="empty-state">No content found.</div>';
         }

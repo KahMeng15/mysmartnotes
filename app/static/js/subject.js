@@ -104,6 +104,17 @@ function displayLectures(lectures) {
         const activeTask = activeTasks.get(taskId);
         const isProcessing = activeTask && (activeTask.status === 'processing' || activeTask.status === 'pending' || activeTask.status === 'running');
         const progress = activeTask ? activeTask.progress : 0;
+        
+        let statusBadge = '';
+        if (activeTask) {
+            if (activeTask.status === 'pending') {
+                statusBadge = '<span class="status-badge status-pending" style="margin-left: 8px; font-size: 10px;">Pending</span>';
+            } else if (activeTask.status === 'processing' || activeTask.status === 'running') {
+                statusBadge = '<span class="status-badge status-running" style="margin-left: 8px; font-size: 10px;">Processing</span>';
+            }
+        }
+
+        const fileTypeLabel = getFriendlyFileType(lecture.file_type);
 
         return `
             <div class="lecture-item ${isProcessing ? 'skeleton-card' : ''}" id="lecture-${lecture.id}">
@@ -112,8 +123,8 @@ function displayLectures(lectures) {
                         <i class="ph ${getIconForType(lecture.file_type)}"></i>
                     </div>
                     <div class="lecture-details">
-                        <h4>${lecture.title}</h4>
-                        <p>${isProcessing ? 'Processing content...' : `${new Date(lecture.created_at).toLocaleDateString()} • ${lecture.file_type ? lecture.file_type.split('/')[1].toUpperCase() : 'FILE'}`}</p>
+                        <h4 style="display: flex; align-items: center;">${lecture.title}${statusBadge}</h4>
+                        <p>${isProcessing ? 'Processing content...' : `${new Date(lecture.created_at).toLocaleDateString()} • ${fileTypeLabel}`}</p>
                     </div>
                 </div>
                 <div class="lecture-actions">
@@ -132,6 +143,16 @@ function displayLectures(lectures) {
             </div>
         `;
     }).join('');
+}
+
+function getFriendlyFileType(mimeType) {
+    if (!mimeType) return 'FILE';
+    const type = mimeType.toLowerCase();
+    if (type.includes('pdf')) return 'PDF';
+    if (type.includes('presentation') || type.includes('powerpoint') || type.includes('pptx')) return 'PowerPoint';
+    if (type.includes('image') || type.includes('png') || type.includes('jpeg')) return 'Image';
+    if (type.includes('word') || type.includes('docx')) return 'Word';
+    return type.split('/')[1].toUpperCase();
 }
 
 // Listen for task updates to refresh the list in real-time
