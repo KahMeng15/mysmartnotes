@@ -312,7 +312,7 @@ const ProgressManager = {
             return `/note.html?id=${kwargs.lecture_id}`;
         }
         if (task.task_type === 'summary_generation' && kwargs.lecture_id) {
-            return `/summary.html?lecture_id=${kwargs.lecture_id}`;
+            return `/note/${kwargs.lecture_id}/summary`;
         }
         if (task.task_type === 'quiz_generation') {
             return `/quiz_dashboard.html`;

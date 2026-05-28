@@ -58,6 +58,18 @@
                             <div id="quickreadContent" class="markdown-content"></div>
                         </div>
                         
+                        <!-- Progress Container -->
+                        <div id="summaryProgressContainer" style="display: none;" class="progress-container">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                                <span style="font-weight: 600; font-size: var(--font-size-sm);">Summarizing with AI...</span>
+                                <span id="summaryProgressPercent" style="font-size: var(--font-size-sm); color: var(--color-gray);">0%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="summaryProgressFill" class="progress-fill"></div>
+                            </div>
+                            <p id="summaryProgressMessage" style="font-size: var(--font-size-xs); color: var(--color-gray); margin: 0;">Initializing AI model...</p>
+                        </div>
+
                         <!-- View Mode: Rendered Markdown -->
                         <div id="viewContainer">
                             <div id="summaryText" class="markdown-content">
@@ -328,31 +340,7 @@
         </div>
     </div>
 
-    <!-- Summary Progress Modal -->
-    <div id="summaryProgressModal" class="modal">
-        <div class="modal-content modal-content-progress">
-            <div class="progress-centered-header">
-                <div class="progress-icon-sparkle">
-                    <i class="ph ph-sparkle"></i>
-                </div>
-                <h3 class="progress-title-main">Summarizing with AI</h3>
-                <p class="progress-subtitle-main" id="summaryProgressMessage">Initializing AI model...</p>
-            </div>
-            
-            <div class="progress-wrapper-alt">
-                <div class="progress-info-labels">
-                    <span id="summaryProgressLabel" class="progress-status-text">Working...</span>
-                    <span id="summaryProgressPercent" class="progress-percent-text">0%</span>
-                </div>
-                <div class="progress-bar-alt">
-                    <div id="summaryProgressFill" class="progress-fill"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteConfirmModal" class="modal">
+    <!-- Delete Confirmation Modal -->    <div id="deleteConfirmModal" class="modal">
         <div class="modal-content modal-content-compact">
             <h3>Delete Summary Version?</h3>
             <p class="modal-text-gray">This action cannot be undone. Are you sure you want to delete this version?</p>

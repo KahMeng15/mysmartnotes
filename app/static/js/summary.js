@@ -133,39 +133,59 @@ async function loadSummaryVersions() {
             const summaries = docs.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
             const list = document.getElementById('summaryList');
             if (!list) return summaries;
+
+            // Check if there is an active summary task for this lecture
+            const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
+            const summaryTask = Array.from(activeTasks.values()).find(t => 
+                t.task_type === 'summary_generation' && t.input_data?.kwargs?.lecture_id === lectureId
+            );
             
-            if (summaries.length === 0) {
+            let processingItem = '';
+            if (summaryTask && !['completed', 'failed'].includes(summaryTask.status)) {
+                const isProcessingActive = !currentVersionId;
+                processingItem = `
+                    <div class="version-item ${isProcessingActive ? 'active' : ''} processing" onclick="showNoSummaryUI(); currentVersionId=null; loadSummaryVersions();" style="opacity: 0.7; cursor: pointer;">
+                        <div style="flex: 1; min-width: 0;">
+                            <div class="version-title">
+                                <i class="ph ph-spinner ph-spin" style="margin-right: 6px;"></i>
+                                Processing Summary
+                            </div>
+                            <div class="version-meta">${summaryTask.progress}% complete</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (summaries.length === 0 && !processingItem) {
                 list.innerHTML = '<div class="empty-state" style="padding: var(--spacing-md); font-size: var(--font-size-xs);">No summaries yet</div>';
                 return summaries;
             }
             
-            list.innerHTML = summaries.map((s, idx) => {
-                const date = new Date(s.created_at);
-                const isSelected = currentVersionId === s.id;
-                
-                let label = s.title;
+            const versionsHtml = summaries.map(function(s) {
+                const isSelected = (currentVersionId === s.id);
+                var label = s.title;
                 if (s.is_user_edited) {
                     label += ' (Edited)';
                 }
+                var dateString = window.formatDate ? window.formatDate(s.created_at) : s.created_at;
                 
-                const dateString = window.formatDate(s.created_at);
-                
-                return `
-                    <div class="version-item ${isSelected ? 'active' : ''}" onclick="loadSummaryVersion('${s.id}')">
-                        <div style="flex: 1; min-width: 0;">
-                            <div class="version-title">${label}</div>
-                            <div class="version-meta">${dateString}</div>
-                        </div>
-                        <button class="version-delete" onclick="event.stopPropagation(); showDeleteConfirm('${s.id}')">
-                            <i class="ph ph-trash"></i>
-                        </button>
-                    </div>
-                `;
+                return '<div class="version-item ' + (isSelected ? 'active' : '') + '" onclick="loadSummaryVersion(\'' + s.id + '\')">' +
+                        '<div style="flex: 1; min-width: 0;">' +
+                            '<div class="version-title">' + label + '</div>' +
+                            '<div class="version-meta">' + dateString + '</div>' +
+                        '</div>' +
+                        '<button class="version-delete" onclick="event.stopPropagation(); showDeleteConfirm(\'' + s.id + '\')">' +
+                            '<i class="ph ph-trash"></i>' +
+                        '</button>' +
+                    '</div>';
             }).join('');
-            return summaries;
 
+            list.innerHTML = processingItem + versionsHtml;
+            return summaries;
         }
-    } catch (e) { console.error('Error loading versions:', e); }
+    } catch (e) { 
+        console.error('Error loading versions:', e); 
+    }
     return [];
 }
 
@@ -290,16 +310,11 @@ function showNoSummaryUI() {
             </div>
         `;
 
-        // Add fixed bottom progress bar if not present
-        if (!document.getElementById('summaryLoadingBar')) {
-            const bar = document.createElement('div');
-            bar.id = 'summaryLoadingBar';
-            bar.className = 'loading-bar-fixed-bottom';
-            bar.innerHTML = '<div class="loading-bar-fill" id="summaryLoadingBarFill"></div>';
-            document.body.appendChild(bar);
-        }
-        const fill = document.getElementById('summaryLoadingBarFill');
-        if (fill) fill.style.width = summaryTask.progress + '%';
+        // Update on-page progress container
+        const progressContainer = document.getElementById('summaryProgressContainer');
+        if (progressContainer) progressContainer.style.display = 'block';
+        updateSummaryProgress(summaryTask.progress, summaryTask.message || 'Summarizing note content', 'Processing');
+        
         return;
     }
 
@@ -339,12 +354,16 @@ function showNoSummaryUI() {
 window.addEventListener('taskUpdate', (e) => {
     const task = e.detail;
     if (task.task_type === 'summary_generation' && task.input_data?.kwargs?.lecture_id === lectureId) {
-        const fill = document.getElementById('summaryLoadingBarFill');
-        if (fill) fill.style.width = task.progress + '%';
+        // Update on-page progress
+        updateSummaryProgress(task.progress, task.message || 'Summarizing note content', 'Processing');
+        
+        // Update sidebar version list to show progress there too
+        loadSummaryVersions();
 
         if (task.status === 'completed') {
-            const bar = document.getElementById('summaryLoadingBar');
-            if (bar) bar.remove();
+            const container = document.getElementById('summaryProgressContainer');
+            if (container) container.style.display = 'none';
+            
             // Reload summaries and load the latest
             loadSummaryVersions().then(summaries => {
                 if (summaries && summaries.length > 0) {
@@ -352,8 +371,8 @@ window.addEventListener('taskUpdate', (e) => {
                 }
             });
         } else if (task.status === 'failed') {
-            const bar = document.getElementById('summaryLoadingBar');
-            if (bar) bar.remove();
+            const container = document.getElementById('summaryProgressContainer');
+            if (container) container.style.display = 'none';
             showNoSummaryUI();
         }
     }
@@ -727,15 +746,15 @@ function hideRedundantSections() {
 }
 
 function updateSummaryProgress(percent, message, label) {
+    const container = document.getElementById('summaryProgressContainer');
     const fill = document.getElementById('summaryProgressFill');
     const percentText = document.getElementById('summaryProgressPercent');
     const msgText = document.getElementById('summaryProgressMessage');
-    const labelText = document.getElementById('summaryProgressLabel');
     
+    if (container) container.style.display = 'block';
     if (fill) fill.style.width = `${percent}%`;
     if (percentText) percentText.textContent = `${percent}%`;
     if (msgText && message) msgText.textContent = message;
-    if (labelText && label) labelText.textContent = label;
 }
 
 async function generateSummary() {
@@ -743,8 +762,10 @@ async function generateSummary() {
     const splitLevel = document.getElementById('summarySplitLevel').value;
     
     closeSummaryModal();
-    document.getElementById('summaryProgressModal').classList.add('active');
-    updateSummaryProgress(0, 'Initializing AI model...', 'Working...');
+    // Show on-page progress instead of modal
+    const container = document.getElementById('summaryProgressContainer');
+    if (container) container.style.display = 'block';
+    updateSummaryProgress(0, 'Initializing AI model', 'Working');
     
     let currentPercent = 5;
     let progressInterval = setInterval(() => {
@@ -752,7 +773,7 @@ async function generateSummary() {
         // OR if the real progress is already ahead of us
         if (currentPercent < 85) {
             currentPercent += Math.random() * 3;
-            updateSummaryProgress(Math.floor(currentPercent), 'Summarizing note content...', 'Processing');
+            updateSummaryProgress(Math.floor(currentPercent), 'Summarizing note content', 'Processing');
         }
     }, 2000);
 
@@ -778,13 +799,18 @@ async function generateSummary() {
 
             if (data.task_id) {
                 console.log(`[Summary] Task submitted. Task ID: ${data.task_id}`);
+                
+                // Switch UI to processing mode immediately
+                showNoSummaryUI();
+                loadSummaryVersions();
+
                 // Background task submitted, wait for WebSocket
                 WSManager.subscribe(data.task_id, (update) => {
                     console.log(`[Summary] WS Update for ${data.task_id}:`, update);
                     if (update.progress !== undefined) {
                         // Synchronize our local progress with the real one from the server
                         currentPercent = update.progress;
-                        updateSummaryProgress(Math.floor(currentPercent), update.message || 'Summarizing note content...', 'Processing');
+                        updateSummaryProgress(Math.floor(currentPercent), update.message || 'Summarizing note content', 'Processing');
                     }
 
                     if (update.status === 'completed') {
@@ -805,7 +831,7 @@ async function generateSummary() {
                         currentVersionId = result.id;
 
                         setTimeout(() => {
-                            document.getElementById('summaryProgressModal').classList.remove('active');
+                            if (container) container.style.display = 'none';
                             displaySummary();
                             loadSummaryVersions();
                             loadNoteMetadata();
@@ -813,7 +839,7 @@ async function generateSummary() {
                         }, 600);
                     } else if (update.status === 'failed') {
                         clearInterval(progressInterval);
-                        document.getElementById('summaryProgressModal').classList.remove('active');
+                        if (container) container.style.display = 'none';
                         alert('Summary generation failed: ' + (update.error || 'Unknown error'));
                     }
                 });
@@ -835,7 +861,7 @@ async function generateSummary() {
             currentVersionId = data.id;
 
             setTimeout(() => {
-                document.getElementById('summaryProgressModal').classList.remove('active');
+                if (container) container.style.display = 'none';
                 displaySummary();
                 loadSummaryVersions();
                 loadNoteMetadata();
@@ -843,11 +869,11 @@ async function generateSummary() {
             }, 600);
         } else {
             clearInterval(progressInterval);
-            document.getElementById('summaryProgressModal').classList.remove('active');
+            if (container) container.style.display = 'none';
             alert('Failed to generate summary');
         }    } catch (e) {
         clearInterval(progressInterval);
-        document.getElementById('summaryProgressModal').classList.remove('active');
+        if (container) container.style.display = 'none';
         alert('Error: ' + e.message);
     }
 }

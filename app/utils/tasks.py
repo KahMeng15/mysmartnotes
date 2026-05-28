@@ -366,10 +366,13 @@ class SummaryTask:
                 "content": summary_content,
                 "mode": mode,
                 "output_format": output_format,
+                "processing_method": processing_method,
+                "split_level": split_level,
                 "processing_time": processing_time,
                 "processing_time_ms": int(processing_time * 1000),
                 "model": doc.model,
                 "version": next_version,
+                "is_user_edited": False,
                 "status": "completed"
             }
         finally:

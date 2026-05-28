@@ -182,7 +182,9 @@ async def generate_summary_endpoint(
         existing_summary = db.query(Summary).filter(
             Summary.lecture_id == request.lecture_id,
             Summary.summary_type == "summary",
-            Summary.processing_method == request.processing_method
+            Summary.processing_method == request.processing_method,
+            Summary.mode == request.mode,
+            Summary.output_format == request.output_format
         ).order_by(Summary.created_at.desc()).first()
 
         if existing_summary:
@@ -213,7 +215,8 @@ async def generate_summary_endpoint(
         task_id, 
         "summary_generation", 
         current_user.id, 
-        lecture_id=lecture.id, 
+        lecture_id=lecture.id,
+        title=lecture.title, 
         mode=request.mode,
         output_format=request.output_format,
         processing_method=request.processing_method,
@@ -351,7 +354,6 @@ async def update_generated_summary(
     )
 
 @router.get("", response_model=List[SummaryItemResponse])
-@cache_response(ttl=3600)
 async def list_summaries(
     request: Request,
     lecture_id: str = None,
@@ -390,7 +392,6 @@ async def list_summaries(
 
 
 @router.get("/{summary_id}", response_model=SummaryItemResponse)
-@cache_response(ttl=3600)
 async def get_summary(
     request: Request,
     summary_id: str,
