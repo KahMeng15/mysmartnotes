@@ -12,13 +12,29 @@ const ProgressManager = {
     init: async function() {
         console.log('ProgressManager: Initializing...');
         
-        // Load dismissed tasks from storage
+        // Load state from storage
         this.loadDismissedTasks();
+        this.loadActiveTasks(); // Load cached tasks immediately
+        this.isExpanded = localStorage.getItem('progressExpanded') === 'true';
 
         // Create the progress card element
         this.createUI();
         
-        // Fetch active tasks from backend
+        // If it was expanded, make sure UI reflects it
+        if (this.isExpanded) {
+            const card = document.getElementById('globalProgressCard');
+            if (card) card.classList.add('expanded');
+            const icon = document.getElementById('progressToggleIcon');
+            if (icon) icon.className = 'ph ph-caret-down';
+        }
+
+        // Render immediately if we have cached tasks to avoid flickering
+        if (this.activeTasks.size > 0) {
+            this.renderTasks();
+            this.updateVisibility();
+        }
+        
+        // Fetch fresh active tasks from backend
         await this.fetchActiveTasks();
 
         // Subscribe to WebSocket updates
@@ -52,7 +68,7 @@ const ProgressManager = {
 
         const card = document.createElement('div');
         card.id = 'globalProgressCard';
-        card.className = 'global-progress-card';
+        card.className = 'global-progress-card' + (this.isExpanded ? ' expanded' : '');
         card.innerHTML = `
             <div class="global-progress-card-header" onclick="ProgressManager.toggleExpand()">
                 <div class="global-progress-info">
@@ -61,7 +77,7 @@ const ProgressManager = {
                 </div>
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <span id="progressGlobalCounter" style="font-size: 11px; font-weight: 600; color: var(--color-gray);"></span>
-                    <i class="ph ph-caret-up" id="progressToggleIcon"></i>
+                    <i class="ph ${this.isExpanded ? 'ph-caret-down' : 'ph-caret-up'}" id="progressToggleIcon"></i>
                 </div>
                 <div class="global-progress-header-bar" id="progressHeaderBar" style="width: 0%"></div>
             </div>
@@ -74,6 +90,7 @@ const ProgressManager = {
 
     toggleExpand: function() {
         this.isExpanded = !this.isExpanded;
+        localStorage.setItem('progressExpanded', this.isExpanded);
         const card = document.getElementById('globalProgressCard');
         const icon = document.getElementById('progressToggleIcon');
         
@@ -105,15 +122,23 @@ const ProgressManager = {
                     const data = await response.json();
                     console.log('ProgressManager: Fetched active tasks', data.tasks.length);
                     
+                    // Clear and rebuild to sync with server
+                    // Only keep tasks that are NOT in dismissedTasks
+                    const syncedTasks = new Map();
                     data.tasks.forEach(task => {
-                        // Skip tasks that the user has already manually dismissed
-                        if (this.dismissedTasks.has(task.task_id)) return;
-
-                        const existing = this.activeTasks.get(task.task_id);
-                        if (!existing || task.status !== existing.status || task.progress > existing.progress) {
-                            this.activeTasks.set(task.task_id, task);
+                        if (!this.dismissedTasks.has(task.task_id)) {
+                            syncedTasks.set(task.task_id, task);
                         }
                     });
+                    
+                    this.activeTasks = syncedTasks;
+                    this.saveActiveTasks();
+
+                    // Auto-expand on load if there are active tasks AND it was previously expanded OR never set
+                    if (this.activeTasks.size > 0 && localStorage.getItem('progressExpanded') === null) {
+                        this.isExpanded = true;
+                        localStorage.setItem('progressExpanded', 'true');
+                    }
 
                     this.renderTasks();
                     this.updateVisibility();
@@ -149,12 +174,14 @@ const ProgressManager = {
         if (data.input_data) task.input_data = data.input_data;
         if (data.message) task.message = data.message;
 
-        // Auto-expand if a new task is added or if something starts processing
-        if (!existing && !this.isExpanded) {
+        // Auto-expand if a new task is added or if something starts processing, 
+        // BUT ONLY IF the user hasn't explicitly collapsed it (stay persistent)
+        if (!existing && !this.isExpanded && localStorage.getItem('progressExpanded') !== 'false') {
             this.toggleExpand();
         }
 
         this.activeTasks.set(data.task_id, task);
+        this.saveActiveTasks();
 
         this.renderTasks();
         this.updateVisibility();
@@ -295,10 +322,33 @@ const ProgressManager = {
 
     dismissTask: function(taskId) {
         this.activeTasks.delete(taskId);
+        this.saveActiveTasks();
         this.dismissedTasks.add(taskId);
         this.saveDismissedTasks(); // Persist to storage
         this.renderTasks();
         this.updateVisibility();
+    },
+
+    loadActiveTasks: function() {
+        try {
+            const stored = localStorage.getItem('progress_active_tasks');
+            if (stored) {
+                const tasks = JSON.parse(stored);
+                this.activeTasks = new Map(tasks.map(t => [t.task_id, t]));
+            }
+        } catch (e) {
+            console.error('Error loading active tasks:', e);
+            this.activeTasks = new Map();
+        }
+    },
+
+    saveActiveTasks: function() {
+        try {
+            const tasks = Array.from(this.activeTasks.values());
+            localStorage.setItem('progress_active_tasks', JSON.stringify(tasks));
+        } catch (e) {
+            console.error('Error saving active tasks:', e);
+        }
     },
 
     loadDismissedTasks: function() {
@@ -374,6 +424,7 @@ const ProgressManager = {
                     this.activeTasks.delete(id);
                     this.dismissedTasks.add(id);
                 });
+                this.saveActiveTasks();
                 this.saveDismissedTasks(); // Persist auto-cleared ones
                 this.updateVisibility();
                 this.renderTasks();

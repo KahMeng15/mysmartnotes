@@ -137,7 +137,17 @@
         let groupsData = [];
         let subjectsData = [];
         let ungroupedSubjects = [];
-        let minimizedGroups = new Set(); // Track minimized group IDs
+        
+        // Load minimized groups from localStorage
+        let minimizedGroups = new Set(); 
+        try {
+            const savedMinimized = localStorage.getItem('minimizedGroups');
+            if (savedMinimized) {
+                minimizedGroups = new Set(JSON.parse(savedMinimized));
+            }
+        } catch (e) {
+            console.error('Error loading minimized groups', e);
+        }
 
         window.addEventListener('load', () => {
             // Load saved sort preference
@@ -209,6 +219,10 @@
             } else {
                 minimizedGroups.add(groupId);
             }
+            
+            // Persist to localStorage
+            localStorage.setItem('minimizedGroups', JSON.stringify(Array.from(minimizedGroups)));
+
             // Update the DOM to show/hide subjects
             const groupElement = document.querySelector(`[data-group-id="${groupId}"] .subjects-grid`);
             if (groupElement) {

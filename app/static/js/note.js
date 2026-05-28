@@ -1710,17 +1710,15 @@ function toggleActionPanel() {
     }
 }
 
-// Restore action collapsed state
-if (localStorage.getItem('actionCollapsed') === 'true') {
-    document.addEventListener('DOMContentLoaded', () => {
-        const layout = document.querySelector('.app-layout');
-        if (layout) {
-            layout.classList.add('action-collapsed');
-            const icon = document.getElementById('actionToggleIcon');
-            if (icon) icon.className = 'ph ph-caret-left';
-        }
-    });
-}
+// Initialize action collapsed icon state
+document.addEventListener('DOMContentLoaded', () => {
+    const layout = document.querySelector('.app-layout');
+    const icon = document.getElementById('actionToggleIcon');
+    if (layout && icon) {
+        const isCollapsed = layout.classList.contains('action-collapsed');
+        icon.className = isCollapsed ? 'ph ph-caret-left' : 'ph ph-caret-right';
+    }
+});
 
 function initInlineChat() {
     chatInitialized = true;

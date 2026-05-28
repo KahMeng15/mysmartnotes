@@ -4,6 +4,15 @@
  * Handles collapse toggle and persists state in localStorage.
  */
 
+// Apply preload class immediately to prevent transitions on load
+document.documentElement.classList.add('preload');
+window.addEventListener('load', () => {
+    // Small delay to ensure all dynamic elements are injected and settled
+    setTimeout(() => {
+        document.documentElement.classList.remove('preload');
+    }, 100);
+});
+
 // Global function to sync user display
 window.syncUserDisplay = async function() {
     try {
@@ -199,8 +208,14 @@ function injectSidebar() {
         // .app-layout already exists in note.html — just prepend sidebar into it
         const appLayout = document.querySelector('.app-layout');
         if (appLayout) {
-            appLayout.insertAdjacentHTML('afterbegin', sidebarHtml);
+            // Apply collapsed classes immediately before injection
             if (collapsed) appLayout.classList.add('sidebar-collapsed');
+            
+            // Also restore action panel state here for consistency on note pages
+            const actionCollapsed = localStorage.getItem('actionCollapsed') === 'true';
+            if (actionCollapsed) appLayout.classList.add('action-collapsed');
+
+            appLayout.insertAdjacentHTML('afterbegin', sidebarHtml);
         }
     } else {
         // All other pages: wrap body children in .app-layout > sidebar + .app-main

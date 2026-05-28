@@ -110,6 +110,16 @@
   --toast-info-text: #0c4a6e;
 }
 
+/* Prevent transitions on load */
+.preload,
+.preload * {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -ms-transition: none !important;
+  -o-transition: none !important;
+  transition: none !important;
+}
+
 /* ===== RESET & BASE STYLES ===== */
 
 * {
