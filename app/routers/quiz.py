@@ -228,8 +228,6 @@ async def generate_quiz_ai(
         task_id, 
         "quiz_generation", 
         current_user.id, 
-        task_id=task_id,
-        user_id=current_user.id,
         title=request.title,
         scope_type=request.scope_type,
         scope_id=request.scope_id,

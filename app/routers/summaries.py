@@ -126,7 +126,7 @@ async def generate_quiz(
             detail="Lecture not found"
         )
     
-    lecture_content = StorageManager.get_lecture_text(lecture_id) or ""
+    lecture_content = StorageManager.get_lecture_text(lecture.id) or ""
     if not lecture_content:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -213,9 +213,7 @@ async def generate_summary_endpoint(
         task_id, 
         "summary_generation", 
         current_user.id, 
-        task_id=task_id,
-        lecture_id=db_lecture.id, 
-        user_id=current_user.id,
+        lecture_id=lecture.id, 
         mode=request.mode,
         output_format=request.output_format,
         processing_method=request.processing_method,
@@ -248,7 +246,7 @@ async def generate_cheatsheet(
             detail="Lecture not found"
         )
     
-    lecture_content = StorageManager.get_lecture_text(lecture_id) or ""
+    lecture_content = StorageManager.get_lecture_text(lecture.id) or ""
     if not lecture_content:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
