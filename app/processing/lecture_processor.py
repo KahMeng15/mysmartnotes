@@ -127,6 +127,22 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             TaskManager._update_db_task(task_id, status="failed", error="Lecture or User not found")
             return {"status": "error", "message": "Lecture or User not found"}
 
+        def is_cancelled():
+            """Check if the task has been marked as failed/cancelled in the DB"""
+            try:
+                # We need a fresh check from DB
+                check_db = SessionLocal()
+                t = check_db.query(Task).filter(Task.task_id == task_id).first()
+                cancelled = t and (t.status == "failed" or t.status == "cancelled")
+                check_db.close()
+                return cancelled
+            except:
+                return False
+
+        if is_cancelled():
+            logger.info(f"Task {task_id} aborted before start")
+            return {"status": "cancelled"}
+
         file_path = lecture.file_path
         if not os.path.exists(file_path):
             logger.error(f"Processing failed: File not found at {file_path}")
@@ -145,13 +161,20 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             
             # Custom wrapper to pass messages through the pipeline's callback
             def pipeline_callback(p):
+                if is_cancelled():
+                    raise InterruptedError("Task cancelled by user")
                 msg = "Extracting text..."
                 if p > 30: msg = "Analyzing document structure..."
                 if p > 60: msg = "Polishing with AI..."
                 if p > 85: msg = "Finalizing content..."
                 progress_callback(p, msg)
 
-            markdown = extract_markdown_for_user(user, file_path, progress_callback=pipeline_callback)
+            try:
+                markdown = extract_markdown_for_user(user, file_path, progress_callback=pipeline_callback)
+            except InterruptedError:
+                logger.info(f"Task {task_id} halted during smart pipeline")
+                return {"status": "cancelled"}
+
             structured_segments = markdown_to_segments(markdown)
             
             # Save to file storage
@@ -173,6 +196,9 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             
             # STEP 4: Compute and store embeddings
             if markdown and markdown.strip():
+                if is_cancelled():
+                    logger.info(f"Task {task_id} halted before embeddings")
+                    return {"status": "cancelled"}
                 try:
                     progress_callback(95, "Generating search embeddings...")
                     from app.processing.embeddings import update_lecture_embeddings
@@ -187,8 +213,12 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
         else:
             # Fallback to OCR for images
             logger.info(f"Processing lecture {lecture_id} (OCR Fallback)")
+            if is_cancelled(): return {"status": "cancelled"}
+            
             progress_callback(20, "OCR: Analyzing image...")
             ocr_result = OCRProcessor.extract_text(file_path, lecture.file_type, lecture_id=lecture_id)
+            
+            if is_cancelled(): return {"status": "cancelled"}
             progress_callback(80, "Structuring content...")
             
             raw_text = ocr_result.get("raw_text", "")
@@ -205,6 +235,7 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             db.commit()
             
             if raw_text:
+                if is_cancelled(): return {"status": "cancelled"}
                 try:
                     progress_callback(95, "Generating search embeddings...")
                     from app.processing.embeddings import update_lecture_embeddings
@@ -216,6 +247,9 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             return {"status": "success", "lecture_id": lecture_id}
 
     except Exception as e:
+        if "Task cancelled by user" in str(e):
+             logger.info(f"Task {task_id} confirmed cancelled")
+             return {"status": "cancelled"}
         logger.error(f"Error in processing: {e}", exc_info=True)
         TaskManager._update_db_task(task_id, status="failed", error=str(e))
         return {"status": "error", "message": str(e)}

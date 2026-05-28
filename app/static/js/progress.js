@@ -5,6 +5,7 @@
 
 const ProgressManager = {
     activeTasks: new Map(),
+    dismissedTasks: new Set(),
     isExpanded: false,
     autoHideTimeout: null,
 
@@ -101,6 +102,9 @@ const ProgressManager = {
                     console.log('ProgressManager: Fetched active tasks', data.tasks.length);
                     
                     data.tasks.forEach(task => {
+                        // Skip tasks that the user has already manually dismissed
+                        if (this.dismissedTasks.has(task.task_id)) return;
+
                         const existing = this.activeTasks.get(task.task_id);
                         if (!existing || task.status !== existing.status || task.progress > existing.progress) {
                             this.activeTasks.set(task.task_id, task);
@@ -118,6 +122,10 @@ const ProgressManager = {
 
     handleTaskUpdate: function(data) {
         if (!data || !data.task_id) return;
+        
+        // Don't show updates for tasks the user explicitly dismissed
+        if (this.dismissedTasks.has(data.task_id)) return;
+
         console.log('ProgressManager: Received task update', data.task_id, data.status, data.progress + '%');
 
         const existing = this.activeTasks.get(data.task_id);
@@ -157,25 +165,27 @@ const ProgressManager = {
     },
 
     cancelTask: async function(taskId) {
-        if (!window.confirm('Are you sure you want to cancel this task?')) return;
+        const confirmFn = window.showConfirmModal || ((msg, cb) => { if(window.confirm(msg)) cb(); });
         
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/search/tasks/${taskId}/cancel`, { 
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                const task = this.activeTasks.get(taskId);
-                if (task) {
-                    task.status = 'failed';
-                    task.error = 'Cancelled';
-                    this.renderTasks();
+        confirmFn('Are you sure you want to cancel this task?', async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/search/tasks/${taskId}/cancel`, { 
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const task = this.activeTasks.get(taskId);
+                    if (task) {
+                        task.status = 'failed';
+                        task.error = 'Cancelled';
+                        this.renderTasks();
+                    }
                 }
+            } catch (e) {
+                console.error('Error cancelling task:', e);
             }
-        } catch (e) {
-            console.error('Error cancelling task:', e);
-        }
+        });
     },
 
     renderTasks: function() {
@@ -198,8 +208,8 @@ const ProgressManager = {
 
         content.innerHTML = allTasks.map(task => {
             const name = this.getTaskName(task);
-            const statusLabel = task.message || (!['completed', 'failed'].includes(task.status) ? `${task.progress}%` : task.status);
             const isFinished = task.status === 'completed' || task.status === 'failed';
+            const statusLabel = task.message || (isFinished ? task.status : `${task.progress}%`);
             const url = this.getTaskUrl(task);
             
             return `
@@ -209,10 +219,14 @@ const ProgressManager = {
                             ${name}
                         </a>
                         ${!isFinished ? `
-                            <button class="task-cancel-btn" onclick="ProgressManager.cancelTask('${task.task_id}')">
+                            <button class="task-cancel-btn" onclick="ProgressManager.cancelTask('${task.task_id}')" title="Cancel task">
                                 <i class="ph ph-x"></i>
                             </button>
-                        ` : ''}
+                        ` : `
+                            <button class="task-cancel-btn" onclick="ProgressManager.dismissTask('${task.task_id}')" title="Clear from list">
+                                <i class="ph ph-x"></i>
+                            </button>
+                        `}
                     </div>
                     <div class="task-progress-container">
                         <div class="task-progress-bar" style="width: ${task.progress}%; background-color: ${task.status === 'failed' ? 'var(--color-error)' : (task.status === 'completed' ? '#10b981' : 'var(--color-primary)')}"></div>
@@ -274,6 +288,13 @@ const ProgressManager = {
         return null;
     },
 
+    dismissTask: function(taskId) {
+        this.activeTasks.delete(taskId);
+        this.dismissedTasks.add(taskId); // Remember that we cleared this
+        this.renderTasks();
+        this.updateVisibility();
+    },
+
     updateVisibility: function() {
         const card = document.getElementById('globalProgressCard');
         if (!card) return;
@@ -284,12 +305,15 @@ const ProgressManager = {
             card.offsetHeight;
             card.style.opacity = '1';
             card.style.transform = 'translateY(0)';
-        } else if (!this.isExpanded) {
+        } else {
+            // Hide if no tasks, even if it was expanded
             card.style.opacity = '0';
             card.style.transform = 'translateY(20px)';
             setTimeout(() => {
-                if (this.activeTasks.size === 0 && !this.isExpanded) {
+                if (this.activeTasks.size === 0) {
                     card.style.display = 'none';
+                    this.isExpanded = false;
+                    card.classList.remove('expanded');
                 }
             }, 400);
         }
@@ -303,7 +327,11 @@ const ProgressManager = {
         if (activeCount === 0 && !this.isExpanded) {
             this.autoHideTimeout = setTimeout(() => {
                 // Clear finished tasks and hide
-                this.activeTasks.clear();
+                const allFinished = Array.from(this.activeTasks.keys());
+                allFinished.forEach(id => {
+                    this.activeTasks.delete(id);
+                    this.dismissedTasks.add(id); // Also mark as dismissed so they don't return
+                });
                 this.updateVisibility();
                 this.renderTasks();
             }, 10000); // Wait 10 seconds after all done before clearing
