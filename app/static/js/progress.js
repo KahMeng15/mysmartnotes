@@ -8,6 +8,7 @@ const ProgressManager = {
     dismissedTasks: new Set(),
     isExpanded: false,
     autoHideTimeout: null,
+    tasksLoaded: false,
 
     init: async function() {
         console.log('ProgressManager: Initializing...');
@@ -110,7 +111,12 @@ const ProgressManager = {
     fetchActiveTasks: async function() {
         try {
             const token = localStorage.getItem('token');
-            if (!token) return;
+            if (!token) {
+                console.warn('ProgressManager: No token found for fetchActiveTasks');
+                this.tasksLoaded = true;
+                window.dispatchEvent(new CustomEvent('tasksLoaded', { detail: [] }));
+                return;
+            }
 
             const response = await fetch('/search/tasks/active', {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -120,18 +126,31 @@ const ProgressManager = {
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.indexOf("application/json") !== -1) {
                     const data = await response.json();
-                    console.log('ProgressManager: Fetched active tasks', data.tasks.length);
+                    console.log(`ProgressManager: Fetched ${data.tasks.length} active tasks from server`);
                     
-                    // Clear and rebuild to sync with server
-                    // Only keep tasks that are NOT in dismissedTasks
+                    // Create a new Map but preserve input_data if it already exists locally 
+                    // (in case server update is missing it)
                     const syncedTasks = new Map();
-                    data.tasks.forEach(task => {
-                        if (!this.dismissedTasks.has(task.task_id)) {
-                            syncedTasks.set(task.task_id, task);
+                    data.tasks.forEach(serverTask => {
+                        // Only apply dismissal filter to completed/failed tasks
+                        // Running/pending tasks should always be shown even if previously dismissed
+                        const isDismissed = this.dismissedTasks.has(serverTask.task_id);
+                        const isTaskFinished = serverTask.status === 'completed' || serverTask.status === 'failed';
+                        const shouldInclude = !isDismissed || !isTaskFinished;
+                        
+                        console.log(`ProgressManager: Task ${serverTask.task_id} (${serverTask.status}): dismissed=${isDismissed}, finished=${isTaskFinished}, include=${shouldInclude}`);
+                        
+                        if (shouldInclude) {
+                            const existing = this.activeTasks.get(serverTask.task_id);
+                            if (existing && !serverTask.input_data && existing.input_data) {
+                                serverTask.input_data = existing.input_data;
+                            }
+                            syncedTasks.set(serverTask.task_id, serverTask);
                         }
                     });
                     
                     this.activeTasks = syncedTasks;
+                    console.log(`ProgressManager: Sync complete. Active task count: ${this.activeTasks.size}. Tasks:`, Array.from(this.activeTasks.keys()));
                     this.saveActiveTasks();
 
                     // Auto-expand on load if there are active tasks AND it was previously expanded OR never set
@@ -142,10 +161,22 @@ const ProgressManager = {
 
                     this.renderTasks();
                     this.updateVisibility();
+                    this.tasksLoaded = true;
+                    
+                    // Notify other components that tasks are now loaded
+                    const tasksToDispatch = Array.from(this.activeTasks.values());
+                    console.log(`ProgressManager: Dispatching tasksLoaded event with ${tasksToDispatch.length} tasks`, tasksToDispatch.map(t => t.task_id));
+                    window.dispatchEvent(new CustomEvent('tasksLoaded', { detail: tasksToDispatch }));
                 }
+            } else {
+                console.error(`ProgressManager: Failed to fetch active tasks. Status: ${response.status}`);
+                this.tasksLoaded = true;
+                window.dispatchEvent(new CustomEvent('tasksLoaded', { detail: [] }));
             }
         } catch (e) {
             console.error('ProgressManager: Error fetching active tasks', e);
+            this.tasksLoaded = true;
+            window.dispatchEvent(new CustomEvent('tasksLoaded', { detail: [] }));
         }
     },
 
@@ -155,7 +186,7 @@ const ProgressManager = {
         // Don't show updates for tasks the user explicitly dismissed
         if (this.dismissedTasks.has(data.task_id)) return;
 
-        console.log('ProgressManager: Received task update', data.task_id, data.status, data.progress + '%');
+        console.log(`ProgressManager: Received task update for ${data.task_id}: ${data.status} ${data.progress}%`);
 
         const existing = this.activeTasks.get(data.task_id);
         const task = existing || { 
@@ -192,6 +223,7 @@ const ProgressManager = {
         }
 
         // Custom events for dashboards to listen to
+        console.log(`ProgressManager: Dispatching taskUpdate event for ${data.task_id}`);
         window.dispatchEvent(new CustomEvent('taskUpdate', { detail: data }));
     },
 
@@ -432,6 +464,9 @@ const ProgressManager = {
         }
     }
 };
+
+// Expose globally
+window.ProgressManager = ProgressManager;
 
 // Initialize on load
 if (document.readyState === 'loading') {

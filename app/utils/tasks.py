@@ -81,7 +81,8 @@ class TaskManager:
         result: Any = None,
         error: Optional[str] = None,
         progress: Optional[int] = None,
-        message: Optional[str] = None
+        message: Optional[str] = None,
+        intermediate_result: Optional[Any] = None
     ) -> None:
         db = SessionLocal()
         try:
@@ -108,7 +109,8 @@ class TaskManager:
                 "result": result if status == "completed" else None,
                 "error": error if status == "failed" else None,
                 "progress": db_task.progress or 0,
-                "message": message # Pass current step message to UI
+                "message": message, # Pass current step message to UI
+                "intermediate_result": intermediate_result
             }
             manager.publish_update(db_task.user_id, payload)
 
@@ -146,10 +148,10 @@ class TaskManager:
         return None
     
     @staticmethod
-    def update_task_progress(task_id: str, progress: int, message: Optional[str] = None):
-        """Update task progress (0-100) with optional status message"""
+    def update_task_progress(task_id: str, progress: int, message: Optional[str] = None, intermediate_result: Optional[Any] = None):
+        """Update task progress (0-100) with optional status message and partial results"""
         bounded = min(100, max(0, progress))
-        TaskManager._update_db_task(task_id, progress=bounded, message=message)
+        TaskManager._update_db_task(task_id, progress=bounded, message=message, intermediate_result=intermediate_result)
 
     @staticmethod
     def get_active_tasks(user_id: int) -> list:
@@ -310,13 +312,15 @@ class SummaryTask:
             start_time = time.time()
             task_id = kwargs.get("task_id")
             
-            def progress_callback(percent):
+            def progress_callback(percent, message=None, intermediate_result=None):
                 if task_id:
-                    msg = "Generating summary..."
-                    if percent > 20: msg = "Analyzing note content..."
-                    if percent > 50: msg = "Drafting sections..."
-                    if percent > 80: msg = "Finalizing summary..."
-                    TaskManager.update_task_progress(task_id, percent, message=msg)
+                    msg = message
+                    if not msg:
+                        msg = "Generating summary..."
+                        if percent > 20: msg = "Analyzing note content..."
+                        if percent > 50: msg = "Drafting sections..."
+                        if percent > 80: msg = "Finalizing summary..."
+                    TaskManager.update_task_progress(task_id, percent, message=msg, intermediate_result=intermediate_result)
 
             summary_content = await ai_client.generate_summary(
                 content=lecture_content,

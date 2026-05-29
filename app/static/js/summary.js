@@ -77,38 +77,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load initial data
     await loadNoteMetadata();
+    
     const summaries = await loadSummaryVersions();
     
-    if (summaries && summaries.length > 0) {
+    if (initialSummaryId) { // A specific version is requested in the URL
         let versionToLoad = null;
-        
-        if (initialSummaryId) {
-            if (initialSummaryId.startsWith('v')) {
-                const vNum = parseInt(initialSummaryId.substring(1));
-                versionToLoad = summaries.find(s => s.version === vNum);
-            } else {
-                versionToLoad = summaries.find(s => s.id == initialSummaryId);
-            }
+        if (initialSummaryId.startsWith('v')) {
+            const vNum = parseInt(initialSummaryId.substring(1));
+            versionToLoad = summaries.find(s => s.version === vNum);
+        } else {
+            versionToLoad = summaries.find(s => s.id == initialSummaryId);
         }
         
-        if (!versionToLoad) {
-            // Try to load last selected version
-            const lastVersionId = localStorage.getItem(`lastSummaryVersion_${lectureId}`);
-            versionToLoad = summaries[0];
-            if (lastVersionId) {
-                const found = summaries.find(s => s.id == lastVersionId);
-                if (found) versionToLoad = found;
+        if (versionToLoad) {
+            await loadSummaryVersion(versionToLoad.id, false);
+            if (shouldEdit && currentVersionId) {
+                toggleEdit();
             }
-        }
-        
-        await loadSummaryVersion(versionToLoad.id, false);
-        
-        if (shouldEdit && currentVersionId) {
-            toggleEdit();
+        } else {
+            // If specific version not found, fall back to default behavior
+            // This will ensure tasksLoaded event still triggers processInitialTaskState
+            handleInitialUISetup(summaries);
         }
     } else {
-        showNoSummaryUI();
-        showSummaryOptions(false);
+        // No specific version in URL, defer to handleInitialUISetup
+        handleInitialUISetup(summaries);
     }
 });
 
@@ -277,46 +270,103 @@ async function confirmDeleteVersion() {
     }
 }
 
+// Helper to generate a detailed, vertically rich skeleton loader
+function getSkeletonHTML() {
+    return `
+        <div class="skeleton-container" style="padding: 0; display: flex; flex-direction: column; gap: 20px;">
+            <!-- Heading block -->
+            <div>
+                <div class="skeleton-line" style="width: 35%; height: 28px; margin-bottom: 12px; border-radius: 6px;"></div>
+                <div class="skeleton-line" style="width: 15%; height: 16px; margin-bottom: 16px; border-radius: 4px;"></div>
+            </div>
+            
+            <!-- Section Paragraph -->
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="skeleton-line" style="width: 50%; height: 20px; margin-bottom: 8px; border-radius: 5px;"></div>
+                <div class="skeleton-line" style="width: 100%; height: 14px; border-radius: 3px;"></div>
+                <div class="skeleton-line" style="width: 98%; height: 14px; border-radius: 3px;"></div>
+                <div class="skeleton-line" style="width: 95%; height: 14px; border-radius: 3px;"></div>
+                <div class="skeleton-line" style="width: 88%; height: 14px; border-radius: 3px;"></div>
+                <div class="skeleton-line" style="width: 40%; height: 14px; border-radius: 3px;"></div>
+            </div>
+
+            <!-- List points -->
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+                <div class="skeleton-line" style="width: 30%; height: 20px; margin-bottom: 8px; border-radius: 5px;"></div>
+                <div style="display: flex; gap: 10px; align-items: center; padding-left: 8px;">
+                    <div class="skeleton-line" style="width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--color-light-gray);"></div>
+                    <div class="skeleton-line" style="width: 85%; height: 14px; border-radius: 3px;"></div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; padding-left: 8px;">
+                    <div class="skeleton-line" style="width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--color-light-gray);"></div>
+                    <div class="skeleton-line" style="width: 90%; height: 14px; border-radius: 3px;"></div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; padding-left: 8px;">
+                    <div class="skeleton-line" style="width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--color-light-gray);"></div>
+                    <div class="skeleton-line" style="width: 75%; height: 14px; border-radius: 3px;"></div>
+                </div>
+            </div>
+
+            <!-- Another Paragraph block to fill height -->
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                <div class="skeleton-line" style="width: 45%; height: 20px; margin-bottom: 8px; border-radius: 5px;"></div>
+                <div class="skeleton-line" style="width: 100%; height: 14px; border-radius: 3px;"></div>
+                <div class="skeleton-line" style="width: 96%; height: 14px; border-radius: 3px;"></div>
+                <div class="skeleton-line" style="width: 92%; height: 14px; border-radius: 3px;"></div>
+                <div class="skeleton-line" style="width: 35%; height: 14px; border-radius: 3px;"></div>
+            </div>
+        </div>
+    `;
+}
+
 function showNoSummaryUI() {
     const summaryText = document.getElementById('summaryText');
     const noteHeader = document.getElementById('noteHeader');
     const summaryContainer = document.getElementById('summaryContainer');
+    const progressContainer = document.getElementById('summaryProgressContainer');
     if (!summaryText) return;
 
     // Check if there is an active summary task for this lecture
     const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
+    console.log(`[Summary] showNoSummaryUI called. LectureID: ${lectureId}, Total active tasks from ProgressManager: ${activeTasks.size}`);
+    
+    if (activeTasks.size > 0) {
+        console.log('[Summary] showNoSummaryUI - Map contents:', Array.from(activeTasks.values()).map(t => ({ id: t.task_id, status: t.status, lectureId: t.input_data?.kwargs?.lecture_id })));
+    }
+    
     const summaryTask = Array.from(activeTasks.values()).find(t => 
         t.task_type === 'summary_generation' && t.input_data?.kwargs?.lecture_id === lectureId
     );
 
+    if (summaryTask) {
+        console.log(`[Summary] Found matching task for UI:`, summaryTask);
+    } else {
+        console.log(`[Summary] No matching task found for lectureId: ${lectureId}`);
+    }
+
     if (summaryTask && (summaryTask.status === 'processing' || summaryTask.status === 'pending' || summaryTask.status === 'running')) {
+        console.log(`[Summary] Switching to processing UI for task: ${summaryTask.task_id}`);
         // Show skeleton loading
         if (summaryContainer) summaryContainer.classList.remove('flex-centering-active');
         summaryText.style.display = 'block';
         summaryText.style.flex = 'none';
         if (noteHeader) noteHeader.style.display = 'block';
 
-        summaryText.innerHTML = `
-            <div class="skeleton-container" style="padding: 0;">
-                <div class="skeleton-line" style="width: 40%; height: 24px; margin-bottom: 24px;"></div>
-                <div class="skeleton-line" style="width: 100%;"></div>
-                <div class="skeleton-line" style="width: 95%;"></div>
-                <div class="skeleton-line" style="width: 90%;"></div>
-                <div class="skeleton-line" style="width: 85%; margin-bottom: 12px;"></div>
-                <div class="skeleton-line" style="width: 100%;"></div>
-                <div class="skeleton-line" style="width: 98%;"></div>
-                <div class="skeleton-line" style="width: 92%;"></div>
-                <div class="skeleton-line" style="width: 40%;"></div>
-            </div>
-        `;
+        summaryText.innerHTML = getSkeletonHTML();
 
         // Update on-page progress container
-        const progressContainer = document.getElementById('summaryProgressContainer');
-        if (progressContainer) progressContainer.style.display = 'block';
+        if (progressContainer) {
+            console.log(`[Summary] Showing progressContainer and updating progress to ${summaryTask.progress}%`);
+            progressContainer.style.display = 'block';
+        }
         updateSummaryProgress(summaryTask.progress, summaryTask.message || 'Summarizing note content', 'Processing');
         
         return;
     }
+
+    console.log(`[Summary] No active processing task, showing empty state UI.`);
+    // Not processing - hide progress bar
+    if (progressContainer) progressContainer.style.display = 'none';
 
     // Remove loading bar if present
     const bar = document.getElementById('summaryLoadingBar');
@@ -350,15 +400,112 @@ function showNoSummaryUI() {
 }
 
 
+// New function to handle initial UI setup after summaries are loaded
+async function handleInitialUISetup(summaries) {
+    // Check if tasks were already loaded before we added the listener
+    // Or if they get loaded now, the listener will fire.
+    if (window.ProgressManager && window.ProgressManager.tasksLoaded) {
+        console.log('[Summary] handleInitialUISetup: ProgressManager tasks already loaded. Checking for active task.');
+        await processInitialTaskState(summaries);
+    } else {
+        console.log('[Summary] handleInitialUISetup: ProgressManager tasks not yet loaded. Waiting for tasksLoaded event.');
+        // Add one-time listener to execute once tasks are loaded
+        window.addEventListener('tasksLoaded', () => processInitialTaskState(summaries), { once: true });
+    }
+}
+
+async function processInitialTaskState(summaries) {
+    const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
+    console.log(`[Summary] processInitialTaskState: Checking for active tasks in Map (size: ${activeTasks.size})`);
+    
+    if (activeTasks.size > 0) {
+        console.log('[Summary] Map contents:', Array.from(activeTasks.values()).map(t => ({ id: t.task_id, status: t.status, lectureId: t.input_data?.kwargs?.lecture_id })));
+    }
+
+    const summaryTask = Array.from(activeTasks.values()).find(t => 
+        t.task_type === 'summary_generation' && t.input_data?.kwargs?.lecture_id === lectureId
+    );
+    const isTaskRunning = summaryTask && !['completed', 'failed'].includes(summaryTask.status);
+
+    if (isTaskRunning) {
+        console.log('[Summary] processInitialTaskState: Active summary task found. Ensuring progress bar is visible.');
+        
+        // Show progress bar container at the top
+        const progressContainer = document.getElementById('summaryProgressContainer');
+        if (progressContainer) progressContainer.style.display = 'block';
+        updateSummaryProgress(summaryTask.progress, summaryTask.message || 'Summarizing note content', 'Processing');
+
+        // If we are not currently viewing an existing version, show the skeleton for the new one
+        if (!currentVersionId) {
+            console.log('[Summary] No current version selected. Showing skeleton loader for active task.');
+            showNoSummaryUI(); // This will show the skeleton under the progress bar
+        }
+    } else if (summaries && summaries.length > 0) {
+        console.log('[Summary] processInitialTaskState: No active task, but summaries exist. Loading latest.');
+        // If no task is running, make sure progress container is hidden
+        const progressContainer = document.getElementById('summaryProgressContainer');
+        if (progressContainer) progressContainer.style.display = 'none';
+
+        // Load the latest summary if no task is running and summaries exist
+        if (!currentVersionId) {
+            const lastVersionId = localStorage.getItem(`lastSummaryVersion_${lectureId}`);
+            let versionToLoad = summaries[0];
+            if (lastVersionId) {
+                const found = summaries.find(s => s.id == lastVersionId);
+                if (found) versionToLoad = found;
+            }
+            if (versionToLoad) {
+                await loadSummaryVersion(versionToLoad.id, false);
+            }
+        }
+    } else {
+        console.log('[Summary] processInitialTaskState: No summaries and no active task, showing empty state.');
+        showNoSummaryUI();
+        showSummaryOptions(false);
+    }
+}
+
 // Listen for task updates to refresh the summary content in real-time
+const handleTasksLoadedEvent = (tasks) => {
+    console.log('[Summary] handleTasksLoadedEvent triggered with tasks count:', tasks ? tasks.length : 0);
+    if (tasks && tasks.length > 0) {
+        console.log('[Summary] Event detail tasks:', tasks.map(t => ({ id: t.task_id, status: t.status, lectureId: t.input_data?.kwargs?.lecture_id })));
+    }
+    loadSummaryVersions().then(summaries => {
+        // ALWAYS re-process initial state when tasks are loaded to ensure progress bar visibility
+        processInitialTaskState(summaries);
+    });
+};
+
+window.addEventListener('tasksLoaded', (e) => handleTasksLoadedEvent(e.detail));
+
+// Check if tasks were already loaded before we added the listener
+if (window.ProgressManager && window.ProgressManager.tasksLoaded) {
+    handleTasksLoadedEvent(Array.from(window.ProgressManager.activeTasks.values()));
+}
+
 window.addEventListener('taskUpdate', (e) => {
     const task = e.detail;
     if (task.task_type === 'summary_generation' && task.input_data?.kwargs?.lecture_id === lectureId) {
+        console.log(`[Summary] Received relevant taskUpdate for ${task.task_id}: ${task.progress}% - ${task.status}`);
+        
+        // Ensure progress container is visible if task is active
+        const progressContainer = document.getElementById('summaryProgressContainer');
+        if (progressContainer && !['completed', 'failed'].includes(task.status)) {
+            progressContainer.style.display = 'block';
+        }
+
         // Update on-page progress
         updateSummaryProgress(task.progress, task.message || 'Summarizing note content', 'Processing');
         
         // Update sidebar version list to show progress there too
         loadSummaryVersions();
+
+        // Handle streaming intermediate results
+        if (task.intermediate_result) {
+            summaryData = task.intermediate_result;
+            displaySummary();
+        }
 
         if (task.status === 'completed') {
             const container = document.getElementById('summaryProgressContainer');
@@ -762,6 +909,17 @@ async function generateSummary() {
     const splitLevel = document.getElementById('summarySplitLevel').value;
     
     closeSummaryModal();
+    
+    // Switch to processing UI immediately
+    const summaryText = document.getElementById('summaryText');
+    const summaryContainer = document.getElementById('summaryContainer');
+    if (summaryContainer) summaryContainer.classList.remove('flex-centering-active');
+    if (summaryText) {
+        summaryText.style.display = 'block';
+        summaryText.style.flex = 'none';
+        summaryText.innerHTML = getSkeletonHTML();
+    }
+
     // Show on-page progress instead of modal
     const container = document.getElementById('summaryProgressContainer');
     if (container) container.style.display = 'block';
@@ -800,7 +958,23 @@ async function generateSummary() {
             if (data.task_id) {
                 console.log(`[Summary] Task submitted. Task ID: ${data.task_id}`);
                 
-                // Switch UI to processing mode immediately
+                // Force ProgressManager to recognize this task immediately AND synchronously update its internal map
+                if (window.ProgressManager) {
+                    const taskToUpdate = {
+                        task_id: data.task_id,
+                        task_type: 'summary_generation',
+                        status: 'pending',
+                        progress: 0,
+                        input_data: { kwargs: { lecture_id: lectureId, title: currentNoteTitleForBreadcrumb } }
+                    };
+                    window.ProgressManager.activeTasks.set(data.task_id, taskToUpdate);
+                    window.ProgressManager.saveActiveTasks();
+                    window.ProgressManager.renderTasks(); // Re-render global task list
+                    window.ProgressManager.updateVisibility();
+                }
+
+                // Switch UI to processing mode now that the task is registered
+                currentVersionId = null; 
                 showNoSummaryUI();
                 loadSummaryVersions();
 

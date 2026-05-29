@@ -59,15 +59,22 @@
                         </div>
                         
                         <!-- Progress Container -->
-                        <div id="summaryProgressContainer" style="display: none;" class="progress-container">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
-                                <span style="font-weight: 600; font-size: var(--font-size-sm);">Summarizing with AI...</span>
-                                <span id="summaryProgressPercent" style="font-size: var(--font-size-sm); color: var(--color-gray);">0%</span>
+                        <div id="summaryProgressContainer" style="display: none;" class="progress-container progress-card">
+                            <div class="progress-card-icon-container">
+                                <div class="progress-pulse-sparkle">
+                                    <i class="ph ph-sparkle ph-spin-slow"></i>
+                                </div>
                             </div>
-                            <div class="progress-bar">
-                                <div id="summaryProgressFill" class="progress-fill"></div>
+                            <div class="progress-card-info">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span style="font-weight: 600; font-size: var(--font-size-sm); color: var(--color-dark);">Summarizing with AI...</span>
+                                    <span id="summaryProgressPercent" style="font-size: var(--font-size-sm); font-weight: 700; color: var(--color-primary);">0%</span>
+                                </div>
+                                <div class="progress-bar" style="margin-bottom: 8px;">
+                                    <div id="summaryProgressFill" class="progress-fill"></div>
+                                </div>
+                                <p id="summaryProgressMessage" style="font-size: var(--font-size-xs); color: var(--color-gray); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Initializing AI model...</p>
                             </div>
-                            <p id="summaryProgressMessage" style="font-size: var(--font-size-xs); color: var(--color-gray); margin: 0;">Initializing AI model...</p>
                         </div>
 
                         <!-- View Mode: Rendered Markdown -->
