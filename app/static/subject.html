@@ -37,15 +37,15 @@
                     <h1 id="subjectTitle">Loading Subject...</h1>
                     <p id="subjectDesc" style="color: var(--color-gray); margin-bottom: 0;"></p>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 group-detail-actions">
                     <button onclick="openEditSubjectModal()" class="btn btn-outline">
-                        <i class="ph ph-pencil-simple"></i> Edit
+                        <i class="ph ph-pencil-simple"></i><span class="btn-text"> Edit</span>
                     </button>
                     <button onclick="goToUpload()" class="btn btn-primary">
-                        <i class="ph ph-upload-simple"></i> Upload
+                        <i class="ph ph-upload-simple"></i><span class="btn-text"> Upload</span>
                     </button>
-                    <button onclick="deleteSubject()" class="btn btn-text" style="color: var(--color-error);">
-                        <i class="ph ph-trash"></i> Delete
+                    <button onclick="deleteSubject()" class="btn btn-text delete-btn" style="color: var(--color-error);">
+                        <i class="ph ph-trash"></i><span class="btn-text"> Delete</span>
                     </button>
                 </div>
             </div>
@@ -56,7 +56,21 @@
                     <i class="ph ph-magnifying-glass search-icon"></i>
                     <input type="text" id="searchInput" placeholder="Search lectures..." onkeyup="filterLectures()">
                 </div>
-                <select id="sortSelect" class="form-control" onchange="filterLectures()">
+                <div class="sort-container">
+                    <button type="button" id="sortBtn" class="btn btn-outline" onclick="toggleSortModal(event)" style="height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="ph ph-arrow-down-up"></i>
+                        <span class="btn-text" id="sortBtnLabel">Sort</span>
+                    </button>
+                    <div id="sortModal" class="sort-modal-popover">
+                        <div class="sort-modal-header">
+                            <span>Sort By</span>
+                        </div>
+                        <button type="button" class="sort-option-btn active" id="opt-name" onclick="selectSortOption('name', 'Name (A-Z)')">Name (A-Z)</button>
+                        <button type="button" class="sort-option-btn" id="opt-recent" onclick="selectSortOption('recent', 'Most Recent')">Most Recent</button>
+                        <button type="button" class="sort-option-btn" id="opt-oldest" onclick="selectSortOption('oldest', 'Oldest First')">Oldest First</button>
+                    </div>
+                </div>
+                <select id="sortSelect" class="form-control" onchange="filterLectures()" style="display: none;">
                     <option value="name">Name (A-Z)</option>
                     <option value="recent">Most Recent</option>
                     <option value="oldest">Oldest First</option>
@@ -66,7 +80,7 @@
 
         <div class="page-card-content" style="padding-top: var(--spacing-md);">
             <!-- Lecture List Container -->
-            <div class="group-section">
+            <div class="group-section flat-mobile">
                 <div id="lecturesList" class="lecture-list">
                     <div class="empty-state">
                         <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>

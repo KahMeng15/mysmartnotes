@@ -5,6 +5,40 @@ const subjectId = urlParams.get('id');
 let allLectures = [];
 let currentSubject = null;
 
+window.toggleSortModal = function(event) {
+    event.stopPropagation();
+    const modal = document.getElementById('sortModal');
+    if (modal) modal.classList.toggle('active');
+};
+
+window.updateSortModalUI = function(val) {
+    document.querySelectorAll('.sort-option-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    const activeBtn = document.getElementById('opt-' + val);
+    if (activeBtn) activeBtn.classList.add('active');
+};
+
+window.selectSortOption = function(val, label) {
+    const select = document.getElementById('sortSelect');
+    if (select) {
+        select.value = val;
+        select.dispatchEvent(new Event('change'));
+    }
+    window.updateSortModalUI(val);
+    const modal = document.getElementById('sortModal');
+    if (modal) modal.classList.remove('active');
+};
+
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('sortModal');
+    if (modal && modal.classList.contains('active')) {
+        if (!modal.contains(e.target) && !e.target.closest('#sortBtn')) {
+            modal.classList.remove('active');
+        }
+    }
+});
+
 window.addEventListener('load', () => {
     if (!subjectId) {
         alert('No subject specified');
@@ -18,6 +52,7 @@ window.addEventListener('load', () => {
     if (sortSelect) {
         sortSelect.value = savedSort;
     }
+    window.updateSortModalUI(savedSort);
 
     loadSubjectDetails();
     loadLectures();
@@ -142,10 +177,10 @@ function displayLectures(lectures) {
                     ${isProcessing ? `
                         <div style="font-size: 11px; font-weight: 600; color: var(--color-primary);">${progress}%</div>
                     ` : `
-                        <button onclick="openLecture('${lecture.id}')" class="btn btn-outline btn-small">
-                            View
+                        <button onclick="openLecture('${lecture.id}')" class="btn btn-view-note" style="background: none; border: none; padding: 8px; color: var(--color-primary); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-lg);" title="View Note">
+                            <i class="ph ph-eye"></i>
                         </button>
-                        <button onclick="deleteLecture('${lecture.id}')" class="btn btn-outline btn-small" style="color: var(--color-error);">
+                        <button onclick="deleteLecture('${lecture.id}')" class="btn btn-delete-note" style="background: none; border: none; padding: 8px; color: var(--color-error); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-lg);" title="Delete Note">
                             <i class="ph ph-trash"></i>
                         </button>
                     `}

@@ -31,8 +31,8 @@
             <!-- Header -->
             <div class="page-header-row">
                 <h1>My Notes</h1>
-                <button onclick="openGroupModal()" class="btn btn-primary">
-                    <i class="ph ph-plus"></i> Create Group
+                <button onclick="openGroupModal()" class="btn btn-primary btn-create-group">
+                    <i class="ph ph-plus"></i><span class="btn-text"> Create Group</span>
                 </button>
             </div>
 
@@ -43,7 +43,20 @@
                     <input type="text" id="searchInput" placeholder="Search groups, subjects, lectures..."
                         onkeyup="filterNotes()">
                 </div>
-                <select id="sortSelect" class="form-control" onchange="sortNotes()">
+                <div class="sort-container">
+                    <button type="button" id="sortBtn" class="btn btn-outline" onclick="toggleSortModal(event)" style="height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="ph ph-arrow-down-up"></i>
+                        <span class="btn-text" id="sortBtnLabel">Sort</span>
+                    </button>
+                    <div id="sortModal" class="sort-modal-popover">
+                        <div class="sort-modal-header">
+                            <span>Sort By</span>
+                        </div>
+                        <button type="button" class="sort-option-btn active" id="opt-name" onclick="selectSortOption('name', 'Name (A-Z)')">Name (A-Z)</button>
+                        <button type="button" class="sort-option-btn" id="opt-date" onclick="selectSortOption('date', 'Date Created')">Date Created</button>
+                    </div>
+                </div>
+                <select id="sortSelect" class="form-control" onchange="sortNotes()" style="display: none;">
                     <option value="name">Sort by Name (A-Z)</option>
                     <option value="date">Sort by Date Created</option>
                 </select>
@@ -149,10 +162,45 @@
             console.error('Error loading minimized groups', e);
         }
 
+        function toggleSortModal(event) {
+            event.stopPropagation();
+            const modal = document.getElementById('sortModal');
+            if (modal) modal.classList.toggle('active');
+        }
+
+        function updateSortModalUI(val) {
+            document.querySelectorAll('.sort-option-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const activeBtn = document.getElementById('opt-' + val);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+
+        function selectSortOption(val, label) {
+            const select = document.getElementById('sortSelect');
+            if (select) {
+                select.value = val;
+                select.dispatchEvent(new Event('change'));
+            }
+            updateSortModalUI(val);
+            const modal = document.getElementById('sortModal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('sortModal');
+            if (modal && modal.classList.contains('active')) {
+                if (!modal.contains(e.target) && !e.target.closest('#sortBtn')) {
+                    modal.classList.remove('active');
+                }
+            }
+        });
+
         window.addEventListener('load', () => {
             // Load saved sort preference
             const savedSort = localStorage.getItem('mynotes_sort') || 'name';
             document.getElementById('sortSelect').value = savedSort;
+            updateSortModalUI(savedSort);
             
             fetchData();
         });
@@ -255,7 +303,7 @@
                         ${s.description || 'No description'}
                     </p>
                     <div class="subject-meta">
-                        <i class="ph ph-files"></i> View Lectures
+                        <i class="ph ph-files"></i> View Notes
                     </div>
                 </div>
             `).join('') : `
@@ -270,10 +318,10 @@
                 actionsHtml = `
                     <div class="group-actions">
                         <button onclick="event.stopPropagation(); openSubjectModal('${group.id}')" class="btn btn-outline btn-small">
-                            <i class="ph ph-plus"></i> Subject
+                            <i class="ph ph-plus"></i><span class="btn-text"> Subject</span>
                         </button>
                          <button onclick="event.stopPropagation(); location.href='/upload?group_id=${group.id}'" class="btn btn-outline btn-small">
-                            <i class="ph ph-upload-simple"></i> Upload
+                            <i class="ph ph-upload-simple"></i><span class="btn-text"> Upload</span>
                         </button>
                         <button onclick="event.stopPropagation(); openEditGroupModal('${group.id}', '${group.name.replace(/'/g, "\\'")}')" class="btn btn-outline btn-small">
                             <i class="ph ph-pencil-simple"></i>
@@ -288,7 +336,7 @@
                 actionsHtml = `
                      <div class="group-actions">
                         <button onclick="event.stopPropagation(); openSubjectModal(null)" class="btn btn-outline btn-small">
-                            <i class="ph ph-plus"></i> Subject
+                            <i class="ph ph-plus"></i><span class="btn-text"> Subject</span>
                         </button>
                     </div>
                 `;

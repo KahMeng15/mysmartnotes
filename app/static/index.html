@@ -21,20 +21,33 @@
             background-color: var(--color-bg);
         }
         .hero-title {
-            font-size: 4rem;
+            font-size: clamp(2rem, 8vw, 4rem);
             font-weight: 800;
             margin-bottom: 1rem;
             letter-spacing: -0.05em;
+            line-height: 1.1;
         }
         .hero-subtitle {
-            font-size: 1.25rem;
+            font-size: clamp(1rem, 4vw, 1.25rem);
             color: var(--color-gray);
             max-width: 600px;
             margin-bottom: 2.5rem;
+            line-height: 1.5;
         }
         .cta-group {
             display: flex;
             gap: 1rem;
+        }
+        @media (max-width: 600px) {
+            .cta-group {
+                flex-direction: column;
+                width: 100%;
+                max-width: 280px;
+            }
+            .cta-group .btn {
+                width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 </head>

@@ -1478,3 +1478,47 @@
     color: var(--color-primary-dark);
     font-weight: 700;
 }
+
+/* ===== QUIZ MOBILE RESPONSIVENESS OVERRIDES ===== */
+@media (max-width: 600px) {
+    .quiz-search-section {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-md);
+        flex-wrap: wrap;
+    }
+    .quiz-search-section .search-box {
+        width: 100%;
+        min-width: 0;
+    }
+    .quiz-search-section .options-select {
+        width: 100%;
+        min-width: 0;
+    }
+    .quiz-search-section .btn-search {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .fc-nav-buttons {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-drawer {
+        width: 100% !important;
+        right: -100% !important;
+    }
+    .chat-drawer.active {
+        right: 0 !important;
+    }
+    .q-action-row {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+    .q-action-row button {
+        width: 100%;
+    }
+}

@@ -243,6 +243,17 @@ function injectSidebar() {
 window.toggleMobileMenu = function() {
     const sidebar = document.getElementById('appSidebar');
     const overlay = document.getElementById('mobileOverlay');
+    const notePanel = document.querySelector('.note-action-panel');
+    
+    if (notePanel && notePanel.classList.contains('mobile-expanded')) {
+        notePanel.classList.remove('mobile-expanded');
+        const btn = document.getElementById('mobileMenuToggle');
+        if (btn) btn.classList.remove('active');
+        if (overlay) overlay.classList.remove('active');
+        document.body.classList.remove('menu-open');
+        return;
+    }
+
     if (sidebar) sidebar.classList.toggle('mobile-active');
     if (overlay) overlay.classList.toggle('active');
     document.body.classList.toggle('menu-open');

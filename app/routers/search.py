@@ -302,8 +302,10 @@ async def get_lecture_task_status(
         return status_info
     
     # No active task
-    logger.info(f"No active task. Lecture extracted_text: {'EXISTS' if lecture.extracted_text else 'NULL'}")
-    if lecture.extracted_text:
+    from app.utils.storage import StorageManager
+    has_text = bool(StorageManager.get_lecture_text(lecture.id))
+    logger.info(f"No active task. Lecture extracted_text: {'EXISTS' if has_text else 'NULL'}")
+    if has_text:
         # Text exists, extraction is complete
         logger.info(f"Text exists, returning completed status")
         return {

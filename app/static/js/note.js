@@ -1690,10 +1690,14 @@ function toggleChat() {
 
 window.toggleMobileActionPanel = function() {
     const panel = document.querySelector('.note-action-panel');
+    const overlay = document.getElementById('mobileOverlay');
     if (panel) {
         panel.classList.toggle('mobile-expanded');
         const btn = document.getElementById('mobileMenuToggle');
-        if (btn) btn.classList.toggle('active');
+        const isExpanded = panel.classList.contains('mobile-expanded');
+        if (btn) btn.classList.toggle('active', isExpanded);
+        if (overlay) overlay.classList.toggle('active', isExpanded);
+        document.body.classList.toggle('menu-open', isExpanded);
     }
 };
 

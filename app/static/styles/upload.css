@@ -95,11 +95,12 @@
     border-radius: var(--radius-lg);
     padding: var(--spacing-xl);
     max-width: 500px;
-    min-height: 500px;
     width: 90%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     display: flex;
     flex-direction: column;
+    max-height: 90dvh;
+    overflow-y: auto;
 }
 
 .modal-content form {
@@ -159,4 +160,20 @@
 
 .info-box li {
     margin-bottom: var(--spacing-sm);
+}
+
+@media (max-width: 480px) {
+    .subject-helper {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--spacing-sm);
+    }
+    .btn-create-subject {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+    .modal-content {
+        padding: var(--spacing-lg);
+    }
 }

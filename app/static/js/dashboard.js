@@ -120,8 +120,8 @@ function displayRecentLectures(lectures) {
         const fileTypeLabel = getFriendlyFileType(lecture.file_type);
 
         return `
-            <div class="lecture-item">
-                <div class="lecture-info" onclick="openLecture('${lecture.id}')">
+            <div class="lecture-item" onclick="openLecture('${lecture.id}')" style="cursor: pointer;">
+                <div class="lecture-info">
                     <div class="lecture-icon">
                         <i class="ph ${getIconForType(lecture.file_type)}"></i>
                     </div>
@@ -135,7 +135,7 @@ function displayRecentLectures(lectures) {
                     </div>
                 </div>
                 <div class="lecture-actions">
-                    <button onclick="openLecture('${lecture.id}')" class="btn btn-outline btn-small">
+                    <button class="btn btn-outline btn-small">
                         View
                     </button>
                 </div>

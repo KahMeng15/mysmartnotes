@@ -33,15 +33,15 @@
             <!-- Header -->
             <div class="page-header-row">
                 <h1 id="groupTitle">Loading Group...</h1>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 group-detail-actions">
                     <button onclick="openEditGroupModal()" class="btn btn-outline">
-                        <i class="ph ph-pencil-simple"></i> Edit Group
+                        <i class="ph ph-pencil-simple"></i><span class="btn-text"> Edit Group</span>
                     </button>
                     <button onclick="goToUpload()" class="btn btn-primary">
-                        <i class="ph ph-upload-simple"></i> Upload
+                        <i class="ph ph-upload-simple"></i><span class="btn-text"> Upload</span>
                     </button>
-                    <button onclick="deleteGroup()" class="btn btn-text" style="color: var(--color-error);">
-                        <i class="ph ph-trash"></i> Delete Group
+                    <button onclick="deleteGroup()" class="btn btn-text delete-btn" style="color: var(--color-error);">
+                        <i class="ph ph-trash"></i><span class="btn-text"> Delete Group</span>
                     </button>
                 </div>
             </div>
@@ -52,7 +52,20 @@
                     <i class="ph ph-magnifying-glass search-icon"></i>
                     <input type="text" id="searchInput" placeholder="Search subjects..." onkeyup="filterSubjects()">
                 </div>
-                <select id="sortSelect" class="form-control" onchange="sortSubjects()">
+                <div class="sort-container">
+                    <button type="button" id="sortBtn" class="btn btn-outline" onclick="toggleSortModal(event)" style="height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="ph ph-arrow-down-up"></i>
+                        <span class="btn-text" id="sortBtnLabel">Sort</span>
+                    </button>
+                    <div id="sortModal" class="sort-modal-popover">
+                        <div class="sort-modal-header">
+                            <span>Sort By</span>
+                        </div>
+                        <button type="button" class="sort-option-btn active" id="opt-name" onclick="selectSortOption('name', 'Name (A-Z)')">Name (A-Z)</button>
+                        <button type="button" class="sort-option-btn" id="opt-recent" onclick="selectSortOption('recent', 'Date Created')">Date Created</button>
+                    </div>
+                </div>
+                <select id="sortSelect" class="form-control" onchange="sortSubjects()" style="display: none;">
                     <option value="name">Name (A-Z)</option>
                     <option value="recent">Date Created</option>
                 </select>
@@ -61,7 +74,7 @@
 
         <div class="page-card-content" style="padding-top: var(--spacing-md);">
             <!-- Subjects Grid Container -->
-            <div class="group-section">
+            <div class="group-section flat-mobile">
                 <div id="subjectsGrid" class="subjects-grid">
                     <div class="empty-state">
                         <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>

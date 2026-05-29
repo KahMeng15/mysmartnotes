@@ -1782,18 +1782,20 @@ textarea {
   height: 40px;
   background: var(--color-white);
   border-radius: var(--radius-md);
+  padding: 0 var(--spacing-md);
 }
 
 .search-box input {
   width: 100%;
   height: 100%;
-  padding: 8px 12px 8px 50px;
+  padding: 8px 0;
   border: none;
   background: transparent;
   outline: none;
   font-size: 14px;
   line-height: 24px;
   color: var(--color-text);
+  margin-left: 8px;
 }
 
 .search-box input::placeholder {
@@ -1806,10 +1808,6 @@ textarea {
 }
 
 .search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
   color: var(--color-gray);
   font-size: 18px;
   pointer-events: none;
@@ -3041,6 +3039,197 @@ body.auth-page {
     padding-bottom: 70px;
   }
 
+  /* Login page logo visibility on mobile */
+  body.auth-page .sidebar-brand {
+    display: block !important;
+  }
+
+  /* Raise task card above mobile bottom nav */
+  .global-progress-card {
+    bottom: 86px !important;
+    right: 16px !important;
+    left: 16px !important;
+    width: calc(100% - 32px) !important;
+  }
+
+  /* Single row stats card styling */
+  .dashboard-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: var(--spacing-xs) !important;
+  }
+  .card-stat {
+    padding: var(--spacing-xs) !important;
+    margin: 0 !important;
+  }
+  .card-stat-value {
+    font-size: 1.25rem !important;
+    margin-bottom: 2px !important;
+  }
+  .card-stat-label {
+    font-size: 9px !important;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-stat-delta {
+    display: none !important;
+  }
+
+  /* 2-3 Row Quick Actions styling */
+  .quick-actions {
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: var(--spacing-sm) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .quick-actions .quick-action {
+    margin: 0 !important;
+    height: auto !important;
+    padding: var(--spacing-sm) var(--spacing-xs) !important;
+  }
+  .quick-actions .quick-action:nth-child(1),
+  .quick-actions .quick-action:nth-child(2) {
+    grid-column: span 3 !important;
+  }
+  .quick-actions .quick-action:nth-child(3),
+  .quick-actions .quick-action:nth-child(4),
+  .quick-actions .quick-action:nth-child(5) {
+    grid-column: span 2 !important;
+  }
+
+  /* Card border restoration overrides */
+  .lecture-item, .subject-card, .group-section {
+    border: 1px solid var(--color-light-gray) !important;
+    border-radius: var(--radius-md) !important;
+    margin-bottom: var(--spacing-sm) !important;
+    box-shadow: var(--shadow-sm) !important;
+    padding: var(--spacing-md) !important;
+  }
+
+  /* Flat layout for wrapper card in group & subject details pages */
+  .group-section.flat-mobile {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Hide button text for groups and list actions on mobile */
+  .group-actions .btn-text,
+  .btn-create-group .btn-text,
+  .btn-icon-only-mobile .btn-text {
+    display: none !important;
+  }
+
+  .btn-icon-only-mobile {
+    padding: 8px 12px !important;
+    gap: 0 !important;
+  }
+
+  /* Keep note lists inline on mobile view */
+  .lecture-item {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: var(--spacing-md) !important;
+  }
+
+  /* Hide view button on mobile for recent notes/lectures */
+  .lecture-item .lecture-actions {
+    display: none !important;
+  }
+
+  /* Keep header title and create button inline on mobile */
+  .page-header-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: var(--spacing-md) !important;
+  }
+
+  /* Group details page header buttons styling on mobile */
+  .group-detail-actions button {
+    padding: 8px !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .group-detail-actions button .btn-text {
+    display: none !important;
+  }
+  .group-detail-actions button.btn-outline,
+  .group-detail-actions button.btn-primary,
+  .group-detail-actions button.btn-text {
+    color: var(--color-primary) !important;
+  }
+  .group-detail-actions button.delete-btn {
+    color: var(--color-error) !important;
+  }
+
+  /* Reset note details scroll/sticky container layout */
+  .note-page .page-card,
+  .note-page .note-content-card {
+    overflow: visible !important;
+  }
+
+  /* Right-side slide-in drawer layout for actions panel */
+  .note-action-panel {
+    position: fixed !important;
+    top: 0 !important;
+    right: -280px !important;
+    left: auto !important;
+    width: 280px !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    background: white !important;
+    margin: 0 !important;
+    padding: var(--spacing-lg) !important;
+    box-shadow: -10px 0 30px rgba(0,0,0,0.1) !important;
+    z-index: 2000 !important;
+    border-radius: 0 !important;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    display: block !important;
+  }
+  .note-action-panel.mobile-expanded {
+    right: 0 !important;
+  }
+  .note-action-panel .action-toggle {
+    display: none !important;
+  }
+  .note-action-panel > *:not(.action-toggle) {
+    display: block !important;
+  }
+  .note-action-panel .sidebar-mobile-header {
+    display: flex !important;
+  }
+  .note-action-panel .sidebar-divider {
+    display: block !important;
+  }
+  .note-action-panel .action-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--spacing-md) !important;
+  }
+  .note-action-panel .info-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--spacing-sm) !important;
+  }
+
+  /* Constrain note inline chat container height on mobile */
+  .note-chat-card.page-card {
+    height: 70dvh !important;
+    max-height: 70dvh !important;
+    min-height: auto !important;
+    overflow: hidden !important;
+  }
+
   .mobile-header {
     display: flex;
     position: fixed;
@@ -3122,6 +3311,17 @@ body.auth-page {
   .search-box { width: 100%; }
   .btn { width: 100%; }
   .page-header-row { flex-direction: column; align-items: flex-start; gap: var(--spacing-md); }
+  .page-header-row .d-flex {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm) !important;
+  }
+  .page-header-row .d-flex .btn {
+    flex: 1 1 calc(50% - var(--spacing-sm));
+    min-width: 120px;
+    justify-content: center;
+    width: auto;
+  }
   .group-header { flex-direction: column; align-items: flex-start; gap: var(--spacing-sm); }
   .subjects-grid { grid-template-columns: 1fr; }
   .lecture-item { flex-direction: column; align-items: stretch; gap: var(--spacing-md); }
@@ -3412,5 +3612,65 @@ body.auth-page {
   background: var(--color-primary);
   width: 0%;
   transition: width 0.3s ease;
+}
+
+/* Custom Sorting Popover Modal */
+.sort-container {
+  position: relative;
+  display: inline-block;
+}
+
+.sort-modal-popover {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: white;
+  border: 1px solid var(--color-light-gray);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 2100;
+  width: 200px;
+  overflow: hidden;
+}
+
+.sort-modal-popover.active {
+  display: block;
+}
+
+.sort-modal-header {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-gray);
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-light-gray);
+}
+
+.sort-option-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 12px 16px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sort-option-btn:hover {
+  background: var(--color-background);
+}
+
+.sort-option-btn.active {
+  color: var(--color-primary);
+  font-weight: 600;
+  background: var(--color-primary-light);
 }
 

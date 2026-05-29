@@ -47,11 +47,11 @@
                     </div>
                 </div>
                 <div class="flex-align-center gap-md">
-                    <button onclick="openGroupModal()" class="btn btn-secondary d-flex align-items-center gap-sm">
-                        <i class="ph ph-folder-plus"></i> Create Group
+                    <button onclick="openGroupModal()" class="btn btn-secondary d-flex align-items-center gap-sm btn-icon-only-mobile">
+                        <i class="ph ph-folder-plus"></i><span class="btn-text"> Create Group</span>
                     </button>
-                    <button onclick="openCreateModal()" class="btn btn-primary d-flex align-items-center gap-sm">
-                        <i class="ph ph-plus-circle"></i> Generate Quiz
+                    <button onclick="openCreateModal()" class="btn btn-primary d-flex align-items-center gap-sm btn-icon-only-mobile">
+                        <i class="ph ph-plus-circle"></i><span class="btn-text"> Generate Quiz</span>
                     </button>
                 </div>
             </div>
@@ -63,13 +63,25 @@
                     <input type="text" id="quizSearch" placeholder="Search name, questions, notes..."
                         onkeyup="debounceSearch()">
                 </div>
-                <div class="flex-align-center gap-sm">
-                    <select id="quizSort" class="form-control" onchange="renderQuizzes()">
-                        <option value="date-desc">Newest First</option>
-                        <option value="date-asc">Oldest First</option>
-                        <option value="name">Name (A-Z)</option>
-                    </select>
+                <div class="sort-container">
+                    <button type="button" id="sortBtn" class="btn btn-outline" onclick="toggleSortModal(event)" style="height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <i class="ph ph-arrow-down-up"></i>
+                        <span class="btn-text" id="sortBtnLabel">Sort</span>
+                    </button>
+                    <div id="sortModal" class="sort-modal-popover">
+                        <div class="sort-modal-header">
+                            <span>Sort By</span>
+                        </div>
+                        <button type="button" class="sort-option-btn active" id="opt-date-desc" onclick="selectSortOption('date-desc', 'Newest First')">Newest First</button>
+                        <button type="button" class="sort-option-btn" id="opt-date-asc" onclick="selectSortOption('date-asc', 'Oldest First')">Oldest First</button>
+                        <button type="button" class="sort-option-btn" id="opt-name" onclick="selectSortOption('name', 'Name (A-Z)')">Name (A-Z)</button>
+                    </div>
                 </div>
+                <select id="quizSort" class="form-control" onchange="renderQuizzes()" style="display: none;">
+                    <option value="date-desc">Newest First</option>
+                    <option value="date-asc">Oldest First</option>
+                    <option value="name">Name (A-Z)</option>
+                </select>
             </div>
         </div>
 

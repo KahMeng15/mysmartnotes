@@ -8,6 +8,40 @@ let quizzesData = [];
 let searchTimeout = null;
 let minimizedGroups = new Set();
 
+window.toggleSortModal = function(event) {
+    event.stopPropagation();
+    const modal = document.getElementById('sortModal');
+    if (modal) modal.classList.toggle('active');
+};
+
+window.updateSortModalUI = function(val) {
+    document.querySelectorAll('.sort-option-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    const activeBtn = document.getElementById('opt-' + val);
+    if (activeBtn) activeBtn.classList.add('active');
+};
+
+window.selectSortOption = function(val, label) {
+    const select = document.getElementById('quizSort');
+    if (select) {
+        select.value = val;
+        select.dispatchEvent(new Event('change'));
+    }
+    window.updateSortModalUI(val);
+    const modal = document.getElementById('sortModal');
+    if (modal) modal.classList.remove('active');
+};
+
+document.addEventListener('click', (e) => {
+    const modal = document.getElementById('sortModal');
+    if (modal && modal.classList.contains('active')) {
+        if (!modal.contains(e.target) && !e.target.closest('#sortBtn')) {
+            modal.classList.remove('active');
+        }
+    }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     loadQuizGroups();
     loadQuizzes();
