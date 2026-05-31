@@ -185,6 +185,9 @@ const ProgressManager = {
         
         // Don't show updates for tasks the user explicitly dismissed
         if (this.dismissedTasks.has(data.task_id)) return;
+        
+        // Ignore chat tasks completely so they don't pop up in the task card
+        if (data.task_id.startsWith('chat_') || data.task_type === 'chat_response') return;
 
         console.log(`ProgressManager: Received task update for ${data.task_id}: ${data.status} ${data.progress}%`);
 

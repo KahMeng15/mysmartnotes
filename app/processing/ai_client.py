@@ -186,12 +186,20 @@ class AIClient:
         if not text: return ""
         
         # 1. Clean explicit tags
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
         text = re.sub(r'<\|channel\|>thought.*?<channel\|>', '', text, flags=re.DOTALL)
         text = re.sub(r'<\|thought\|>.*?</\|thought\|>', '', text, flags=re.DOTALL)
+        text = text.replace("<think>", "").replace("</think>", "")
         text = text.replace("<|channel|>thought", "").replace("<channel|>", "").replace("<|thought|>", "").replace("</|thought|>", "")
 
-        # 2. Extract after markers (strongest signal)
-        for marker in ["===START===", "Final Answer:", "Answer:", "ANSWER:"]:
+        # 2. Extract strictly bounded XML answer first
+        xml_match = re.search(r'<FINAL_ANSWER>(.*?)</FINAL_ANSWER>', text, flags=re.DOTALL | re.IGNORECASE)
+        if xml_match:
+            candidate = xml_match.group(1).strip()
+            if len(candidate) > 5: return candidate
+            
+        # 3. Fallback extraction markers (strongest signal)
+        for marker in ["FINAL_ANSWER:", "FINAL ANSWER:", "===START===", "Final Answer:", "Answer:", "ANSWER:"]:
             if marker in text:
                 parts = text.split(marker)
                 if len(parts) > 1:

@@ -142,12 +142,12 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
         "eli5": "Explain like to a 5-year-old using ONLY context material. Use short sentences and relatable analogies from the context only.",
     }
 
-    # Output format instructions
+    # Output format instructions (Suggestive rather than strict)
     output_instructions = {
-        "sentence": "Respond as 1-3 clear sentences.",
-        "pointform": "Use bullet points (- or •). 3-5 points. Keep each point short and factual.",
-        "numbered_list": "Use numbered format (1. 2. 3.). 3-7 items. Be concise and specific.",
-        "table": "Create ONLY a markdown table with 2-3 relevant columns based on the context content. Do NOT add any text outside the table.",
+        "sentence": "Respond using complete sentences. You may use headings, titles, or multiple sections as appropriate.",
+        "pointform": "Incorporate bullet points where helpful. You may use headings, titles, or multiple sections as appropriate.",
+        "numbered_list": "Incorporate numbered lists where helpful. You may use headings, titles, or multiple sections as appropriate.",
+        "table": "Include a markdown table if relevant. You may use headings, titles, or multiple sections as appropriate.",
     }
 
     mode_inst = mode_instructions.get(mode, mode_instructions["elaborate"])
@@ -169,10 +169,14 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
 {output_inst}
 
 CRITICAL: 
-- DO NOT show your internal reasoning, constraints, task analysis, or step-by-step thinking.
-- SKIP THE THINKING PHASE output. Start your response directly with the answer.
-- NEVER output bullet points like "* Context:", "* Question:", or "* Thinking:".
+You are a reasoning model. You MUST think step-by-step first.
+To prevent leaking your thoughts to the user, you MUST format your ENTIRE output exactly as follows:
 
+REASONING:
+[Your step-by-step internal thoughts, constraints checks, etc.]
+
+FINAL_ANSWER:
+[Your polished final answer that directly addresses the prompt. No intro phrases. No checklists.]
 RULES:
 - NO introductory phrases like "Based on...", "Let me explain...", "Here's what..."
 - Answer directly and concisely
@@ -503,12 +507,6 @@ def inject_citations(response: str, detailed_sources: List[dict]) -> str:
             sentence_citations[best_sentence_idx] = citation_num
             used_sources.add(src_idx)
     
-    # If no sentences matched from content matching, cite the first few sentences
-    if not sentence_citations and detailed_sources:
-        for i in range(min(len(detailed_sources), min(3, len(sentences)))):
-            if i not in sentence_citations:
-                sentence_citations[i] = i + 1
-    
     # Rebuild response with citations placed at the end of sentences
     cited_parts = []
     for sent_idx, sentence in enumerate(sentences):
@@ -691,25 +689,30 @@ async def ask_question_logic(**kwargs) -> dict:
             if target_lecture_ids:
                 try:
                     from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
-                    chunks = retrieve_relevant_chunks(query=message, lecture_ids=target_lecture_ids, db=db, top_k=3)
+                    raw_chunks = retrieve_relevant_chunks(query=message, lecture_ids=target_lecture_ids, db=db, top_k=5)
+                    # Filter for confident chunks (score >= 15.0)
+                    chunks = [c for c in raw_chunks if c["score"] >= 15.0]
+                    
                     if chunks:
                         snippets = [{"text": chunk["text"], "position": chunk["position"], "score": chunk["score"]} for chunk in chunks]
-                        context = combine_snippets(snippets, max_chars=2000)
+                        context = combine_snippets(snippets, max_chars=3000)
                         for chunk in chunks:
                             detailed_sources.append({
-                                "text_preview": chunk["text"][:100],
+                                "text_preview": chunk["text"][:150],
                                 "position": chunk["position"],
                                 "score": chunk["score"],
                                 "lecture_id": chunk["lecture_id"]
                             })
                         snippet_sources = list(set(sources))[:2]
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Error retrieving chunks: {e}")
             
             step_times["step4"] = round((time.time() - t_step4_start) * 1000.0, 2)
 
             t_step5_start = time.time()
-            if not context or len(context) < 100:
+            # Only fallback to web search if we truly have no context or very little context AND no chunks found
+            if not context or (len(context) < 50 and len(detailed_sources) == 0):
                 web_snippet, web_sources, web_error = await web_search(message, timeout=10.0)
                 if web_snippet:
                     context = web_snippet

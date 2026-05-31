@@ -163,8 +163,9 @@ class TaskManager:
             five_minutes_ago = datetime.utcnow() - timedelta(minutes=5)
             tasks = db.query(Task).filter(
                 Task.user_id == user_id,
-                (Task.status.in_(["pending", "processing", "running"])) |
-                (Task.updated_at >= five_minutes_ago)
+                Task.task_type != "chat_response",
+                ((Task.status.in_(["pending", "processing", "running"])) |
+                 (Task.updated_at >= five_minutes_ago))
             ).order_by(Task.created_at.asc()).all()
 
             return [{
