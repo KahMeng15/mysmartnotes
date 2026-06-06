@@ -39,8 +39,9 @@ function AppLayout({ children }) {
         collapsed: { mobile: !opened },
       }}
       padding="md"
+      bg="#ffffff"
     >
-      <AppShell.Header>
+      <AppShell.Header bg="#ffffff">
         <Group h="100%" px="md">
           <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
           <Text size="xl" fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
@@ -49,7 +50,7 @@ function AppLayout({ children }) {
         </Group>
       </AppShell.Header>
 
-      <AppShell.Navbar p="md">
+      <AppShell.Navbar p="md" bg="#ffffff">
         <AppShell.Section grow component={ScrollArea}>
           <MantineNavLink component={NavLink} to="/dashboard" label="Dashboard" leftSection={<IconDashboard size="1rem" stroke={1.5} />} />
           <MantineNavLink component={NavLink} to="/upload" label="Upload" leftSection={<IconUpload size="1rem" stroke={1.5} />} />

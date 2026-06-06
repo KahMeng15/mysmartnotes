@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Text, FileInput, Select, Button, Stack, Paper, Group, Checkbox, Progress } from '@mantine/core';
+import { Box, Title, Text, FileInput, Select, Button, Stack, Paper, Group, Progress } from '@mantine/core';
 import { IconUpload, IconFile } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -8,11 +8,11 @@ export default function UploadDocs() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const groupId = searchParams.get('group_id');
+  const subjectId = searchParams.get('subject_id');
 
   const [subjects, setSubjects] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [files, setFiles] = useState([]);
-  const [autoGenerate, setAutoGenerate] = useState(true);
   
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -25,8 +25,10 @@ export default function UploadDocs() {
         const fetchedSubjects = data || [];
         setSubjects(fetchedSubjects);
         
-        // Auto-select subject based on group_id if present
-        if (groupId && fetchedSubjects.length > 0) {
+        if (subjectId) {
+          const match = fetchedSubjects.find(s => s.id.toString() === subjectId);
+          if (match) setSelectedSubject(match.id.toString());
+        } else if (groupId && fetchedSubjects.length > 0) {
           const groupSubjects = fetchedSubjects.filter(s => s.group_id && s.group_id.toString() === groupId);
           if (groupSubjects.length > 0) {
             setSelectedSubject(groupSubjects[0].id.toString());
@@ -37,7 +39,7 @@ export default function UploadDocs() {
       }
     };
     loadSubjects();
-  }, [groupId]);
+  }, [groupId, subjectId]);
 
   const handleUpload = async () => {
     if (!selectedSubject || files.length === 0) {
@@ -55,7 +57,6 @@ export default function UploadDocs() {
       files.forEach(file => {
         formData.append('files', file);
       });
-      formData.append('auto_extract', autoGenerate);
 
       await fetchApi('/lectures/upload', {
         method: 'POST',
@@ -76,7 +77,7 @@ export default function UploadDocs() {
   };
 
   return (
-    <Box maxWidth={600}>
+    <Box maw={600}>
       <Title order={2} mb="md">Upload Documents</Title>
       <Text c="dimmed" mb="xl">Upload PDFs, PPTXs, or Images to generate smart notes.</Text>
 
@@ -104,12 +105,6 @@ export default function UploadDocs() {
             value={files}
             onChange={setFiles}
             required
-          />
-
-          <Checkbox
-            label="Generate AI Summary automatically after processing"
-            checked={autoGenerate}
-            onChange={(e) => setAutoGenerate(e.currentTarget.checked)}
           />
 
           {uploading && (
