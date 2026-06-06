@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Box, Flex, Title, Tabs, Paper, Textarea, Group, Button, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Divider } from '@mantine/core';
-import { IconDeviceFloppy, IconRobot, IconCards, IconFileText, IconChevronLeft, IconPencil, IconX } from '@tabler/icons-react';
+import { Box, Container, Title, Textarea, Group, Button, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer } from '@mantine/core';
+import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 
@@ -12,13 +12,16 @@ export default function LectureView() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  
+  const [taskStatus, setTaskStatus] = useState(null);
+  const [chatOpened, setChatOpened] = useState(false);
 
   useEffect(() => {
     const loadLecture = async () => {
       try {
-        const data = await fetchApi(`/lectures/${id}`);
+        const data = await fetchApi(`/lectures/${id}?t=${Date.now()}`);
         setLecture(data);
-        setContent(data.content || '');
+        setContent(data.extracted_text || '');
       } catch (err) {
         console.error("Failed to load lecture", err);
       } finally {
@@ -28,16 +31,45 @@ export default function LectureView() {
     loadLecture();
   }, [id]);
 
+  useEffect(() => {
+    if (!lecture) return;
+    if (isProcessedCheck(lecture)) return;
+
+    let interval;
+    const pollTask = async () => {
+      try {
+        const statusData = await fetchApi(`/search/task?lecture_id=${id}`);
+        setTaskStatus(statusData);
+
+        if (statusData && statusData.status === 'completed') {
+          // Task just finished, reload lecture with cache buster to get the fresh extracted_text
+          const data = await fetchApi(`/lectures/${id}?t=${Date.now()}`);
+          setLecture(data);
+          setContent(data.extracted_text || '');
+          clearInterval(interval);
+        } else if (statusData && statusData.status === 'failed') {
+          clearInterval(interval);
+        }
+      } catch (e) {
+        console.error("Failed to poll task status", e);
+      }
+    };
+
+    pollTask(); // Initial poll
+    interval = setInterval(pollTask, 2000); // Poll every 2 seconds
+    
+    return () => clearInterval(interval);
+  }, [id, lecture?.processing_time_ms, lecture?.extracted_text, lecture?.output_pdf_path]);
+
   const handleSave = async () => {
     setSaving(true);
     try {
       await fetchApi(`/lectures/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ extracted_text: content })
       });
       setIsEditing(false);
-      // Update local state to reflect new content in view mode
-      setLecture({ ...lecture, content });
+      setLecture({ ...lecture, extracted_text: content });
     } catch (err) {
       console.error("Failed to save", err);
     } finally {
@@ -45,7 +77,11 @@ export default function LectureView() {
     }
   };
 
-  if (loading) {
+  const isProcessedCheck = (lec) => {
+    return lec.processing_time_ms != null || lec.extracted_text != null || lec.output_pdf_path != null;
+  };
+
+  if (loading && !lecture) {
     return <Center h="50vh"><Loader size="lg" /></Center>;
   }
 
@@ -53,34 +89,51 @@ export default function LectureView() {
     return <Center h="50vh"><Text c="dimmed">Lecture not found.</Text></Center>;
   }
 
+  const isProcessed = isProcessedCheck(lecture) || (taskStatus?.status === 'completed');
+  const isFailed = taskStatus?.status === 'failed';
+  const processingProgress = taskStatus?.progress || 10;
+
   return (
-    <Flex h="calc(100vh - 90px)" gap="md">
-      {/* Left Column: Note Content */}
-      <Paper withBorder radius="md" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        
-        {/* Sticky Header */}
-        <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 10 }}>
-          <Group justify="space-between">
-            <Group>
-              <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
-                <IconChevronLeft size={20} />
-              </ActionIcon>
-              <Box>
-                <Title order={3} fw={700} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>
-                  {lecture.title}
-                </Title>
-                <Text size="xs" c="dimmed">Subject › {lecture.title}</Text>
-              </Box>
-              <Badge ml="md" color={lecture.status === 'processed' ? 'teal' : 'orange'} variant="light">
-                {lecture.status === 'processed' ? 'Processed' : 'Processing...'}
-              </Badge>
-            </Group>
-            
-            {!isEditing ? (
-              <Button leftSection={<IconPencil size={16} />} variant="light" onClick={() => setIsEditing(true)}>
-                Edit Note
+    <Box h="calc(100vh - 90px)" style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Sticky Header */}
+      <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 10 }}>
+        <Group justify="space-between">
+          <Group>
+            <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
+              <IconChevronLeft size={20} />
+            </ActionIcon>
+            <Box>
+              <Title order={3} fw={700} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>
+                {lecture.title}
+              </Title>
+              <Text size="xs" c="dimmed">Note ID: {lecture.id}</Text>
+            </Box>
+            <Badge ml="md" color={isFailed ? 'red' : isProcessed ? 'teal' : 'orange'} variant="light">
+              {isFailed ? 'Failed' : isProcessed ? 'Processed' : 'Processing...'}
+            </Badge>
+          </Group>
+          
+          <Group gap="sm">
+            {isProcessed && (
+              <>
+                <Button variant="light" color="indigo" leftSection={<IconFileText size={16} />} onClick={() => navigate(`/summaries?lecture_id=${id}`)}>
+                  See Summaries
+                </Button>
+                <Button variant="light" color="blue" leftSection={<IconMessageChatbot size={16} />} onClick={() => setChatOpened(true)}>
+                  Quick Chat
+                </Button>
+                <Button variant="light" color="pink" leftSection={<IconCards size={16} />} onClick={() => navigate(`/quiz?lecture_id=${id}`)}>
+                  Generate Quiz
+                </Button>
+              </>
+            )}
+
+            {isProcessed && !isEditing && (
+              <Button leftSection={<IconPencil size={16} />} variant="default" onClick={() => setIsEditing(true)}>
+                Edit Content
               </Button>
-            ) : (
+            )}
+            {isEditing && (
               <Group>
                 <Button variant="subtle" color="gray" leftSection={<IconX size={16} />} onClick={() => setIsEditing(false)}>
                   Cancel
@@ -91,11 +144,33 @@ export default function LectureView() {
               </Group>
             )}
           </Group>
-        </Box>
+        </Group>
+      </Box>
 
-        {/* Content Area */}
-        <ScrollArea style={{ flex: 1, backgroundColor: isEditing ? '#f8f9fa' : '#fff' }} p="xl">
-          {isEditing ? (
+      {/* Content Area */}
+      <ScrollArea style={{ flex: 1, backgroundColor: isEditing ? '#f8f9fa' : '#fff' }} p="xl">
+        <Container size="md">
+          {isFailed ? (
+             <Box mt={100} ta="center">
+              <IconAlertCircle size={64} color="var(--mantine-color-red-6)" stroke={1.5} />
+              <Title order={2} mt="xl" mb="sm" fw={800} c="red">Processing Failed</Title>
+              <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                {taskStatus?.error || 'An unexpected error occurred while processing this document.'}
+              </Text>
+             </Box>
+          ) : !isProcessed ? (
+            <Box mt={100} ta="center">
+              <IconRobot size={64} color="var(--mantine-color-blue-6)" stroke={1.5} style={{ opacity: 0.8 }} />
+              <Title order={2} mt="xl" mb="sm" fw={800} c="#171738">Processing Document...</Title>
+              <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                Our AI is currently extracting text, analyzing the content, and preparing your smart notes. This usually takes a few seconds.
+              </Text>
+              <Box maw={400} mx="auto">
+                <Progress value={processingProgress} animated striped color="blue" size="xl" radius="xl" />
+                <Text size="sm" c="dimmed" mt="xs" ta="right">{processingProgress}%</Text>
+              </Box>
+            </Box>
+          ) : isEditing ? (
             <Textarea 
               minRows={30} 
               autosize 
@@ -105,56 +180,29 @@ export default function LectureView() {
               styles={{ input: { fontFamily: 'monospace', fontSize: '14px', lineHeight: 1.6 } }}
             />
           ) : (
-            <Box className="markdown-content" style={{ maxWidth: '800px', margin: '0 auto', color: '#171738', fontSize: '16px', lineHeight: 1.6 }}>
-              {/* If we had marked.js we would render it, but for now just preserving newlines */}
+            <Box className="markdown-content" style={{ color: '#171738', fontSize: '16px', lineHeight: 1.8 }}>
               {content ? (
                 <div style={{ whiteSpace: 'pre-wrap' }}>{content}</div>
               ) : (
-                <Center h={200}><Text c="dimmed">No content available.</Text></Center>
+                <Center h={200}><Text c="dimmed">No content extracted.</Text></Center>
               )}
             </Box>
           )}
-        </ScrollArea>
-      </Paper>
+        </Container>
+      </ScrollArea>
 
-      {/* Right Column: Actions Sidebar */}
-      <Paper withBorder radius="md" style={{ width: '350px', display: 'flex', flexDirection: 'column', backgroundColor: '#fafafa' }}>
-        <Tabs defaultValue="ai" variant="outline" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Tabs.List grow>
-            <Tabs.Tab value="ai" leftSection={<IconRobot size={14} />}>AI Actions</Tabs.Tab>
-            <Tabs.Tab value="quiz" leftSection={<IconCards size={14} />}>Quizzes</Tabs.Tab>
-          </Tabs.List>
-
-          <Tabs.Panel value="ai" p="md" style={{ flex: 1, overflowY: 'auto' }}>
-            <Title order={5} mb="md">AI Summary</Title>
-            <Paper p="sm" withBorder radius="md" bg="white">
-              {lecture.summary ? (
-                <Box dangerouslySetInnerHTML={{ __html: lecture.summary }} style={{ fontSize: '14px', color: '#333' }} />
-              ) : (
-                <Text size="sm" c="dimmed" ta="center" py="xl">No summary generated.</Text>
-              )}
-            </Paper>
-            <Button fullWidth mt="md" variant="light" color="indigo" leftSection={<IconRobot size={16} />}>
-              Generate Summary
-            </Button>
-            <Divider my="xl" />
-            <Title order={5} mb="md">Chat with this Note</Title>
-            <Button fullWidth variant="light" color="blue" onClick={() => navigate(`/chat?lecture_id=${lecture.id}`)}>
-              Open AI Chat
-            </Button>
-          </Tabs.Panel>
-
-          <Tabs.Panel value="quiz" p="md" style={{ flex: 1, overflowY: 'auto' }}>
-            <Title order={5} mb="md">Generate Quiz</Title>
-            <Text size="sm" c="dimmed" mb="md">
-              Test your knowledge on this lecture by generating a custom quiz using AI.
-            </Text>
-            <Button fullWidth color="pink" onClick={() => navigate(`/quiz?lecture_id=${lecture.id}`)}>
-              Create Quiz
-            </Button>
-          </Tabs.Panel>
-        </Tabs>
-      </Paper>
-    </Flex>
+      {/* Quick Chat Drawer */}
+      <Drawer
+        opened={chatOpened}
+        onClose={() => setChatOpened(false)}
+        title="Quick Chat"
+        position="right"
+        size="md"
+      >
+        <Center h="70vh">
+          <Text c="dimmed">Chat interface loading...</Text>
+        </Center>
+      </Drawer>
+    </Box>
   );
 }
