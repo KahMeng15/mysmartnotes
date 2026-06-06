@@ -24,6 +24,7 @@ class MergedBlock:
     indent_level: int = 0
     has_bold_spans: bool = False
     has_italic_spans: bool = False
+    font_size: float = 0.0
     markdown_overrides: Optional[str] = None  # Pre-formatted markdown (for tables)
     inline_formats: List[Dict] = field(default_factory=list)  # [{start, end, style}]
 
@@ -48,6 +49,11 @@ class SignalMerger:
         "Formula": "body",
         "Picture": "skip",
     }
+
+    # Pattern for ordered lists like "(i)", "1)", "(a)", "a)"
+    ORDERED_LIST_RE = re.compile(
+        r"^(?:\()?([0-9a-zA-Z]|[ivxIVX]+)(?:\.|\))(?:\s+|$)"
+    )
 
     # Pattern for numbered topic headings like "1.1", "1.2", "2.3.1"
     NUMBERED_HEADING_RE = re.compile(r"^(\d+(?:\.\d+)+)\s+(.+)$")
@@ -98,6 +104,7 @@ class SignalMerger:
                     indent_level=block.indent_level,
                     has_bold_spans=block.has_bold,
                     has_italic_spans=block.has_italic,
+                    font_size=block.max_font_size,
                 )
 
                 # Enhance with layout detection signal
@@ -226,47 +233,56 @@ class SignalMerger:
     def _remove_duplicates(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
         """
         Remove duplicate content blocks.
-        Enhanced: fuzzy-match headings across levels, detect substring duplicates.
+        Enhanced: fuzzy-match headings across levels, detect recurring slide titles.
         """
         cleaned = []
         seen_headers = {}  # normalized_text -> block_type
+        seen_all_blocks = set()
 
         for block in blocks:
             if block.block_type == "skip":
                 continue
 
+            text_norm = block.text.strip().lower()
+            
+            # Global deduplication for every block (prevent exact repeating institutional lines)
+            if len(text_norm) > 10 and text_norm in seen_all_blocks:
+                # If it's a heading, we definitely remove it. 
+                # If it's body text, we remove it if it's identical and short.
+                if block.block_type.startswith("h") or len(text_norm) < 200:
+                    logger.debug(f"Removing exact duplicate block: {block.text[:60]}")
+                    continue
+            seen_all_blocks.add(text_norm)
+
             if block.block_type.startswith("h"):
                 # Normalize for comparison
                 norm = re.sub(r"\s*\(cont\.?(?:inued)?\).*$", "", block.text, flags=re.IGNORECASE)
                 norm = norm.strip().lower()
-                # Remove leading numbering for comparison (e.g., "1.4 " from "1.4 Clients and Servers")
+                # Remove leading numbering for comparison
                 norm_no_num = re.sub(r"^\d+(?:\.\d+)*\s*", "", norm).strip()
 
-                # Check exact duplicate
+                # Check exact normalized duplicate
                 if norm in seen_headers:
                     logger.debug(f"Removing duplicate header: {block.text}")
                     continue
 
                 # Check if this heading text (without numbering) is a substring of an already-seen heading
-                # or if an already-seen heading is a substring of this one
                 is_duplicate = False
                 for seen_text, seen_type in list(seen_headers.items()):
                     seen_no_num = re.sub(r"^\d+(?:\.\d+)*\s*", "", seen_text).strip()
-                    # Skip very short matches to avoid false positives
                     if len(norm_no_num) < 4 or len(seen_no_num) < 4:
                         continue
+                        
                     # If either is a close substring of the other, it's a duplicate
-                    if norm_no_num in seen_no_num or seen_no_num in norm_no_num:
-                        # Keep the more specific one (the one with numbering or the longer one)
+                    if norm_no_num == seen_no_num or (len(norm_no_num) > 10 and (norm_no_num in seen_no_num or seen_no_num in norm_no_num)):
+                        # Keep the more specific one
                         if len(norm) >= len(seen_text):
-                            # Current is longer/more specific — remove previous, keep current
                             cleaned = [b for b in cleaned if not (
                                 b.block_type.startswith("h") and
                                 b.text.strip().lower() == seen_text
                             )]
-                            del seen_headers[seen_text]
+                            if seen_text in seen_headers: del seen_headers[seen_text]
                         else:
-                            # Previous was more specific — skip current
                             is_duplicate = True
                             break
 
@@ -282,48 +298,95 @@ class SignalMerger:
 
     def _normalize_heading_hierarchy(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
         """
-        Normalize heading levels based on document structure rules:
-        - Module/Chapter titles → h1 (only one per document unless multiple modules)
-        - Numbered topics (1.1, 1.2, ...) → h2
-        - Subtopics within topics → h3
-        - Ensure no level jumps > 1
+        Normalize heading levels based on font size ranks and document patterns.
+        Fixes the issue where many slides are flat H5 or otherwise mis-mapped.
         """
-        # Pass 1: Assign semantic levels based on content patterns
+        # Pass 1: Collect all distinct font sizes used for headings
+        heading_sizes = set()
+        for block in blocks:
+            if block.block_type.startswith("h") and block.font_size > 0:
+                heading_sizes.add(round(block.font_size, 1))
+        
+        # Rank them descending (largest = rank 1)
+        sorted_sizes = sorted(list(heading_sizes), reverse=True)
+        size_to_level = {size: f"h{min(i+1, 6)}" for i, size in enumerate(sorted_sizes)}
+
+        # Pass 2: Apply semantic overrides and size-based levels
         for block in blocks:
             if not block.block_type.startswith("h"):
                 continue
 
             text = block.text.strip()
 
-            # Module/Chapter titles → h1
+            # Rule 0: Demote long text (headings are rarely long paragraphs)
+            if len(text) > 160:
+                block.block_type = "body"
+                continue
+
+            # Rule 1: High-priority semantic overrides (Module/numbered topics)
             if self.MODULE_HEADING_RE.match(text):
                 block.block_type = "h1"
                 continue
 
-            # Numbered topics (e.g., "1.1 Network Types") → h2
             m = self.NUMBERED_HEADING_RE.match(text)
             if m:
                 num_parts = m.group(1).split(".")
                 if len(num_parts) == 2:
-                    # Top-level topic like "1.1", "1.2" → h2
                     block.block_type = "h2"
                 elif len(num_parts) >= 3:
-                    # Sub-topic like "1.1.1" → h3
                     block.block_type = "h3"
                 continue
 
-        # Pass 2: Fix hierarchy jumps (no jumping from h1 to h4)
+            # Rule 2: Fallback to font-size ranking
+            rounded_size = round(block.font_size, 1)
+            if rounded_size in size_to_level:
+                block.block_type = size_to_level[rounded_size]
+
+        # Pass 3: Fix hierarchy jumps (no jumping from h1 to h4)
         last_level = 0
         for block in blocks:
             if block.block_type.startswith("h"):
-                level = int(block.block_type[1])
-                if level > last_level + 1 and last_level > 0:
-                    corrected = last_level + 1
-                    block.block_type = f"h{corrected}"
-                    level = corrected
-                last_level = level
+                try:
+                    level = int(block.block_type[1])
+                    if level > last_level + 1 and last_level > 0:
+                        corrected = last_level + 1
+                        block.block_type = f"h{corrected}"
+                        level = corrected
+                    last_level = level
+                except (ValueError, IndexError):
+                    continue
 
-        return blocks
+        # Pass 4: Enforce ONLY ONE H1 (the document title).
+        seen_first_h1 = False
+        for block in blocks:
+            if block.block_type == "h1":
+                if seen_first_h1:
+                    block.block_type = "h2"
+                else:
+                    seen_first_h1 = True
+
+        # Pass 5: Remove consecutive duplicate/empty headers
+        final_blocks = []
+        for block in blocks:
+            if not final_blocks:
+                final_blocks.append(block)
+                continue
+            
+            last = final_blocks[-1]
+            if block.block_type.startswith("h") and last.block_type.startswith("h"):
+                # If they have identical text, remove the second
+                if block.text.strip().lower() == last.text.strip().lower():
+                    logger.debug(f"Removing consecutive identical header: {block.text}")
+                    continue
+                # If the first is empty or low quality, and levels are similar, favor the second
+                if len(last.text) < 3 and block.block_type == last.block_type:
+                    final_blocks.pop()
+                    final_blocks.append(block)
+                    continue
+            
+            final_blocks.append(block)
+
+        return final_blocks
 
     def _split_inline_bullets(self, blocks: List[MergedBlock]) -> List[MergedBlock]:
         """
@@ -392,8 +455,15 @@ class SignalMerger:
             if not text:
                 continue
 
+            # Detect ordered list markers
+            m_ordered = self.ORDERED_LIST_RE.match(text)
+            if m_ordered:
+                # Strip the marker and mark as ordered_list
+                # We keep the marker for context during merging but eventually the formatter handles numbering
+                block.block_type = "ordered_list"
+
             # Detect leading dash as list marker
-            if text[0] in DASH_CHARS and len(text) > 1:
+            elif text[0] in DASH_CHARS and len(text) > 1:
                 # Strip leading dash(es) and mark as list
                 cleaned = text.lstrip("-–—‐‑ ")
                 if cleaned:
@@ -468,17 +538,22 @@ class SignalMerger:
 
             # --- Body + Body merging ---
             if prev.block_type == "body" and block.block_type == "body" and same_page:
-                # Current starts with lowercase → continuation
+                # Current starts with lowercase → definite continuation
                 if text[0].islower():
                     should_merge = True
-                # Previous ends with connector word
-                last_word = prev_text.split()[-1].lower().rstrip(".,;:")
-                if last_word in CONNECTOR_WORDS:
-                    should_merge = True
-                # Previous line doesn't end with sentence-ending punctuation
-                # and current doesn't start with uppercase after a bullet/number
-                if not prev_text[-1] in ".!?:\"'" and text[0].islower():
-                    should_merge = True
+                # Previous doesn't end with sentence-terminating punctuation
+                # and Current is either lowercase OR a common "continuation" fragment
+                elif not prev_text[-1] in ".!?:\"')":
+                    # If prev ends in a comma or connector, it's almost certainly a split line
+                    last_word = prev_text.split()[-1].lower().rstrip(".,;:")
+                    if last_word in CONNECTOR_WORDS or prev_text[-1] in ",:;":
+                        should_merge = True
+                    # If next is short and uppercase, it might be a split phrase (e.g., "Masyar- \n Akat")
+                    elif len(text.split()) < 3:
+                        should_merge = True
+                    # If prev has no punctuation at all in the last 10 chars, it's likely a mid-sentence slide wrap
+                    elif not any(c in ".!?" for c in prev_text[-10:]):
+                        should_merge = True
 
             # --- List + Body merging (stray text after list items) ---
             if (prev.block_type in ("list", "ordered_list") and
@@ -537,9 +612,13 @@ class SignalMerger:
 
             if should_merge:
                 sep = " "
-                if prev.text.endswith("-"):
-                    sep = ""
-                    prev.text = prev.text[:-1]
+                if prev.text.endswith("-") or prev.text.endswith("–") or prev.text.endswith("—"):
+                    # Check if it was a hyphenated word or just a dash
+                    # If it ends with a letter-dash, it's likely a hyphenated word split by line
+                    if len(prev.text) > 2 and prev.text[-2].isalpha():
+                        sep = ""
+                        prev.text = prev.text[:-1]
+                
                 prev.text += sep + block.text
             else:
                 merged.append(block)
@@ -597,13 +676,20 @@ class SignalMerger:
                     # BUT: skip if both items are short (likely separate terms from bullet splitting)
                     prev_is_short = len(prev_text) < 40
                     curr_is_short = len(curr_text) < 40
-                    if not prev_ends_sentence and curr_starts_lower and not (prev_is_short and curr_is_short):
-                        sep = " "
-                        if prev.text.endswith("-"):
-                            sep = ""
-                            prev.text = prev.text[:-1]
-                        prev.text += sep + block.text
-                        continue
+                    # Merge if previous doesn't end sentence and current starts lowercase
+                    # OR if previous doesn't end in terminal punctuation and current is a short fragment (Phase 4)
+                    if (not prev_ends_sentence and curr_starts_lower) or \
+                       (not prev_text[-1] in ".!?" and len(curr_text.split()) < 5):
+                        # Merge if they are not both short terms
+                        prev_is_short = len(prev_text) < 40
+                        curr_is_short = len(curr_text) < 40
+                        if not (prev_is_short and curr_is_short):
+                            sep = " "
+                            if prev.text.endswith("-"):
+                                sep = ""
+                                prev.text = prev.text[:-1]
+                            prev.text += sep + block.text
+                            continue
 
                     # Merge if previous has unclosed parenthesis
                     # e.g., "Mobile devices (such as smart phones, tablets," + "PDAs, and...)"
@@ -702,9 +788,18 @@ class SignalMerger:
                 cleaned.append(block)
                 continue
 
+            # Remove repeated institutional headers (Phase 4)
+            # e.g., course names or professor names appearing on every slide
+            lowered = text.lower()
+            if h1_title and h1_title in lowered and len(text) < len(h1_title) + 15:
+                # Basic safety check to ensure it's not a newly introduced section
+                if len(cleaned) > 0 and (cleaned[-1].text.lower() == text.lower() or text.count(' ') < 4):
+                     logger.debug(f"Removing repeated title header/footer: {text}")
+                     continue
+
             # Remove repeated "Module N" headings (e.g., "Module 1 – New Terms")
             if block.block_type.startswith("h"):
-                module_match = re.match(r"^Module\s+\d+", text, re.IGNORECASE)
+                module_match = re.match(r"^(?:Module|Chapter|Unit)\s+\d+", text, re.IGNORECASE)
                 if module_match:
                     if seen_module_heading:
                         # Demote to h3 or keep but remove "Module N" prefix

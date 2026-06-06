@@ -1,22 +1,35 @@
 """Request/Response schemas"""
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any, Annotated
+import re
+
+
+# Constants for validation
+NICKNAME_REGEX = r"^[a-zA-Z0-9_-]+$"
+FULL_NAME_REGEX = r"^[a-zA-Z\s\-\'\.]+$"
+
+# Reusable types with validation
+NicknameStr = Annotated[str, Field(min_length=2, max_length=30, pattern=NICKNAME_REGEX)]
+FullNameStr = Annotated[str, Field(min_length=2, max_length=100, pattern=FULL_NAME_REGEX)]
 
 
 # ========== User Schemas ==========
 class UserBase(BaseModel):
-    username: str
-    email: EmailStr
-    full_name: Optional[str] = None
-    nickname: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    full_name: Optional[FullNameStr] = None
+    nickname: Optional[NicknameStr] = None
 
 
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
-    nickname: str
-    full_name: Optional[str] = None
+    nickname: NicknameStr
+    full_name: Optional[FullNameStr] = None
+    agree_tos: bool = False
+    agree_privacy: bool = False
+    agree_fair_use: bool = False
 
 
 class UserLogin(BaseModel):
@@ -25,24 +38,28 @@ class UserLogin(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = None
-    nickname: Optional[str] = None
+    full_name: Optional[FullNameStr] = None
+    nickname: Optional[NicknameStr] = None
     ai_provider: Optional[str] = None
     ai_model: Optional[str] = None
     ai_base_url: Optional[str] = None
-    ai_api_key: Optional[str] = None
+    ai_api_key: Optional[str] = None # Ignored by backend, but accepted from frontend
     use_global_ai_config: Optional[bool] = None
 
 
 class User(UserBase):
     id: int
-    is_active: bool
+    is_active: Optional[bool] = True
+    is_admin: bool = False
+    is_approved: bool = True
+    is_verified: bool = False
+    tier: str = "free"
     ai_provider: str = "gemini"
     ai_model: Optional[str] = None
     ai_base_url: Optional[str] = None
-    ai_api_key: Optional[str] = None
-    use_global_ai_config: bool = False
-    created_at: datetime
+    ai_api_key_configured: bool = False
+    use_global_ai_config: bool = True
+    created_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -67,7 +84,7 @@ class SubjectGroupUpdate(BaseModel):
     name: Optional[str] = None
 
 class SubjectGroup(SubjectGroupBase):
-    id: int
+    id: str
     user_id: int
     created_at: datetime
     updated_at: datetime
@@ -81,7 +98,7 @@ class SubjectBase(BaseModel):
     name: str
     description: Optional[str] = None
     color: str = "#3b82f6"
-    group_id: Optional[int] = None
+    group_id: Optional[str] = None
 
 
 class SubjectCreate(SubjectBase):
@@ -92,11 +109,11 @@ class SubjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
-    group_id: Optional[int] = None
+    group_id: Optional[str] = None
 
 
 class Subject(SubjectBase):
-    id: int
+    id: str
     user_id: int
     created_at: datetime
     
@@ -106,7 +123,7 @@ class Subject(SubjectBase):
 
 class SubjectResponse(Subject):
     """Response schema for subject endpoints"""
-    pass
+    group: Optional[SubjectGroup] = None
 
 
 class SubjectGroupResponse(SubjectGroup):
@@ -116,7 +133,7 @@ class SubjectGroupResponse(SubjectGroup):
 # ========== Lecture Schemas ==========
 class LectureBase(BaseModel):
     title: str
-    subject_id: int
+    subject_id: str
 
 
 class LectureCreate(LectureBase):
@@ -124,7 +141,7 @@ class LectureCreate(LectureBase):
 
 
 class Lecture(LectureBase):
-    id: int
+    id: str
     file_path: str
     file_type: str
     file_size: int
@@ -145,46 +162,18 @@ class Lecture(LectureBase):
 
 class LectureResponse(Lecture):
     """Response schema for lecture endpoints"""
-    subject: Optional[Subject] = None
+    subject: Optional[SubjectResponse] = None
 
 
-# ========== Flashcard Schemas ==========
-class FlashcardBase(BaseModel):
-    question: str
-    answer: str
-    difficulty: str = "medium"
-
-
-class FlashcardCreate(FlashcardBase):
-    lecture_id: int
-
-
-class FlashcardUpdate(BaseModel):
-    question: Optional[str] = None
-    answer: Optional[str] = None
-    difficulty: Optional[str] = None
-
-
-class Flashcard(FlashcardBase):
-    id: int
-    lecture_id: int
-    times_reviewed: int
-    times_correct: int
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-
-# ========== Document Schemas ==========
-class DocumentBase(BaseModel):
+# ========== Auth Schemas ==========
+class SummaryBase(BaseModel):
     title: str
-    document_type: str
+    summary_type: str
 
 
-class GeneratedDocument(DocumentBase):
+class Summary(SummaryBase):
     id: int
-    lecture_id: int
+    lecture_id: str
     file_path: str
     created_at: datetime
     
@@ -194,11 +183,15 @@ class GeneratedDocument(DocumentBase):
 
 # ========== Study Session Schemas ==========
 class StudySessionCreate(BaseModel):
+    lecture_id: Optional[str] = None
     session_type: str
     duration_minutes: int
-    questions_attempted: int
-    questions_correct: int
+    questions_attempted: int = 0
+    questions_correct: int = 0
     score: Optional[float] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    status: Optional[str] = "completed"
 
 
 class StudySession(StudySessionCreate):
@@ -226,7 +219,7 @@ class TaskResponse(BaseModel):
 
 # ========== Chat Schemas ==========
 class ChatMessage(BaseModel):
-    lecture_id: int
+    lecture_id: str
     message: str
 
 
@@ -244,7 +237,7 @@ class NoteSnapshotCreate(BaseModel):
 
 class NoteSnapshotResponse(BaseModel):
     id: int
-    lecture_id: int
+    lecture_id: str
     user_id: int
     name: str
     content: str
@@ -257,3 +250,20 @@ class NoteSnapshotResponse(BaseModel):
 # ========== Lecture Content Update ==========
 class LectureContentUpdate(BaseModel):
     extracted_text: str
+
+
+# ========== Export Template Schemas ==========
+class TemplateCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    config: Optional[Any] = None
+
+
+class TemplateDuplicate(BaseModel):
+    name: Optional[str] = None
+
+
+class TemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    config: Optional[Any] = None

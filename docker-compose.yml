@@ -1,24 +1,115 @@
-version: "3.8"
-
 services:
-  app:
-    build: .
-    container_name: mysmartnotes
-    ports:
-      - "8000:8000"
+  db:
+    image: postgres:15-alpine
+    container_name: mysmartnotes_db
     environment:
-      - DATABASE_URL=sqlite:///./data/app.db
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
-      - DEBUG=${DEBUG:-False}
-      - LOG_LEVEL=INFO
+      POSTGRES_USER: mysmartnotes
+      POSTGRES_PASSWORD: mysmartnotespassword
+      POSTGRES_DB: mysmartnotes
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mysmartnotes-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    container_name: mysmartnotes_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - mysmartnotes-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    platform: linux/amd64
+    build:
+      context: .
+      args:
+        - USER_ID=${PUID:-568}
+        - GROUP_ID=${PGID:-568}
+    image: ghcr.io/kahmeng15/mysmartnotes:dev
+    container_name: mysmartnotes_api
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+      - DB_USER=mysmartnotes
+      - DB_PASSWORD=mysmartnotespassword
+      - DB_HOST=db
+      - DB_NAME=mysmartnotes
+      - REDIS_URL=redis://redis:6379/0
+      - USER_ID=${PUID:-568}
+      - GROUP_ID=${PGID:-568}
     volumes:
       - ./data:/app/data
-      - ./app:/app/app
+      - ./logs:/app/logs
     restart: unless-stopped
     networks:
       - mysmartnotes-net
+
+  worker:
+    platform: linux/amd64
+    build: .
+    image: ghcr.io/kahmeng15/mysmartnotes:dev
+    container_name: mysmartnotes_worker
+    command: ["python", "-m", "app.worker_main"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DB_USER=mysmartnotes
+      - DB_PASSWORD=mysmartnotespassword
+      - DB_HOST=db
+      - DB_NAME=mysmartnotes
+      - REDIS_URL=redis://redis:6379/0
+      - USER_ID=${PUID:-568}
+      - GROUP_ID=${PGID:-568}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - mysmartnotes-net
+
+  nginx:
+    build:
+      context: ./app
+      dockerfile: Dockerfile.nginx
+    container_name: mysmartnotes_frontend
+    depends_on:
+      - api
+    ports:
+      - "${PORT:-8000}:80"
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - mysmartnotes-net
+
+volumes:
+  db_data:
 
 networks:
   mysmartnotes-net:

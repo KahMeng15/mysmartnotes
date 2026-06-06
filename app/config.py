@@ -1,74 +1,177 @@
 """Configuration management"""
-from pydantic_settings import BaseSettings
 from functools import lru_cache
-import os
+
+from pydantic_settings import BaseSettings
+
+
+# Hardcoded constants (not configurable via environment)
+APP_NAME = "MySmartNotes"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ALLOWED_EXTENSIONS = "pdf,pptx,png,jpg,jpeg"
+OCR_ENABLED = True
+AI_POLISH_ENABLED = True
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+# Database defaults
+DB_POOL_SIZE = 20
+DB_MAX_OVERFLOW = 40
+DB_POOL_TIMEOUT_SECONDS = 30
+DB_POOL_RECYCLE_SECONDS = 1800
 
 
 class Settings(BaseSettings):
-    """Application settings from environment variables
-    
-    AI Configuration Hierarchy:
-    ===========================
-    1. GLOBAL_* settings: Administrator-managed defaults for all users
-       - Used when user enables "Use Global AI Settings" in their profile
-       - Recommended for most users in managed environments
-    
-    2. User personal settings: Individual user configurations (stored in DB)
-       - Used when user disables "Use Global AI Settings"
-       - Allows users to use their own API keys and providers
-    
-    3. Fallback settings: System-wide defaults (GEMINI_API_KEY, AI_PROVIDER, etc.)
-       - Used only when user has no personal settings and not using global
-       - Typically not used in production environments
-    """
-    
-    # Database
-    DATABASE_URL: str = "sqlite:///./data/app.db"
-    
+    """Application settings from environment variables."""
+
+    # Database Configuration
+    # Use these to construct the PostgreSQL connection string
+    DB_USER: str = "mysmartnotes"
+    DB_PASSWORD: str = ""
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
+    DB_NAME: str = "mysmartnotes"
+
+    # Runtime Environment
+    ENVIRONMENT: str = "development"  # development, staging, production
+
     # JWT Security
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
-    # ============================================
-    # Global AI Configuration (Administrator-managed)
-    # ============================================
-    GLOBAL_AI_PROVIDER: str = "gemini"  # Options: gemini, huggingface, ollama
-    GLOBAL_GEMINI_API_KEY: str = ""     # API key for global Gemini usage
-    GLOBAL_HUGGINGFACE_TOKEN: str = ""  # API token for global Hugging Face usage
-    GLOBAL_AI_MODEL: str = ""           # Optional: specific model name (leave empty for auto-select)
-    
-    # ============================================
-    # Fallback AI Settings (System defaults)
-    # ============================================
-    GEMINI_API_KEY: str = ""            # Fallback Gemini API key
-    HUGGINGFACE_TOKEN: str = ""         # Fallback Hugging Face token
-    AI_PROVIDER: str = "gemini"         # Fallback provider
-    OLLAMA_BASE_URL: str = ""           # Ollama server URL (e.g., "http://192.168.1.100:11434")
-    
+    # Generate a secure key with: openssl rand -hex 32
+    SECRET_KEY: str = ""
+
+    # CORS
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:8000,http://127.0.0.1:8000"
+
+    # Session Cookie Security
+    COOKIE_SECURE: bool = False
+    COOKIE_SAMESITE: str = "lax"  # strict, lax, none
+    CSRF_COOKIE_NAME: str = "csrf_token"
+    CSRF_HEADER_NAME: str = "X-CSRF-Token"
+
+    # Encryption for secrets stored in DB (Fernet key)
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    APP_ENCRYPTION_KEY: str = ""
+
+    # Background task retention
+    TASK_RETENTION_DAYS: int = 14
+
+    # Redis Caching
+    REDIS_URL: str = "redis://localhost:6379/0"
+    CACHE_TTL_SECONDS: int = 3600
+
+    # Admin Bootstrap
+    ADMIN_EMAIL: str = ""
+
+    # SMTP Configuration
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_SENDER_NAME: str = "MySmartNotes"
+    SMTP_TLS: bool = True
+
+    # Global AI Configuration (3-Tier Fallback System)
+    # Tier 1 (Primary - Gemini)
+    GLOBAL_AI_TIER1_PROVIDER: str = "gemini"
+    GLOBAL_AI_TIER1_MODEL: str = "models/gemma-4-31b-it"
+    GLOBAL_AI_TIER1_API_KEY: str = ""
+    GLOBAL_AI_TIER1_REASONING_LEVEL: str = "high"
+
+    # Tier 2 (Secondary - Gemini)
+    GLOBAL_AI_TIER2_PROVIDER: str = "gemini"
+    GLOBAL_AI_TIER2_MODEL: str = "models/gemma-4-26b-a4b-it"
+    GLOBAL_AI_TIER2_API_KEY: str = ""
+    GLOBAL_AI_TIER2_REASONING_LEVEL: str = "high"
+
+    # Tier 3 (Local Fallback - Ollama)
+    GLOBAL_AI_TIER3_PROVIDER: str = "ollama"
+    GLOBAL_AI_TIER3_MODEL: str = "llama3"
+    GLOBAL_AI_TIER3_API_KEY: str = "" 
+    GLOBAL_AI_TIER3_REASONING_LEVEL: str = "low"
+    GLOBAL_AI_TIER3_BASE_URL: str = "http://localhost:11434"
+
+    # Legacy/Individual Fallback Settings
+    GEMINI_API_KEY: str = ""
+    HUGGINGFACE_TOKEN: str = ""
+    AI_PROVIDER: str = "gemini"
+    OLLAMA_BASE_URL: str = ""
+
+    # Firebase Cloud Configuration
+    FIREBASE_API_KEY: str = ""
+    FIREBASE_AUTH_DOMAIN: str = ""
+    FIREBASE_PROJECT_ID: str = "mysmartnotes-965fe"
+    FIREBASE_STORAGE_BUCKET: str = ""
+    FIREBASE_MESSAGING_SENDER_ID: str = ""
+    FIREBASE_APP_ID: str = ""
+    FIREBASE_MEASUREMENT_ID: str = ""
+
     # App Settings
-    APP_NAME: str = "MySmartNotes"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
-    
+
     # Server
-    HOST: str = "0.0.0.0"
+    HOST: str = "0.0.0.0"  # nosec - intentional for Docker/container deployments
     PORT: int = 8000
-    
+
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 50
-    ALLOWED_EXTENSIONS: str = "pdf,pptx,png,jpg,jpeg"
-    
-    # Processing
-    OCR_ENABLED: bool = True
-    EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-    
+
+    # Expose hardcoded constants through settings for backward compatibility
+    @property
+    def APP_NAME(self) -> str:
+        return APP_NAME
+
+    @property
+    def ALGORITHM(self) -> str:
+        return ALGORITHM
+
+    @property
+    def ACCESS_TOKEN_EXPIRE_MINUTES(self) -> int:
+        return ACCESS_TOKEN_EXPIRE_MINUTES
+
+    @property
+    def ALLOWED_EXTENSIONS(self) -> str:
+        return ALLOWED_EXTENSIONS
+
+    @property
+    def OCR_ENABLED(self) -> bool:
+        return OCR_ENABLED
+
+    @property
+    def EMBEDDING_MODEL(self) -> str:
+        return EMBEDDING_MODEL
+
+    @property
+    def AI_POLISH_ENABLED(self) -> bool:
+        return AI_POLISH_ENABLED
+
+    @property
+    def DB_POOL_SIZE(self) -> int:
+        return DB_POOL_SIZE
+
+    @property
+    def DB_MAX_OVERFLOW(self) -> int:
+        return DB_MAX_OVERFLOW
+
+    @property
+    def DB_POOL_TIMEOUT_SECONDS(self) -> int:
+        return DB_POOL_TIMEOUT_SECONDS
+
+    @property
+    def DB_POOL_RECYCLE_SECONDS(self) -> int:
+        return DB_POOL_RECYCLE_SECONDS
+
+    @property
+    def DATABASE_URL(self) -> str:
+        """Construct SQLAlchemy database URL"""
+        return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Get cached settings instance"""
+    """Get cached settings instance."""
     return Settings()

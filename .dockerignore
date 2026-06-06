@@ -1,0 +1,41 @@
+# Git
+.git
+.github
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
+.env
+*.local
+
+# Application data (should be mounted as volumes)
+data/
+generated/
+output/
+uploads/
+
+# Documentation and scripts
+docs/
+scripts/
+README.md
+GEMINI.md
+instrument_sans.zip
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Ignore logs
+logs/
+*.log

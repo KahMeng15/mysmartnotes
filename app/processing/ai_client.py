@@ -1,173 +1,405 @@
 """AI client for LLM interactions"""
+import asyncio
 import logging
-from typing import Optional, List
+import random
+import re
+import httpx
+from typing import Optional, List, Callable, TypeVar, Awaitable
 from app.config import get_settings
-from app.models.db import User
-import aiohttp
-import json
+from app.models.db import User, SystemSettings
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+T = TypeVar("T")
 
+class AITier:
+    """Configuration for an AI tier"""
+    def __init__(self, provider: str, model_name: str, api_key: str, reasoning_level: str, base_url: Optional[str] = None):
+        self.provider = provider
+        self.model_name = model_name
+        self.api_key = api_key
+        self.reasoning_level = reasoning_level
+        self.base_url = base_url
+        self.model = None # For Gemini/HF clients
 
 class AIClient:
-    """Unified AI client for Gemini, Hugging Face, and local Ollama
+    """Unified AI client with 3-tier fallback system (Gemini -> Gemini -> Ollama)"""
     
-    Settings Priority:
-    1. User personal settings (if use_global_ai_config=False)
-    2. Global settings from environment (if use_global_ai_config=True)
-    3. System fallback settings (rarely used)
-    """
-    
-    def __init__(self, user: Optional[User] = None):
+    def __init__(self, user: Optional[User] = None, db: Optional[Session] = None):
         self.user = user
+        self.db = db
+        self.request_timeout_seconds = 240
+        self.max_retries = 2 # Retries per tier
+        self.retry_base_delay_seconds = 1.0
+        self.last_successful_tier: Optional[AITier] = None
         
-        # Determine settings source
-        if user and user.use_global_ai_config:
-            # Use global settings managed by administrator
-            self.provider = settings.GLOBAL_AI_PROVIDER
-            self.ai_model_name = settings.GLOBAL_AI_MODEL or None
-            self.gemini_key = settings.GLOBAL_GEMINI_API_KEY if self.provider == "gemini" else None
-            self.hf_token = settings.GLOBAL_HUGGINGFACE_TOKEN if self.provider == "huggingface" else None
-            self.ollama_base_url = None
-            logger.info(f"[User {user.id}] Using global AI settings: {self.provider}")
-            
-        elif user and user.ai_provider:
-            # Use user's personal settings
-            self.provider = user.ai_provider
-            self.ai_model_name = user.ai_model or None
-            self.gemini_key = user.ai_api_key if self.provider == "gemini" else None
-            self.hf_token = user.ai_api_key if self.provider == "huggingface" else None
-            self.ollama_base_url = user.ai_base_url if self.provider == "ollama" else None
-            logger.info(f"[User {user.id}] Using personal AI settings: {self.provider}")
-            
-        else:
-            # Fallback to system defaults (no user or user has no settings)
-            self.provider = settings.AI_PROVIDER
-            self.ai_model_name = None
-            self.gemini_key = settings.GEMINI_API_KEY
-            self.hf_token = settings.HUGGINGFACE_TOKEN
-            self.ollama_base_url = settings.OLLAMA_BASE_URL
-            logger.info(f"Using system fallback AI settings: {self.provider}")
+        # 1. Start with 3-tier defaults from .env settings
+        self.tiers: List[AITier] = [
+            AITier(
+                provider=settings.GLOBAL_AI_TIER1_PROVIDER,
+                model_name=settings.GLOBAL_AI_TIER1_MODEL,
+                api_key=settings.GLOBAL_AI_TIER1_API_KEY,
+                reasoning_level=settings.GLOBAL_AI_TIER1_REASONING_LEVEL
+            ),
+            AITier(
+                provider=settings.GLOBAL_AI_TIER2_PROVIDER,
+                model_name=settings.GLOBAL_AI_TIER2_MODEL,
+                api_key=settings.GLOBAL_AI_TIER2_API_KEY,
+                reasoning_level=settings.GLOBAL_AI_TIER2_REASONING_LEVEL
+            ),
+            AITier(
+                provider=settings.GLOBAL_AI_TIER3_PROVIDER,
+                model_name=settings.GLOBAL_AI_TIER3_MODEL,
+                api_key=settings.GLOBAL_AI_TIER3_API_KEY,
+                reasoning_level=settings.GLOBAL_AI_TIER3_REASONING_LEVEL,
+                base_url=settings.GLOBAL_AI_TIER3_BASE_URL
+            )
+        ]
         
-        # Initialize the selected provider
-        if self.provider == "gemini":
-            self._init_gemini()
-        elif self.provider == "huggingface":
-            self._init_huggingface()
-        elif self.provider == "ollama":
-            logger.info(f"Ollama AI initialized (URL: {self.ollama_base_url})")
+        # 3. User-specific override (Legacy/Personal)
+        # If user has a personal provider configured and is NOT using global config,
+        # we treat it as an additional Tier 0 (top priority).
+        if user and not user.use_global_ai_config and user.ai_provider:
+            logger.info(f"Applying User-specific AI override: {user.ai_provider} ({user.ai_model})")
+            user_tier = AITier(
+                provider=user.ai_provider,
+                model_name=user.ai_model or settings.GLOBAL_AI_TIER1_MODEL,
+                api_key=settings.GLOBAL_AI_TIER1_API_KEY,
+                reasoning_level="medium",
+                base_url=user.ai_base_url
+            )
+            self.tiers.insert(0, user_tier)
+            
+        self._init_tiers()
+
+    @property
+    def provider(self) -> str:
+        tier = self.last_successful_tier or (self.tiers[0] if self.tiers else None)
+        return tier.provider if tier else "unknown"
+
+    @provider.setter
+    def provider(self, value: str):
+        if self.tiers:
+            self.tiers[0].provider = value
+
+    @property
+    def gemini_key(self) -> Optional[str]:
+        tier = self.last_successful_tier or (self.tiers[0] if self.tiers else None)
+        return tier.api_key if tier and tier.provider == "gemini" else None
+
+    @gemini_key.setter
+    def gemini_key(self, value: str):
+        if self.tiers and self.tiers[0].provider == "gemini":
+            self.tiers[0].api_key = value
+
+    @property
+    def ai_model_name(self) -> str:
+        tier = self.last_successful_tier or (self.tiers[0] if self.tiers else None)
+        return tier.model_name if tier else "default"
+
+    @ai_model_name.setter
+    def ai_model_name(self, value: str):
+        if self.tiers:
+            self.tiers[0].model_name = value
+
     def _init_gemini(self):
-        """Initialize Gemini API and dynamically select the best model."""
+        """Legacy re-initialization for Tier 1 if it's Gemini"""
+        if self.tiers and self.tiers[0].provider == "gemini":
+            self._init_gemini_tier(self.tiers[0])
+
+    def _init_tiers(self):
+        """Initialize clients for each tier"""
+        for tier in self.tiers:
+            if tier.provider == "gemini":
+                self._init_gemini_tier(tier)
+            elif tier.provider == "huggingface":
+                self._init_huggingface_tier(tier)
+
+    def _init_gemini_tier(self, tier: AITier):
         try:
             import google.generativeai as genai
-            genai.configure(api_key=self.gemini_key)
-
-            if self.ai_model_name:
-                # Use user-specified model
-                model_name = self.ai_model_name
-            else:
-                # Dynamically find the best model
-                model_name = "gemini-1.5-flash"  # Fallback
-                best_model = None
-                for m in genai.list_models():
-                    if 'generateContent' in m.supported_generation_methods:
-                        # Prefer 'flash' models that are not preview
-                        if "flash" in m.name and "preview" not in m.name:
-                            best_model = m.name
-                            break # Found a good one
-                
-                if best_model:
-                    model_name = best_model
-                    logger.info(f"Dynamically selected Gemini model: {model_name}")
-                else:
-                    logger.warning(f"Could not dynamically find a suitable model, falling back to {model_name}")
-
-            self.model = genai.GenerativeModel(model_name)
-            logger.info(f"Gemini AI initialized with model: {self.model.model_name}")
+            if not tier.api_key:
+                logger.warning(f"!!! No API key provided for Gemini tier ({tier.model_name}) !!!")
+                return
+            
+            # Diagnostic: Show first and last 2 chars to help user verify without leaking secret
+            key_preview = f"{tier.api_key[:2]}...{tier.api_key[-2:]}" if len(tier.api_key) > 4 else tier.api_key
+            logger.info(f"INIT: Configuring Gemini ({tier.model_name}) with key: [{key_preview}] (len: {len(tier.api_key)})")
+            
+            genai.configure(api_key=tier.api_key)
+            tier.model = genai.GenerativeModel(tier.model_name)
         except Exception as e:
-            logger.error(f"Failed to initialize Gemini: {e}")
-            self.model = None
-            self.connection_error = f"[GEMINI] Connection failed: {e}"
-    
-    def _init_huggingface(self):
-        """Initialize Hugging Face"""
+            logger.error(f"Failed to init Gemini tier ({tier.model_name}): {e}")
+
+    def _init_huggingface_tier(self, tier: AITier):
         try:
             from huggingface_hub import InferenceClient
-            self.client = InferenceClient(api_key=self.hf_token)
-            logger.info("Hugging Face AI initialized")
+            if not tier.api_key: return
+            tier.model = InferenceClient(api_key=tier.api_key)
         except Exception as e:
-            logger.error(f"Failed to initialize Hugging Face: {e}")
-    
-    async def generate_text(self, prompt: str, max_tokens: int = 500) -> str:
-        """Generate text response"""
+            logger.error(f"Failed to init HuggingFace tier ({tier.model_name}): {e}")
+
+    async def _with_retries_and_timeout(self, operation_name: str, operation: Callable[[], Awaitable[T]]) -> T:
+        last_error: Optional[Exception] = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                return await asyncio.wait_for(operation(), timeout=self.request_timeout_seconds)
+            except Exception as exc:
+                last_error = exc
+                logger.warning(f"{operation_name} attempt {attempt} failed: {exc}")
+                if attempt < self.max_retries:
+                    await asyncio.sleep(self.retry_base_delay_seconds * (2 ** (attempt - 1)))
+        raise last_error or RuntimeError(f"{operation_name} failed")
+
+    async def _call_ollama(self, tier: AITier, prompt: str, system_instruction: Optional[str] = None) -> str:
+        """Call local Ollama server"""
+        if not tier.base_url:
+            raise ValueError("Ollama base URL not configured")
+        
+        url = f"{tier.base_url.rstrip('/')}/api/generate"
+        logger.info(f"OLLAMA: Calling {url} with model {tier.model_name}")
+        payload = {
+            "model": tier.model_name,
+            "prompt": prompt,
+            "system": system_instruction,
+            "stream": False,
+            "options": {
+                "temperature": 0.7
+            }
+        }
+        
         try:
-            if self.provider == "gemini":
-                response = self.model.generate_content(prompt)
-                return response.text
-            elif self.provider == "huggingface":
-                kwargs = {"max_new_tokens": max_tokens}
-                if self.ai_model_name:
-                    kwargs["model"] = self.ai_model_name
-                response = self.client.text_generation(prompt, **kwargs)
-                return response
-            elif self.provider == "ollama":
-                model_name = self.ai_model_name if self.ai_model_name else "llama3"
-                url = f"{self.ollama_base_url.rstrip('/')}/api/generate"
-                payload = {
-                    "model": model_name,
-                    "prompt": prompt,
-                    "stream": False
-                }
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json=payload) as response:
-                        if response.status == 200:
-                            result = await response.json()
-                            return result.get("response", "")
-                        else:
-                            error_text = await response.text()
-                            logger.error(f"Ollama API error: {error_text}")
-                            return f"Provider Error: Failed to generate response from Local Ollama ({response.status})"
+            async with httpx.AsyncClient(timeout=self.request_timeout_seconds) as client:
+                response = await client.post(url, json=payload)
+                if response.status_code != 200:
+                    logger.error(f"OLLAMA ERROR: Server returned status {response.status_code}: {response.text}")
+                response.raise_for_status()
+                data = response.json()
+                return data.get("response", "")
         except Exception as e:
-            error_msg = f"[{self.provider.upper()}] Connection failed: {str(e)}"
-            if self.provider == "ollama":
-                error_msg = f"[OLLAMA] Failed to connect to {self.ollama_base_url}: {str(e)}. Please ensure Ollama is running at the configured address."
-            logger.error(error_msg)
-            return error_msg
-    
-    async def answer_question(self, context: str, question: str, system_prompt: Optional[str] = None) -> str:
-        """Answer question based on context with optional custom system prompt"""
-        if system_prompt:
-            prompt = system_prompt
+            logger.error(f"OLLAMA CRITICAL ERROR: {str(e)}")
+            raise
+
+    def _extract_polished_answer(self, text: str) -> str:
+        """Surgically extract the final answer from reasoning/meta-talk."""
+        if not text: return ""
+        
+        # 0. Try strict JSON parse first (Chat enforces JSON schema)
+        try:
+            import json
+            clean_text = text.strip()
+            if clean_text.startswith("```json"):
+                clean_text = clean_text[7:]
+            if clean_text.startswith("```"):
+                clean_text = clean_text[3:]
+            if clean_text.endswith("```"):
+                clean_text = clean_text[:-3]
+            parsed = json.loads(clean_text.strip())
+            if "final_answer" in parsed:
+                return str(parsed["final_answer"]).strip()
+        except Exception:
+            pass
+        
+        # 1. Clean explicit tags
+        text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        text = re.sub(r'<\|channel\|>thought.*?<channel\|>', '', text, flags=re.DOTALL)
+        text = re.sub(r'<\|thought\|>.*?</\|thought\|>', '', text, flags=re.DOTALL)
+        text = text.replace("<think>", "").replace("</think>", "")
+        text = text.replace("<|channel|>thought", "").replace("<channel|>", "").replace("<|thought|>", "").replace("</|thought|>", "")
+
+        # 2. Extract strictly bounded XML answer first
+        xml_match = re.search(r'<FINAL_ANSWER>(.*?)</FINAL_ANSWER>', text, flags=re.DOTALL | re.IGNORECASE)
+        if xml_match:
+            candidate = xml_match.group(1).strip()
+            if len(candidate) > 5: return candidate
+            
+        # 3. Fallback extraction markers (strongest signal)
+        for marker in ["FINAL_ANSWER:", "FINAL ANSWER:", "===START===", "Final Answer:", "Answer:", "ANSWER:"]:
+            if marker in text:
+                parts = text.split(marker)
+                if len(parts) > 1:
+                    candidate = parts[-1].strip()
+                    if len(candidate) > 5: return candidate
+
+        # 3. Detect and skip reasoning blocks (Look from bottom up)
+        if text.lstrip().startswith("*") or "Context:" in text[:400] or "Question:" in text[:400] or "Wait," in text[:200]:
+            lines = text.split("\n")
+            meta_keywords = ["Context:", "Question:", "Constraint:", "Task:", "Wait,", "Actually,", "Let me", "Draft", "Final Check", "Source:", "Check constraints", "Let's check", "Final version:"]
+            
+            for i in range(len(lines) - 1, -1, -1):
+                clean = lines[i].strip()
+                if not clean: continue
+                is_meta = clean.startswith("*") or clean.startswith("-") or any(k in clean for k in meta_keywords)
+                if not is_meta and len(clean) > 25 and clean[0].isupper() and not clean.endswith(":"):
+                    start_idx = i
+                    while start_idx > 0:
+                        prev = lines[start_idx-1].strip()
+                        if not prev: start_idx -= 1; continue
+                        if prev.startswith("*") or prev.startswith("-") or any(k in prev for k in meta_keywords): break
+                        start_idx -= 1
+                    return "\n".join(lines[start_idx:]).strip()
+
+        return text.strip()
+
+    async def _generate_with_tier(self, tier: AITier, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None) -> str:
+        """Helper to generate text using a specific tier"""
+        # Validation
+        if tier.provider == "gemini" and not tier.model:
+            raise ValueError(f"Gemini model not initialized for {tier.model_name}")
+        
+        # Reasoning handling
+        is_reasoning = "gemma-4" in tier.model_name.lower() or tier.reasoning_level == "high"
+        if tier.provider == "gemini" and is_reasoning:
+            instr = f"\nREASONING DEPTH: {tier.reasoning_level.upper()}\n"
+            modified_prompt = prompt.replace("===START===", instr + "===START===") if "===START===" in prompt else instr + prompt
         else:
-            prompt = f"""Based on the following context, answer the question concisely.
+            modified_prompt = prompt
 
-Context:
-{context}
+        if tier.provider == "gemini":
+            import google.generativeai as genai
+            # CRITICAL: Re-configure with THIS tier's key to prevent leakage from other tiers
+            if tier.api_key:
+                genai.configure(api_key=tier.api_key)
+            
+            cfg = genai.types.GenerationConfig(max_output_tokens=max_tokens, temperature=0.7)
+            active_model = genai.GenerativeModel(tier.model.model_name, system_instruction=system_instruction) if system_instruction else tier.model
+            
+            async def _gemini_call():
+                return await asyncio.to_thread(active_model.generate_content, modified_prompt, generation_config=cfg)
 
-Question:
-{question}
+            res = await self._with_retries_and_timeout(f"gemini_{tier.model_name}", _gemini_call)
+            if res.candidates and res.candidates[0].content.parts:
+                parts = res.candidates[0].content.parts
+                text = parts[-1].text if len(parts) > 1 else "".join(p.text for p in parts if hasattr(p, 'text'))
+                self.last_successful_tier = tier
+                logger.info(f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})")
+                return self._extract_polished_answer(text)
+        
+        elif tier.provider == "ollama":
+            async def _ollama_call():
+                return await self._call_ollama(tier, modified_prompt, system_instruction)
+            
+            res = await self._with_retries_and_timeout(f"ollama_{tier.model_name}", _ollama_call)
+            self.last_successful_tier = tier
+            logger.info(f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})")
+            return self._extract_polished_answer(res)
 
-Answer:"""
+        elif tier.provider == "huggingface" and tier.model:
+            async def _hf_call():
+                return tier.model.text_generation(modified_prompt, max_new_tokens=max_tokens, system_instruction=system_instruction)
+            
+            res = await self._with_retries_and_timeout(f"hf_{tier.model_name}", _hf_call)
+            self.last_successful_tier = tier
+            return self._extract_polished_answer(res)
+        
+        return ""
+
+    async def generate_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None) -> str:
+        """Unary generation with 3-tier fallback logic."""
+        last_error = None
+        
+        for i, tier in enumerate(self.tiers):
+            try:
+                logger.info(f"Attempting generation with Tier {i+1} ({tier.provider}: {tier.model_name})")
+                return await self._generate_with_tier(tier, prompt, max_tokens, system_instruction)
+            except Exception as e:
+                logger.error(f"Tier {i+1} ({tier.provider}) failed: {e}")
+                last_error = e
+                continue # Try next tier
+        
+        logger.error("All AI tiers failed to generate text.")
+        return ""
+
+    async def stream_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None):
+        """Stream generation with 3-tier fallback logic."""
+        last_error = None
+        
+        for i, tier in enumerate(self.tiers):
+            try:
+                logger.info(f"Attempting stream with Tier {i+1} ({tier.provider}: {tier.model_name})")
+                
+                # Special handling for streaming-capable providers
+                if tier.provider == "gemini":
+                    if not tier.model: raise ValueError("Gemini model not initialized")
+                    
+                    is_reasoning = "gemma-4" in tier.model_name.lower() or tier.reasoning_level == "high"
+                    if is_reasoning:
+                        instr = f"\nREASONING DEPTH: {tier.reasoning_level.upper()}\n"
+                        modified_prompt = prompt.replace("===START===", instr + "===START===") if "===START===" in prompt else instr + prompt
+                    else:
+                        modified_prompt = prompt
+
+                    import google.generativeai as genai
+                    # CRITICAL: Re-configure with THIS tier's key to prevent leakage from other tiers
+                    if tier.api_key:
+                        genai.configure(api_key=tier.api_key)
+
+                    cfg = genai.types.GenerationConfig(max_output_tokens=max_tokens, temperature=0.7)
+                    active_model = genai.GenerativeModel(tier.model.model_name, system_instruction=system_instruction) if system_instruction else tier.model
+                    
+                    async def _gemini_stream():
+                        return await asyncio.to_thread(active_model.generate_content, modified_prompt, generation_config=cfg, stream=True)
+
+                    response_stream = await self._with_retries_and_timeout(f"Tier{i+1}_gemini_stream", _gemini_stream)
+                    all_parts = []
+                    for chunk in response_stream:
+                        if chunk.candidates and chunk.candidates[0].content.parts:
+                            for part in chunk.candidates[0].content.parts:
+                                if hasattr(part, 'text'): all_parts.append(part.text)
+                    
+                    self.last_successful_tier = tier
+                    yield self._extract_polished_answer("".join(all_parts))
+                    return # Success!
+
+                else:
+                    # For non-streaming or fallback, use the tier-specific unary call
+                    res = await self._generate_with_tier(tier, prompt, max_tokens, system_instruction)
+                    if res:
+                        yield res
+                        return
+                    else:
+                        raise ValueError("Empty response from tier")
+
+            except Exception as e:
+                logger.error(f"Tier {i+1} stream failed: {e}")
+                last_error = e
+                continue
+        
+        yield f"Error: All AI tiers failed. Last error: {last_error}"
+
+    async def answer_question(self, context: str, question: str, system_prompt: Optional[str] = None) -> str:
+        prompt = system_prompt if system_prompt else f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"
         return await self.generate_text(prompt)
     
     async def generate_quiz(self, content: str, num_questions: int = 5) -> List[dict]:
-        """Generate quiz questions from content"""
-        prompt = f"""Generate {num_questions} multiple choice quiz questions based on this content:
+        prompt = f"Generate {num_questions} quiz questions (JSON): {content}"
+        res = await self.generate_text(prompt)
+        try: import json; return json.loads(res)
+        except: return []
 
-{content}
+    async def generate_summary(
+        self, 
+        content: str, 
+        mode: str = "elaborate", 
+        output_format: str = "sentence", 
+        processing_method: str = "whole",
+        split_level: str = "h2",
+        progress_callback: Optional[Callable[[int], None]] = None
+    ) -> str:
+        """
+        Generate a summary using parallel chunked processing via SummaryPipeline.
+        """
+        from app.processing.summary_pipeline import SummaryPipeline
+        pipeline = SummaryPipeline(self)
+        return await pipeline.generate_summary(
+            content, 
+            mode, 
+            output_format, 
+            processing_method=processing_method,
+            split_level=split_level,
+            progress_callback=progress_callback
+        )
 
-Format as JSON array with objects containing: question, options (array of 4), correct_answer (index)"""
-        response = await self.generate_text(prompt)
-        # Parse JSON response
-        try:
-            import json
-            return json.loads(response)
-        except:
-            return []
-
-
-# Global AI client instance wrapper
-def get_ai_client(user: Optional[User] = None) -> AIClient:
-    """Create AI client with user context"""
-    return AIClient(user=user)
+def get_ai_client(user: Optional[User] = None, db: Optional[Session] = None) -> AIClient:
+    return AIClient(user=user, db=db)

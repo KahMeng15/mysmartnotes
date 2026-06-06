@@ -1,26 +1,101 @@
 """Database utilities and session management"""
+import os
+from typing import Generator
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from app.config import get_settings
 from app.models.db import Base
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+
 # Create engine
-engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
-    echo=settings.DEBUG,
-)
+engine_kwargs = {
+    "echo": os.getenv("SQL_ECHO", "false").lower() == "true",
+    "pool_size": settings.DB_POOL_SIZE,
+    "max_overflow": settings.DB_MAX_OVERFLOW,
+    "pool_timeout": settings.DB_POOL_TIMEOUT_SECONDS,
+    "pool_recycle": settings.DB_POOL_RECYCLE_SECONDS,
+    "pool_pre_ping": True,
+}
+
+logger.info(f"Creating SQLAlchemy engine for PostgreSQL...")
+engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_db() -> Session:
+def generate_random_id(db: Session, model, length: int = 8) -> str:
+    """Generate a unique hex-based ID with model-specific prefix.
+    
+    Args:
+        db: Database session
+        model: SQLAlchemy model class to check for ID uniqueness
+        length: Number of hex digits to include (default 8)
+    
+    Returns:
+        A unique prefixed hex ID derived from UUID4
+    """
+    from app.models.db import SubjectGroup, Subject, Lecture, Summary, Quiz, QuizGroup, ChatMessage
+    
+    prefix = ""
+    if model == SubjectGroup:
+        prefix = "gp_"
+    elif model == Subject:
+        prefix = "sj_"
+    elif model == Lecture:
+        prefix = "nt_"
+    elif model == Summary:
+        prefix = "sy_"
+    elif model == Quiz:
+        prefix = "qz_"
+    elif model == QuizGroup:
+        prefix = "qg_"
+    elif model == ChatMessage:
+        prefix = "mg_"
+        
+    while True:
+        needed_chars = length
+        random_chunks = []
+        while needed_chars > 0:
+            random_chunks.append(uuid.uuid4().hex)
+            needed_chars -= 32
+        random_part = ''.join(random_chunks)[:length]
+        new_id = f"{prefix}{random_part}"
+        if not db.query(model).filter(model.id == new_id).first():
+            return new_id
+        length += 1
+
+
+def generate_conversation_id(db: Session, length: int = 8) -> str:
+    """Generate a unique conversation ID with 'cv_' prefix.
+    
+    Checks against ChatMessage.conversation_id for uniqueness.
+    """
+    from app.models.db import ChatMessage
+    prefix = "cv_"
+    
+    while True:
+        needed_chars = length
+        random_chunks = []
+        while needed_chars > 0:
+            random_chunks.append(uuid.uuid4().hex)
+            needed_chars -= 32
+        random_part = ''.join(random_chunks)[:length]
+        new_id = f"{prefix}{random_part}"
+        # Check uniqueness against conversation_id column
+        if not db.query(ChatMessage).filter(ChatMessage.conversation_id == new_id).first():
+            return new_id
+        length += 1
+
+
+def get_db() -> Generator[Session, None, None]:
     """Dependency for getting database session"""
     db = SessionLocal()
     try:
@@ -30,10 +105,215 @@ def get_db() -> Session:
 
 
 def init_db():
-    """Initialize database with tables"""
+    """Initialize database with tables and apply simple migrations"""
     logger.info("Initializing database...")
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created/verified")
+    except Exception as e:
+        logger.error(f"Failed to create database tables: {e}", exc_info=True)
+        raise
+
+    # Apply migrations for type changes (e.g. ChatMessage ID change)
+    try:
+        apply_postgresql_migrations()
+        apply_postgresql_user_security_migrations()
+        apply_content_dissociation_migrations()
+    except Exception as e:
+        logger.error(f"Failed to apply PostgreSQL migrations: {e}")
+
     logger.info("Database initialized successfully")
+
+
+def apply_content_dissociation_migrations():
+    """Programmatically alter constraints and nullability for account deletion logic"""
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            # 1. Tables where user_id should be NULLABLE for dissociation (SET NULL)
+            dissociate_tables = [
+                'subject_groups', 'quiz_groups', 'subjects', 'lectures', 
+                'quizzes', 'chat_messages', 'note_snapshots', 'export_templates'
+            ]
+            
+            for table in dissociate_tables:
+                # Check if column is NOT NULL
+                res = conn.execute(text("""
+                    SELECT is_nullable 
+                    FROM information_schema.columns 
+                    WHERE table_name = :table AND column_name = 'user_id'
+                """), {"table": table}).fetchone()
+                
+                if res and res[0] == 'NO':
+                    logger.info(f"Migration: Making {table}.user_id NULLABLE...")
+                    conn.execute(text(f'ALTER TABLE "{table}" ALTER COLUMN user_id DROP NOT NULL'))
+
+                # Update Foreign Key to ON DELETE SET NULL
+                # First find current constraint name
+                fk_res = conn.execute(text("""
+                    SELECT conname 
+                    FROM pg_constraint c 
+                    JOIN pg_class r ON c.conrelid = r.oid 
+                    WHERE r.relname = :table AND c.contype = 'f' 
+                    AND pg_get_constraintdef(c.oid) LIKE '%user_id%REFERENCES users%'
+                """), {"table": table}).fetchone()
+                
+                if fk_res:
+                    fk_name = fk_res[0]
+                    # Check if it already has SET NULL
+                    def_res = conn.execute(text("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = :fk_name"), {"fk_name": fk_name}).fetchone()
+                    if def_res and "SET NULL" not in def_res[0]:
+                        logger.info(f"Migration: Updating {table} FK {fk_name} to ON DELETE SET NULL...")
+                        conn.execute(text(f'ALTER TABLE "{table}" DROP CONSTRAINT "{fk_name}"'))
+                        conn.execute(text(f'ALTER TABLE "{table}" ADD CONSTRAINT "{fk_name}" FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL'))
+
+            # 2. Tables where data should be CASCADED (Security/Logs/Sessions)
+            cascade_tables = [
+                'user_logs', 'tasks', 'study_sessions', 'user_invitations', 
+                'password_reset_tokens', 'email_verification_tokens', 'password_change_confirmations'
+            ]
+            
+            for table in cascade_tables:
+                # Find FK to users table
+                fk_res = conn.execute(text("""
+                    SELECT conname 
+                    FROM pg_constraint c 
+                    JOIN pg_class r ON c.conrelid = r.oid 
+                    WHERE r.relname = :table AND c.contype = 'f' 
+                    AND (pg_get_constraintdef(c.oid) LIKE '%user_id%REFERENCES users%' 
+                         OR pg_get_constraintdef(c.oid) LIKE '%invited_by%REFERENCES users%'
+                         OR pg_get_constraintdef(c.oid) LIKE '%used_by%REFERENCES users%')
+                """), {"table": table}).all()
+                
+                for row in fk_res:
+                    fk_name = row[0]
+                    # Check definition
+                    def_res = conn.execute(text("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = :fk_name"), {"fk_name": fk_name}).fetchone()
+                    if def_res and "CASCADE" not in def_res[0]:
+                        logger.info(f"Migration: Updating {table} FK {fk_name} to ON DELETE CASCADE...")
+                        
+                        # Get full definition to know which column it is
+                        full_def = def_res[0]
+                        col_start = full_def.find("(") + 1
+                        col_end = full_def.find(")")
+                        column = full_def[col_start:col_end]
+                        
+                        conn.execute(text(f'ALTER TABLE "{table}" DROP CONSTRAINT "{fk_name}"'))
+                        conn.execute(text(f'ALTER TABLE "{table}" ADD CONSTRAINT "{fk_name}" FOREIGN KEY ({column}) REFERENCES users(id) ON DELETE CASCADE'))
+
+        logger.info("Dissociation migrations applied successfully")
+    except Exception as e:
+        logger.error(f"Dissociation migration failed: {e}", exc_info=True)
+
+
+def apply_postgresql_migrations():
+    """Apply migrations specific to PostgreSQL (e.g. changing column types)"""
+    from sqlalchemy import text
+    try:
+        # Check first without a heavy transaction
+        with engine.connect() as conn:
+            res = conn.execute(text("""
+                SELECT data_type 
+                FROM information_schema.columns 
+                WHERE table_name = 'chat_messages' AND column_name = 'id'
+            """)).fetchone()
+            
+            needs_migration = res and res[0].lower() in ('integer', 'bigint', 'numeric')
+
+        if needs_migration:
+            logger.info(f"Migrating chat_messages table to use string IDs (current type: {res[0]})...")
+            
+            # Now run migration in a proper transaction
+            with engine.begin() as conn:
+                # Find and drop all foreign keys pointing TO or FROM chat_messages
+                fk_res = conn.execute(text("""
+                    SELECT conname, r.relname 
+                    FROM pg_constraint c 
+                    JOIN pg_class r ON c.conrelid = r.oid 
+                    WHERE r.relname = 'chat_messages' AND c.contype = 'f'
+                """)).all()
+                
+                for row in fk_res:
+                    logger.info(f"Dropping constraint {row[0]} on {row[1]}")
+                    conn.execute(text(f'ALTER TABLE "{row[1]}" DROP CONSTRAINT IF EXISTS "{row[0]}"'))
+                
+                fk_ref_res = conn.execute(text("""
+                    SELECT conname, r.relname 
+                    FROM pg_constraint c 
+                    JOIN pg_class r ON c.conrelid = r.oid 
+                    JOIN pg_class t ON c.confrelid = t.oid
+                    WHERE t.relname = 'chat_messages' AND c.contype = 'f'
+                """)).all()
+                
+                for row in fk_ref_res:
+                    logger.info(f"Dropping external constraint {row[0]} on {row[1]}")
+                    conn.execute(text(f'ALTER TABLE "{row[1]}" DROP CONSTRAINT IF EXISTS "{row[0]}"'))
+
+                # Change column types with explicit casting
+                logger.info("Altering column types...")
+                conn.execute(text('ALTER TABLE chat_messages ALTER COLUMN id TYPE VARCHAR(16) USING id::varchar'))
+                conn.execute(text('ALTER TABLE chat_messages ALTER COLUMN reply_to_message_id TYPE VARCHAR(16) USING reply_to_message_id::varchar'))
+                conn.execute(text('ALTER TABLE chat_messages ALTER COLUMN conversation_id TYPE VARCHAR(64) USING conversation_id::varchar'))
+                
+                # Remove default nextval (sequence)
+                conn.execute(text("ALTER TABLE chat_messages ALTER COLUMN id DROP DEFAULT"))
+                
+                # Restore constraints
+                logger.info("Restoring constraints...")
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_reply_to_message_id_fkey FOREIGN KEY (reply_to_message_id) REFERENCES chat_messages(id)'))
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)'))
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_lecture_id_fkey FOREIGN KEY (lecture_id) REFERENCES lectures(id)'))
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES subjects(id)'))
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_group_id_fkey FOREIGN KEY (group_id) REFERENCES subject_groups(id)'))
+                
+            logger.info("Successfully migrated chat_messages to string IDs")
+    except Exception as e:
+        logger.error(f"PostgreSQL migration failed: {e}", exc_info=True)
+
+
+def apply_postgresql_user_security_migrations():
+    """Add security-related columns to users table if they are missing"""
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            # Check for failed_login_attempts
+            res = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'users' AND column_name = 'failed_login_attempts'
+            """)).fetchone()
+            
+            if not res:
+                logger.info("Adding failed_login_attempts column to users table...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0 NOT NULL"))
+            
+            # Check for locked_until
+            res = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'users' AND column_name = 'locked_until'
+            """)).fetchone()
+            
+            if not res:
+                logger.info("Adding locked_until column to users table...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN locked_until TIMESTAMP WITHOUT TIME ZONE"))
+            
+            # Check for is_verified
+            res = conn.execute(text("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'users' AND column_name = 'is_verified'
+            """)).fetchone()
+            
+            if not res:
+                logger.info("Adding is_verified column to users table...")
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE"))
+                # Existing users might already be "verified" by virtue of being active
+                conn.execute(text("UPDATE users SET is_verified = TRUE WHERE is_active = TRUE"))
+                
+        logger.info("PostgreSQL user security migrations applied successfully")
+    except Exception as e:
+        logger.error(f"PostgreSQL user security migration failed: {e}", exc_info=True)
 
 
 def drop_all_tables():

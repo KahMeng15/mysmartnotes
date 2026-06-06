@@ -25,12 +25,15 @@ router = APIRouter(prefix="/processing", tags=["processing"])
 _pipeline = None
 
 def get_pipeline() -> SmartPipeline:
-    """Get or create the shared SmartPipeline instance."""
+    """Get or create the shared SmartPipeline instance using global settings."""
     global _pipeline
     if _pipeline is None:
+        from app.config import get_settings
+        settings = get_settings()
         _pipeline = SmartPipeline(
-            use_layout_detection=False,   # Enable when YOLO model is downloaded
-            use_table_transformer=False,  # Enable when Table Transformer is downloaded
+            use_polish=settings.AI_POLISH_ENABLED,
+            gemini_api_key=settings.GLOBAL_AI_TIER1_API_KEY,
+            gemini_model=settings.GLOBAL_AI_TIER1_MODEL,
         )
     return _pipeline
 
@@ -39,6 +42,7 @@ def get_pipeline() -> SmartPipeline:
 async def smart_extract(
     file: UploadFile = File(...),
     use_ai: bool = False,
+    current_user: User = Depends(get_current_user),
 ):
     """
     Upload a PDF/PPTX and get clean Markdown back immediately.
@@ -115,6 +119,7 @@ async def smart_extract(
 async def smart_extract_download(
     file: UploadFile = File(...),
     use_ai: bool = False,
+    current_user: User = Depends(get_current_user),
 ):
     """
     Upload a PDF/PPTX and download the result as a .md file directly.
@@ -159,7 +164,7 @@ async def smart_extract_download(
 
 @router.post("/lectures/{lecture_id}/reprocess-smart")
 async def reprocess_smart(
-    lecture_id: int,
+    lecture_id: str,
     use_ai: bool = False,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -204,9 +209,10 @@ async def reprocess_smart(
         # Convert markdown to structured segments for compatibility with existing UI
         structured_segments = _markdown_to_segments(markdown)
 
-        # Update lecture record
-        lecture.extracted_text = markdown
-        lecture.extracted_content_structured = json.dumps(structured_segments)
+        # Update lecture record (save to file storage)
+        StorageManager.save_lecture_text(lecture_id, markdown)
+        StorageManager.save_lecture_json(lecture_id, "structured", structured_segments)
+        
         lecture.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(lecture)

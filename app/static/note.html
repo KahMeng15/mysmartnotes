@@ -7,542 +7,55 @@
     <title>Note View - MySmartNotes</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="/style.css?v=2">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles/master.css">
+    <link rel="stylesheet" href="/styles/note.css">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="/js/auth.js"></script>
-    <script src="/js/nav.js"></script>
     <script src="/js/utils.js"></script>
-    <style>
-        /* ===== NOTE HEADER ===== */
-        .note-header {
-            padding: var(--spacing-2xl);
-            border-radius: var(--radius-lg);
-            margin-bottom: var(--spacing-2xl);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .note-header h1 {
-            margin: 0 0 var(--spacing-md) 0;
-            font-size: 2rem;
-            color: inherit;
-        }
-
-        .note-header-meta {
-            display: flex;
-            gap: var(--spacing-lg);
-            flex-wrap: wrap;
-            font-size: var(--font-size-sm);
-            align-items: center;
-        }
-
-        .note-header-meta a {
-            text-decoration: none;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            transition: opacity 0.2s;
-        }
-
-        .note-header-meta a:hover {
-            opacity: 0.8;
-        }
-
-        .meta-separator {
-            opacity: 0.5;
-        }
-
-        /* ===== LAYOUT ===== */
-        .note-content {
-            display: grid;
-            grid-template-columns: 1fr 340px;
-            gap: var(--spacing-2xl);
-        }
-
-        .note-main {
-            min-width: 0;
-        }
-
-        .note-sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: var(--spacing-lg);
-            position: sticky;
-            top: 100px;
-            align-self: start;
-            max-height: calc(100vh - 120px);
-            overflow-y: hidden;
-            scrollbar-width: none;
-            /* Firefox */
-            -ms-overflow-style: none;
-            /* IE and Edge */
-        }
-
-        .note-sidebar.can-scroll {
-            overflow-y: auto;
-        }
-
-        .note-sidebar::-webkit-scrollbar {
-            display: none;
-            /* Chrome, Safari and Opera */
-        }
-
-        /* ===== SECTION CARDS ===== */
-        .section-card {
-            background: white;
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-lg);
-            border: 1px solid var(--color-light-gray);
-            overflow: visible;
-        }
-
-        .section-title {
-            font-weight: 600;
-            margin-bottom: var(--spacing-md);
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            font-size: var(--font-size-base);
-        }
-
-        /* ===== INFO ITEMS ===== */
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--spacing-sm);
-            margin-bottom: var(--spacing-md);
-        }
-
-        .info-item {
-            padding: var(--spacing-sm);
-            background: var(--color-background);
-            border-radius: var(--radius-md);
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            min-width: 0;
-        }
-
-        .info-item.clickable {
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .info-item.clickable:hover {
-            background: var(--color-light-gray);
-        }
-
-        .info-item>div:last-child {
-            min-width: 0;
-        }
-
-        .info-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            flex-shrink: 0;
-            background: white;
-            border: 1px solid var(--color-light-gray);
-            color: var(--color-primary);
-        }
-
-        .info-label {
-            font-size: 0.65rem;
-            color: var(--color-gray);
-            text-transform: uppercase;
-            font-weight: 600;
-        }
-
-        .info-value {
-            font-weight: 500;
-            color: var(--color-dark);
-            font-size: 0.8rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* ===== ACTION GRID ===== */
-        .action-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: var(--spacing-sm);
-        }
-
-        .action-btn {
-            display: flex;
-            align-items: center;
-            gap: var(--spacing-sm);
-            padding: var(--spacing-md);
-            border: 1px solid var(--color-light-gray);
-            border-radius: var(--radius-md);
-            background: white;
-            cursor: pointer;
-            font-size: var(--font-size-sm);
-            font-weight: 500;
-            color: var(--color-dark);
-            transition: all 0.2s;
-            font-family: var(--font-primary);
-            text-align: left;
-        }
-
-        .action-btn:hover {
-            background: var(--color-background);
-            border-color: var(--color-primary);
-            color: var(--color-primary);
-        }
-
-        .action-btn.delete-btn:hover {
-            border-color: var(--color-error);
-            color: var(--color-error);
-        }
-
-        .action-btn.coming-soon {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .action-btn i {
-            font-size: 18px;
-        }
-
-        /* ===== SNAPSHOT ITEMS ===== */
-        .snapshot-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .snapshot-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: var(--spacing-md);
-            background: var(--color-background);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--spacing-sm);
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
-
-        .snapshot-item:hover {
-            background: var(--color-light-gray);
-            border-color: var(--color-primary);
-        }
-
-        .snapshot-item.active {
-            border-color: var(--color-primary);
-            background: rgba(78, 205, 196, 0.05);
-        }
-
-        .snapshot-name {
-            font-weight: 500;
-            font-size: var(--font-size-sm);
-        }
-
-        .snapshot-date {
-            font-size: var(--font-size-xs);
-            color: var(--color-gray);
-        }
-
-        .snapshot-delete {
-            background: none;
-            border: none;
-            color: var(--color-gray);
-            cursor: pointer;
-            padding: 4px;
-            font-size: 14px;
-            transition: color 0.2s;
-        }
-
-        .snapshot-delete:hover {
-            color: var(--color-error);
-        }
-
-        /* ===== MARKDOWN (read-only view) ===== */
-        .markdown-content {
-            line-height: 1.6;
-            color: var(--color-dark);
-        }
-
-        .markdown-content>*:first-child {
-            margin-top: 0;
-        }
-
-        .markdown-content h1,
-        .markdown-content h2,
-        .markdown-content h3 {
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
-            font-weight: 600;
-            position: sticky;
-            background: white;
-            z-index: 10;
-        }
-
-        .markdown-content h1 {
-            font-size: 1.8rem;
-            color: #1a1a1a;
-            padding-bottom: 0.3em;
-            padding-top: 15px;
-            padding-bottom: 5px;
-            top: 70px;
-            /* Spacing from navbar */
-            z-index: 13;
-        }
-
-        .markdown-content h2 {
-            font-size: 1.5rem;
-            color: #333;
-            padding-top: 15px;
-            padding-bottom: 5px;
-            top: 150px;
-            /* Clear h1 */
-            z-index: 12;
-        }
-
-        .markdown-content h3 {
-            font-size: 1.25rem;
-            color: #555;
-            padding-top: 15px;
-            padding-bottom: 5px;
-            top: 190px;
-            /* Clear h2 */
-            z-index: 11;
-        }
-
-        .markdown-content p {
-            margin-bottom: 1em;
-        }
-
-        .markdown-content ul,
-        .markdown-content ol {
-            margin-bottom: 1em;
-            padding-left: 2em;
-        }
-
-        .markdown-content li {
-            margin-bottom: 0.25em;
-        }
-
-        .markdown-content table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1.5em 0;
-            font-size: 0.9em;
-        }
-
-        .markdown-content th,
-        .markdown-content td {
-            border: 1px solid #ddd;
-            padding: 8px 12px;
-            text-align: left;
-        }
-
-        .markdown-content th {
-            background-color: #f8f9fa;
-            font-weight: 600;
-        }
-
-        .markdown-content tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-
-        .markdown-content blockquote {
-            border-left: 4px solid #ddd;
-            margin: 0;
-            padding-left: 1em;
-            color: #666;
-            font-style: italic;
-        }
-
-        .markdown-content code {
-            font-family: var(--font-mono);
-            background: #f5f5f5;
-            padding: 0.2em 0.4em;
-            border-radius: 3px;
-            font-size: 0.85em;
-        }
-
-        .markdown-content pre {
-            background: #f5f5f5;
-            padding: 1em;
-            border-radius: 5px;
-            overflow-x: auto;
-            margin-bottom: 1em;
-        }
-
-        .markdown-content pre code {
-            background: none;
-            padding: 0;
-        }
-
-        .markdown-content img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 4px;
-            margin: 1em 0;
-        }
-
-        /* ===== STATUS & PROGRESS ===== */
-        .loading {
-            text-align: center;
-            padding: var(--spacing-2xl);
-            color: var(--color-gray);
-        }
-
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: var(--spacing-lg);
-            border-radius: var(--radius-md);
-            border-left: 4px solid #c33;
-        }
-
-        .progress-container {
-            padding-top: 10px;
-
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e0e0e0;
-            border-radius: var(--radius-full);
-            overflow: hidden;
-            margin: var(--spacing-md) 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--color-primary), var(--color-primary-dark));
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: var(--spacing-sm) var(--spacing-md);
-            border-radius: var(--radius-full);
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            text-transform: uppercase;
-            margin-bottom: var(--spacing-md);
-        }
-
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .status-running {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-
-        .status-completed {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-failed {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .snapshot-save-row {
-            display: flex;
-            gap: var(--spacing-sm);
-            margin-bottom: var(--spacing-md);
-        }
-
-        .snapshot-save-row input {
-            flex: 1;
-            padding: var(--spacing-sm) var(--spacing-md);
-            font-size: var(--font-size-sm);
-        }
-
-        .snapshot-save-row button {
-            padding: var(--spacing-sm) var(--spacing-md);
-            font-size: var(--font-size-sm);
-            white-space: nowrap;
-        }
-
-        /* Responsive */
-        @media (max-width: 968px) {
-            .note-content {
-                grid-template-columns: 1fr;
-            }
-
-            .note-header h1 {
-                font-size: 1.5rem;
-            }
-
-            .editor-split {
-                grid-template-columns: 1fr;
-            }
-
-            .action-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+    <script src="/js/nav.js"></script>
     <script src="/js/marked.min.js"></script>
-    <script>
-        if (typeof marked === 'undefined') {
-            document.write('<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>');
-        }
-        // Configure marked.js to support tables and other GFM features
-        marked.setOptions({
-            gfm: true,           // GitHub Flavored Markdown (includes tables)
-            breaks: false,        // Don't convert \n to <br>
-            pedantic: false,
-            smartLists: true,
-            smartypants: false
-        });
-    </script>
+    <script src="/js/note.js"></script>
 </head>
 
-<body>
+<body class="note-page">
 
-    <div class="container" style="padding-top: var(--spacing-2xl);">
-        <!-- Back Link -->
-        <div style="margin-bottom: var(--spacing-md);">
-            <a href="/mynotes.html" id="backLink"
-                style="color: var(--color-gray); font-size: var(--font-size-sm); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                <i class="ph ph-arrow-left"></i> Back to Notes
-            </a>
-        </div>
+    <div class="app-layout">
+        <!-- NOTE: sidebar is injected here by nav.js as the first child -->
+        <!-- CONTENT CARD (white card) -->
+        <div class="note-content-card page-card">
+            <!-- Sticky header bar with back + breadcrumb -->
+            <div class="note-sticky-header">
+                <button class="mobile-back-btn" onclick="window.history.back()">
+                    <i class="ph ph-caret-left"></i>
+                </button>
 
-        <div id="loadingContainer" class="loading">
-            <div style="font-size: 2rem; margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i></div>
-            <p>Loading note...</p>
-        </div>
-
-        <div id="lectureContainer" style="display: none;">
-            <!-- Note Header -->
-            <div class="note-header" id="noteHeader">
-                <h1 id="lectureTitle">Note Title</h1>
-                <div class="note-header-meta">
-                    <a href="#" id="metaSubject"><i class="ph ph-book-open"></i> <span>Subject</span></a>
-                    <span class="meta-separator">•</span>
-                    <a href="#" id="metaGroup"><i class="ph ph-folder"></i> <span>Group</span></a>
+                <div class="note-breadcrumb-row" id="noteBreadcrumb">
+                    <a href="#" id="metaGroup" class="note-nav-crumb-link">Group</a>
+                    <span class="note-nav-sep">›</span>
+                    <a href="#" id="metaSubject" class="note-nav-crumb-link">Subject</a>
+                    <span class="note-nav-sep">›</span>
+                    <a href="#" id="metaNote" class="note-nav-crumb-link">Note Name</a>
                 </div>
+
+                <div class="mobile-note-actions">
+                    <button class="mobile-action-btn" onclick="toggleMobileActionPanel()" id="mobileMenuToggle" title="Show Actions">
+                        <i class="ph ph-lightning"></i>
+                    </button>
+                </div>
+                
+                <div style="display:none;"><a href="#" id="metaSubjectHidden"><span>Subject</span></a></div>
+            </div>
+            <div id="loadingContainer" class="loading">
+                <div class="spinner" style="margin-bottom: var(--spacing-md);"><i class="ph ph-spinner ph-spin"></i>
+                </div>
+                <p>Loading note...</p>
             </div>
 
-            <!-- Content Area -->
-            <div class="note-content">
-                <!-- Main Content -->
+            <div id="lectureContainer" style="display: none;">
                 <div class="note-main">
                     <div class="section-card" style="padding-top: 10px;">
+                        <div class="note-header" id="noteHeader"></div>
                         <!-- Status Badge -->
                         <div id="extractionStatus" style="display: none;">
                             <div id="statusBadge" class="status-badge status-pending">Pending</div>
@@ -553,7 +66,7 @@
                             <div
                                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
                                 <span style="font-weight: 600; font-size: var(--font-size-sm);">Processing
-                                    document...</span>
+                                    note...</span>
                                 <span id="progressPercent"
                                     style="font-size: var(--font-size-sm); color: var(--color-gray);">0%</span>
                             </div>
@@ -562,7 +75,7 @@
                             </div>
                             <p id="progressMessage"
                                 style="font-size: var(--font-size-xs); color: var(--color-gray); margin: 0;">Extracting
-                                text from document...</p>
+                                text from note...</p>
                         </div>
 
                         <!-- Error Container -->
@@ -571,7 +84,7 @@
                                 <strong>Processing Failed</strong>
                                 <p id="errorDetails"
                                     style="margin: var(--spacing-md) 0 0 0; font-size: var(--font-size-sm);">Failed to
-                                    extract text from document</p>
+                                    extract text from note</p>
                             </div>
                         </div>
 
@@ -582,107 +95,310 @@
                                     Loading...</p>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Sidebar -->
-                <div class="note-sidebar">
-                    <!-- Info Card -->
-                    <div class="section-card">
-                        <div class="section-title"><i class="ph ph-info"></i> Info</div>
-                        <div class="info-grid">
-                            <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
-                                onclick="downloadOriginalFile()">
-                                <div class="info-icon"><i class="ph ph-file-arrow-down"></i></div>
-                                <div>
-                                    <div class="info-label">File Name</div>
-                                    <div class="info-value" id="fileName">-</div>
+                        <!-- Edit Mode: Fullscreen WYSIWYG Editor -->
+                        <div id="editorContainer" class="editor-container" style="display: none;">
+                            <div class="editor-body" id="editorBody">
+                                <div id="wysiwygArea" class="wysiwyg-area markdown-content" contenteditable="true">
                                 </div>
+                                <textarea id="sourceTextarea" class="source-textarea" spellcheck="false"
+                                    style="display:none;"></textarea>
                             </div>
-                            <div class="info-item">
-                                <div class="info-icon"><i class="ph ph-calendar-blank"></i></div>
-                                <div>
-                                    <div class="info-label">Uploaded</div>
-                                    <div class="info-value" id="uploadedDate">-</div>
-                                </div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-icon"><i class="ph ph-file-text"></i></div>
-                                <div>
-                                    <div class="info-label">File Type</div>
-                                    <div class="info-value" id="fileType">-</div>
-                                </div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-icon"><i class="ph ph-hard-drives"></i></div>
-                                <div>
-                                    <div class="info-label">File Size</div>
-                                    <div class="info-value" id="fileSize">-</div>
-                                </div>
-                            </div>
-                            <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
-                                onclick="reprocessOCR()">
-                                <div class="info-icon"><i class="ph ph-timer"></i></div>
-                                <div>
-                                    <div class="info-label">Processing</div>
-                                    <div class="info-value" id="processingTime">-</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Snapshots Card -->
-                    <div class="section-card">
-                        <div class="section-title"><i class="ph ph-camera"></i> Snapshots</div>
-                        <div class="snapshot-save-row">
-                            <input type="text" id="snapshotNameInput" placeholder="Snapshot name...">
-                            <button class="btn btn-primary btn-small" onclick="createSnapshot()"><i
-                                    class="ph ph-plus"></i> Save</button>
-                        </div>
-                        <div id="snapshotList" class="snapshot-list">
-                            <p
-                                style="color: var(--color-gray); font-size: var(--font-size-sm); text-align: center; padding: var(--spacing-md);">
-                                No snapshots yet</p>
-                        </div>
-                    </div>
+                            <!-- Table Context Menu -->
+                            <div id="tableContextMenu" class="table-context-menu">
+                                <button class="table-context-btn"
+                                    onmousedown="event.preventDefault(); insertHtmlRow('before')"
+                                    title="Add Row Above"><i class="ph ph-arrow-line-up"></i></button>
+                                <button class="table-context-btn"
+                                    onmousedown="event.preventDefault(); insertHtmlRow('after')"
+                                    title="Add Row Below"><i class="ph ph-arrow-line-down"></i></button>
+                                <div class="table-context-divider"></div>
+                                <button class="table-context-btn"
+                                    onmousedown="event.preventDefault(); insertHtmlCol('before')"
+                                    title="Add Column Left"><i class="ph ph-arrow-line-left"></i></button>
+                                <button class="table-context-btn"
+                                    onmousedown="event.preventDefault(); insertHtmlCol('after')"
+                                    title="Add Column Right"><i class="ph ph-arrow-line-right"></i></button>
+                                <div class="table-context-divider"></div>
+                                <button class="table-context-btn" onmousedown="event.preventDefault(); mergeHtmlCells()"
+                                    id="btnMergeCells" title="Merge Right"><i class="ph ph-intersect"></i></button>
+                                <div class="table-context-divider"></div>
+                                <button class="table-context-btn danger"
+                                    onmousedown="event.preventDefault(); deleteHtmlRow()" title="Delete Row">
+                                    <i class="ph ph-trash"></i> <span
+                                        style="font-size: 11px; margin-left: 4px; font-weight: 600;">Row</span>
+                                </button>
+                                <button class="table-context-btn danger"
+                                    onmousedown="event.preventDefault(); deleteHtmlCol()" title="Delete Column">
+                                    <i class="ph ph-trash"></i> <span
+                                        style="font-size: 11px; margin-left: 4px; font-weight: 600;">Col</span>
+                                </button>
+                                <button class="table-context-btn danger"
+                                    onmousedown="event.preventDefault(); deleteHtmlTable()" title="Delete Table">
+                                    <i class="ph ph-trash"></i> <span
+                                        style="font-size: 11px; margin-left: 4px; font-weight: 600;">Table</span>
+                                </button>
+                            </div>
 
-                    <!-- Actions Card -->
-                    <div class="section-card">
-                        <div class="section-title"><i class="ph ph-lightning"></i> Actions</div>
-                        <div class="action-grid">
-                            <button class="action-btn" onclick="goToChat()"><i class="ph ph-chat-circle-dots"></i>
-                                Chat</button>
-                            <button class="action-btn" onclick="toggleEdit()" id="editBtn"><i
-                                    class="ph ph-pencil-simple"></i> Edit</button>
-                            <button class="action-btn" onclick="reprocessOCR()" id="autoFormatBtn"><i
-                                    class="ph ph-magic-wand"></i> Auto Format</button>
-                            <button class="action-btn coming-soon" title="Coming Soon"><i
-                                    class="ph ph-text-align-left"></i> Summarize</button>
-                            <button class="action-btn coming-soon" title="Coming Soon"><i class="ph ph-exam"></i>
-                                Quiz</button>
-                            <button class="action-btn" onclick="generateFlashcards()"><i class="ph ph-cards"></i>
-                                Flashcards</button>
-                            <button class="action-btn" onclick="exportNote()"><i class="ph ph-export"></i>
-                                Export</button>
-                            <button class="action-btn delete-btn" onclick="deleteLecture()"><i class="ph ph-trash"></i>
-                                Delete</button>
+                            <!-- Table Add Handles -->
+                            <div id="colAddHandle" class="table-add-handle vertical"
+                                onmousedown="event.preventDefault(); insertHtmlCol('after')" title="Add Column Right">
+                                <i class="ph ph-plus"></i>
+                            </div>
+                            <div id="rowAddHandle" class="table-add-handle horizontal"
+                                onmousedown="event.preventDefault(); insertHtmlRow('after')" title="Add Row Below">
+                                <i class="ph ph-plus"></i>
+                            </div>
+
+                            <!-- Floating Toolbar -->
+                            <div class="floating-toolbar" id="editorToolbar">
+                                <button class="toolbar-btn" id="btnH1" onclick="execCmd('formatBlock','H1')"
+                                    title="Heading 1">H1</button>
+                                <button class="toolbar-btn" id="btnH2" onclick="execCmd('formatBlock','H2')"
+                                    title="Heading 2">H2</button>
+                                <button class="toolbar-btn" id="btnH3" onclick="execCmd('formatBlock','H3')"
+                                    title="Heading 3">H3</button>
+                                <div class="toolbar-sep"></div>
+                                <button class="toolbar-btn" id="btnBold" onclick="execCmd('bold')"
+                                    title="Bold (Ctrl+B)"><b>B</b></button>
+                                <button class="toolbar-btn" id="btnItalic" onclick="execCmd('italic')"
+                                    title="Italic (Ctrl+I)"><i>I</i></button>
+                                <button class="toolbar-btn" id="btnUnderline" onclick="execCmd('underline')"
+                                    title="Underline (Ctrl+U)"><u>U</u></button>
+                                <button class="toolbar-btn" id="btnStrike" onclick="execCmd('strikeThrough')"
+                                    title="Strikethrough"><s>S</s></button>
+                                <div class="toolbar-sep"></div>
+                                <button class="toolbar-btn" id="btnUl" onclick="execCmd('insertUnorderedList')"
+                                    title="Bullet List"><i class="ph ph-list-bullets"></i></button>
+                                <button class="toolbar-btn" id="btnOl" onclick="execCmd('insertOrderedList')"
+                                    title="Numbered List"><i class="ph ph-list-numbers"></i></button>
+                                <div class="toolbar-sep"></div>
+                                <button class="toolbar-btn" onclick="insertTableWysiwyg()" title="Insert Table"><i
+                                        class="ph ph-table"></i></button>
+                                <button class="toolbar-btn" id="btnQuote" onclick="toggleBlockquote()"
+                                    title="Blockquote"><i class="ph ph-quotes"></i></button>
+                                <button class="toolbar-btn" onclick="insertCodeBlock()" title="Code Block"><i
+                                        class="ph ph-code"></i></button>
+                                <div class="toolbar-sep"></div>
+                                <button class="toolbar-btn" onclick="document.execCommand('undo')"
+                                    title="Undo (Ctrl+Z)"><i class="ph ph-arrow-counter-clockwise"></i></button>
+                                <button class="toolbar-btn" onclick="document.execCommand('redo')"
+                                    title="Redo (Ctrl+Shift+Z)"><i class="ph ph-arrow-clockwise"></i></button>
+                                <button class="toolbar-toggle" id="sourceToggle" onclick="toggleSource()"
+                                    title="View raw markdown">
+                                    <i class="ph ph-code"></i> Source
+                                </button>
+                                <div class="toolbar-sep" style="margin: 0 8px;"></div>
+                                <div class="editor-topbar-actions" style="margin-left: 0;">
+                                    <button class="btn btn-outline" style="padding: 4px 12px; font-size: 12px;"
+                                        onclick="showDiscardModal()">Cancel</button>
+                                    <button class="btn btn-primary" style="padding: 4px 12px; font-size: 12px;"
+                                        onclick="showSaveModal()"><i class="ph ph-floppy-disk"></i> Save</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div id="errorContainer" style="display: none; margin-top: var(--spacing-2xl);">
-            <div class="error-message" id="errorMessage">Error loading note</div>
-        </div>
-    </div>
+            <div id="errorContainer" style="display: none; margin-top: var(--spacing-2xl);">
+                <div class="error-message" id="errorMessage">Error loading note</div>
+            </div>
+        </div> <!-- /note-content-card -->
 
-    <!-- Save Confirm Modal -->
+        <!-- CHAT CARD (white card) — hidden by default -->
+        <div class="note-chat-card page-card" id="noteChatPanel" style="display: none;">
+            <div class="note-chat-header">
+                <h4 id="noteChatTitle"
+                    style="cursor: pointer; display: flex; align-items: center; gap: var(--spacing-sm);"
+                    onclick="goToChat()" title="Open full chat history">
+                    <i class="ph ph-chat-circle-dots"></i> Chat <i class="ph ph-arrow-square-out"
+                        style="font-size: 0.8em; color: var(--color-gray);"></i>
+                </h4>
+                <button class="note-chat-close" onclick="toggleChat()" title="Close chat"><i
+                        class="ph ph-x"></i></button>
+                <p class="note-chat-subtitle" id="noteChatSubtitle">Ask questions about this note</p>
+                <p class="note-chat-subtitle" id="chatMeta" style="display: none; font-size: 11px; margin-top: 2px;">
+                </p>
+            </div>
+            <div class="chat-messages" id="noteChatMessages">
+                <div class="empty-state">
+                    <i class="ph ph-chat-circle-dots" style="font-size: 2rem;"></i>
+                    <p>Ask a question about this note</p>
+                </div>
+            </div>
+            <div class="note-chat-input-area">
+                <!-- AI Controls: Compact Display -->
+                <div class="ai-controls-compact" id="noteChatControlsCompact">
+                    <span
+                        style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Mode</span>
+                    <button class="control-badge" onclick="toggleNoteChatMode()" title="Click to change mode">
+                        <i class="ph" id="noteModeIcon"></i>
+                        <span id="noteModeLabel"></span>
+                    </button>
+                    <span
+                        style="text-transform: uppercase; font-size: 10px; font-weight: 600; color: var(--color-gray); margin-right: 2px;">Output</span>
+                    <button class="control-badge" onclick="toggleNoteChatOutput()"
+                        title="Click to change output format">
+                        <i class="ph" id="noteOutputIcon"></i>
+                        <span id="noteOutputLabel"></span>
+                    </button>
+                </div>
+
+                <!-- AI Controls: Expanded Selection -->
+                <div class="ai-controls-expanded" id="noteChatControlsExpanded" style="display: none;">
+                    <!-- Mode Selection -->
+                    <div id="noteModeSelection" style="display: none;">
+                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">
+                            Select Mode</div>
+                        <div class="ai-mode-bar" style="flex-direction: row; gap: 6px;">
+                            <button class="mode-pill active" data-mode="normal"
+                                onclick="setNoteChatMode('normal')" title="A balanced response with standard detail">
+                                <i class="ph ph-stack"></i> Normal
+                            </button>
+                            <button class="mode-pill" data-mode="quick" onclick="setNoteChatMode('quick')"
+                                title="Use less processing to get answer">
+                                <i class="ph ph-lightning"></i> Quick
+                            </button>
+                            <button class="mode-pill" data-mode="simple" onclick="setNoteChatMode('simple')"
+                                title="Answer in simple terms">
+                                <i class="ph ph-text-a-underline"></i> Simple
+                            </button>
+                            <button class="mode-pill" data-mode="elaborate"
+                                onclick="setNoteChatMode('elaborate')" title="Provide thorough explanation">
+                                <i class="ph ph-lightbulb"></i> Elaborate
+                            </button>
+                            <button class="mode-pill" data-mode="eli5" onclick="setNoteChatMode('eli5')"
+                                title="Explain like I'm 5">
+                                <i class="ph ph-smiley"></i> ELI5
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Output Selection -->
+                    <div id="noteOutputSelection" style="display: none;">
+                        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--color-dark);">
+                            Select Output</div>
+                        <div class="output-format-bar" style="flex-direction: row; gap: 6px;">
+                            <button class="mode-pill active" data-format="sentence"
+                                onclick="setNoteChatOutputFormat('sentence')" title="Single paragraph response">
+                                <i class="ph ph-text-t"></i> Sentence
+                            </button>
+                            <button class="mode-pill" data-format="pointform"
+                                onclick="setNoteChatOutputFormat('pointform')" title="Bullet point format">
+                                <i class="ph ph-list-bullets"></i> Pointform
+                            </button>
+                            <button class="mode-pill" data-format="numbered_list"
+                                onclick="setNoteChatOutputFormat('numbered_list')" title="Numbered list format">
+                                <i class="ph ph-list-numbers"></i> Numbered List
+                            </button>
+                            <button class="mode-pill" data-format="table" onclick="setNoteChatOutputFormat('table')"
+                                title="Table format">
+                                <i class="ph ph-table"></i> Table
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="inlineReplyIndicatorContainer"></div>
+
+                <div class="note-chat-input-row">
+                    <input type="text" id="noteChatInput" placeholder="Ask about this note..." disabled>
+                    <button type="button" id="noteChatSendBtn" class="btn btn-primary" disabled
+                        onclick="sendNoteChat()">
+                        <i class="ph ph-paper-plane-right"></i>
+                    </button>
+                </div>
+                <div style="text-align: center; font-size: 10px; color: var(--color-gray); margin-top: 6px;">
+                    AI can make mistakes. Always double check.
+                </div>
+            </div>
+        </div> <!-- /note-chat-card -->
+
+        <div class="note-action-panel">
+            <!-- Mobile Header inside panel -->
+            <div class="sidebar-mobile-header" style="display: none; align-items: center; justify-content: space-between; margin-bottom: var(--spacing-lg);">
+                 <h4 style="margin: 0; font-weight: 700; color: var(--color-primary);">Actions</h4>
+                 <button class="mobile-menu-close" onclick="toggleMobileActionPanel()" style="background: var(--color-background); border: none; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--color-gray);">
+                    <i class="ph ph-x"></i>
+                 </button>
+            </div>
+            <!-- Actions -->
+            <div class="action-grid">
+                <button class="action-btn" onclick="toggleChat()" title="Quick Chat" id="quickChatBtn"><i
+                        class="ph ph-chat-circle-dots"></i> <span>Quick Chat</span></button>
+                <button class="action-btn" onclick="window.location.href='/quiz_dashboard.html'" title="Quiz"><i class="ph ph-exam"></i> <span>Quiz</span></button>
+                <button class="action-btn" onclick="handleSummarizeClick()" title="Summarize" id="summarizeBtn"><i class="ph ph-text-align-left"></i>
+                    <span>Summarize</span></button>
+                <button class="action-btn" onclick="exportNote()"><i class="ph ph-export"></i>
+                    <span>Export</span></button>
+            </div>
+
+            <div class="sidebar-divider"></div>
+
+            <!-- Edit/View -->
+            <div class="action-grid">
+                <button class="action-btn" onclick="viewLecture()" id="viewBtn"><i class="ph ph-eye"></i>
+                    <span>View</span></button>
+                <button class="action-btn" onclick="toggleEdit()" id="editBtn"><i class="ph ph-pencil-simple"></i>
+                    <span>Edit</span></button>
+            </div>
+
+            <!-- Snapshots Section -->
+            <div style="display: none;" id="snapshotsSection">
+                <div class="sidebar-divider"></div>
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
+                    <h4
+                        style="font-size: var(--font-size-xs); font-weight: 600; color: var(--color-dark-gray); margin: 0;">
+                        Snapshots</h4>
+                    <button class="action-btn" onclick="promptCreateSnapshot()" title="Create snapshot"
+                        style="padding: 2px 6px; font-size: 0.7rem;">
+                        <i class="ph ph-plus"></i><span>New</span>
+                    </button>
+                </div>
+                <div id="snapshotList" style="max-height: 150px; overflow-y: auto;"></div>
+            </div>
+
+            <button class="action-toggle" onclick="toggleActionPanel()" title="Collapse" id="actionToggleBtn">
+                <i class="ph ph-caret-right" id="actionToggleIcon"></i>
+            </button>
+
+            <div class="sidebar-divider"></div>
+
+            <!-- System Info -->
+            <div class="info-grid">
+                <div class="info-item clickable" id="fileNameItem" title="Click to download original file"
+                    onclick="downloadOriginalFile()">
+                    <div class="info-label">File</div>
+                    <div class="info-value" id="fileName">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Format</div>
+                    <div class="info-value" id="fileType">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Size</div>
+                    <div class="info-value" id="fileSize">-</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Uploaded</div>
+                    <div class="info-value" id="uploadedDate">-</div>
+                </div>
+                <div class="info-item clickable" id="processingTimeItem" title="Click to reprocess"
+                    onclick="reprocessOCR()">
+                    <div class="info-label">Processing</div>
+                    <div class="info-value" id="processingTime">-</div>
+                </div>
+            </div>
+        </div> <!-- /note-action-panel -->
+    </div> <!-- /app-layout -->
     <div id="saveConfirmModal" class="modal">
         <div class="modal-content" style="min-height: auto;">
             <h3>Save Changes?</h3>
             <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray);">Are you sure you want to save the
-                changes made to this document?</p>
+                changes made to this note?</p>
             <div class="modal-buttons">
                 <button type="button" class="btn-save" onclick="confirmSave()">Save</button>
                 <button type="button" class="btn-cancel" onclick="closeSaveModal()">Cancel</button>
@@ -710,568 +426,80 @@
         <div class="modal-content" style="min-height: auto;">
             <h3>Reprocess Document?</h3>
             <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray);">Are you sure you want to reprocess
-                this document? This will overwrite the current content with newly processed data.</p>
+                this note? This will overwrite the current content with newly processed data.</p>
             <div class="modal-buttons">
                 <button type="button" class="btn-save" onclick="confirmReprocess()">Reprocess</button>
                 <button type="button" class="btn-cancel" onclick="closeReprocessModal()">Cancel</button>
             </div>
         </div>
     </div>
-    <script>
-        const TOKEN_KEY = 'token';
-        const token = localStorage.getItem(TOKEN_KEY);
-        let lectureId = null;
-        let lectureData = null;
-        let pollingInterval = null;
-        let isEditing = false;
 
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content" style="min-height: auto; max-width: 420px;">
+            <h3 style="margin-bottom: var(--spacing-md);"><i class="ph ph-export" style="margin-right: 6px;"></i> Export
+                Note</h3>
 
-        // ===== CONTRAST COLOR UTILITY =====
-        function getContrastColor(hexColor) {
-            if (!hexColor || hexColor.length < 7) return '#ffffff';
-            const r = parseInt(hexColor.slice(1, 3), 16);
-            const g = parseInt(hexColor.slice(3, 5), 16);
-            const b = parseInt(hexColor.slice(5, 7), 16);
-            // Relative luminance (WCAG formula)
-            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-            return luminance > 0.5 ? '#1a1a1a' : '#ffffff';
-        }
-
-        // ===== INIT =====
-        window.addEventListener('load', () => {
-            if (!token) { window.location.href = '/index.html'; return; }
-
-            // Extract UUID or integer ID from path /note/123
-            const pathParts = window.location.pathname.split('/');
-            lectureId = pathParts[pathParts.length - 1];
-
-            if (!lectureId || lectureId === 'note') {
-                showError('No lecture ID provided in URL path');
-                return;
-            }
-            loadLecture();
-        });
-
-        // ===== LOAD LECTURE =====
-        async function loadLecture() {
-            try {
-                const response = await fetch(`/lectures/${lectureId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!response.ok) throw new Error('Failed to load lecture');
-                lectureData = await response.json();
-                displayLecture();
-                checkExtractionStatus();
-                loadSnapshots();
-            } catch (error) {
-                showError(error.message);
-            }
-        }
-
-        // ===== DISPLAY LECTURE =====
-        function displayLecture() {
-            document.getElementById('loadingContainer').style.display = 'none';
-            document.getElementById('lectureContainer').style.display = 'block';
-
-            document.getElementById('lectureTitle').textContent = lectureData.title;
-
-            // Header color from subject
-            const subjectColor = lectureData.subject?.color || '#3b82f6';
-            const textColor = getContrastColor(subjectColor);
-            const header = document.getElementById('noteHeader');
-            header.style.background = subjectColor;
-            header.style.color = textColor;
-            // Style links in header
-            header.querySelectorAll('a').forEach(a => a.style.color = textColor);
-            header.querySelectorAll('.meta-separator').forEach(s => s.style.color = textColor);
-
-            // Metadata
-            const subjectName = lectureData.subject?.name || 'Unknown Subject';
-            const subjectId = lectureData.subject_id;
-            const metaSubject = document.getElementById('metaSubject');
-            metaSubject.querySelector('span').textContent = subjectName;
-            metaSubject.href = subjectId ? `/subject.html?id=${subjectId}` : '#';
-
-            // Fetch group name
-            if (lectureData.subject?.group_id) {
-                fetchGroupName(lectureData.subject.group_id);
-            } else {
-                document.getElementById('metaGroup').querySelector('span').textContent = 'No Group';
-            }
-
-            // Back link
-            const backLink = document.getElementById('backLink');
-            if (subjectId) {
-                backLink.href = `/subject.html?id=${subjectId}`;
-                backLink.innerHTML = `<i class="ph ph-arrow-left"></i> Back to Subject`;
-            }
-
-            // Sidebar info
-            document.getElementById('fileName').textContent = lectureData.file_name || '-';
-            const uploadDate = new Date(lectureData.created_at);
-            document.getElementById('uploadedDate').textContent = uploadDate.toLocaleString();
-
-            const fileType = lectureData.file_type || '';
-            if (fileType.includes('pdf')) document.getElementById('fileType').textContent = 'PDF';
-            else if (fileType.includes('presentation') || fileType.includes('powerpoint')) document.getElementById('fileType').textContent = 'PPTX';
-            else if (fileType.includes('image')) document.getElementById('fileType').textContent = 'Image';
-            else document.getElementById('fileType').textContent = fileType.split('/').pop()?.toUpperCase() || 'File';
-
-            document.getElementById('fileSize').textContent = formatFileSize(lectureData.file_size);
-
-            // Processing time
-            if (lectureData.processing_time_ms !== null && lectureData.processing_time_ms !== undefined) {
-                const diffMs = lectureData.processing_time_ms;
-                if (diffMs < 1000) {
-                    document.getElementById('processingTime').textContent = `${diffMs}ms`;
-                } else {
-                    const totalSecs = Math.floor(diffMs / 1000);
-                    if (totalSecs > 3600) {
-                        document.getElementById('processingTime').textContent = 'N/A';
-                    } else {
-                        document.getElementById('processingTime').textContent = totalSecs > 60 ?
-                            `${Math.floor(totalSecs / 60)}m ${totalSecs % 60}s` : `${totalSecs}s`;
-                    }
-                }
-            } else {
-                document.getElementById('processingTime').textContent = 'N/A';
-            }
-
-            updateExtractedText();
-        }
-
-        async function fetchGroupName(groupId) {
-            try {
-                const res = await fetch('/groups', { headers: { 'Authorization': `Bearer ${token}` } });
-                if (res.ok) {
-                    const groups = await res.json();
-                    const group = groups.find(g => g.id == groupId);
-                    const metaGroup = document.getElementById('metaGroup');
-                    if (group) {
-                        metaGroup.querySelector('span').textContent = group.name;
-                        metaGroup.href = `/group.html?id=${group.id}`;
-                    } else {
-                        metaGroup.querySelector('span').textContent = 'Unknown Group';
-                    }
-                }
-            } catch (e) { console.error('Error fetching group:', e); }
-        }
-
-        function formatFileSize(bytes) {
-            if (!bytes) return '-';
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / 1048576).toFixed(2) + ' MB';
-        }
-
-        // ===== EXTRACTED TEXT =====
-        function updateExtractedText() {
-            const textContainer = document.getElementById('extractedText');
-            textContainer.innerHTML = '';
-            document.getElementById('progressContainer').style.display = 'none';
-            document.getElementById('errorContainerInline').style.display = 'none';
-            document.getElementById('extractionStatus').style.display = 'none';
-
-            if (lectureData.extracted_text) {
-                try {
-                    textContainer.innerHTML = marked.parse(lectureData.extracted_text);
-                    if (pollingInterval) clearInterval(pollingInterval);
-                    return;
-                } catch (e) {
-                    console.error('marked.js failed:', e);
-                }
-            }
-
-            if (lectureData.extracted_text) {
-                textContainer.innerHTML = `<p>${lectureData.extracted_text.replace(/\n/g, '<br>')}</p>`;
-            } else {
-                textContainer.innerHTML = '<p class="text-center text-muted">No content extracted yet.</p>';
-            }
-            if (pollingInterval) clearInterval(pollingInterval);
-        }
-
-        // ===== EXTRACTION STATUS =====
-        async function checkExtractionStatus() {
-            if (lectureData.extracted_text) return;
-            try {
-                const response = await fetch(`/search/task?lecture_id=${lectureId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const task = await response.json();
-                    document.getElementById('extractionStatus').style.display = 'block';
-                    if (task.status === 'pending') { showPending(); startPolling(); }
-                    else if (task.status === 'running') { showRunning(); startPolling(); }
-                    else if (task.status === 'completed') { reloadLecture(); }
-                    else if (task.status === 'failed') { showFailed(); }
-                }
-            } catch (error) { console.error('Error checking task status:', error); }
-        }
-
-        function showPending() {
-            document.getElementById('progressContainer').style.display = 'block';
-            document.getElementById('statusBadge').textContent = 'Pending';
-            document.getElementById('statusBadge').className = 'status-badge status-pending';
-            document.getElementById('progressPercent').textContent = '5%';
-            document.getElementById('progressFill').style.width = '5%';
-            document.getElementById('progressMessage').textContent = 'Waiting to process...';
-        }
-
-        function showRunning() {
-            document.getElementById('progressContainer').style.display = 'block';
-            document.getElementById('statusBadge').textContent = 'Processing';
-            document.getElementById('statusBadge').className = 'status-badge status-running';
-            document.getElementById('progressPercent').textContent = '50%';
-            document.getElementById('progressFill').style.width = '50%';
-            document.getElementById('progressMessage').textContent = 'Extracting text from document...';
-        }
-
-        function showFailed() {
-            document.getElementById('progressContainer').style.display = 'none';
-            document.getElementById('errorContainerInline').style.display = 'block';
-            document.getElementById('statusBadge').textContent = 'Failed';
-            document.getElementById('statusBadge').className = 'status-badge status-failed';
-            if (pollingInterval) clearInterval(pollingInterval);
-        }
-
-        function startPolling() { pollingInterval = setInterval(pollStatus, 2000); }
-
-        async function pollStatus() {
-            try {
-                const response = await fetch(`/search/task?lecture_id=${lectureId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const task = await response.json();
-                    if (task.status === 'completed') { clearInterval(pollingInterval); reloadLecture(); }
-                    else if (task.status === 'failed') { clearInterval(pollingInterval); showFailed(); }
-                }
-            } catch (error) { console.error('Error polling:', error); }
-        }
-
-        async function reloadLecture() {
-            try {
-                const response = await fetch(`/lectures/${lectureId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    lectureData = await response.json();
-                    updateExtractedText();
-                    document.getElementById('progressContainer').style.display = 'none';
-                    document.getElementById('errorContainerInline').style.display = 'none';
-                    document.getElementById('extractionStatus').style.display = 'none';
-                }
-            } catch (error) { console.error('Error reloading:', error); }
-        }
-
-        function toggleEdit() {
-            window.location.href = `/note/${lectureId}/edit`;
-        }
-
-        // ===== SNAPSHOTS =====
-        async function loadSnapshots() {
-            try {
-                const res = await fetch(`/snapshots/${lectureId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const snapshots = await res.json();
-                    renderSnapshots(snapshots);
-                }
-            } catch (e) { console.error('Error loading snapshots:', e); }
-        }
-
-        function renderSnapshots(snapshots) {
-            const container = document.getElementById('snapshotList');
-            if (!snapshots || snapshots.length === 0) {
-                container.innerHTML = '<p style="color: var(--color-gray); font-size: var(--font-size-sm); text-align: center; padding: var(--spacing-md);">No snapshots yet</p>';
-                return;
-            }
-            container.innerHTML = snapshots.map(s => `
-                <div class="snapshot-item" onclick="viewSnapshot(${s.id})">
-                    <div>
-                        <div class="snapshot-name">${escapeHtml(s.name)}</div>
-                        <div class="snapshot-date">${new Date(s.created_at).toLocaleString()}</div>
-                    </div>
-                    <button class="snapshot-delete" onclick="event.stopPropagation(); deleteSnapshot(${s.id})" title="Delete snapshot">
-                        <i class="ph ph-trash"></i>
+            <!-- Format Selector -->
+            <div style="margin-bottom: var(--spacing-lg);">
+                <label
+                    style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray); display: block; margin-bottom: var(--spacing-sm);">Format</label>
+                <div style="display: flex; gap: 8px;">
+                    <button class="export-format-btn active" data-format="pdf" onclick="selectExportFormat('pdf')">
+                        <i class="ph ph-file-pdf" style="font-size: 1.2em; color: #e74c3c;"></i> PDF
+                    </button>
+                    <button class="export-format-btn" data-format="docx" onclick="selectExportFormat('docx')">
+                        <i class="ph ph-file-doc" style="font-size: 1.2em; color: #2b579a;"></i> Word (DOCX)
                     </button>
                 </div>
-            `).join('');
-        }
+            </div>
 
-        async function createSnapshot() {
-            const nameInput = document.getElementById('snapshotNameInput');
-            const name = nameInput.value.trim();
-            if (!name) { alert('Please enter a snapshot name'); return; }
+            <!-- Template Selector -->
+            <div style="margin-bottom: var(--spacing-lg);">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-sm);">
+                    <label
+                        style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-dark-gray);">Template</label>
+                    <a href="/templates" target="_blank"
+                        style="font-size: 11px; color: var(--color-primary); text-decoration: none;">
+                        <i class="ph ph-gear"></i> Manage Templates
+                    </a>
+                </div>
+                <select id="exportTemplateSelect" class="options-select">
+                    <option value="">Default (no template)</option>
+                </select>
+            </div>
 
-            const content = lectureData.extracted_text || '';
-            try {
-                const res = await fetch(`/snapshots/${lectureId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ name, content })
-                });
-                if (res.ok) {
-                    nameInput.value = '';
-                    loadSnapshots();
-                } else {
-                    alert('Failed to create snapshot');
-                }
-            } catch (e) { alert('Error: ' + e.message); }
-        }
+            <!-- Progress -->
+            <div id="exportProgress" style="display: none; margin-bottom: var(--spacing-lg);">
+                <div style="padding: 12px; background: var(--color-bg); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <div class="spinner" style="width: 16px; height: 16px;"><i class="ph ph-spinner ph-spin"
+                                style="font-size: 16px;"></i></div>
+                        <span id="exportProgressText"
+                            style="font-size: var(--font-size-sm); color: var(--color-gray); flex: 1;">Starting...</span>
+                        <span id="exportProgressPercent"
+                            style="font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary);">0%</span>
+                    </div>
+                    <div
+                        style="width: 100%; height: 6px; background: var(--color-light-gray); border-radius: 3px; overflow: hidden;">
+                        <div id="exportProgressBar"
+                            style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--color-primary), #7c5cbf); border-radius: 3px; transition: width 0.3s ease;">
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        async function viewSnapshot(snapshotId) {
-            try {
-                const res = await fetch(`/snapshots/${lectureId}/${snapshotId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    const snapshot = await res.json();
-                    // Show snapshot content in the main view
-                    const textContainer = document.getElementById('extractedText');
-                    try {
-                        textContainer.innerHTML = marked.parse(snapshot.content);
-                    } catch (e) {
-                        textContainer.innerHTML = snapshot.content.replace(/\n/g, '<br>');
-                    }
-                    // If editing, also load into editor
-                    if (isEditing) {
-                        document.getElementById('editorTextarea').value = snapshot.content;
-                        updatePreview();
-                    }
-                    // Highlight active snapshot
-                    document.querySelectorAll('.snapshot-item').forEach(el => el.classList.remove('active'));
-                    event.target.closest('.snapshot-item')?.classList.add('active');
-                }
-            } catch (e) { alert('Error loading snapshot: ' + e.message); }
-        }
-
-        async function deleteSnapshot(snapshotId) {
-            if (!confirm('Delete this snapshot?')) return;
-            try {
-                const res = await fetch(`/snapshots/${lectureId}/${snapshotId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.status === 204) {
-                    loadSnapshots();
-                }
-            } catch (e) { alert('Error: ' + e.message); }
-        }
-
-        // ===== ACTIONS =====
-        function goToChat() {
-            window.location.href = `/chat.html?lecture_id=${lectureId}`;
-        }
-
-        async function generateFlashcards() {
-            if (!lectureId) return;
-            try {
-                const response = await fetch(`/documents/flashcards/${lectureId}`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    alert('Flashcards generated! Redirecting...');
-                    window.location.href = '/flashcards.html';
-                } else {
-                    const error = await response.json();
-                    alert('Error: ' + (error.detail || 'Failed to generate flashcards'));
-                }
-            } catch (error) { alert('Error: ' + error.message); }
-        }
-
-        function exportNote() {
-            // Use existing PDF generation
-            generatePDF();
-        }
-
-        async function generatePDF() {
-            const button = document.querySelector('.action-btn[onclick="exportNote()"]');
-            if (button) { button.disabled = true; button.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Exporting...'; }
-            try {
-                const response = await fetch(`/lectures/${lectureId}/generate-pdf`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    // Auto-download
-                    const dlRes = await fetch(`/lectures/${lectureId}/download-pdf`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (dlRes.ok) {
-                        const blob = await dlRes.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = url;
-                        a.download = `${lectureData.title || 'lecture'}_OUTPUT.pdf`;
-                        document.body.appendChild(a);
-                        a.click();
-                        setTimeout(() => {
-                            window.URL.revokeObjectURL(url);
-                            a.remove();
-                        }, 1000);
-                    }
-                    alert('✅ PDF exported!');
-                } else {
-                    const error = await response.json();
-                    alert('Error: ' + (error.detail || 'Failed to export'));
-                }
-            } catch (error) { alert('Error: ' + error.message); }
-            finally {
-                if (button) { button.disabled = false; button.innerHTML = '<i class="ph ph-export"></i> Export'; }
-            }
-        }
-
-        async function downloadOriginalFile() {
-            try {
-                const response = await fetch(`/lectures/${lectureId}/download-file`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-
-                    let filename = lectureData.file_name || 'file';
-                    const disposition = response.headers.get('Content-Disposition');
-                    if (disposition && disposition.indexOf('filename=') !== -1) {
-                        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
-                        if (matches != null && matches[1]) {
-                            filename = matches[1].replace(/['"]/g, '');
-                        }
-                    }
-
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-
-                    setTimeout(() => {
-                        window.URL.revokeObjectURL(url);
-                        a.remove();
-                    }, 1000);
-                } else {
-                    alert('Failed to download file');
-                }
-            } catch (e) { alert('Error: ' + e.message); }
-        }
-
-        function reprocessOCR() {
-            document.getElementById('reprocessConfirmModal').classList.add('active');
-        }
-
-        function closeReprocessModal() {
-            document.getElementById('reprocessConfirmModal').classList.remove('active');
-        }
-
-        async function confirmReprocess() {
-            closeReprocessModal();
-            const btn = document.getElementById('autoFormatBtn');
-            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Processing...'; }
-
-            // Hide content and only show progress bar
-            document.getElementById('viewContainer').style.display = 'none';
-            document.getElementById('progressContainer').style.display = 'block';
-            document.getElementById('progressFill').style.width = '10%';
-            document.getElementById('progressPercent').textContent = '10%';
-            document.getElementById('progressMessage').textContent = 'Initializing Smart Pipeline...';
-
-            setTimeout(() => {
-                document.getElementById('progressFill').style.width = '40%';
-                document.getElementById('progressPercent').textContent = '40%';
-                document.getElementById('progressMessage').textContent = 'Analyzing layout & extracting text...';
-            }, 2000);
-
-            setTimeout(() => {
-                document.getElementById('progressFill').style.width = '70%';
-                document.getElementById('progressPercent').textContent = '70%';
-                document.getElementById('progressMessage').textContent = 'Structuring content...';
-            }, 5000);
-
-            try {
-                const response = await fetch(`/lectures/${lectureId}/reprocess-ocr`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok) {
-                    document.getElementById('progressFill').style.width = '100%';
-                    document.getElementById('progressPercent').textContent = '100%';
-                    document.getElementById('progressMessage').textContent = 'Complete! Reloading...';
-                    setTimeout(() => window.location.reload(), 800);
-                } else {
-                    let errorMsg = 'Failed to reprocess';
-                    try { const e = await response.json(); errorMsg = e.detail || errorMsg; } catch (e) { }
-                    alert('❌ Error: ' + errorMsg);
-                    document.getElementById('viewContainer').style.display = 'block';
-                    document.getElementById('progressContainer').style.display = 'none';
-                }
-            } catch (error) {
-                alert('❌ Error: ' + error.message);
-                document.getElementById('viewContainer').style.display = 'block';
-                document.getElementById('progressContainer').style.display = 'none';
-            }
-            finally {
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph ph-magic-wand"></i> Auto Format'; }
-            }
-        }
-
-        async function deleteLecture() {
-            if (!confirm('Delete this lecture? This cannot be undone.')) return;
-            try {
-                const response = await fetch(`/lectures/${lectureId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (response.ok || response.status === 204) {
-                    alert('Lecture deleted');
-                    if (lectureData.subject_id) {
-                        window.location.href = `/subject.html?id=${lectureData.subject_id}`;
-                    } else {
-                        window.location.href = '/mynotes.html';
-                    }
-                } else {
-                    alert('Failed to delete lecture');
-                }
-            } catch (error) { alert('Error: ' + error.message); }
-        }
-
-        // ===== UTILITIES =====
-        function showError(message) {
-            document.getElementById('loadingContainer').style.display = 'none';
-            document.getElementById('lectureContainer').style.display = 'none';
-            document.getElementById('errorContainer').style.display = 'block';
-            document.getElementById('errorMessage').textContent = message;
-        }
-
-        function escapeHtml(text) {
-            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
-
-        function logout() {
-            localStorage.removeItem(TOKEN_KEY);
-            window.location.href = '/index.html';
-        }
-
-        // Toggle sidebar scroll based on window scroll position
-        window.addEventListener('scroll', () => {
-            const sidebar = document.querySelector('.note-sidebar');
-            if (sidebar) {
-                if (window.scrollY > 0) {
-                    sidebar.classList.add('can-scroll');
-                } else {
-                    sidebar.classList.remove('can-scroll');
-                }
-            }
-        });
-    </script>
+            <!-- Buttons -->
+            <div class="modal-buttons">
+                <button type="button" class="btn-save" id="exportSubmitBtn" onclick="doExport()"><i
+                        class="ph ph-download-simple"></i> Export</button>
+                <button type="button" class="btn-cancel" onclick="closeExportModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <!-- Hidden input for snapshot name -->
+    <input type="hidden" id="snapshotNameInput" value="">
 </body>
 
 </html>

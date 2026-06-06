@@ -43,17 +43,15 @@ env/
 .env.*.local
 
 # Data and databases
-data/app.db
-data/uploads/
-data/generated/
-data/embeddings/
-data/backups/
+/data/*
+!/data/.gitkeep
 *.db
 *.sqlite
 *.sqlite3
 
 # Logs
-logs/
+/logs/*
+!/logs/.gitkeep
 *.log
 
 # Docker
@@ -64,17 +62,15 @@ docker-compose.override.yml
 .coverage
 htmlcov/
 
-# Node modules (if frontend has npm)
-node_modules/
-npm-debug.log
-
 # Temporary files
 *.tmp
 *.temp
 .cache/
-uploads
+test/
 
-ProcessingAlgorithmTest/output/*
-output/*
-ProcessingAlgorithmTest/output/OUTPUT_smart.md
-.github/copilot-instructions.md
+scripts/ProcessingAlgorithmTest/input/*
+scripts/ProcessingAlgorithmTest/output/*
+scripts/ProcessingAlgorithmTest/temp_input/*
+
+docker-compose-test-env/*
+docker\ compose\ test\ env/

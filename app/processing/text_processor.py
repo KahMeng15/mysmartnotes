@@ -17,9 +17,17 @@ class ContentType(str, Enum):
     H1 = "h1"  # Section header
     H2 = "h2"  # Topic header
     H3 = "h3"  # Subtopic header
+    H4 = "h4"  # Subheading level 4
+    H5 = "h5"  # Subheading level 5
     BODY = "body"  # Regular text
     CODE = "code"  # Code block
-    LIST = "list"  # List item
+    LIST = "list"  # List item (bullet)
+    ORDERED_LIST = "ordered_list"  # Numbered list
+    TABLE_ROW = "table_row"  # Table row
+    IMAGE = "image"  # Image
+    NOTE_TITLE = "note_title"
+    SUBJECT_NAME = "subject_name"
+    GROUP_NAME = "group_name"
 
 
 @dataclass
@@ -106,6 +114,14 @@ class HeaderDetector:
                 return True
         return False
 
+    def is_table_row(self, text: str) -> bool:
+        """Check if text is a markdown table row"""
+        text = text.strip()
+        # Markdown table rows start with | and contain |
+        if text.startswith("|") and text.count("|") >= 2:
+            return True
+        return False
+
     def detect_header_level(
         self,
         text: str,
@@ -119,6 +135,15 @@ class HeaderDetector:
         Returns: (ContentType, confidence_score)
         """
         text = text.strip()
+        
+        # Check for table rows first (before headers/lists)
+        if self.is_table_row(text):
+            # Skip table separator rows (|---|---|)
+            if re.match(r"^\s*\|\s*[-:]+\s*(\|\s*[-:]+\s*)*\|?\s*$", text):
+                # It's a separator row, mark as TABLE_ROW with zero confidence (skip)
+                return ContentType.TABLE_ROW, 0.0
+            else:
+                return ContentType.TABLE_ROW, 0.95
         
         # Strategy 1: Font size detection (if available)
         if font_size:
@@ -162,6 +187,7 @@ class HeaderDetector:
 
         # Default: body text
         return ContentType.BODY, 0.60
+
 
 
 class TextCleaner:
@@ -270,12 +296,18 @@ class TextCleaner:
                 font_size=None,
             )
 
-            # Collect related lines for non-headers
+            # Skip separator rows (confidence <= 0)
+            if confidence <= 0:
+                logger.debug(f"Skipping separator row: {line}")
+                i += 1
+                continue
+
+            # Collect related lines for non-headers (but not TABLE_ROW)
             if content_type in [ContentType.BODY, ContentType.LIST]:
                 collected_lines = [line]
                 j = i + 1
                 
-                # Collect following lines until we hit a likely header or end
+                # Collect following lines until we hit a likely header or table row or end
                 while j < len(lines):
                     next_line = lines[j].strip()
                     
@@ -286,11 +318,16 @@ class TextCleaner:
                     if self.header_detector.is_blacklisted(next_line):
                         break
                     
-                    next_type, _ = self.header_detector.detect_header_level(
+                    next_type, next_conf = self.header_detector.detect_header_level(
                         next_line, j, len(lines), avg_line_length
                     )
                     
-                    if next_type in [ContentType.H1, ContentType.H2, ContentType.H3]:
+                    # Break on headers or table rows
+                    if next_type in [ContentType.H1, ContentType.H2, ContentType.H3, ContentType.TABLE_ROW]:
+                        break
+                    
+                    # Skip separator rows
+                    if next_conf <= 0:
                         break
                     
                     collected_lines.append(next_line)
@@ -311,7 +348,7 @@ class TextCleaner:
                 
                 i = j
             else:
-                # Header
+                # Header or TABLE_ROW - create single segment
                 segment = ContentSegment(
                     content=self.clean_text(line),
                     content_type=content_type,
