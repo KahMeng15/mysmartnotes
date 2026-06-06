@@ -26,7 +26,7 @@ A scalable, AI-powered study companion that intelligently converts lecture slide
 MySmartNotes uses a **Multi-Container Architecture** to ensure reliable background processing and high availability.
 
 **Stack:**
-- **Frontend**: Nginx (Static assets + Reverse Proxy)
+- **Frontend**: React (Vite) + Mantine UI (served via Nginx in production)
 - **API**: FastAPI (Request handling & Auth)
 - **Worker**: Python (Background processing: OCR, AI, Embeddings)
 - **Database**: PostgreSQL 15 (Persistent storage & Task Queue)

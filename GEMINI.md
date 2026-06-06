@@ -6,7 +6,7 @@ MySmartNotes is a multi-container web application designed to convert lecture ma
 ### Architecture & Tech Stack
 - **Backend**: FastAPI (Python 3.11+)
 - **Worker**: Dedicated Python process for background tasks (OCR, AI, Embeddings).
-- **Frontend**: Vanilla JavaScript/HTML/CSS, served via **Nginx** (which also acts as a reverse proxy).
+- **Frontend**: React (Vite), styled with Mantine UI.
 - **Database**: **PostgreSQL 15** (managed via SQLAlchemy ORM).
 - **AI/LLM**: Supports Google Gemini (default), Hugging Face, and Ollama.
 - **Vector Search**: Local embeddings (`sentence-transformers/all-MiniLM-L6-v2`) stored in PostgreSQL.
@@ -72,4 +72,4 @@ Tasks (OCR, AI generation, Embeddings) are managed via a database-backed queue. 
 The system uses a granular logging configuration (`app/logging_config.py`) that outputs to 15 different log files in the `./logs` directory, separating concerns by API module and worker type.
 
 ### UI Development
-The frontend is built with vanilla JavaScript and CSS to avoid build-step complexity. Static assets are served from `app/static/` and proxy-passed through Nginx in production.
+The frontend is built with React, Vite, and Mantine UI. It handles its own routing using `react-router-dom` and interacts with the FastAPI backend via REST endpoints.

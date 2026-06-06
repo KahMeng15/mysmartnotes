@@ -1,3 +1,5 @@
+import SummaryView from "./pages/SummaryView";
+
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { AppShell, Burger, Group, Text, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip } from '@mantine/core';
@@ -123,6 +125,8 @@ function AppLayout({ children }) {
   );
 }
 
+
+
 function App() {
   return (
     <Router>
@@ -138,6 +142,7 @@ function App() {
           <Route path="/group/:id" element={<GroupView />} />
           <Route path="/subject/:id" element={<SubjectView />} />
           <Route path="/lecture/:id" element={<LectureView />} />
+          <Route path="/summaries" element={<SummaryView />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </AppLayout>
