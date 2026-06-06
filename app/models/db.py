@@ -41,6 +41,10 @@ class User(Base):
     pomo_break_mins = Column(Integer, default=5)
     pomo_long_break_mins = Column(Integer, default=15)
     
+    # UI Preferences
+    nav_sidebar_open = Column(Boolean, default=True)
+    action_sidebar_open = Column(Boolean, default=True)
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

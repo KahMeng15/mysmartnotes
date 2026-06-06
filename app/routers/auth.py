@@ -95,6 +95,8 @@ def _prepare_user_for_response(user: User) -> dict:
         "ai_api_key": None,
         "ai_api_key_configured": False,
         "use_global_ai_config": user.use_global_ai_config,
+        "nav_sidebar_open": getattr(user, "nav_sidebar_open", True),
+        "action_sidebar_open": getattr(user, "action_sidebar_open", True),
         "created_at": user.created_at,
     }
 
@@ -916,6 +918,10 @@ async def update_profile(user_update: UserUpdate, current_user: User = Depends(g
         pass # Keys are no longer stored in DB (managed via global fallback or user secrets if implemented later)
     if user_update.use_global_ai_config is not None:
         current_user.use_global_ai_config = user_update.use_global_ai_config
+    if getattr(user_update, "nav_sidebar_open", None) is not None:
+        current_user.nav_sidebar_open = user_update.nav_sidebar_open
+    if getattr(user_update, "action_sidebar_open", None) is not None:
+        current_user.action_sidebar_open = user_update.action_sidebar_open
         
     db.commit()
     db.refresh(current_user)

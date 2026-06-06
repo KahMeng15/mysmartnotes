@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from 'react-router-dom';
-import { AppShell, Burger, Group, Text, NavLink as MantineNavLink, ScrollArea } from '@mantine/core';
+import { AppShell, Burger, Group, Text, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconDashboard, 
@@ -10,7 +11,10 @@ import {
   IconMessageDots, 
   IconBolt, 
   IconSettings,
-  IconChartBar
+  IconChartBar,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
+  IconBook2
 } from '@tabler/icons-react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -22,10 +26,36 @@ import SubjectView from './pages/SubjectView';
 import LectureView from './pages/LectureView';
 import Settings from './pages/Settings';
 import GroupView from './pages/GroupView';
+import { fetchApi } from './lib/api';
 
 function AppLayout({ children }) {
-  const [opened, { toggle }] = useDisclosure();
+  const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
+  const [navOpen, setNavOpen] = useState(true);
   const location = useLocation();
+
+  useEffect(() => {
+    // Only fetch if logged in
+    if (localStorage.getItem('token')) {
+      fetchApi('/auth/me').then(data => {
+        if (data && data.nav_sidebar_open !== undefined) {
+          setNavOpen(data.nav_sidebar_open);
+        }
+      }).catch(err => console.error("Failed to load user preferences", err));
+    }
+  }, [location.pathname]);
+
+  const toggleNav = async () => {
+    const newState = !navOpen;
+    setNavOpen(newState);
+    try {
+      await fetchApi('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ nav_sidebar_open: newState })
+      });
+    } catch (e) {
+      console.error("Failed to save nav state", e);
+    }
+  };
 
   if (location.pathname === '/login' || location.pathname === '/') {
     return <>{children}</>;
@@ -33,36 +63,56 @@ function AppLayout({ children }) {
 
   return (
     <AppShell
-      header={{ height: 60 }}
       navbar={{
-        width: 250,
+        width: navOpen ? 250 : 80,
         breakpoint: 'sm',
-        collapsed: { mobile: !opened },
+        collapsed: { mobile: !mobileOpened },
       }}
       padding="md"
       bg="#ffffff"
     >
-      <AppShell.Header bg="#ffffff">
-        <Group h="100%" px="md">
-          <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-          <Text size="xl" fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
-            MySmartNotes
-          </Text>
+      <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
+        <Group justify={navOpen ? "space-between" : "center"} mb="xl" style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          <Group gap="sm" wrap="nowrap" style={{ display: navOpen ? 'flex' : 'none' }}>
+            <IconBook2 size={28} color="#171738" />
+            <Text size="xl" fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
+              MySmartNotes
+            </Text>
+          </Group>
+          <ActionIcon variant="subtle" color="gray" onClick={toggleNav} hiddenFrom="sm" display="none">
+             {/* Hidden on mobile, they use burger */}
+          </ActionIcon>
+          <ActionIcon variant="subtle" color="gray" onClick={toggleNav} visibleFrom="sm">
+            {navOpen ? <IconLayoutSidebarLeftCollapse size={20} /> : <IconLayoutSidebarLeftExpand size={20} />}
+          </ActionIcon>
+          <Burger opened={mobileOpened} onClick={toggleMobile} hiddenFrom="sm" size="sm" />
         </Group>
-      </AppShell.Header>
 
-      <AppShell.Navbar p="md" bg="#ffffff">
         <AppShell.Section grow component={ScrollArea}>
-          <MantineNavLink component={NavLink} to="/dashboard" label="Dashboard" leftSection={<IconDashboard size="1rem" stroke={1.5} />} />
-          <MantineNavLink component={NavLink} to="/upload" label="Upload" leftSection={<IconUpload size="1rem" stroke={1.5} />} />
-          <MantineNavLink component={NavLink} to="/mynotes" label="My Notes" leftSection={<IconBooks size="1rem" stroke={1.5} />} />
-          <MantineNavLink component={NavLink} to="/chat" label="AI Chat" leftSection={<IconMessageDots size="1rem" stroke={1.5} />} />
-          <MantineNavLink component={NavLink} to="/quiz" label="Quiz Engine" leftSection={<IconBolt size="1rem" stroke={1.5} />} />
+          <Tooltip label="Dashboard" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/dashboard" label={navOpen ? "Dashboard" : ""} leftSection={<IconDashboard size="1.2rem" stroke={1.5} />} />
+          </Tooltip>
+          <Tooltip label="Upload" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/upload" label={navOpen ? "Upload" : ""} leftSection={<IconUpload size="1.2rem" stroke={1.5} />} />
+          </Tooltip>
+          <Tooltip label="My Notes" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/mynotes" label={navOpen ? "My Notes" : ""} leftSection={<IconBooks size="1.2rem" stroke={1.5} />} />
+          </Tooltip>
+          <Tooltip label="AI Chat" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/chat" label={navOpen ? "AI Chat" : ""} leftSection={<IconMessageDots size="1.2rem" stroke={1.5} />} />
+          </Tooltip>
+          <Tooltip label="Quiz Engine" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/quiz" label={navOpen ? "Quiz Engine" : ""} leftSection={<IconBolt size="1.2rem" stroke={1.5} />} />
+          </Tooltip>
         </AppShell.Section>
         
         <AppShell.Section>
-          <MantineNavLink component={NavLink} to="/settings" label="Settings" leftSection={<IconSettings size="1rem" stroke={1.5} />} />
-          <MantineNavLink component={NavLink} to="/login" label="Logout" leftSection={<IconLogin size="1rem" stroke={1.5} />} onClick={() => localStorage.removeItem('token')} />
+          <Tooltip label="Settings" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/settings" label={navOpen ? "Settings" : ""} leftSection={<IconSettings size="1.2rem" stroke={1.5} />} />
+          </Tooltip>
+          <Tooltip label="Logout" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/login" label={navOpen ? "Logout" : ""} leftSection={<IconLogin size="1.2rem" stroke={1.5} />} onClick={() => localStorage.removeItem('token')} />
+          </Tooltip>
         </AppShell.Section>
       </AppShell.Navbar>
 

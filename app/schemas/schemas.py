@@ -45,6 +45,8 @@ class UserUpdate(BaseModel):
     ai_base_url: Optional[str] = None
     ai_api_key: Optional[str] = None # Ignored by backend, but accepted from frontend
     use_global_ai_config: Optional[bool] = None
+    nav_sidebar_open: Optional[bool] = None
+    action_sidebar_open: Optional[bool] = None
 
 
 class User(UserBase):
@@ -59,6 +61,8 @@ class User(UserBase):
     ai_base_url: Optional[str] = None
     ai_api_key_configured: bool = False
     use_global_ai_config: bool = True
+    nav_sidebar_open: bool = True
+    action_sidebar_open: bool = True
     created_at: Optional[datetime] = None
     
     class Config:
