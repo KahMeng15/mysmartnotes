@@ -14,7 +14,7 @@ export default function LectureView() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  
+
   const [taskStatus, setTaskStatus] = useState(null);
   const [chatOpened, setChatOpened] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -47,31 +47,31 @@ export default function LectureView() {
     if (!viewportRef.current || !markdownRef.current) return;
     const viewportRect = viewportRef.current.getBoundingClientRect();
     const viewportTop = viewportRect.top;
-    
+
     let currentAccumulatedTop = 0;
-    
+
     for (let i = 1; i <= 6; i++) {
       const tag = `h${i}`;
       const elements = markdownRef.current.querySelectorAll(tag);
       let activeEl = null;
-      
+
       for (const el of elements) {
         const rect = el.getBoundingClientRect();
         if (rect.top <= viewportTop + currentAccumulatedTop + 5) {
-            activeEl = el;
+          activeEl = el;
         }
       }
-      
+
       let h = 0;
       if (activeEl) {
-         h = activeEl.offsetHeight;
+        h = activeEl.offsetHeight;
       } else if (elements.length > 0) {
-         h = elements[0].offsetHeight;
+        h = elements[0].offsetHeight;
       }
-      
+
       currentAccumulatedTop += h;
       if (i < 6) {
-        markdownRef.current.style.setProperty(`--h${i+1}-top`, `${currentAccumulatedTop}px`);
+        markdownRef.current.style.setProperty(`--h${i + 1}-top`, `${currentAccumulatedTop}px`);
       }
     }
   };
@@ -121,7 +121,7 @@ export default function LectureView() {
 
     pollTask(); // Initial poll
     interval = setInterval(pollTask, 2000); // Poll every 2 seconds
-    
+
     return () => clearInterval(interval);
   }, [id, lecture?.processing_time_ms, lecture?.extracted_text, lecture?.output_pdf_path]);
 
@@ -158,7 +158,7 @@ export default function LectureView() {
   const processingProgress = taskStatus?.progress || 10;
 
   return (
-    <Box h="calc(100vh - 90px)" style={{ display: 'flex', flexDirection: 'column' }}>
+    <Box h="100vh" style={{ display: 'flex', flexDirection: 'column' }}>
       <style>{`
         .sticky-markdown {
           font-family: 'Instrument Sans', sans-serif;
@@ -205,7 +205,7 @@ export default function LectureView() {
           font-size: 0.9em;
         }
       `}</style>
-      
+
       {/* Sticky Header */}
       <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
         <Group justify="space-between">
@@ -219,7 +219,7 @@ export default function LectureView() {
               </Badge>
             )}
           </Group>
-          
+
           <Group gap="sm">
             {isProcessed && (
               <Tooltip label={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}>
@@ -235,21 +235,21 @@ export default function LectureView() {
       {/* Main Area with Sidebar */}
       <Box style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Content Area */}
-        <ScrollArea 
+        <ScrollArea
           viewportRef={viewportRef}
           onScrollPositionChange={handleScroll}
-          style={{ flex: 1, backgroundColor: isEditing ? '#f8f9fa' : '#fff' }} 
+          style={{ flex: 1, backgroundColor: isEditing ? '#f8f9fa' : '#fff' }}
           p="md"
         >
           <Container size="md" py="xl">
             {isFailed ? (
-               <Box mt={100} ta="center">
+              <Box mt={100} ta="center">
                 <IconAlertCircle size={64} color="var(--mantine-color-red-6)" stroke={1.5} />
                 <Title order={2} mt="xl" mb="sm" fw={800} c="red">Processing Failed</Title>
                 <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
                   {taskStatus?.error || 'An unexpected error occurred while processing this document.'}
                 </Text>
-               </Box>
+              </Box>
             ) : !isProcessed ? (
               <Box mt={100} ta="center">
                 <IconRobot size={64} color="var(--mantine-color-blue-6)" stroke={1.5} style={{ opacity: 0.8 }} />
@@ -263,9 +263,9 @@ export default function LectureView() {
                 </Box>
               </Box>
             ) : isEditing ? (
-              <Textarea 
-                minRows={30} 
-                autosize 
+              <Textarea
+                minRows={30}
+                autosize
                 value={content}
                 onChange={(e) => setContent(e.currentTarget.value)}
                 variant="unstyled"
@@ -290,44 +290,44 @@ export default function LectureView() {
           <Box w={280} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#fafafa', overflowY: 'auto' }} p="md">
             <Stack gap="md">
               <Title order={5} fw={600} c="dimmed">Smart Actions</Title>
-              
+
               {!isEditing ? (
                 <>
-                  <Button 
-                    variant="light" 
-                    color="gray" 
-                    fullWidth 
-                    leftSection={<IconPencil size={18} />} 
+                  <Button
+                    variant="light"
+                    color="gray"
+                    fullWidth
+                    leftSection={<IconPencil size={18} />}
                     onClick={() => setIsEditing(true)}
                     style={{ justifyContent: 'flex-start' }}
                   >
                     Edit Note
                   </Button>
-                  <Button 
-                    variant="light" 
-                    color="indigo" 
-                    fullWidth 
-                    leftSection={<IconFileText size={18} />} 
+                  <Button
+                    variant="light"
+                    color="indigo"
+                    fullWidth
+                    leftSection={<IconFileText size={18} />}
                     onClick={() => navigate(`/summaries?lecture_id=${id}`)}
                     style={{ justifyContent: 'flex-start' }}
                   >
                     See Summaries
                   </Button>
-                  <Button 
-                    variant="light" 
-                    color="blue" 
-                    fullWidth 
-                    leftSection={<IconMessageChatbot size={18} />} 
+                  <Button
+                    variant="light"
+                    color="blue"
+                    fullWidth
+                    leftSection={<IconMessageChatbot size={18} />}
                     onClick={() => setChatOpened(true)}
                     style={{ justifyContent: 'flex-start' }}
                   >
                     Quick Chat
                   </Button>
-                  <Button 
-                    variant="light" 
-                    color="pink" 
-                    fullWidth 
-                    leftSection={<IconCards size={18} />} 
+                  <Button
+                    variant="light"
+                    color="pink"
+                    fullWidth
+                    leftSection={<IconCards size={18} />}
                     onClick={() => navigate(`/quiz?lecture_id=${id}`)}
                     style={{ justifyContent: 'flex-start' }}
                   >
@@ -336,22 +336,22 @@ export default function LectureView() {
                 </>
               ) : (
                 <>
-                  <Button 
-                    variant="filled" 
-                    color="blue" 
-                    fullWidth 
-                    leftSection={<IconDeviceFloppy size={18} />} 
-                    onClick={handleSave} 
+                  <Button
+                    variant="filled"
+                    color="blue"
+                    fullWidth
+                    leftSection={<IconDeviceFloppy size={18} />}
+                    onClick={handleSave}
                     loading={saving}
                     style={{ justifyContent: 'flex-start' }}
                   >
                     Save Changes
                   </Button>
-                  <Button 
-                    variant="light" 
-                    color="gray" 
-                    fullWidth 
-                    leftSection={<IconX size={18} />} 
+                  <Button
+                    variant="light"
+                    color="gray"
+                    fullWidth
+                    leftSection={<IconX size={18} />}
                     onClick={() => setIsEditing(false)}
                     style={{ justifyContent: 'flex-start' }}
                   >

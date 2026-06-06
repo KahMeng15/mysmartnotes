@@ -68,7 +68,7 @@ function AppLayout({ children }) {
         breakpoint: 'sm',
         collapsed: { mobile: !mobileOpened },
       }}
-      padding="md"
+      padding={location.pathname.startsWith('/lecture/') ? 0 : "md"}
       bg="#ffffff"
     >
       <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
