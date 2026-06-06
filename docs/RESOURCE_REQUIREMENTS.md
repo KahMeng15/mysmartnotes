@@ -49,6 +49,10 @@ The `all-MiniLM-L6-v2` model is used for semantic search, running on the **Worke
 ### 3. OCR (Tesseract)
 - **CPU**: High impact during OCR of large PDFs, handled by the Worker service.
 
+### 4. Redis Cache
+- **Memory**: Minimal resource impact (~10-50MB resident memory on the Redis container).
+- **Network/Performance**: High-speed database query caching, user session state tracking, and API rate-limiting lookups.
+
 ---
 
 ## 💾 Storage Management

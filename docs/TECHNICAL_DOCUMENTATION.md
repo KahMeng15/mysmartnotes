@@ -13,9 +13,10 @@ MySmartNotes follows a modular, multi-service architecture designed for reliable
 
 ### 2.1 Services
 - **Frontend (Nginx)**: Serves static assets and acts as a reverse proxy for the API.
-- **API (FastAPI)**: Handles user authentication, database CRUD operations, and task submission.
+- **API (FastAPI)**: Handles HTTP requests, authentication, and database operations.
 - **Worker (Python)**: Dedicated background process that polls for tasks (OCR, AI, Embeddings) and executes them.
 - **Database (PostgreSQL)**: Persistent storage for application data and the task queue.
+- **Cache (Redis)**: High-speed in-memory store for sessions, token validation, and rate limiting.
 
 ### 2.2 Stack
 - **Backend Framework**: FastAPI (Python 3.11+)
@@ -36,17 +37,25 @@ MySmartNotes follows a modular, multi-service architecture designed for reliable
 
 The database consists of several key entities managed via SQLAlchemy:
 
-- **User**: Authentication, personal AI configurations, and Pomodoro preferences.
-- **SubjectGroup**: Organizes subjects into higher-level categories (e.g., "Semester 1").
-- **Subject**: Individual courses or topics.
-- **Lecture**: The core document entity. Stores file metadata and extracted content.
-- **LectureEmbedding**: Stores vector embeddings and text chunks for semantic search.
-- **Task**: Tracking background processing jobs (OCR, Embeddings, AI generation).
-- **ChatMessage**: Stores conversation history and RAG sources.
-- **Quiz / QuizQuestion / QuizProgress**: Handles AI-generated quizzes and SRS tracking.
-- **StudySession**: Tracks time spent studying and performance metrics.
-- **Summary**: Stores versioned AI-generated summaries and cheat sheets.
-- **SystemSettings**: Global configuration for system-wide AI and security limits.
+- **User**: Authentication, personal AI configurations (OAuth metadata, credentials encryption key), failed login attempt lockouts, and Pomodoro timer preferences.
+- **SubjectGroup**: Organizes subjects into higher-level course groups or semesters.
+- **QuizGroup**: Organizes AI-generated quizzes into high-level categories.
+- **Subject**: Individual courses or topics under a SubjectGroup.
+- **Lecture**: The core document entity. Stores file metadata, original path, and generated output PDF path.
+- **LectureEmbedding**: Stores vector embeddings and raw text chunks for semantic search.
+- **Task**: Background processing queue items (OCR, embedding generation, summaries, AI polish).
+- **ChatMessage**: Stores conversation history, supporting conversation threading (`conversation_id`), reply nesting (`reply_to_message_id`), response modes, custom output formats, timing logs, and pinned/favourite status.
+- **ExportTemplate**: Stores user-defined layouts, styles, and settings for document exports.
+- **Quiz**: Stores quizzes scoped by group, subject, or lecture.
+- **QuizQuestion**: Stores individual questions, optional JSON choices (for objective types), and detailed explanations.
+- **QuizProgress**: Tracks Spaced Repetition (SRS) parameters (`interval_days`, `ease_factor`, `consecutive_correct`) for student review schedules.
+- **StudySession**: Tracks time spent studying, session type (quiz, chat, pomodoro, stopwatch), and user score performance.
+- **Summary**: Stores versioned summaries, cheat sheets, formatting modes, and custom outputs.
+- **SystemSettings**: Global configuration (Maintenance Mode, Lockdown Mode, sign-up rules, sliding session lengths, and global AI models).
+- **UserInvitation**: Manages pending registration invitation tokens.
+- **PasswordResetToken / EmailVerificationToken / PasswordChangeConfirmation**: Handles verification, reset, and confirmation tokens for security flows.
+- **UserLog**: Centralized actions audit trail (pages accessed, logs generated, etc.).
+- **IPBlock / IPFilter / RateLimitConfig**: Temporary IP block list for brute-force mitigation, IP blacklist/whitelist rules, and API rate-limiting rules.
 
 ---
 
@@ -71,21 +80,42 @@ MySmartNotes implements a "Zero-Config RAG" system:
 4. **Retrieval**: At query time, the user's question is embedded, and cosine similarity is calculated to find relevant chunks.
 5. **Augmentation**: Top-K chunks are injected into the LLM prompt as context.
 
-### 4.3 AI Integration (`AIClient`)
-The system abstracts AI providers to allow flexibility:
+### 4.3 AI Integration (`AIClient` & 3-Tier Fallback)
+The system abstracts AI providers into a unified `AIClient` utilizing a three-tier fallback architecture:
 
-- **Gemini**: Primary provider for high-speed processing.
-- **Hugging Face**: Support for open-source models via the Inference API.
-- **Ollama**: Offline support with local models.
+- **Tier 1 (Primary - Gemini)**: High-reasoning model (configured for `models/gemma-4-31b-it`). Automatically injects the reasoning depth header.
+- **Tier 2 (Secondary - Gemini)**: Fallback reasoning model (configured for `models/gemma-4-26b-a4b-it`).
+- **Tier 3 (Local Fallback - Ollama)**: Local LLM service (configured for local models like `llama3` or `gemma4:e2b`).
+
+**Gemma-4 Reasoning Support**: The `AIClient` automatically intercepts and strips reasoning-specific tokens (such as `<think>`, `</think>`, `<|channel|>thought`, and `<|thought|>`) from streaming and unary responses, outputting polished Markdown directly.
+
+### 4.4 Spaced Repetition System (SRS)
+The application implements an automated quiz system powered by the **SuperMemo-2 (SM-2)** algorithm. When a user submits a quiz answer:
+- **Correct Response**:
+  - `consecutive_correct` is incremented.
+  - If `consecutive_correct == 1`: review interval is set to 1 day.
+  - If `consecutive_correct == 2`: review interval is set to 6 days.
+  - If `consecutive_correct > 2`: review interval is set to `interval_days * ease_factor` (rounded to integer).
+  - `ease_factor` increases by 0.1.
+- **Incorrect Response**:
+  - `consecutive_correct` is reset to 0.
+  - `interval_days` is reset to 1 day.
+  - `ease_factor` decreases by 0.2 (floor limit is 1.3).
+
+The next review date is scheduled via `next_review_at` based on the computed `interval_days`.
 
 ---
 
-## 5. Security & Authentication
+## 5. Security & Governance
 
-- **JWT Auth**: Stateless authentication using JSON Web Tokens.
-- **Encryption**: Sensitive API keys are encrypted at rest using Fernet (AES-128).
-- **IP Filtering**: Built-in middleware to whitelist/blacklist IP addresses.
-- **Lockdown Mode**: Restricts access to the local network only.
+The middleware logic in `app/main.py` coordinates robust safety controls:
+- **JWT Authentication**: Handles cookie-based and header-based session tokens with a sliding window.
+- **Sliding Session Expiration**: If enabled in `SystemSettings`, active sessions are automatically re-issued new tokens and CSRF cookies on each API request.
+- **Lockdown Mode**: Instantly blocks all incoming connections from non-local networks (allows only localhost/private IP ranges).
+- **Maintenance Mode**: Restricts application access to administrators only, redirecting standard users to a status page.
+- **IP Filtering**: Middleware whitelists or blacklists connections by specific IP addresses or countries.
+- **Rate Limiting**: Enforces rate-limiting policies on critical endpoints (e.g., login, sign-up, document extraction) to mitigate DDoS and brute-force attacks.
+- **Secrets Encryption**: Fernet-based encryption is used to secure user-configured API keys at rest in the database.
 
 ---
 

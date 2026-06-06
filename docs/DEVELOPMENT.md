@@ -31,7 +31,7 @@ cd mysmartnotes
 # Create a .env file from the example
 cp .env.example .env
 ```
-*Note: Ensure `DATABASE_URL` in `.env` points to the `db` service as defined in the compose file.*
+*Note: Ensure individual database variables in `.env` are set correctly. If running via Docker Compose, set `DB_HOST=db` and `REDIS_URL=redis://redis:6379/0`. If running locally on the host machine, use `DB_HOST=localhost` and `REDIS_URL=redis://localhost:6379/0`.*
 
 ### 3. Start Development Environment
 ```bash
@@ -112,6 +112,14 @@ The core logic resides in `app/processing/smart_pipeline.py`.
 
 ### Database Migrations
 We currently use SQLAlchemy's `Base.metadata.create_all()` for automatic schema initialization on startup. For complex migrations, ensure the API container starts first as it handles the `init_db()` call.
+
+### AI Configuration & 3-Tier Fallback
+The AI client (`app/processing/ai_client.py`) is designed with a 3-tier fallback hierarchy to ensure robustness:
+1. **Tier 1 (Primary)**: High-performance Reasoning LLM (default: `models/gemma-4-31b-it` via Gemini API).
+2. **Tier 2 (Secondary)**: Fallback Reasoning LLM (default: `models/gemma-4-26b-a4b-it` via Gemini API).
+3. **Tier 3 (Local Fallback)**: Offline/local model (default: `llama3` or `gemma4:e2b` via Ollama).
+
+For testing LLM interactions, you can use `scripts/test_chat_logic.py` to verify prompt responses and fallback logic.
 
 ---
 
