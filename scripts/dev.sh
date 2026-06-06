@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # MySmartNotes Local Development Script
-# This starts both the API and the Worker in parallel.
+# This starts the API, the Worker, and the React Frontend in parallel.
 
 # 1. Ensure logs directory exists
 mkdir -p logs
@@ -13,9 +13,15 @@ pkill -f "python3 -m app.worker_main" || true
 python3 -m app.worker_main > logs/worker_stdout.log 2>&1 &
 WORKER_PID=$!
 
-# 3. Start the API Server
+# 3. Start the React Frontend Dev Server in the background
+echo "Starting React Frontend on http://localhost:5173..."
+(cd frontend && npm run dev > ../logs/frontend_stdout.log 2>&1) &
+FRONTEND_PID=$!
+
+
+# Cleanup on exit (Must be defined before blocking commands)
+trap "kill $WORKER_PID $FRONTEND_PID; exit" SIGINT SIGTERM
+
+# 4. Start the API Server (blocking)
 echo "Starting API Server on http://localhost:8000..."
 python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Cleanup on exit
-trap "kill $WORKER_PID; exit" SIGINT SIGTERM
