@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { Box, Title, Text, FileInput, Select, Button, Stack, Paper, Group, Checkbox, Progress } from '@mantine/core';
 import { IconUpload, IconFile } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function UploadDocs() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const groupId = searchParams.get('group_id');
+
   const [subjects, setSubjects] = useState([]);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [files, setFiles] = useState([]);
@@ -19,13 +22,22 @@ export default function UploadDocs() {
     const loadSubjects = async () => {
       try {
         const data = await fetchApi('/subjects');
-        setSubjects(data || []);
+        const fetchedSubjects = data || [];
+        setSubjects(fetchedSubjects);
+        
+        // Auto-select subject based on group_id if present
+        if (groupId && fetchedSubjects.length > 0) {
+          const groupSubjects = fetchedSubjects.filter(s => s.group_id && s.group_id.toString() === groupId);
+          if (groupSubjects.length > 0) {
+            setSelectedSubject(groupSubjects[0].id.toString());
+          }
+        }
       } catch (err) {
         console.error("Failed to load subjects", err);
       }
     };
     loadSubjects();
-  }, []);
+  }, [groupId]);
 
   const handleUpload = async () => {
     if (!selectedSubject || files.length === 0) {
@@ -52,7 +64,7 @@ export default function UploadDocs() {
 
       setProgress(100);
       setTimeout(() => {
-        navigate(`/notes`);
+        navigate(`/mynotes`);
       }, 800);
 
     } catch (err) {

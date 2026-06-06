@@ -35,7 +35,7 @@ import { fetchApi } from '../lib/api';
 
 const quickActions = [
   { label: 'Upload', icon: IconUpload, color: 'indigo', path: '/upload' },
-  { label: 'My Notes', icon: IconBooks, color: 'teal', path: '/notes' },
+  { label: 'My Notes', icon: IconBooks, color: 'teal', path: '/mynotes' },
   { label: 'Chat', icon: IconMessageDots, color: 'blue', path: '/chat' },
   { label: 'Start Quiz', icon: IconBolt, color: 'pink', path: '/quiz' },
   { label: 'Pomodoro', icon: IconTimerFallback, color: 'yellow', path: '/pomodoro' },
@@ -54,16 +54,27 @@ export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userName = user.nickname || user.full_name || user.username || 'Student';
 
+  const [recentLectures, setRecentLectures] = useState([]);
+  const [loadingLectures, setLoadingLectures] = useState(true);
+
   useEffect(() => {
-    const loadSummary = async () => {
+    const loadData = async () => {
       try {
-        const data = await fetchApi('/analytics/dashboard-summary');
-        setSummary(data);
+        const [summaryData, lecturesData] = await Promise.all([
+          fetchApi('/analytics/dashboard-summary'),
+          fetchApi('/lectures')
+        ]);
+        setSummary(summaryData);
+        // Sort lectures by newest first and take top 5
+        const sorted = lecturesData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
+        setRecentLectures(sorted);
       } catch (err) {
-        console.error("Failed to load dashboard summary", err);
+        console.error("Failed to load dashboard data", err);
+      } finally {
+        setLoadingLectures(false);
       }
     };
-    loadSummary();
+    loadData();
   }, []);
 
   const formatStudyTime = (mins) => {
@@ -84,10 +95,10 @@ export default function Dashboard() {
     <Box>
       {/* Welcome Section */}
       <Box mb="xl">
-        <Title order={1} fw={900} variant="gradient" gradient={{ from: 'blue', to: 'cyan', deg: 90 }}>
+        <Text ff="Instrument Serif, serif" fs="italic" style={{ fontSize: '4rem', fontWeight: 700, lineHeight: 0.8, color: '#171738' }}>
           Welcome back, {userName}
-        </Title>
-        <Text c="dimmed" size="lg">
+        </Text>
+        <Text c="dimmed" size="lg" mt="md">
           Let's continue your learning journey
         </Text>
       </Box>
@@ -117,7 +128,7 @@ export default function Dashboard() {
       </SimpleGrid>
 
       {/* Quick Actions */}
-      <Title order={3} mb="md">
+      <Title order={3} mb="md" fw={600} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>
         Quick Actions
       </Title>
       <SimpleGrid cols={{ base: 2, sm: 3, md: 5 }} spacing="lg" mb="xl">
@@ -132,7 +143,7 @@ export default function Dashboard() {
               justifyContent: 'center',
               padding: theme.spacing.xl,
               borderRadius: theme.radius.md,
-              backgroundColor: theme.colors.gray[0],
+              backgroundColor: '#fff',
               transition: 'transform 150ms ease, box-shadow 150ms ease',
               border: `1px solid ${theme.colors.gray[2]}`,
               '&:hover': {
@@ -144,7 +155,7 @@ export default function Dashboard() {
             <ThemeIcon color={action.color} variant="filled" size={50} radius="xl" mb="sm">
               <action.icon size={26} stroke={1.5} />
             </ThemeIcon>
-            <Text size="sm" fw={600}>
+            <Text size="sm" fw={600} c="#171738">
               {action.label}
             </Text>
           </UnstyledButton>
@@ -153,19 +164,37 @@ export default function Dashboard() {
 
       {/* Recent Notes Section */}
       <Group justify="space-between" mb="md" mt="xl">
-        <Title order={3}>Recent Notes</Title>
+        <Title order={3} fw={600} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>Recent Notes</Title>
         <Button leftSection={<IconPlus size={16} />} variant="light" onClick={openSubjectModal}>
           Create Subject
         </Button>
       </Group>
-      <Card withBorder radius="md" padding="xl">
-        <Center style={{ height: 150 }}>
-          <Stack align="center" spacing="xs">
-            <Loader color="blue" type="bars" />
-            <Text c="dimmed">Loading lectures...</Text>
-          </Stack>
-        </Center>
-      </Card>
+      
+      {loadingLectures ? (
+        <Card withBorder radius="md" padding="xl">
+          <Center style={{ height: 150 }}>
+            <Stack align="center" spacing="xs">
+              <Loader color="blue" type="bars" />
+              <Text c="dimmed">Loading lectures...</Text>
+            </Stack>
+          </Center>
+        </Card>
+      ) : recentLectures.length > 0 ? (
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
+          {recentLectures.map(lecture => (
+            <Card key={lecture.id} withBorder radius="md" padding="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/lecture/${lecture.id}`)}>
+              <Text fw={600} mb="xs" c="#171738">{lecture.title}</Text>
+              <Text size="sm" c="dimmed">Uploaded: {new Date(lecture.created_at).toLocaleDateString()}</Text>
+            </Card>
+          ))}
+        </SimpleGrid>
+      ) : (
+        <Card withBorder radius="md" padding="xl">
+          <Center style={{ height: 150 }}>
+            <Text c="dimmed">No recent notes found.</Text>
+          </Center>
+        </Card>
+      )}
 
       {/* Create Subject Modal */}
       <Modal opened={subjectModalOpened} onClose={closeSubjectModal} title="Create New Subject" centered>

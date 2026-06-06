@@ -21,7 +21,6 @@ import QuizSystem from './pages/QuizSystem';
 import SubjectView from './pages/SubjectView';
 import LectureView from './pages/LectureView';
 import Settings from './pages/Settings';
-import Analytics from './pages/Analytics';
 
 function AppLayout({ children }) {
   const [opened, { toggle }] = useDisclosure();
@@ -44,7 +43,7 @@ function AppLayout({ children }) {
       <AppShell.Header>
         <Group h="100%" px="md">
           <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-          <Text size="xl" fw={900} variant="gradient" gradient={{ from: 'blue', to: 'cyan', deg: 90 }}>
+          <Text size="xl" fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
             MySmartNotes
           </Text>
         </Group>
@@ -53,9 +52,8 @@ function AppLayout({ children }) {
       <AppShell.Navbar p="md">
         <AppShell.Section grow component={ScrollArea}>
           <MantineNavLink component={NavLink} to="/dashboard" label="Dashboard" leftSection={<IconDashboard size="1rem" stroke={1.5} />} />
-          <MantineNavLink component={NavLink} to="/analytics" label="Analytics" leftSection={<IconChartBar size="1rem" stroke={1.5} />} />
           <MantineNavLink component={NavLink} to="/upload" label="Upload" leftSection={<IconUpload size="1rem" stroke={1.5} />} />
-          <MantineNavLink component={NavLink} to="/notes" label="My Notes" leftSection={<IconBooks size="1rem" stroke={1.5} />} />
+          <MantineNavLink component={NavLink} to="/mynotes" label="My Notes" leftSection={<IconBooks size="1rem" stroke={1.5} />} />
           <MantineNavLink component={NavLink} to="/chat" label="AI Chat" leftSection={<IconMessageDots size="1rem" stroke={1.5} />} />
           <MantineNavLink component={NavLink} to="/quiz" label="Quiz Engine" leftSection={<IconBolt size="1rem" stroke={1.5} />} />
         </AppShell.Section>
@@ -81,8 +79,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/notes" element={<NotesManager />} />
+          <Route path="/mynotes" element={<NotesManager />} />
           <Route path="/upload" element={<UploadDocs />} />
           <Route path="/chat" element={<ChatInterface />} />
           <Route path="/quiz" element={<QuizSystem />} />
