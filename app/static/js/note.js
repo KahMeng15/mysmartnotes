@@ -1646,9 +1646,7 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => map[m]);
 }
 
-function logout() {
-    window.logout();
-}
+
 
 // Toggle sidebar scroll based on window scroll position
 window.addEventListener('scroll', () => {

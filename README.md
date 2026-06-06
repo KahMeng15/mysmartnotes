@@ -46,8 +46,40 @@ cd mysmartnotes
 
 # Copy environment template and configure
 cp .env.example .env
-# Edit .env: Add your GEMINI_API_KEY or other provider keys
 ```
+
+#### Configuration (`.env`)
+Configure the following core options in your `.env` file:
+* **Database Configuration**:
+  The application automatically constructs the connection string from individual variables. **Do not use a raw `DATABASE_URL` variable**, as the settings validator ignores it in favor of:
+  ```env
+  DB_USER=mysmartnotes
+  DB_PASSWORD=mysmartnotespassword
+  DB_HOST=localhost # Use 'db' if running inside Docker Compose
+  DB_PORT=5432
+  DB_NAME=mysmartnotes
+  ```
+* **Global 3-Tier AI Fallback**:
+  Configure the three tiers of AI models to ensure uninterrupted processing in case of rate limits or provider failures. Gemma-4 reasoning models are supported and configured by default:
+  ```env
+  # Tier 1 (Primary - Gemini Gemma-4 31B Reasoning Model)
+  GLOBAL_AI_TIER1_PROVIDER=gemini
+  GLOBAL_AI_TIER1_MODEL=models/gemma-4-31b-it
+  GLOBAL_AI_TIER1_API_KEY=your_gemini_api_key
+  GLOBAL_AI_TIER1_REASONING_LEVEL=high
+
+  # Tier 2 (Secondary - Gemini Gemma-4 26B MoE Reasoning Model)
+  GLOBAL_AI_TIER2_PROVIDER=gemini
+  GLOBAL_AI_TIER2_MODEL=models/gemma-4-26b-a4b-it
+  GLOBAL_AI_TIER2_API_KEY=your_gemini_api_key
+  GLOBAL_AI_TIER2_REASONING_LEVEL=high
+
+  # Tier 3 (Local Fallback - Ollama Llama 3)
+  GLOBAL_AI_TIER3_PROVIDER=ollama
+  GLOBAL_AI_TIER3_MODEL=llama3
+  GLOBAL_AI_TIER3_BASE_URL=http://localhost:11434
+  GLOBAL_AI_TIER3_REASONING_LEVEL=low
+  ```
 
 ### 2. Launch
 ```bash
@@ -56,8 +88,9 @@ docker-compose up -d
 ```
 
 **Services:**
-- **Web UI**: [http://localhost:8000](http://localhost:8000)
+- **Web UI**: [http://localhost:8000](http://localhost:8000) (routed via Nginx reverse proxy)
 - **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Redis Cache**: In-memory cache for sessions, tokens, and database requests.
 - **Logs**: View via `docker-compose logs -f` or in the `./logs` directory.
 
 ---

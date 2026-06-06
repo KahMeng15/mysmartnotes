@@ -70,7 +70,7 @@ class AIClient:
                 base_url=user.ai_base_url
             )
             self.tiers.insert(0, user_tier)
-        
+            
         self._init_tiers()
 
     @property
@@ -184,6 +184,22 @@ class AIClient:
     def _extract_polished_answer(self, text: str) -> str:
         """Surgically extract the final answer from reasoning/meta-talk."""
         if not text: return ""
+        
+        # 0. Try strict JSON parse first (Chat enforces JSON schema)
+        try:
+            import json
+            clean_text = text.strip()
+            if clean_text.startswith("```json"):
+                clean_text = clean_text[7:]
+            if clean_text.startswith("```"):
+                clean_text = clean_text[3:]
+            if clean_text.endswith("```"):
+                clean_text = clean_text[:-3]
+            parsed = json.loads(clean_text.strip())
+            if "final_answer" in parsed:
+                return str(parsed["final_answer"]).strip()
+        except Exception:
+            pass
         
         # 1. Clean explicit tags
         text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)

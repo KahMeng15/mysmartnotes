@@ -48,7 +48,7 @@ async def main():
             response_text = result["response"]
             sources = result.get("detailed_sources", [])
             
-            print(f"Response: {response_text[:100]}...")
+            print(f"Response:\n{response_text}\n{'='*20}")
             print(f"Sources: {len(sources)}")
             
             has_think_tag = "<think>" in response_text or "</think>" in response_text

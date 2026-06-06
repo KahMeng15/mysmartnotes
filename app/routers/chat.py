@@ -161,7 +161,6 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
             "If the answer is NOT found in snippets, respond with EXACTLY AND ONLY: \"I am unable to find any information based on your question.\" "
             "Never hallucinate or guess."
         )
-
     prompt = f"""{mode_inst}
 
 {guard}
@@ -169,19 +168,18 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
 {output_inst}
 
 CRITICAL: 
-You are a reasoning model. You MUST think step-by-step first.
-To prevent leaking your thoughts to the user, you MUST format your ENTIRE output exactly as follows:
+You MUST output your response as a valid JSON object. Do not include any other text, markdown blocks, or greetings before or after the JSON.
+Your JSON must exactly match the following structure:
+{{
+  "reasoning": "your step-by-step internal thoughts, constraint checks, and task analysis",
+  "final_answer": "your polished final answer that directly addresses the prompt. No intro phrases. No checklists."
+}}
 
-REASONING:
-[Your step-by-step internal thoughts, constraints checks, etc.]
-
-FINAL_ANSWER:
-[Your polished final answer that directly addresses the prompt. No intro phrases. No checklists.]
-RULES:
+RULES FOR final_answer:
 - NO introductory phrases like "Based on...", "Let me explain...", "Here's what..."
 - Answer directly and concisely
 - PARAPHRASE the context in your own words—do NOT copy-paste source text
-- Do NOT include quotes or brackets 
+- Do NOT include quotes or brackets
 - Do NOT include author names or dates in the answer
 - Simply answer naturally; numerical citations [1], [2], etc. will be added automatically
 - If you found the answer, provide IT and NOTHING ELSE. Do NOT append "I am unable to find any information..." to a valid answer.

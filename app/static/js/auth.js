@@ -87,6 +87,7 @@
                             const newToken = data.access_token;
                             console.debug('✅ Token refreshed successfully');
                             
+                            localStorage.setItem('token', newToken);
                             isRefreshing = false;
                             onRerfreshed(newToken);
                         } else {
@@ -104,8 +105,21 @@
 
                 // Wait for the token to be refreshed
                 const retryOriginalRequest = new Promise((resolve) => {
-                    subscribeTokenRefresh(() => {
-                        // Re-fetch with same options (the cookies/headers will be handled by the browser)
+                    subscribeTokenRefresh((newToken) => {
+                        // Update the Authorization header with the new token
+                        if (options.headers) {
+                            if (options.headers['Authorization']) {
+                                options.headers['Authorization'] = `Bearer ${newToken}`;
+                            } else if (options.headers.get && typeof options.headers.get === 'function' && options.headers.get('Authorization')) {
+                                options.headers.set('Authorization', `Bearer ${newToken}`);
+                            } else if (Array.isArray(options.headers)) {
+                                // For array-like headers, though less common in this app's fetch calls
+                                const authIndex = options.headers.findIndex(h => h[0] === 'Authorization');
+                                if (authIndex >= 0) options.headers[authIndex][1] = `Bearer ${newToken}`;
+                            }
+                        }
+                        
+                        // Re-fetch with updated options
                         resolve(originalFetch(url, options));
                     });
                 });

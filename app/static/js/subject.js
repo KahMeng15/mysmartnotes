@@ -331,9 +331,7 @@ async function deleteLecture(id) {
     });
 }
 
-function logout() {
-    window.logout();
-}
+
 
 // Close modal on outside click
 window.onclick = function (event) {

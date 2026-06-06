@@ -84,6 +84,4 @@ function shareProgress() {
     alert('Share progress feature coming soon');
 }
 
-function logout() {
-    window.logout();
-}
+

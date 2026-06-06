@@ -205,9 +205,7 @@ async function deleteGroup() {
     });
 }
 
-function logout() {
-    window.logout();
-}
+
 
 // Close modal on outside click
 window.onclick = function (event) {
