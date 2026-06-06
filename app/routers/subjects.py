@@ -35,18 +35,7 @@ async def create_subject(
     # Enforce tier quotas
     enforce_quota_subjects(current_user, db)
     
-    # Check if subject already exists
-    existing = db.query(Subject).filter(
-        Subject.user_id == current_user.id,
-        Subject.name == subject.name
-    ).first()
-    
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Subject already exists"
-        )
-    
+
     db_subject = Subject(
         id=generate_random_id(db, Subject),
         name=subject.name,
@@ -84,19 +73,7 @@ async def update_subject(
             detail="Subject not found"
         )
     
-    # Check for duplicate name
-    if subject.name:
-        existing = db.query(Subject).filter(
-            Subject.user_id == current_user.id,
-            Subject.name == subject.name,
-            Subject.id != subject_id
-        ).first()
-        if existing:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Subject name already exists"
-            )
-    
+
     update_data = subject.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_subject, field, value)

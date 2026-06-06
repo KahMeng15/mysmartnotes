@@ -230,45 +230,53 @@ export default function SubjectView() {
 
       {/* Modals */}
       <Modal opened={editSubjectModalOpened} onClose={closeEditSubjectModal} title="Edit Subject" centered>
-        <Stack>
-          <TextInput required label="Subject Name" value={editSubjectName} onChange={(e) => setEditSubjectName(e.currentTarget.value)} data-autofocus />
-          <Textarea label="Description" value={editSubjectDesc} onChange={(e) => setEditSubjectDesc(e.currentTarget.value)} rows={3} />
-          <ColorInput label="Color Tag" value={editSubjectColor} onChange={setEditSubjectColor} format="hex" />
-          <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={closeEditSubjectModal}>Cancel</Button>
-            <Button onClick={handleUpdateSubject} loading={submitting}>Save Changes</Button>
-          </Group>
-        </Stack>
+        <form onSubmit={(e) => { e.preventDefault(); handleUpdateSubject(); }}>
+          <Stack>
+            <TextInput required label="Subject Name" value={editSubjectName} onChange={(e) => setEditSubjectName(e.currentTarget.value)} data-autofocus />
+            <Textarea label="Description" value={editSubjectDesc} onChange={(e) => setEditSubjectDesc(e.currentTarget.value)} rows={3} />
+            <ColorInput label="Color Tag" value={editSubjectColor} onChange={setEditSubjectColor} format="hex" />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeEditSubjectModal}>Cancel</Button>
+              <Button type="submit" loading={submitting}>Save Changes</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       <Modal opened={deleteSubjectModalOpened} onClose={closeDeleteSubjectModal} title="Confirm Delete Subject" centered>
-        <Stack>
-          <Text size="sm">Are you sure you want to delete <b>{subject.name}</b>? This will permanently remove all associated notes and quizzes.</Text>
-          <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={closeDeleteSubjectModal}>Cancel</Button>
-            <Button color="red" onClick={executeDeleteSubject} loading={submitting}>Delete Subject</Button>
-          </Group>
-        </Stack>
+        <form onSubmit={(e) => { e.preventDefault(); executeDeleteSubject(); }}>
+          <Stack>
+            <Text size="sm">Are you sure you want to delete <b>{subject.name}</b>? This will permanently remove all associated notes and quizzes.</Text>
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeDeleteSubjectModal}>Cancel</Button>
+              <Button type="submit" color="red" loading={submitting} data-autofocus>Delete Subject</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       <Modal opened={renameModalOpened} onClose={closeRenameModal} title="Rename Note" centered>
-        <Stack>
-          <TextInput label="Note Title" value={newTitle} onChange={(e) => setNewTitle(e.currentTarget.value)} data-autofocus />
-          <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={closeRenameModal}>Cancel</Button>
-            <Button onClick={handleRename} loading={submitting}>Save</Button>
-          </Group>
-        </Stack>
+        <form onSubmit={(e) => { e.preventDefault(); handleRename(); }}>
+          <Stack>
+            <TextInput label="Note Title" value={newTitle} onChange={(e) => setNewTitle(e.currentTarget.value)} data-autofocus />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeRenameModal}>Cancel</Button>
+              <Button type="submit" loading={submitting}>Save</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       <Modal opened={deleteLectureModalOpened} onClose={closeDeleteLectureModal} title="Confirm Delete" centered>
-        <Stack>
-          <Text size="sm">Are you sure you want to delete the note <b>{deletingLecture?.title}</b>? This action cannot be undone.</Text>
-          <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={closeDeleteLectureModal}>Cancel</Button>
-            <Button color="red" onClick={executeDeleteLecture} loading={submitting}>Delete Note</Button>
-          </Group>
-        </Stack>
+        <form onSubmit={(e) => { e.preventDefault(); executeDeleteLecture(); }}>
+          <Stack>
+            <Text size="sm">Are you sure you want to delete the note <b>{deletingLecture?.title}</b>? This action cannot be undone.</Text>
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeDeleteLectureModal}>Cancel</Button>
+              <Button type="submit" color="red" loading={submitting} data-autofocus>Delete Note</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
     </Box>
   );

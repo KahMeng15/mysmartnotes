@@ -21,6 +21,7 @@ import QuizSystem from './pages/QuizSystem';
 import SubjectView from './pages/SubjectView';
 import LectureView from './pages/LectureView';
 import Settings from './pages/Settings';
+import GroupView from './pages/GroupView';
 
 function AppLayout({ children }) {
   const [opened, { toggle }] = useDisclosure();
@@ -84,6 +85,7 @@ function App() {
           <Route path="/upload" element={<UploadDocs />} />
           <Route path="/chat" element={<ChatInterface />} />
           <Route path="/quiz" element={<QuizSystem />} />
+          <Route path="/group/:id" element={<GroupView />} />
           <Route path="/subject/:id" element={<SubjectView />} />
           <Route path="/lecture/:id" element={<LectureView />} />
           <Route path="/settings" element={<Settings />} />

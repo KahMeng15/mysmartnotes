@@ -6,11 +6,9 @@ import {
   Group,
   TextInput,
   Select,
-  Accordion,
   Card,
   SimpleGrid,
   ActionIcon,
-  Menu,
   Modal,
   ColorInput,
   Textarea,
@@ -19,18 +17,17 @@ import {
   Badge,
   Loader,
   Center,
+  Menu,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconPlus,
   IconSearch,
   IconArrowsSort,
-  IconDotsVertical,
   IconEdit,
   IconTrash,
-  IconUpload,
   IconFiles,
-  IconChevronDown,
+  IconDotsVertical,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -38,12 +35,11 @@ import { fetchApi } from '../lib/api';
 export default function NotesManager() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('name');
+  const [sort, setSort] = useState(localStorage.getItem('smartnotes_sort_pref') || 'date_desc');
   
   const [groups, setGroups] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expandedGroups, setExpandedGroups] = useState(null);
 
   // Modals
   const [groupModalOpened, { open: openGroupModal, close: closeGroupModal }] = useDisclosure(false);
@@ -79,14 +75,6 @@ export default function NotesManager() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAddSubjectClick = (groupId) => {
-    setActiveGroupId(groupId);
-    setNewSubjectName('');
-    setNewSubjectDesc('');
-    setNewSubjectColor('#593C8F');
-    openSubjectModal();
   };
 
   const handleEditGroupClick = (group) => {
@@ -194,23 +182,21 @@ export default function NotesManager() {
       })).filter(g => g.name.toLowerCase().includes(q) || g.subjects.length > 0);
     }
 
-    // 3. Sort subjects within groups
-    combined.forEach(g => {
-      g.subjects.sort((a, b) => {
-        if (sort === 'name') return a.name.localeCompare(b.name);
-        if (sort === 'date') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-        return 0;
-      });
+    // 3. Sort groups
+    combined.sort((a, b) => {
+      // Put ungrouped at the end
+      if (a.id === 'ungrouped') return 1;
+      if (b.id === 'ungrouped') return -1;
+      
+      if (sort === 'name_asc') return a.name.localeCompare(b.name);
+      if (sort === 'name_desc') return b.name.localeCompare(a.name);
+      if (sort === 'date_desc') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      if (sort === 'date_asc') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      return 0;
     });
 
     return combined;
   }, [groups, subjects, search, sort]);
-
-  useEffect(() => {
-    if (processedGroups.length > 0 && expandedGroups === null) {
-      setExpandedGroups(processedGroups.map(g => g.id.toString()));
-    }
-  }, [processedGroups, expandedGroups]);
 
   if (loading) {
     return (
@@ -231,113 +217,82 @@ export default function NotesManager() {
       </Group>
 
       {/* Controls */}
-      <Group mb="xl" grow>
+      <Group mb="xl" align="flex-end">
         <TextInput
           placeholder="Search groups, subjects..."
           leftSection={<IconSearch size={16} />}
           value={search}
           onChange={(e) => setSearch(e.currentTarget.value)}
+          style={{ flexGrow: 1 }}
         />
         <Select
           value={sort}
-          onChange={setSort}
+          onChange={(val) => {
+             setSort(val);
+             localStorage.setItem('smartnotes_sort_pref', val);
+          }}
           data={[
-            { value: 'name', label: 'Sort by Name (A-Z)' },
-            { value: 'date', label: 'Sort by Date Created' },
+            { value: 'name_asc', label: 'Name (A-Z)' },
+            { value: 'name_desc', label: 'Name (Z-A)' },
+            { value: 'date_desc', label: 'Newest First' },
+            { value: 'date_asc', label: 'Oldest First' },
           ]}
           leftSection={<IconArrowsSort size={16} />}
-          style={{ flex: 0.3 }}
+          style={{ width: 180 }}
         />
       </Group>
 
-      {/* Groups Accordion */}
+      {/* Groups Grid */}
       {processedGroups.length > 0 ? (
-        <Accordion 
-          multiple 
-          value={expandedGroups || []}
-          onChange={setExpandedGroups}
-          variant="separated" 
-          styles={{ item: { backgroundColor: '#fff' } }}
-          chevron={
-            <ActionIcon component="div" variant="light" color="gray" size="lg" style={{ pointerEvents: 'none' }}>
-              <IconChevronDown size={18} />
-            </ActionIcon>
-          }
-        >
+        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
           {processedGroups.map((group) => (
-            <Accordion.Item key={group.id} value={group.id.toString()}>
-              <Accordion.Control>
-                <Group justify="space-between" wrap="nowrap">
-                  <Title order={3} fw={700} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
-                    {group.name}
-                  </Title>
+            <Card
+              key={group.id}
+              shadow="sm"
+              padding="lg"
+              radius="md"
+              withBorder
+              onClick={() => navigate(`/group/${group.id}`)}
+              style={{ cursor: 'pointer', transition: 'transform 150ms ease', '&:hover': { transform: 'translateY(-2px)' } }}
+            >
+              <Group justify="space-between" wrap="nowrap" mb="xs">
+                <Title order={3} fw={700} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
+                  {group.name}
+                </Title>
+              </Group>
 
-                  <Group gap="xs">
-                    <Badge color="gray" variant="light" size="lg" mr="sm">
-                      {group.subjects.length} Subjects
-                    </Badge>
+              <Text size="sm" c="dimmed" style={{ minHeight: '3rem' }}>
+                {group.subjects.length} Subjects inside
+              </Text>
 
-                    {group.id !== 'ungrouped' && expandedGroups?.includes(group.id.toString()) && (
-                      <Group gap="xs" mr="md" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                        <ActionIcon component="div" variant="light" color="blue" size="lg" onClick={() => handleAddSubjectClick(group.id)} title="Add Subject">
-                          <IconPlus size={18} />
+              <Group mt="md" justify="space-between">
+                <Badge leftSection={<IconFiles size={12} />} color="blue" variant="light">
+                  View Subjects
+                </Badge>
+                {group.id !== 'ungrouped' && (
+                  <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                    <Menu position="bottom-end" withinPortal>
+                      <Menu.Target>
+                        <ActionIcon component="div" variant="subtle" color="gray">
+                          <IconDotsVertical size={16} />
                         </ActionIcon>
-                        <ActionIcon component="div" variant="light" color="indigo" size="lg" onClick={() => navigate(`/upload?group_id=${group.id}`)} title="Upload Note">
-                          <IconUpload size={18} />
-                        </ActionIcon>
-                        <ActionIcon component="div" variant="light" color="gray" size="lg" onClick={() => handleEditGroupClick(group)} title="Edit Group">
-                          <IconEdit size={18} />
-                        </ActionIcon>
-                        <ActionIcon component="div" variant="light" color="red" size="lg" title="Delete Group" onClick={() => handleDeleteClick(group)}>
-                          <IconTrash size={18} />
-                        </ActionIcon>
-                      </Group>
-                    )}
-                  </Group>
-                </Group>
-              </Accordion.Control>
-              <Accordion.Panel>
-                {/* Subjects Grid */}
-                {group.subjects.length > 0 ? (
-                  <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
-                    {group.subjects.map((subject) => (
-                      <Card
-                        key={subject.id}
-                        shadow="sm"
-                        padding="lg"
-                        radius="md"
-                        withBorder
-                        onClick={() => navigate(`/subject/${subject.id}`)}
-                        style={{ cursor: 'pointer', borderLeft: `4px solid ${subject.color || '#228be6'}`, transition: 'transform 150ms ease', '&:hover': { transform: 'translateY(-2px)' } }}
-                      >
-                        <Text fw={600} size="lg" mb="xs" c="#171738">
-                          {subject.name}
-                        </Text>
-                        <Text size="sm" c="dimmed" style={{ minHeight: '3rem' }}>
-                          {subject.description || 'No description'}
-                        </Text>
-                        <Group mt="md">
-                          <Badge leftSection={<IconFiles size={12} />} color="blue" variant="light">
-                            View Notes
-                          </Badge>
-                        </Group>
-                      </Card>
-                    ))}
-                  </SimpleGrid>
-                ) : (
-                  <Text c="dimmed" fs="italic" ta="center" py="md">
-                    No subjects in this group yet.
-                  </Text>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconEdit size={14} />} onClick={() => { handleEditGroupClick(group); }}>Edit Group</Menu.Item>
+                        <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => { handleDeleteClick(group); }}>Delete Group</Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </div>
                 )}
-              </Accordion.Panel>
-            </Accordion.Item>
+              </Group>
+            </Card>
           ))}
-        </Accordion>
+        </SimpleGrid>
       ) : (
         <Center h={200}>
           <Stack align="center">
             <IconFiles size={48} color="var(--mantine-color-gray-4)" />
-            <Text c="dimmed">No groups or subjects found.</Text>
+            <Text c="dimmed">No groups found.</Text>
             <Button onClick={() => { setNewGroupName(''); openGroupModal(); }}>Create your first Group</Button>
           </Stack>
         </Center>
@@ -345,45 +300,53 @@ export default function NotesManager() {
 
       {/* Modals */}
       <Modal opened={groupModalOpened} onClose={closeGroupModal} title="Create New Group" centered>
-        <Stack>
-          <TextInput required label="Group Name" placeholder="e.g. Semester 1, Year 2" value={newGroupName} onChange={(e) => setNewGroupName(e.currentTarget.value)} data-autofocus />
-          <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={closeGroupModal}>Cancel</Button>
-            <Button onClick={handleCreateOrEditGroup} loading={submitting}>Create Group</Button>
-          </Group>
-        </Stack>
+        <form onSubmit={(e) => { e.preventDefault(); handleCreateOrEditGroup(); }}>
+          <Stack>
+            <TextInput required label="Group Name" placeholder="e.g. Semester 1, Year 2" value={newGroupName} onChange={(e) => setNewGroupName(e.currentTarget.value)} data-autofocus />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeGroupModal}>Cancel</Button>
+              <Button type="submit" loading={submitting}>Create Group</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       <Modal opened={editGroupModalOpened} onClose={closeEditGroupModal} title="Edit Group" centered>
-        <Stack>
-          <TextInput required label="Group Name" value={newGroupName} onChange={(e) => setNewGroupName(e.currentTarget.value)} data-autofocus />
-          <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={closeEditGroupModal}>Cancel</Button>
-            <Button onClick={handleCreateOrEditGroup} loading={submitting}>Save Changes</Button>
-          </Group>
-        </Stack>
+        <form onSubmit={(e) => { e.preventDefault(); handleCreateOrEditGroup(); }}>
+          <Stack>
+            <TextInput required label="Group Name" value={newGroupName} onChange={(e) => setNewGroupName(e.currentTarget.value)} data-autofocus />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeEditGroupModal}>Cancel</Button>
+              <Button type="submit" loading={submitting}>Save Changes</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       <Modal opened={subjectModalOpened} onClose={closeSubjectModal} title="Add New Subject" centered>
-        <Stack>
-          <TextInput required label="Subject Name" placeholder="e.g. Calculus I" value={newSubjectName} onChange={(e) => setNewSubjectName(e.currentTarget.value)} data-autofocus />
-          <Textarea label="Description (Optional)" placeholder="Brief overview" value={newSubjectDesc} onChange={(e) => setNewSubjectDesc(e.currentTarget.value)} rows={3} />
-          <ColorInput label="Color Tag" value={newSubjectColor} onChange={setNewSubjectColor} format="hex" />
-          <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={closeSubjectModal}>Cancel</Button>
-            <Button onClick={handleCreateSubject} loading={submitting}>Add Subject</Button>
-          </Group>
-        </Stack>
+        <form onSubmit={(e) => { e.preventDefault(); handleCreateSubject(); }}>
+          <Stack>
+            <TextInput required label="Subject Name" placeholder="e.g. Calculus I" value={newSubjectName} onChange={(e) => setNewSubjectName(e.currentTarget.value)} data-autofocus />
+            <Textarea label="Description (Optional)" placeholder="Brief overview" value={newSubjectDesc} onChange={(e) => setNewSubjectDesc(e.currentTarget.value)} rows={3} />
+            <ColorInput label="Color Tag" value={newSubjectColor} onChange={setNewSubjectColor} format="hex" />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeSubjectModal}>Cancel</Button>
+              <Button type="submit" loading={submitting}>Add Subject</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       <Modal opened={deleteGroupModalOpened} onClose={closeDeleteGroupModal} title="Confirm Delete" centered>
-        <Stack>
-          <Text size="sm">Are you sure you want to delete the group <b>{groupToDelete?.name}</b>? This action cannot be undone.</Text>
-          <Group justify="flex-end" mt="md">
-            <Button variant="default" onClick={closeDeleteGroupModal}>Cancel</Button>
-            <Button color="red" onClick={executeDeleteGroup} loading={submitting}>Delete Group</Button>
-          </Group>
-        </Stack>
+        <form onSubmit={(e) => { e.preventDefault(); executeDeleteGroup(); }}>
+          <Stack>
+            <Text size="sm">Are you sure you want to delete the group <b>{groupToDelete?.name}</b>? This action cannot be undone.</Text>
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeDeleteGroupModal}>Cancel</Button>
+              <Button type="submit" color="red" loading={submitting} data-autofocus>Delete Group</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
     </Box>
   );
