@@ -1,33 +1,185 @@
-import { Box, Title, Paper, Switch, Stack, TextInput, Button, Divider, Text } from '@mantine/core';
+import { useState, useEffect } from 'react';
+import { Box, Title, Paper, Tabs, TextInput, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader } from '@mantine/core';
+import { fetchApi } from '../lib/api';
 
 export default function Settings() {
-  return (
-    <Box maxWidth={600}>
-      <Title order={2} mb="xl">Account Settings</Title>
-      
-      <Paper withBorder p="xl" radius="md" mb="xl">
-        <Title order={4} mb="md">Profile</Title>
-        <Stack>
-          <TextInput label="Full Name" defaultValue="Student Name" />
-          <TextInput label="Email" defaultValue="student@university.edu" disabled />
-          <Button w="fit-content">Update Profile</Button>
-        </Stack>
-      </Paper>
+  const [activeTab, setActiveTab] = useState('profile');
+  
+  const [profile, setProfile] = useState({ nickname: '', full_name: '', email: '' });
+  const [stats, setStats] = useState(null);
+  const [quotas, setQuotas] = useState(null);
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
 
-      <Paper withBorder p="xl" radius="md">
-        <Title order={4} mb="md">Preferences</Title>
-        <Stack>
-          <Switch label="Email Notifications" description="Receive updates about processing completion" defaultChecked />
-          <Divider my="sm" />
-          <Switch label="Dark Mode" description="Toggle dark mode theme across the app" />
-          <Divider my="sm" />
-          <Box>
-            <Text fw={500} size="sm">Export Format</Text>
-            <Text c="dimmed" size="xs" mb="sm">Default format when exporting notes</Text>
-            <TextInput defaultValue="Markdown" readOnly />
-          </Box>
-        </Stack>
-      </Paper>
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [profileData, statsData, quotasData] = await Promise.all([
+          fetchApi('/auth/me'),
+          fetchApi('/auth/stats'),
+          fetchApi('/auth/quotas').catch(() => null) // Ignore if 404
+        ]);
+        
+        setProfile({
+          nickname: profileData.nickname || '',
+          full_name: profileData.full_name || '',
+          email: profileData.email || ''
+        });
+        setStats(statsData);
+        setQuotas(quotasData);
+      } catch (err) {
+        console.error("Failed to load settings data", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  const handleProfileUpdate = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      await fetchApi('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({
+          nickname: profile.nickname,
+          full_name: profile.full_name
+        })
+      });
+      setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      
+      // Update local storage so sidebar/dashboard update
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      localStorage.setItem('user', JSON.stringify({ ...user, ...profile }));
+      
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Failed to update profile' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePasswordRequest = async () => {
+    try {
+      await fetchApi('/auth/request-password-change', { method: 'POST' });
+      setMessage({ type: 'success', text: 'Password reset email sent!' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Failed to request password reset' });
+    }
+  };
+
+  if (loading) {
+    return <Center h="50vh"><Loader size="lg" /></Center>;
+  }
+
+  return (
+    <Box maxWidth={800} mx="auto">
+      <Title order={2} mb="xl">Account Settings</Title>
+
+      <Tabs value={activeTab} onChange={setActiveTab} orientation="vertical" variant="pills">
+        <Tabs.List mr="xl">
+          <Tabs.Tab value="profile">Profile</Tabs.Tab>
+          <Tabs.Tab value="account">Account & Security</Tabs.Tab>
+          <Tabs.Tab value="usage">Usage & Quotas</Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel value="profile">
+          <Paper withBorder p="xl" radius="md">
+            <Title order={4} mb="md">Public Profile</Title>
+            {message && <Text color={message.type === 'error' ? 'red' : 'teal'} mb="md">{message.text}</Text>}
+            <Stack>
+              <TextInput 
+                label="Nickname" 
+                value={profile.nickname} 
+                onChange={(e) => setProfile({...profile, nickname: e.currentTarget.value})} 
+              />
+              <TextInput 
+                label="Full Name" 
+                value={profile.full_name} 
+                onChange={(e) => setProfile({...profile, full_name: e.currentTarget.value})} 
+              />
+              <TextInput label="Email Address" value={profile.email} disabled />
+              
+              <Group justify="flex-end" mt="md">
+                <Button onClick={handleProfileUpdate} loading={saving}>Save Changes</Button>
+              </Group>
+            </Stack>
+          </Paper>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="account">
+          <Paper withBorder p="xl" radius="md">
+            <Title order={4} mb="md">Security</Title>
+            {message && <Text color={message.type === 'error' ? 'red' : 'teal'} mb="md">{message.text}</Text>}
+            <Text size="sm" c="dimmed" mb="md">
+              A password reset link will be sent to your registered email address ({profile.email}).
+            </Text>
+            <Button variant="light" onClick={handlePasswordRequest}>
+              Request Password Change
+            </Button>
+
+            <Divider my="xl" />
+
+            <Title order={4} mb="md" c="red">Danger Zone</Title>
+            <Text size="sm" c="dimmed" mb="md">
+              Once you delete your account, there is no going back. Please be certain.
+            </Text>
+            <Button color="red" variant="outline">Delete Account</Button>
+          </Paper>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="usage">
+          <Paper withBorder p="xl" radius="md">
+            <Title order={4} mb="md">Account Usage</Title>
+            
+            {stats && (
+              <Group grow mb="xl">
+                <Box>
+                  <Text size="xl" fw={700}>{stats.total_lectures || 0}</Text>
+                  <Text size="sm" c="dimmed">Total Notes Processed</Text>
+                </Box>
+                <Box>
+                  <Text size="xl" fw={700}>{stats.total_chat_messages || 0}</Text>
+                  <Text size="sm" c="dimmed">AI Questions Asked</Text>
+                </Box>
+                <Box>
+                  <Text size="xl" fw={700}>{stats.total_quizzes_taken || 0}</Text>
+                  <Text size="sm" c="dimmed">Quizzes Completed</Text>
+                </Box>
+              </Group>
+            )}
+
+            {quotas && (
+              <>
+                <Divider my="xl" />
+                <Title order={4} mb="md">Current Plan: Free Tier</Title>
+                <Group>
+                  <RingProgress
+                    size={120}
+                    roundCaps
+                    thickness={8}
+                    sections={[{ value: (quotas.lectures_used / quotas.lectures_limit) * 100, color: 'blue' }]}
+                    label={
+                      <Text ta="center" size="xs" fw={700}>
+                        {Math.round((quotas.lectures_used / quotas.lectures_limit) * 100)}%
+                      </Text>
+                    }
+                  />
+                  <Box>
+                    <Text fw={500}>Document Processing Quota</Text>
+                    <Text size="sm" c="dimmed">{quotas.lectures_used} of {quotas.lectures_limit} documents used this month.</Text>
+                  </Box>
+                </Group>
+              </>
+            )}
+            
+            {!quotas && !stats && <Text c="dimmed">No usage data available yet.</Text>}
+          </Paper>
+        </Tabs.Panel>
+      </Tabs>
     </Box>
   );
 }
