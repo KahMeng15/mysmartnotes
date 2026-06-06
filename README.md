@@ -1,4 +1,4 @@
-MySmartNotes – Smart AI-Powered Study Companion
+# MySmartNotes – Smart AI-Powered Study Companion
 
 A scalable, AI-powered study companion that intelligently converts lecture slides (PDF/PPTX) into structured study materials. Featuring a **Multi-Container Architecture**, it extracts clean markdown with properly formatted tables, provides RAG-based chat, generates quizzes, and organizes your learning journey. Perfect for personal use or small study groups.
 
