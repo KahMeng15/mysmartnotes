@@ -123,7 +123,12 @@ async function loadSummaryVersions() {
         const res = await fetch(`/summaries?note_id=${noteId}`);
         if (res.ok) {
             const docs = await res.json();
-            const summaries = docs.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
+            const summaries = docs.filter(d => d.summary_type === 'summary').sort((a, b) => {
+                if (a.is_pinned !== b.is_pinned) {
+                    return a.is_pinned ? -1 : 1;
+                }
+                return b.version - a.version;
+            });
             const list = document.getElementById('summaryList');
             if (!list) return summaries;
 
@@ -162,14 +167,28 @@ async function loadSummaryVersions() {
                 }
                 var dateString = window.formatDate ? window.formatDate(s.created_at) : s.created_at;
                 
+                var pinIcon = s.is_pinned ? '<i class="ph-fill ph-push-pin" style="color: var(--color-primary); margin-right: 4px;"></i>' : '';
                 return '<div class="version-item ' + (isSelected ? 'active' : '') + '" onclick="loadSummaryVersion(\'' + s.id + '\')">' +
                         '<div style="flex: 1; min-width: 0;">' +
-                            '<div class="version-title">' + label + '</div>' +
+                            '<div class="version-title">' + pinIcon + label + '</div>' +
                             '<div class="version-meta">' + dateString + '</div>' +
                         '</div>' +
-                        '<button class="version-delete" onclick="event.stopPropagation(); showDeleteConfirm(\'' + s.id + '\')">' +
-                            '<i class="ph ph-trash"></i>' +
-                        '</button>' +
+                        '<div style="position: relative;">' +
+                            '<button class="version-menu-btn" onclick="event.stopPropagation(); toggleVersionMenu(event, \'' + s.id + '\')">' +
+                                '<i class="ph ph-dots-three-vertical"></i>' +
+                            '</button>' +
+                            '<div class="version-dropdown" id="version-menu-' + s.id + '">' +
+                                '<button class="version-dropdown-item" onclick="event.stopPropagation(); toggleVersionMenu(event, \'' + s.id + '\'); renameVersion(\'' + s.id + '\', \'' + (s.title || '').replace(/'/g, "\\'") + '\')">' +
+                                    '<i class="ph ph-pencil-simple"></i> Rename' +
+                                '</button>' +
+                                '<button class="version-dropdown-item" onclick="event.stopPropagation(); toggleVersionMenu(event, \'' + s.id + '\'); togglePinVersion(\'' + s.id + '\')">' +
+                                    '<i class="ph ' + (s.is_pinned ? 'ph-push-pin-slash' : 'ph-push-pin') + '"></i> ' + (s.is_pinned ? 'Unpin' : 'Pin') +
+                                '</button>' +
+                                '<button class="version-dropdown-item danger" onclick="event.stopPropagation(); toggleVersionMenu(event, \'' + s.id + '\'); showDeleteConfirm(\'' + s.id + '\')">' +
+                                    '<i class="ph ph-trash"></i> Delete' +
+                                '</button>' +
+                            '</div>' +
+                        '</div>' +
                     '</div>';
             }).join('');
 
@@ -180,6 +199,66 @@ async function loadSummaryVersions() {
         console.error('Error loading versions:', e); 
     }
     return [];
+}
+
+function toggleVersionMenu(e, id) {
+    e.stopPropagation();
+    const dropdown = document.getElementById('version-menu-' + id);
+    const isShowing = dropdown.classList.contains('show');
+    
+    // Close all other dropdowns
+    document.querySelectorAll('.version-dropdown.show').forEach(el => el.classList.remove('show'));
+    
+    // Toggle current
+    if (!isShowing) {
+        dropdown.classList.add('show');
+    }
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.version-dropdown') && !e.target.closest('.version-menu-btn')) {
+        document.querySelectorAll('.version-dropdown.show').forEach(el => el.classList.remove('show'));
+    }
+});
+
+async function renameVersion(id, currentTitle) {
+    const newTitle = prompt('Enter new name for this summary:', currentTitle);
+    if (!newTitle || newTitle === currentTitle) return;
+    
+    try {
+        const response = await fetch(`/summaries/${id}/rename`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title: newTitle })
+        });
+        
+        if (response.ok) {
+            loadSummaryVersions();
+        } else {
+            console.error('Failed to rename summary version');
+        }
+    } catch (e) {
+        console.error('Error renaming summary:', e);
+    }
+}
+
+async function togglePinVersion(id) {
+    try {
+        const response = await fetch(`/summaries/${id}/pin`, {
+            method: 'PATCH'
+        });
+        
+        if (response.ok) {
+            loadSummaryVersions();
+        } else {
+            console.error('Failed to pin summary version');
+        }
+    } catch (e) {
+        console.error('Error pinning summary:', e);
+    }
 }
 
 async function loadSummaryVersion(docId, pushURL = true) {

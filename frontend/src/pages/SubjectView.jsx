@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select } from '@mantine/core';
+import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort } from '@tabler/icons-react';
+import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 
@@ -87,7 +87,10 @@ export default function SubjectView() {
   // Note Action Modals
   const [renameModalOpened, { open: openRenameModal, close: closeRenameModal }] = useDisclosure(false);
   const [deleteNoteModalOpened, { open: openDeleteNoteModal, close: closeDeleteNoteModal }] = useDisclosure(false);
+  const [reprocessNoteModalOpened, { open: openReprocessNoteModal, close: closeReprocessNoteModal }] = useDisclosure(false);
   const [editingNote, setEditingNote] = useState(null);
+  const [reprocessingNote, setReprocessingNote] = useState(null);
+  const [infoModalNote, setInfoModalNote] = useState(null);
   const [newTitle, setNewTitle] = useState('');
   const [deletingNote, setDeletingNote] = useState(null);
 
@@ -164,6 +167,11 @@ export default function SubjectView() {
     openDeleteNoteModal();
   };
 
+  const openReprocess = (note) => {
+    setReprocessingNote(note);
+    openReprocessNoteModal();
+  };
+
   const handleRename = async () => {
     if (!newTitle.trim() || !editingNote) return;
     setSubmitting(true);
@@ -190,6 +198,23 @@ export default function SubjectView() {
       closeDeleteNoteModal();
     } catch (err) {
       alert("Failed to delete note: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const executeReprocessNote = async () => {
+    if (!reprocessingNote) return;
+    setSubmitting(true);
+    try {
+      const res = await fetchApi(`/notes/${reprocessingNote.id}/reprocess`, {
+        method: 'POST'
+      });
+      // The API returns the updated note
+      setNotes(notes.map(l => l.id === reprocessingNote.id ? res : l));
+      closeReprocessNoteModal();
+    } catch (err) {
+      alert("Failed to reprocess note: " + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -328,6 +353,8 @@ export default function SubjectView() {
                       </Menu.Target>
                       <Menu.Dropdown>
                         <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRename(note)}>Rename</Menu.Item>
+                        <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocess(note)}>Reprocess</Menu.Item>
+                        <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalNote(note); }}>System Info</Menu.Item>
                         <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDelete(note)}>Delete</Menu.Item>
                       </Menu.Dropdown>
                     </Menu>
@@ -405,6 +432,76 @@ export default function SubjectView() {
             </Group>
           </Stack>
         </form>
+      </Modal>
+
+      <Modal opened={reprocessNoteModalOpened} onClose={closeReprocessNoteModal} title="Reprocess Note" centered>
+        <Text size="sm" mb="lg">
+          Are you sure you want to reprocess <b>{reprocessingNote?.title}</b>? This will extract all content from the file again, completely replacing the current extraction and embeddings. Existing summaries will be kept. This operation might take a while.
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={closeReprocessNoteModal} disabled={submitting}>Cancel</Button>
+          <Button leftSection={<IconRefresh size={16} />} onClick={executeReprocessNote} loading={submitting}>Reprocess</Button>
+        </Group>
+      </Modal>
+
+      <Modal opened={!!infoModalNote} onClose={() => setInfoModalNote(null)} title="System Information" centered size="lg">
+        {infoModalNote && (
+          <Stack gap="sm">
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Note ID</Text>
+              <Code>{infoModalNote.id}</Code>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Created</Text>
+              <Text size="sm">{new Date(infoModalNote.created_at).toLocaleString()}</Text>
+            </Group>
+            
+            {infoModalNote.timings ? (
+              <>
+                <Text size="sm" fw={700} mt="md">Processing Timings</Text>
+                {infoModalNote.timings.local_extraction && (
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>Local Extraction</Text>
+                    <Text size="sm" c="dimmed">{infoModalNote.timings.local_extraction.toFixed(2)}s</Text>
+                  </Group>
+                )}
+                {infoModalNote.timings.ai_polish_total && (
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>AI Polish (Total)</Text>
+                    <Text size="sm" c="dimmed">{infoModalNote.timings.ai_polish_total.toFixed(2)}s</Text>
+                  </Group>
+                )}
+                
+                {/* Find chunk timings dynamically */}
+                {Object.keys(infoModalNote.timings)
+                  .filter(k => k.startsWith("chunk_"))
+                  .sort()
+                  .map(k => (
+                  <Group key={k} justify="space-between" pl="md">
+                    <Text size="xs" fw={500}>- {k.replace('chunk_', 'Chunk ')}</Text>
+                    <Text size="xs" c="dimmed">{infoModalNote.timings[k].toFixed(2)}s</Text>
+                  </Group>
+                ))}
+
+                {infoModalNote.timings.total_pipeline && (
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>Total Pipeline Time</Text>
+                    <Text size="sm" c="dimmed">{infoModalNote.timings.total_pipeline.toFixed(2)}s</Text>
+                  </Group>
+                )}
+              </>
+            ) : (
+              <Text size="sm" c="dimmed" mt="md">No detailed timings available for this note.</Text>
+            )}
+
+            {infoModalNote.processing_time_ms && (
+              <Group justify="space-between" mt="xs">
+                <Text size="sm" fw={500}>Total Request Processing Time</Text>
+                <Text size="sm" c="dimmed">{(infoModalNote.processing_time_ms / 1000).toFixed(2)}s</Text>
+              </Group>
+            )}
+          </Stack>
+        )}
       </Modal>
     </Box>
   );

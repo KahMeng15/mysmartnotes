@@ -9,6 +9,7 @@ from app.models.db import User, Note
 from app.utils.db import SessionLocal
 from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
+from app.utils.cache import clear_cache_pattern_sync
 from app.processing.ocr import OCRProcessor
 from app.processing.smart_pipeline import SmartPipeline
 
@@ -41,13 +42,14 @@ def ensure_valid_markdown_result(markdown: str) -> str:
         raise RuntimeError(markdown)
     return markdown
 
-def extract_markdown_for_user(user: User, file_path: str, progress_callback: Optional[Callable] = None) -> str:
+def extract_markdown_for_user(user: User, file_path: str, progress_callback: Optional[Callable] = None) -> tuple:
     """
     Process a note with the configured SmartPipeline.
     """
     pipeline = get_pipeline_for_user(user)
     try:
-        return ensure_valid_markdown_result(pipeline.process(file_path, progress_callback=progress_callback))
+        markdown = ensure_valid_markdown_result(pipeline.process(file_path, progress_callback=progress_callback))
+        return markdown, getattr(pipeline, "timings", {})
     except Exception:
         if not getattr(pipeline, "use_polish", False):
             raise
@@ -57,7 +59,8 @@ def extract_markdown_for_user(user: User, file_path: str, progress_callback: Opt
             exc_info=True,
         )
         fallback_pipeline = SmartPipeline(use_polish=False)
-        return ensure_valid_markdown_result(fallback_pipeline.process(file_path, progress_callback=progress_callback))
+        markdown = ensure_valid_markdown_result(fallback_pipeline.process(file_path, progress_callback=progress_callback))
+        return markdown, getattr(fallback_pipeline, "timings", {})
 
 def markdown_to_segments(markdown: str) -> list:
     """
@@ -170,7 +173,7 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
                 progress_callback(p, msg)
 
             try:
-                markdown = extract_markdown_for_user(user, file_path, progress_callback=pipeline_callback)
+                markdown, timings = extract_markdown_for_user(user, file_path, progress_callback=pipeline_callback)
             except InterruptedError:
                 logger.info(f"Task {task_id} halted during smart pipeline")
                 return {"status": "cancelled"}
@@ -180,6 +183,7 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
             # Save to file storage
             StorageManager.save_note_text(note.id, markdown)
             StorageManager.save_note_json(note.id, "structured", structured_segments)
+            StorageManager.save_note_json(note.id, "timings", timings)
             
             # Auto-title detection from H1
             if auto_detect_title:
@@ -208,6 +212,7 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
 
             TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
             logger.info(f"Processing complete for note {note_id}")
+            clear_cache_pattern_sync(f"cache_resp:/notes*:u{user.id}*")
             return {"status": "success", "note_id": note_id}
 
         else:
@@ -244,6 +249,7 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
                     logger.error(f"Error updating embeddings: {e}")
 
             TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
+            clear_cache_pattern_sync(f"cache_resp:/notes*:u{user.id}*")
             return {"status": "success", "note_id": note_id}
 
     except Exception as e:

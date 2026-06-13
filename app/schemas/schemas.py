@@ -159,6 +159,7 @@ class Note(NoteBase):
     extracted_images_metadata: Optional[str] = None
     output_pdf_path: Optional[str] = None
     processing_time_ms: Optional[int] = None
+    timings: Optional[dict] = None
     created_at: datetime
     updated_at: datetime
     

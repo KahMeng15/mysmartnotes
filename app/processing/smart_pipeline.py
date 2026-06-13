@@ -49,6 +49,7 @@ class SmartPipeline:
         self.layout_detector = None  # Legacy: disabled
         self.table_detector = None   # Legacy: disabled
         self.merger = SignalMerger()
+        self.timings = {}
 
     def process(self, file_path: str, progress_callback: Optional[Callable[[int], None]] = None) -> str:
         """
@@ -62,17 +63,24 @@ class SmartPipeline:
             return f"Error: File is missing or empty: {file_path}"
 
         markdown = ""
+        import time
+        start_process = time.time()
+        self.timings = {}
         try:
             if progress_callback:
                 progress_callback(10) # 10%: Started local process
 
+            t0 = time.time()
             markdown = self._local_process(file_path, ext)
+            self.timings["local_extraction"] = time.time() - t0
 
             # Final AI Polish Pass
             if self.use_polish and markdown:
                 if progress_callback:
                     progress_callback(30) # 30%: Local done, starting AI
+                t1 = time.time()
                 markdown = self._ai_polish(markdown, progress_callback=progress_callback)
+                self.timings["ai_polish_total"] = time.time() - t1
 
             if progress_callback:
                 progress_callback(100) # 100%: All done
@@ -83,6 +91,7 @@ class SmartPipeline:
             list_items = len([l for l in lines if l.startswith("- ") or l.startswith("1. ")])
             logger.info(f"Final Output: {len(lines)} lines, {headings} headings, {list_items} list items")
 
+            self.timings["total_pipeline"] = time.time() - start_process
             return markdown
         except Exception as e:
             logger.error(f"Failed to process {file_path}: {e}", exc_info=True)
@@ -951,7 +960,11 @@ class SmartPipeline:
             chunk_debug_dir.mkdir(parents=True, exist_ok=True)
             
             def _run_polish_async(idx, chunk, is_first):
-                return asyncio.run(self._polish_chunk(client, idx, chunk, is_first_chunk=is_first, debug_dir=chunk_debug_dir))
+                import time
+                t_chunk_start = time.time()
+                res = asyncio.run(self._polish_chunk(client, idx, chunk, is_first_chunk=is_first, debug_dir=chunk_debug_dir))
+                self.timings[f"chunk_{idx}"] = time.time() - t_chunk_start
+                return res
 
             polished_chunks = [None] * num_chunks
             completed_chunks = 0

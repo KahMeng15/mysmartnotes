@@ -163,7 +163,7 @@ async def smart_extract_download(
 
 
 @router.post("/notes/{note_id}/reprocess-smart")
-async def reprocess_smart(
+def reprocess_smart(
     note_id: str,
     use_ai: bool = False,
     current_user: User = Depends(get_current_user),

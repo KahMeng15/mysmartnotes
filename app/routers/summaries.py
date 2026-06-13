@@ -1,5 +1,5 @@
 """Document generation endpoints"""
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from app.utils.cache import cache_response, clear_cache_pattern_sync
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -87,6 +87,8 @@ class CheatsheetRequest(BaseModel):
     note_id: str
     format: str = "markdown"  # markdown or html
 
+class RenameSummaryRequest(BaseModel):
+    title: str
 
 class CheatsheetResponse(BaseModel):
     note_id: str
@@ -112,6 +114,7 @@ class SummaryItemResponse(BaseModel):
     processing_time_ms: Optional[int] = None  # Processing time in milliseconds
     model: Optional[str] = None  # AI model used
     is_user_edited: bool = False  # Whether the user has edited this summary
+    is_pinned: bool = False  # Whether the summary is pinned
     prompt_name: Optional[str] = None
     prompt_icon: Optional[str] = None
 
@@ -517,6 +520,64 @@ async def delete_summary(
     
     # Clear cache
     clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
+    
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/{summary_id}/rename")
+async def rename_summary(
+    summary_id: str,
+    request: RenameSummaryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Rename a generated summary"""
+    summary = db.query(Summary).join(Note).filter(
+        Summary.id == summary_id,
+        Note.user_id == current_user.id
+    ).first()
+
+    if not summary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Summary not found"
+        )
+
+    summary.title = request.title
+    summary.is_user_edited = True
+    db.commit()
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
+    
+    return {"message": "Summary renamed", "title": summary.title}
+
+
+@router.patch("/{summary_id}/pin")
+async def toggle_pin_summary(
+    summary_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Toggle pin status of a summary"""
+    summary = db.query(Summary).join(Note).filter(
+        Summary.id == summary_id,
+        Note.user_id == current_user.id
+    ).first()
+
+    if not summary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Summary not found"
+        )
+
+    summary.is_pinned = not summary.is_pinned
+    db.commit()
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
+    
+    return {"message": "Summary pin toggled", "is_pinned": summary.is_pinned}
 
 @router.post("/{summary_id}/export", response_model=dict)
 async def export_summary(

@@ -72,7 +72,8 @@ def _rebuild_note_content(
 
     if file_ext in ('.pdf', '.pptx'):
         logger.info(f"Rebuilding note {note.id} with SmartPipeline from scratch")
-        raw_text = extract_markdown_for_user(current_user, note.file_path)
+        raw_text, timings = extract_markdown_for_user(current_user, note.file_path)
+        StorageManager.save_note_json(note.id, "timings", timings)
         structured_content = markdown_to_segments(raw_text)
 
         images_data = []
@@ -142,7 +143,16 @@ async def get_notes(
         query = query.filter(Note.subject_id == subject_id)
     
     notes = query.order_by(Note.created_at.desc()).all()
-    return notes
+    
+    response_notes = []
+    for note in notes:
+        note_data = NoteResponse.from_orm(note)
+        timings = StorageManager.get_note_json(note.id, "timings")
+        if timings:
+            note_data.timings = timings
+        response_notes.append(note_data)
+
+    return response_notes
 
 
 @router.post("/upload", response_model=List[NoteResponse], status_code=status.HTTP_201_CREATED)
@@ -305,6 +315,10 @@ async def get_note(
     if images:
         note_data.extracted_images_metadata = json.dumps(images)
 
+    timings = StorageManager.get_note_json(note_id, "timings")
+    if timings:
+        note_data.timings = timings
+
     logger.info(f"GET note {note_id}: extracted_text length = {len(note_data.extracted_text) if note_data.extracted_text else 'NULL'}")
     return note_data
 
@@ -357,7 +371,7 @@ async def update_note(
 
 
 @router.post("/{note_id}/reprocess-ocr", response_model=NoteResponse)
-async def reprocess_ocr(
+def reprocess_ocr(
     note_id: str,
     use_v2: bool = True,
     current_user: User = Depends(get_current_user),
@@ -380,7 +394,14 @@ async def reprocess_ocr(
         logger.info(f"Reprocessing OCR for note {note_id} (use_v2={use_v2})")
         note = _rebuild_note_content(note, current_user, db, use_v2=use_v2, reset_first=False)
         logger.info(f"Successfully reprocessed OCR for note {note_id}")
-        return note
+        
+        note_data = NoteResponse.from_orm(note)
+        timings = StorageManager.get_note_json(note.id, "timings")
+        if timings:
+            note_data.timings = timings
+            
+        clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+        return note_data
         
     except Exception as e:
         import traceback
@@ -394,7 +415,7 @@ async def reprocess_ocr(
 
 
 @router.post("/{note_id}/reprocess", response_model=NoteResponse)
-async def reprocess_note_from_scratch(
+def reprocess_note_from_scratch(
     note_id: str,
     use_v2: bool = True,
     current_user: User = Depends(get_current_user),
@@ -416,7 +437,14 @@ async def reprocess_note_from_scratch(
         logger.info(f"Starting full note rebuild for {note_id}")
         note = _rebuild_note_content(note, current_user, db, use_v2=use_v2, reset_first=True)
         logger.info(f"Successfully rebuilt note {note_id} from scratch")
-        return note
+        
+        note_data = NoteResponse.from_orm(note)
+        timings = StorageManager.get_note_json(note.id, "timings")
+        if timings:
+            note_data.timings = timings
+            
+        clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+        return note_data
     except Exception as e:
         logger.error(f"Error rebuilding note from scratch: {e}", exc_info=True)
         raise HTTPException(

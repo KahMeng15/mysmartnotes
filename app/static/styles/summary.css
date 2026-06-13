@@ -267,7 +267,7 @@
     margin-top: 2px;
 }
 
-.version-delete {
+.version-menu-btn {
     background: none;
     border: none;
     color: var(--color-gray);
@@ -275,16 +275,61 @@
     padding: 4px;
     border-radius: 4px;
     transition: all 0.15s;
-    opacity: 0;
     margin-left: 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.version-item:hover .version-delete {
-    opacity: 1;
+.version-menu-btn:hover, .version-menu-btn.active {
+    color: var(--color-primary);
+    background: rgba(var(--color-primary-rgb), 0.1);
 }
 
-.version-delete:hover {
+.version-dropdown {
+    position: absolute;
+    top: 28px;
+    right: 10px;
+    background: var(--color-white);
+    border: 1px solid var(--color-light-gray);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    min-width: 140px;
+    z-index: 100;
+    display: none;
+    flex-direction: column;
+    padding: 4px;
+}
+
+.version-dropdown.show {
+    display: flex;
+}
+
+.version-dropdown-item {
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--color-dark);
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+}
+
+.version-dropdown-item:hover {
+    background: var(--color-background);
+}
+
+.version-dropdown-item.danger {
     color: var(--color-error);
+}
+
+.version-dropdown-item.danger:hover {
     background: rgba(219, 84, 97, 0.1);
 }
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput } from '@mantine/core';
+import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput, Menu, Code } from '@mantine/core';
 import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu } from '@tabler/icons-react';
 import * as TablerIcons from '@tabler/icons-react';
 
@@ -68,6 +68,10 @@ export default function SummaryView() {
   const [generating, setGenerating] = useState(false);
   const [generatingSummaryId, setGeneratingSummaryId] = useState(null);
   const [modalOpened, setModalOpened] = useState(false);
+  const [deleteModalSummary, setDeleteModalSummary] = useState(null);
+  const [renameModalSummary, setRenameModalSummary] = useState(null);
+  const [infoModalSummary, setInfoModalSummary] = useState(null);
+  const [renameInput, setRenameInput] = useState('');
   const [taskStatus, setTaskStatus] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -246,6 +250,76 @@ export default function SummaryView() {
       setError("Failed to load summary content");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRename = (summary, e) => {
+    e.stopPropagation();
+    const details = summary.prompt_name || [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+    const defaultTitle = details || `Version ${summary.version}`;
+    const currentName = summary.is_user_edited ? summary.title : defaultTitle;
+    
+    setRenameInput(currentName);
+    setRenameModalSummary(summary);
+  };
+
+  const confirmRename = async () => {
+    if (!renameModalSummary || !renameInput.trim()) return;
+    
+    const details = renameModalSummary.prompt_name || [renameModalSummary.mode, renameModalSummary.output_format, renameModalSummary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+    const currentName = renameModalSummary.is_user_edited ? renameModalSummary.title : (details || `Version ${renameModalSummary.version}`);
+    
+    if (renameInput === currentName) {
+      setRenameModalSummary(null);
+      return;
+    }
+    
+    try {
+      await fetchApi(`/summaries/${renameModalSummary.id}/rename`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: renameInput })
+      });
+      setSummaries(summaries.map(s => s.id === renameModalSummary.id ? { ...s, title: renameInput, is_user_edited: true } : s));
+      if (selectedSummary?.id === renameModalSummary.id) {
+        setSelectedSummary({ ...selectedSummary, title: renameInput, is_user_edited: true });
+      }
+      setRenameModalSummary(null);
+    } catch (err) {
+      console.error('Failed to rename', err);
+    }
+  };
+
+  const handlePin = async (summary, e) => {
+    e.stopPropagation();
+    try {
+      await fetchApi(`/summaries/${summary.id}/pin`, { method: 'PATCH' });
+      const updated = summaries.map(s => s.id === summary.id ? { ...s, is_pinned: !s.is_pinned } : s);
+      setSummaries(updated.sort((a, b) => {
+        if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+        return b.version - a.version;
+      }));
+    } catch (err) {
+      console.error('Failed to pin', err);
+    }
+  };
+
+  const handleDelete = (summary, e) => {
+    e.stopPropagation();
+    setDeleteModalSummary(summary);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModalSummary) return;
+    try {
+      await fetchApi(`/summaries/${deleteModalSummary.id}`, { method: 'DELETE' });
+      setSummaries(summaries.filter(s => s.id !== deleteModalSummary.id));
+      if (selectedSummary?.id === deleteModalSummary.id) {
+        setSelectedSummary(null);
+        navigate(`/note/${noteId}/summary`, { replace: true });
+      }
+      setDeleteModalSummary(null);
+    } catch (err) {
+      console.error('Failed to delete', err);
     }
   };
 
@@ -487,6 +561,91 @@ export default function SummaryView() {
           background-color: #f8f9fa;
         }
       `}</style>
+      <Modal opened={!!deleteModalSummary} onClose={() => setDeleteModalSummary(null)} title="Delete Summary" centered>
+        <Text size="sm" mb="lg">
+          Are you sure you want to delete <b>{deleteModalSummary?.title || (deleteModalSummary && `Version ${deleteModalSummary.version}`) || 'this summary'}</b>? This action cannot be undone.
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setDeleteModalSummary(null)}>Cancel</Button>
+          <Button color="red" onClick={confirmDelete} data-autofocus>Delete</Button>
+        </Group>
+      </Modal>
+
+      <Modal opened={!!renameModalSummary} onClose={() => setRenameModalSummary(null)} title="Rename Summary" centered>
+        <TextInput
+          label="Summary Name"
+          placeholder="Enter a new name"
+          value={renameInput}
+          onChange={(e) => setRenameInput(e.currentTarget.value)}
+          data-autofocus
+          mb="lg"
+          onKeyDown={(e) => e.key === 'Enter' && confirmRename()}
+        />
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setRenameModalSummary(null)}>Cancel</Button>
+          <Button onClick={confirmRename}>Save</Button>
+        </Group>
+      </Modal>
+
+      <Modal opened={!!infoModalSummary} onClose={() => setInfoModalSummary(null)} title="System Information" centered size="lg">
+        {infoModalSummary && (
+          <Stack gap="sm">
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Note ID</Text>
+              <Code>{infoModalSummary.note_id}</Code>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Summary ID</Text>
+              <Code>{infoModalSummary.id}</Code>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Type</Text>
+              <Badge color={infoModalSummary.prompt_name ? "grape" : "blue"}>{infoModalSummary.prompt_name ? "Single Parameter" : "Multi Parameter"}</Badge>
+            </Group>
+            
+            {infoModalSummary.prompt_name ? (
+              <Group justify="space-between">
+                <Text size="sm" fw={500}>Prompt Name</Text>
+                <Text size="sm">{infoModalSummary.prompt_name}</Text>
+              </Group>
+            ) : (
+              <>
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>Mode</Text>
+                  <Text size="sm" tt="capitalize">{infoModalSummary.mode || 'N/A'}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>Output Format</Text>
+                  <Text size="sm" tt="capitalize">{infoModalSummary.output_format?.replace('_', ' ') || 'N/A'}</Text>
+                </Group>
+                <Group justify="space-between">
+                  <Text size="sm" fw={500}>Processing Method</Text>
+                  <Text size="sm" tt="capitalize">{infoModalSummary.processing_method || 'N/A'}</Text>
+                </Group>
+                {infoModalSummary.split_level && (
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>Split Level</Text>
+                    <Text size="sm" tt="uppercase">{infoModalSummary.split_level}</Text>
+                  </Group>
+                )}
+              </>
+            )}
+            
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>AI Model</Text>
+              <Text size="sm" c="dimmed">{infoModalSummary.model || 'Unknown'}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Processing Time</Text>
+              <Text size="sm" c="dimmed">
+                {infoModalSummary.processing_time_ms ? `${(infoModalSummary.processing_time_ms / 1000).toFixed(2)}s` : 
+                 infoModalSummary.processing_time ? `${infoModalSummary.processing_time.toFixed(2)}s` : 'Unknown'}
+              </Text>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
+
       <Modal opened={modalOpened} onClose={() => setModalOpened(false)} title="Summary Parameters" centered>
         <Stack>
           <SegmentedControl
@@ -853,10 +1012,36 @@ export default function SummaryView() {
                       }}
                       onClick={() => loadSummaryContent(summary.id)}
                     >
-                      <Group justify="space-between">
-                        <Text size="sm" fw={isActive ? 700 : 500}>
-                          {title}
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="sm" fw={isActive ? 700 : 500} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {summary.is_pinned && <TablerIcons.IconPinFilled size={14} style={{ marginRight: 4, color: 'var(--mantine-color-blue-6)', verticalAlign: 'middle' }} />}
+                          {summary.is_user_edited ? summary.title : title}
                         </Text>
+                        {summary.id !== 'generating' && (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Menu shadow="md" width={150} position="bottom-end" withinPortal>
+                              <Menu.Target>
+                                <ActionIcon variant="subtle" color="gray" size="sm">
+                                  <TablerIcons.IconDotsVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Item leftSection={<TablerIcons.IconPencil size={14} />} onClick={(e) => handleRename(summary, e)}>
+                                Rename
+                              </Menu.Item>
+                              <Menu.Item leftSection={<TablerIcons.IconPin size={14} />} onClick={(e) => handlePin(summary, e)}>
+                                {summary.is_pinned ? 'Unpin' : 'Pin'}
+                              </Menu.Item>
+                              <Menu.Item leftSection={<TablerIcons.IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalSummary(summary); }}>
+                                System Info
+                              </Menu.Item>
+                              <Menu.Item color="red" leftSection={<TablerIcons.IconTrash size={14} />} onClick={(e) => handleDelete(summary, e)}>
+                                Delete
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                            </Menu>
+                          </div>
+                        )}
                       </Group>
                       <Text size="xs" c="dimmed" mt={4}>
                         {formatDate(summary.created_at)}
