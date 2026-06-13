@@ -164,7 +164,8 @@ function App() {
           <Route path="/group/:id" element={<GroupView />} />
           <Route path="/subject/:id" element={<SubjectView />} />
           <Route path="/note/:id" element={<NoteView />} />
-          <Route path="/summaries" element={<SummaryView />} />
+          <Route path="/note/:noteId/summary" element={<SummaryView />} />
+          <Route path="/note/:noteId/summary/:summaryId" element={<SummaryView />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </AppLayout>

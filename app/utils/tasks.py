@@ -345,7 +345,7 @@ class SummaryTask:
                 id=doc_id,
                 version=next_version,
                 note_id=note_id,
-                title=f"Summary - {note.title}",
+                title=note.title,
                 summary_type="summary",
                 file_path=f"summary_{note.id}_{next_version}.md",
                 mode=mode,

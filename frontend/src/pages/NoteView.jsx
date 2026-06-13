@@ -456,7 +456,7 @@ export default function NoteView() {
                       <MantineNavLink
                         label={sidebarOpen ? "See Summaries" : ""}
                         leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
-                        onClick={() => navigate(`/summaries?note_id=${id}`)}
+                        onClick={() => navigate(`/note/${id}/summary`)}
                       />
                     </Tooltip>
                     <Tooltip label="Quick Chat" disabled={sidebarOpen} position="left">
