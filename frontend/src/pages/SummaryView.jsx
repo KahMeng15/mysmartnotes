@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput, Menu, Code } from '@mantine/core';
-import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu, IconDeviceFloppy, IconPencil, IconX, IconH1, IconH2, IconH3, IconCode, IconEye } from '@tabler/icons-react';
+import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu, IconDeviceFloppy, IconPencil, IconX, IconH1, IconH2, IconH3, IconCode, IconEye, IconDownload } from '@tabler/icons-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
@@ -675,6 +675,20 @@ export default function SummaryView() {
   const isFailed = taskStatus?.status === 'failed';
   const processingProgress = taskStatus?.progress || 10;
 
+  const handleExportMarkdown = () => {
+    const textToExport = summaryContent || '';
+    if (!textToExport) return;
+    const blob = new Blob([textToExport], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${note?.title || 'Export'}_Summary.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Box h="100vh" style={{ display: 'flex', flexDirection: 'column' }}>
       <style>{`
@@ -1237,14 +1251,33 @@ export default function SummaryView() {
                     />
                   </Tooltip>
 
-                  <Tooltip label="Back to note" disabled={sidebarOpen} position="left">
-                    <MantineNavLink
-                      label={sidebarOpen ? "Back to note" : ""}
-                      leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
-                      onClick={() => navigate(`/note/${noteId}`)}
-                    />
-                  </Tooltip>
-                </>
+                    <Menu position="left-start" withArrow>
+                      <Menu.Target>
+                        <Tooltip label="Export" disabled={sidebarOpen} position="left">
+                          <MantineNavLink
+                            label={sidebarOpen ? "Export" : ""}
+                            leftSection={<IconDownload size="1.2rem" stroke={1.5} />}
+                          />
+                        </Tooltip>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconDownload size="0.9rem" />} onClick={handleExportMarkdown}>
+                          Download as Markdown (.md)
+                        </Menu.Item>
+                        <Menu.Item disabled>
+                          Other formats coming soon...
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+
+                    <Tooltip label="Back to note" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Back to note" : ""}
+                        leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
+                        onClick={() => navigate(`/note/${noteId}`)}
+                      />
+                    </Tooltip>
+                  </>
               ) : (
                 <>
                   {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Actions</Text></Box>}

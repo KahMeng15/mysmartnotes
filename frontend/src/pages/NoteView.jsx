@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button } from '@mantine/core';
-import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye } from '@tabler/icons-react';
+import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu } from '@mantine/core';
+import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
@@ -278,6 +278,20 @@ export default function NoteView() {
   const isFailed = taskStatus?.status === 'failed';
   const processingProgress = taskStatus?.progress || 10;
 
+  const handleExportMarkdown = () => {
+    const textToExport = content || note?.content;
+    if (!textToExport) return;
+    const blob = new Blob([textToExport], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${note?.title || 'Export'}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Box h="100vh" style={{ display: 'flex', flexDirection: 'column' }}>
       <style>{`
@@ -473,6 +487,24 @@ export default function NoteView() {
                         onClick={() => navigate(`/quiz?note_id=${id}`)}
                       />
                     </Tooltip>
+                    <Menu position="left-start" withArrow>
+                      <Menu.Target>
+                        <Tooltip label="Export" disabled={sidebarOpen} position="left">
+                          <MantineNavLink
+                            label={sidebarOpen ? "Export" : ""}
+                            leftSection={<IconDownload size="1.2rem" stroke={1.5} />}
+                          />
+                        </Tooltip>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconDownload size="0.9rem" />} onClick={handleExportMarkdown}>
+                          Download as Markdown (.md)
+                        </Menu.Item>
+                        <Menu.Item disabled>
+                          Other formats coming soon...
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
                   </>
                 ) : (
                   <>
