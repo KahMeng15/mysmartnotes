@@ -97,6 +97,7 @@ def _prepare_user_for_response(user: User) -> dict:
         "use_global_ai_config": user.use_global_ai_config,
         "nav_sidebar_open": getattr(user, "nav_sidebar_open", True),
         "action_sidebar_open": getattr(user, "action_sidebar_open", True),
+        "sort_preference": getattr(user, "sort_preference", "name_asc"),
         "created_at": user.created_at,
     }
 
@@ -922,6 +923,8 @@ async def update_profile(user_update: UserUpdate, current_user: User = Depends(g
         current_user.nav_sidebar_open = user_update.nav_sidebar_open
     if getattr(user_update, "action_sidebar_open", None) is not None:
         current_user.action_sidebar_open = user_update.action_sidebar_open
+    if getattr(user_update, "sort_preference", None) is not None:
+        current_user.sort_preference = user_update.sort_preference
         
     db.commit()
     db.refresh(current_user)

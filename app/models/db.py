@@ -44,6 +44,7 @@ class User(Base):
     # UI Preferences
     nav_sidebar_open = Column(Boolean, default=True)
     action_sidebar_open = Column(Boolean, default=True)
+    sort_preference = Column(String(50), default="name_asc")
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -47,6 +47,7 @@ class UserUpdate(BaseModel):
     use_global_ai_config: Optional[bool] = None
     nav_sidebar_open: Optional[bool] = None
     action_sidebar_open: Optional[bool] = None
+    sort_preference: Optional[str] = None
 
 
 class User(UserBase):
@@ -63,6 +64,7 @@ class User(UserBase):
     use_global_ai_config: bool = True
     nav_sidebar_open: bool = True
     action_sidebar_open: bool = True
+    sort_preference: str = "name_asc"
     created_at: Optional[datetime] = None
     
     class Config:

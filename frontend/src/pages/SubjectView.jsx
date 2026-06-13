@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput } from '@mantine/core';
+import { useState, useEffect, useMemo } from 'react';
+import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft } from '@tabler/icons-react';
+import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 
@@ -13,6 +13,42 @@ export default function SubjectView() {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState(
+    localStorage.getItem('smartnotes_sort_pref') || 
+    JSON.parse(localStorage.getItem('user') || '{}').sort_preference || 
+    'name_asc'
+  );
+
+  useEffect(() => {
+    fetchApi('/auth/me').then(data => {
+      if (data && data.sort_preference) {
+        setSort(data.sort_preference);
+        localStorage.setItem('smartnotes_sort_pref', data.sort_preference);
+      }
+    }).catch(err => console.error("Failed to load user preferences", err));
+  }, []);
+
+  const filteredNotes = useMemo(() => {
+    let result = [...notes];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(n => 
+        n.title.toLowerCase().includes(q) || 
+        (n.file_name && n.file_name.toLowerCase().includes(q))
+      );
+    }
+    
+    result.sort((a, b) => {
+      if (sort === 'name_asc') return a.title.localeCompare(b.title);
+      if (sort === 'name_desc') return b.title.localeCompare(a.title);
+      if (sort === 'date_desc') return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      if (sort === 'date_asc') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+      return 0;
+    });
+    
+    return result;
+  }, [notes, search, sort]);
 
   // Subject Edit Modals
   const [editSubjectModalOpened, { open: openEditSubjectModal, close: closeEditSubjectModal }] = useDisclosure(false);
@@ -188,9 +224,45 @@ export default function SubjectView() {
         </Group>
       </Group>
 
-      {notes.length > 0 ? (
+      <Group mb="xl" align="flex-end">
+        <TextInput
+          placeholder="Search notes..."
+          leftSection={<IconSearch size={16} />}
+          value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)}
+          style={{ flexGrow: 1 }}
+        />
+        <Select
+          value={sort}
+          onChange={async (val) => {
+             setSort(val);
+             localStorage.setItem('smartnotes_sort_pref', val);
+             try {
+               await fetchApi('/auth/profile', {
+                 method: 'PUT',
+                 body: JSON.stringify({ sort_preference: val })
+               });
+               const user = JSON.parse(localStorage.getItem('user') || '{}');
+               user.sort_preference = val;
+               localStorage.setItem('user', JSON.stringify(user));
+             } catch (e) {
+               console.error("Failed to update sort preference in DB", e);
+             }
+          }}
+          data={[
+            { value: 'name_asc', label: 'Name (A-Z)' },
+            { value: 'name_desc', label: 'Name (Z-A)' },
+            { value: 'date_desc', label: 'Newest First' },
+            { value: 'date_asc', label: 'Oldest First' },
+          ]}
+          leftSection={<IconArrowsSort size={16} />}
+          style={{ width: 180 }}
+        />
+      </Group>
+
+      {filteredNotes.length > 0 ? (
         <Stack spacing="sm">
-          {notes.map((note) => {
+          {filteredNotes.map((note) => {
             const isProcessed = note.processing_time_ms != null || note.extracted_text != null || note.output_pdf_path != null;
             return (
               <Card

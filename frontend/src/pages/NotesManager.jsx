@@ -35,7 +35,11 @@ import { fetchApi } from '../lib/api';
 export default function NotesManager() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState(localStorage.getItem('smartnotes_sort_pref') || 'date_desc');
+  const [sort, setSort] = useState(
+    localStorage.getItem('smartnotes_sort_pref') || 
+    JSON.parse(localStorage.getItem('user') || '{}').sort_preference || 
+    'name_asc'
+  );
   
   const [groups, setGroups] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -60,6 +64,12 @@ export default function NotesManager() {
 
   useEffect(() => {
     loadData();
+    fetchApi('/auth/me').then(data => {
+      if (data && data.sort_preference) {
+        setSort(data.sort_preference);
+        localStorage.setItem('smartnotes_sort_pref', data.sort_preference);
+      }
+    }).catch(err => console.error("Failed to load user preferences", err));
   }, []);
 
   const loadData = async () => {
@@ -227,9 +237,20 @@ export default function NotesManager() {
         />
         <Select
           value={sort}
-          onChange={(val) => {
+          onChange={async (val) => {
              setSort(val);
              localStorage.setItem('smartnotes_sort_pref', val);
+             try {
+               await fetchApi('/auth/profile', {
+                 method: 'PUT',
+                 body: JSON.stringify({ sort_preference: val })
+               });
+               const user = JSON.parse(localStorage.getItem('user') || '{}');
+               user.sort_preference = val;
+               localStorage.setItem('user', JSON.stringify(user));
+             } catch (e) {
+               console.error("Failed to update sort preference in DB", e);
+             }
           }}
           data={[
             { value: 'name_asc', label: 'Name (A-Z)' },
