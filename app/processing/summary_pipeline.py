@@ -95,6 +95,8 @@ class SummaryPipeline:
                     return f"\n[Summary of section {idx+1} timed out]\n"
                 except Exception as e:
                     logger.error(f"Segment {idx+1}: Unexpected error: {e}", exc_info=True)
+                    if "All AI tiers failed" in str(e):
+                        raise e
                     return f"\n[Error summarizing section {idx+1}]\n"
 
         tasks = [
@@ -272,7 +274,7 @@ SUMMARY:
 
         except Exception as e:
             logger.error(f"Error summarizing chunk {idx}: {e}")
-            return ""
+            raise e
 
     def _scrub_artifacts(self, text: str) -> str:
         """Remove common AI-generated reasoning artifacts or markers."""

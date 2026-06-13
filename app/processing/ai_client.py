@@ -309,7 +309,7 @@ class AIClient:
                 continue # Try next tier
         
         logger.error("All AI tiers failed to generate text.")
-        return ""
+        raise Exception(f"All AI tiers failed. Last error: {last_error}")
 
     async def stream_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None):
         """Stream generation with 3-tier fallback logic."""
@@ -366,7 +366,7 @@ class AIClient:
                 last_error = e
                 continue
         
-        yield f"Error: All AI tiers failed. Last error: {last_error}"
+        raise Exception(f"All AI tiers failed. Last error: {last_error}")
 
     async def answer_question(self, context: str, question: str, system_prompt: Optional[str] = None) -> str:
         prompt = system_prompt if system_prompt else f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"

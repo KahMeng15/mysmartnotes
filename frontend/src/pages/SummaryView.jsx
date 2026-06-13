@@ -308,7 +308,10 @@ export default function SummaryView() {
           prompt_icon: finalPromptIcon
         })
       });
-      if (res && res.task_id && res.summary_id) {
+      if (res && res.is_cached) {
+         setGenerating(false);
+         navigate(`/note/${noteId}/summary/${res.id}`, { replace: true });
+      } else if (res && res.task_id && res.summary_id) {
          setGeneratingSummaryId(res.summary_id);
          setCurrentTaskId(res.task_id);
          
@@ -749,6 +752,13 @@ export default function SummaryView() {
                             }
                             
                             const isFirstH1 = !node.position || node.position.start.offset === firstH1Ref.current.offset;
+                            
+                            console.log("H1 Node:", {
+                              text: node.children?.[0]?.value,
+                              position: node.position,
+                              trackedOffset: firstH1Ref.current.offset,
+                              isFirstH1
+                            });
                             
                             if (isFirstH1 && selectedSummary) {
                               return (
