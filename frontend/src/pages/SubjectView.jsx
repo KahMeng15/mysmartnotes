@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code } from '@mantine/core';
+import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchApi } from '../lib/api';
+import { fetchApi, getAuthToken } from '../lib/api';
 
 const getFriendlyFileType = (mimeType) => {
   if (!mimeType) return 'DOCUMENT';
@@ -38,6 +38,31 @@ export default function SubjectView() {
   
   const [subject, setSubject] = useState(null);
   const [notes, setNotes] = useState([]);
+
+  const handleDownload = async (noteId, fileName) => {
+    try {
+      const token = getAuthToken();
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch(`/api/notes/${noteId}/download-file`, {
+        headers
+      });
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'download';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (error) {
+      console.error('Failed to download file:', error);
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
@@ -454,6 +479,20 @@ export default function SubjectView() {
             <Group justify="space-between">
               <Text size="sm" fw={500}>Created</Text>
               <Text size="sm">{new Date(infoModalNote.created_at).toLocaleString()}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Date and time uploaded</Text>
+              <Text size="sm">{new Date(infoModalNote.created_at).toLocaleString()}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>File Name</Text>
+              <Anchor 
+                size="sm" 
+                onClick={() => handleDownload(infoModalNote.id, infoModalNote.file_name)}
+                style={{ cursor: 'pointer' }}
+              >
+                {infoModalNote.file_name || 'Download File'}
+              </Anchor>
             </Group>
             
             {infoModalNote.timings ? (

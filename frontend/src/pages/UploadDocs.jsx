@@ -84,14 +84,18 @@ export default function UploadDocs() {
         formData.append('files', file);
       });
 
-      await fetchApi('/notes/upload', {
+      const res = await fetchApi('/notes/upload', {
         method: 'POST',
         body: formData,
       });
 
       setProgress(100);
       setTimeout(() => {
-        navigate(`/subject/${selectedSubject}`);
+        if (res && res.length === 1 && res[0].id) {
+          navigate(`/note/${res[0].id}`);
+        } else {
+          navigate(`/subject/${selectedSubject}`);
+        }
       }, 800);
 
     } catch (err) {
