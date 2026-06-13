@@ -1,10 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { Box, Container, Title, Textarea, Group, Button, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink } from '@mantine/core';
-import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand } from '@tabler/icons-react';
+import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button } from '@mantine/core';
+import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Markdown } from 'tiptap-markdown';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
 
 export default function NoteView() {
   const { id } = useParams();
@@ -13,11 +21,28 @@ export default function NoteView() {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
   const [isEditing, setIsEditing] = useState(false);
+  const [isRawMode, setIsRawMode] = useState(false);
 
   const [taskStatus, setTaskStatus] = useState(null);
   const [chatOpened, setChatOpened] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const [saveModalOpened, setSaveModalOpened] = useState(false);
+  const [cancelModalOpened, setCancelModalOpened] = useState(false);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Markdown,
+    ],
+    content: content,
+  });
 
   useEffect(() => {
     fetchApi('/auth/me').then(data => {
@@ -42,6 +67,51 @@ export default function NoteView() {
 
   const viewportRef = useRef(null);
   const markdownRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  const handleFormat = (type) => {
+    if (!isRawMode) {
+      if (!editor) return;
+      switch(type) {
+        case 'h1': editor.chain().focus().toggleHeading({ level: 1 }).run(); break;
+        case 'h2': editor.chain().focus().toggleHeading({ level: 2 }).run(); break;
+        case 'h3': editor.chain().focus().toggleHeading({ level: 3 }).run(); break;
+        case 'bullet': editor.chain().focus().toggleBulletList().run(); break;
+        case 'ordered': editor.chain().focus().toggleOrderedList().run(); break;
+        case 'table': editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); break;
+      }
+    } else {
+      if (!textareaRef.current) return;
+      const el = textareaRef.current;
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const before = content.substring(0, start);
+      const selected = content.substring(start, end);
+      const after = content.substring(end);
+
+      let inserted = '';
+      switch(type) {
+        case 'h1': inserted = '# ' + selected; break;
+        case 'h2': inserted = '## ' + selected; break;
+        case 'h3': inserted = '### ' + selected; break;
+        case 'bullet': inserted = '- ' + selected; break;
+        case 'ordered': inserted = '1. ' + selected; break;
+        case 'table': inserted = `\n| Column 1 | Column 2 | Column 3 |\n| -------- | -------- | -------- |\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |\n`; break;
+      }
+
+      const newContent = before + inserted + after;
+      setContent(newContent);
+      
+      setTimeout(() => {
+        el.focus();
+        if (type !== 'table') {
+           el.setSelectionRange(start, start + inserted.length);
+        } else {
+           el.setSelectionRange(start + inserted.length, start + inserted.length);
+        }
+      }, 0);
+    }
+  };
 
   const handleScroll = () => {
     if (!viewportRef.current || !markdownRef.current) return;
@@ -63,7 +133,6 @@ export default function NoteView() {
           }
         }
 
-        // Hierarchical invalidation: if this active element is structurally before an active higher-level header, invalidate it
         if (activeEl) {
           for (let j = 1; j < i; j++) {
             if (activeEls[j]) {
@@ -104,7 +173,7 @@ export default function NoteView() {
 
   useEffect(() => {
     setTimeout(handleScroll, 100);
-  }, [content, isEditing]);
+  }, [content, isEditing, isRawMode]);
 
   useEffect(() => {
     const loadNote = async () => {
@@ -132,7 +201,6 @@ export default function NoteView() {
         setTaskStatus(statusData);
 
         if (statusData && statusData.status === 'completed') {
-          // Task just finished, reload note with cache buster to get the fresh extracted_text
           const data = await fetchApi(`/notes/${id}?t=${Date.now()}`);
           setNote(data);
           setContent(data.extracted_text || '');
@@ -145,21 +213,48 @@ export default function NoteView() {
       }
     };
 
-    pollTask(); // Initial poll
-    interval = setInterval(pollTask, 2000); // Poll every 2 seconds
+    pollTask();
+    interval = setInterval(pollTask, 2000);
 
     return () => clearInterval(interval);
   }, [id, note?.processing_time_ms, note?.extracted_text, note?.output_pdf_path]);
 
+  const startEditing = () => {
+    if (editor) {
+      editor.commands.setContent(content);
+    }
+    setIsEditing(true);
+    setIsRawMode(false);
+  };
+
+  const handleToggleRaw = () => {
+    if (isRawMode) {
+      editor?.commands.setContent(content);
+      setIsRawMode(false);
+    } else {
+      if (editor) {
+        setContent(editor.storage.markdown.getMarkdown());
+      }
+      setIsRawMode(true);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
+    let finalContent = content;
+    if (!isRawMode && editor) {
+      finalContent = editor.storage.markdown.getMarkdown();
+    }
+
     try {
       await fetchApi(`/notes/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ extracted_text: content })
+        body: JSON.stringify({ extracted_text: finalContent })
       });
       setIsEditing(false);
-      setNote({ ...note, extracted_text: content });
+      setIsRawMode(false);
+      setContent(finalContent);
+      setNote({ ...note, extracted_text: finalContent });
     } catch (err) {
       console.error("Failed to save", err);
     } finally {
@@ -214,8 +309,9 @@ export default function NoteView() {
         .sticky-markdown h5 { top: var(--h5-top, 11rem); z-index: 12; font-size: 1.1rem; }
         .sticky-markdown h6 { top: var(--h6-top, 13rem); z-index: 11; font-size: 1rem; }
         .sticky-markdown p { margin-bottom: 0.5rem; }
-        .sticky-markdown ul, .sticky-markdown ol { margin-bottom: 0.5rem; padding-left: 1.5rem; }
+        .sticky-markdown ul, .sticky-markdown ol { margin-top: 0; margin-bottom: 0.5rem; padding-left: 1.5rem; }
         .sticky-markdown li { margin-bottom: 0.2rem; }
+        .sticky-markdown li p { margin: 0; }
         .sticky-markdown strong { font-weight: 700; }
         .sticky-markdown blockquote {
           border-left: 4px solid #3b82f6;
@@ -230,6 +326,24 @@ export default function NoteView() {
           border-radius: 4px;
           font-family: monospace;
           font-size: 0.9em;
+        }
+        .sticky-markdown .ProseMirror {
+          min-height: 50vh;
+        }
+        .sticky-markdown .ProseMirror:focus {
+          outline: none;
+        }
+        .sticky-markdown table {
+          border-collapse: collapse;
+          width: 100%;
+          margin-bottom: 1rem;
+        }
+        .sticky-markdown th, .sticky-markdown td {
+          border: 1px solid #dee2e6;
+          padding: 0.5rem;
+        }
+        .sticky-markdown th {
+          background-color: #f8f9fa;
         }
       `}</style>
 
@@ -265,7 +379,7 @@ export default function NoteView() {
         <ScrollArea
           viewportRef={viewportRef}
           onScrollPositionChange={handleScroll}
-          style={{ flex: 1, backgroundColor: isEditing ? '#f8f9fa' : '#fff' }}
+          style={{ flex: 1, backgroundColor: '#fff' }}
           p="xs"
         >
           <Container size="md" py="xs">
@@ -289,8 +403,9 @@ export default function NoteView() {
                   <Text size="sm" c="dimmed" mt="xs" ta="right">{processingProgress}%</Text>
                 </Box>
               </Box>
-            ) : isEditing ? (
+            ) : isEditing && isRawMode ? (
               <Textarea
+                ref={textareaRef}
                 minRows={30}
                 autosize
                 value={content}
@@ -300,7 +415,9 @@ export default function NoteView() {
               />
             ) : (
               <Box ref={markdownRef} className="sticky-markdown" style={{ color: '#171738', fontSize: '16px', lineHeight: 1.8 }}>
-                {content ? (
+                {isEditing && !isRawMode ? (
+                  <EditorContent editor={editor} />
+                ) : content ? (
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {content}
                   </ReactMarkdown>
@@ -324,7 +441,7 @@ export default function NoteView() {
                     <MantineNavLink
                       label={sidebarOpen ? "Edit Note" : ""}
                       leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
-                      onClick={() => setIsEditing(true)}
+                      onClick={startEditing}
                     />
                   </Tooltip>
                   <Tooltip label="See Summaries" disabled={sidebarOpen} position="left">
@@ -351,11 +468,12 @@ export default function NoteView() {
                 </>
               ) : (
                 <>
+                  {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Actions</Text></Box>}
                   <Tooltip label="Save Changes" disabled={sidebarOpen} position="left">
                     <MantineNavLink
                       label={sidebarOpen ? "Save Changes" : ""}
                       leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
-                      onClick={handleSave}
+                      onClick={() => setSaveModalOpened(true)}
                       color="blue"
                       variant="filled"
                       active
@@ -365,15 +483,98 @@ export default function NoteView() {
                     <MantineNavLink
                       label={sidebarOpen ? "Cancel Editing" : ""}
                       leftSection={<IconX size="1.2rem" stroke={1.5} />}
-                      onClick={() => setIsEditing(false)}
+                      onClick={() => setCancelModalOpened(true)}
+                      color="red"
                     />
                   </Tooltip>
+
+                  <Tooltip label={isRawMode ? "Visual Editor" : "Raw Markdown"} disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? (isRawMode ? "Visual Editor" : "Raw Markdown") : ""}
+                      leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
+                      onClick={handleToggleRaw}
+                    />
+                  </Tooltip>
+
+                  {(editor || isRawMode) && (
+                    <>
+                      {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Formatting</Text></Box>}
+                      <Tooltip label="Heading 1" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Heading 1" : ""}
+                          leftSection={<IconH1 size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('h1')}
+                          active={!isRawMode && editor?.isActive('heading', { level: 1 })}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Heading 2" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Heading 2" : ""}
+                          leftSection={<IconH2 size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('h2')}
+                          active={!isRawMode && editor?.isActive('heading', { level: 2 })}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Heading 3" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Heading 3" : ""}
+                          leftSection={<IconH3 size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('h3')}
+                          active={!isRawMode && editor?.isActive('heading', { level: 3 })}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Bullet List" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Bullet List" : ""}
+                          leftSection={<IconList size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('bullet')}
+                          active={!isRawMode && editor?.isActive('bulletList')}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Numbered List" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Numbered List" : ""}
+                          leftSection={<IconListNumbers size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('ordered')}
+                          active={!isRawMode && editor?.isActive('orderedList')}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Insert Table" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Insert Table" : ""}
+                          leftSection={<IconTable size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('table')}
+                        />
+                      </Tooltip>
+                    </>
+                  )}
                 </>
               )}
             </Stack>
           </Box>
         )}
       </Box>
+
+      {/* Modals */}
+      <Modal opened={saveModalOpened} onClose={() => setSaveModalOpened(false)} title="Save Changes" centered withCloseButton={false}>
+        <form onSubmit={(e) => { e.preventDefault(); setSaveModalOpened(false); handleSave(); }}>
+          <Text size="sm" mb="md">Are you sure you want to save these changes?</Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setSaveModalOpened(false)}>Cancel</Button>
+            <Button type="submit" color="blue" data-autofocus>Confirm Save</Button>
+          </Group>
+        </form>
+      </Modal>
+
+      <Modal opened={cancelModalOpened} onClose={() => setCancelModalOpened(false)} title="Cancel Editing" centered withCloseButton={false}>
+        <form onSubmit={(e) => { e.preventDefault(); setCancelModalOpened(false); setIsEditing(false); setIsRawMode(false); }}>
+          <Text size="sm" mb="md">Are you sure you want to cancel? Any unsaved changes will be lost.</Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setCancelModalOpened(false)}>Go Back</Button>
+            <Button type="submit" color="red" data-autofocus>Discard Changes</Button>
+          </Group>
+        </form>
+      </Modal>
 
       {/* Quick Chat Drawer */}
       <Drawer

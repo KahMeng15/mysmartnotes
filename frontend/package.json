@@ -13,12 +13,22 @@
     "@mantine/core": "^9.3.0",
     "@mantine/dropzone": "^9.3.0",
     "@mantine/hooks": "^9.3.0",
+    "@mantine/tiptap": "^9.3.0",
     "@tabler/icons-react": "^3.44.0",
+    "@tiptap/extension-link": "^3.26.1",
+    "@tiptap/extension-table": "^3.26.1",
+    "@tiptap/extension-table-cell": "^3.26.1",
+    "@tiptap/extension-table-header": "^3.26.1",
+    "@tiptap/extension-table-row": "^3.26.1",
+    "@tiptap/pm": "^3.26.1",
+    "@tiptap/react": "^3.26.1",
+    "@tiptap/starter-kit": "^3.26.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.17.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "tiptap-markdown": "^0.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
