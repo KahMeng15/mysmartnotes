@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Center, Loader, SimpleGrid, Modal, TextInput, Textarea, ColorInput, Stack, Menu, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconTrash, IconEdit, IconUpload, IconPlus, IconFiles, IconDotsVertical, IconSearch, IconArrowsSort } from '@tabler/icons-react';
+import { IconTrash, IconEdit, IconUpload, IconPlus, IconFiles, IconDotsVertical, IconSearch, IconArrowsSort, IconChevronLeft } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 
@@ -160,7 +160,7 @@ export default function GroupView() {
             name: newSubjectName.trim(),
             description: newSubjectDesc.trim(),
             color: newSubjectColor,
-            group_id: id === 'ungrouped' ? null : group.id
+            group_id: id === 'ungrouped' ? null : id
           })
         });
       }
@@ -206,6 +206,20 @@ export default function GroupView() {
 
   return (
     <Box>
+      {/* Sticky Header */}
+      <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20, margin: '-16px -16px 20px -16px' }}>
+        <Group justify="space-between">
+          <Group>
+            <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
+              <IconChevronLeft size={20} />
+            </ActionIcon>
+            <Group gap="xs" ml="xs">
+              <Text size="sm" fw={500} c="dimmed" style={{ cursor: 'pointer' }} onClick={() => navigate('/mynotes')}>Notes</Text>
+            </Group>
+          </Group>
+        </Group>
+      </Box>
+
       <Group justify="space-between" mb="lg">
         <Box>
           <Title order={1}>{group.name}</Title>

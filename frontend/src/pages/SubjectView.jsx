@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile } from '@tabler/icons-react';
+import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 
@@ -150,6 +150,26 @@ export default function SubjectView() {
 
   return (
     <Box>
+      {/* Sticky Header */}
+      <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20, margin: '-16px -16px 20px -16px' }}>
+        <Group justify="space-between">
+          <Group>
+            <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
+              <IconChevronLeft size={20} />
+            </ActionIcon>
+            <Group gap="xs" ml="xs">
+              <Text size="sm" fw={500} c="dimmed" style={{ cursor: 'pointer' }} onClick={() => navigate('/mynotes')}>Notes</Text>
+              {subject.group && (
+                <>
+                  <Text size="sm" c="dimmed">/</Text>
+                  <Text size="sm" fw={500} c="dimmed" style={{ cursor: 'pointer' }} onClick={() => navigate(`/group/${subject.group.id}`)}>{subject.group.name}</Text>
+                </>
+              )}
+            </Group>
+          </Group>
+        </Group>
+      </Box>
+
       <Group justify="space-between" mb="lg">
         <Box>
           <Title order={1}>{subject.name}</Title>

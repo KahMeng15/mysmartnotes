@@ -1,6 +1,6 @@
 """Subjects management endpoints"""
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 
 from app.models.db import User, Subject
@@ -21,7 +21,7 @@ async def get_subjects(
     db: Session = Depends(get_db)
 ):
     """Get all subjects for the current user"""
-    subjects = db.query(Subject).filter(Subject.user_id == current_user.id).all()
+    subjects = db.query(Subject).options(joinedload(Subject.group)).filter(Subject.user_id == current_user.id).all()
     return subjects
 
 
@@ -62,7 +62,7 @@ async def update_subject(
     db: Session = Depends(get_db)
 ):
     """Update a subject"""
-    db_subject = db.query(Subject).filter(
+    db_subject = db.query(Subject).options(joinedload(Subject.group)).filter(
         Subject.id == subject_id,
         Subject.user_id == current_user.id
     ).first()
