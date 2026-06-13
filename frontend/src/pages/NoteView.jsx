@@ -263,7 +263,7 @@ export default function NoteView() {
   };
 
   const isProcessedCheck = (lec) => {
-    return lec.processing_time_ms != null || lec.extracted_text != null || lec.output_pdf_path != null;
+    return lec.processing_time_ms != null || lec.extracted_text != null || lec.extracted_content_structured != null || lec.output_pdf_path != null;
   };
 
   if (loading && !note) {

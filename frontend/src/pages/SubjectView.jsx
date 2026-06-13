@@ -340,7 +340,7 @@ export default function SubjectView() {
       {filteredNotes.length > 0 ? (
         <Stack spacing="sm">
           {filteredNotes.map((note) => {
-            const isProcessed = note.processing_time_ms != null || note.extracted_text != null || note.output_pdf_path != null;
+            const isProcessed = note.processing_time_ms != null || note.extracted_text != null || note.extracted_content_structured != null || note.output_pdf_path != null;
             return (
               <Card
                 key={note.id}
@@ -481,8 +481,12 @@ export default function SubjectView() {
               <Text size="sm">{new Date(infoModalNote.created_at).toLocaleString()}</Text>
             </Group>
             <Group justify="space-between">
-              <Text size="sm" fw={500}>Date and time uploaded</Text>
+              <Text size="sm" fw={500}>Uploaded</Text>
               <Text size="sm">{new Date(infoModalNote.created_at).toLocaleString()}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Processing</Text>
+              <Text size="sm">{new Date(infoModalNote.updated_at).toLocaleString()}</Text>
             </Group>
             <Group justify="space-between">
               <Text size="sm" fw={500}>File Name</Text>
@@ -494,6 +498,22 @@ export default function SubjectView() {
                 {infoModalNote.file_name || 'Download File'}
               </Anchor>
             </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>File Type</Text>
+              <Text size="sm">{infoModalNote.file_type || 'Unknown'}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>File Size</Text>
+              <Text size="sm">
+                {infoModalNote.file_size ? `${(infoModalNote.file_size / 1024 / 1024).toFixed(2)} MB` : 'Unknown'}
+              </Text>
+            </Group>
+            {infoModalNote.page_count > 0 && (
+              <Group justify="space-between">
+                <Text size="sm" fw={500}>Page Count</Text>
+                <Text size="sm">{infoModalNote.page_count}</Text>
+              </Group>
+            )}
             
             {infoModalNote.timings ? (
               <>
