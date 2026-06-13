@@ -49,6 +49,7 @@ export default function SummaryView() {
   const [summaries, setSummaries] = useState([]);
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [summaryContent, setSummaryContent] = useState('');
+  const [currentTaskId, setCurrentTaskId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [generating, setGenerating] = useState(false);
@@ -99,37 +100,56 @@ export default function SummaryView() {
       }
     };
     loadNote();
-    loadSummaries();
-    
-    // Initial task check
-    checkTaskStatus();
+    loadSummaries().then(() => {
+      fetchApi('/search/tasks/active').then(activeData => {
+        if (activeData && activeData.tasks) {
+          const task = activeData.tasks.find(t => t.task_type === 'summary_generation' && String(t.note_id) === String(noteId));
+          if (task) {
+            setCurrentTaskId(task.task_id);
+            setGenerating(true);
+            setTaskStatus(task);
+            setSummaries(prev => {
+              if (!prev.some(s => s.id === 'generating')) {
+                 const mockVersion = {
+                   id: 'generating',
+                   version: prev.length > 0 ? prev[0].version + 1 : 1,
+                   created_at: task.created_at || new Date().toISOString(),
+                   mode: 'Generating...',
+                   output_format: '',
+                   processing_method: '',
+                 };
+                 return [mockVersion, ...prev];
+              }
+              return prev;
+            });
+          }
+        }
+      }).catch(e => console.error("Failed to fetch active tasks", e));
+    });
   }, [noteId]);
 
   useEffect(() => {
     let interval;
-    if (generating) {
-      interval = setInterval(checkTaskStatus, 2000);
+    if (generating && currentTaskId) {
+      interval = setInterval(checkTaskStatus, 1500);
     }
     return () => clearInterval(interval);
-  }, [generating]);
+  }, [generating, currentTaskId]);
 
   const checkTaskStatus = async () => {
+    if (!currentTaskId) return;
     try {
-      const statusData = await fetchApi(`/search/task?note_id=${noteId}`);
-      if (statusData && statusData.task_type === 'summary_generation') {
+      const statusData = await fetchApi(`/search/tasks/${currentTaskId}`);
+      if (statusData) {
         setTaskStatus(statusData);
         if (statusData.status === 'completed' || statusData.status === 'failed') {
           setGenerating(false);
-          loadSummaries();
-        } else {
-          setGenerating(true);
-        }
-      } else {
-        // No active summary task
-        if (generating && taskStatus && taskStatus.status !== 'completed' && taskStatus.status !== 'failed') {
-          // If we were generating but task disappeared, maybe it finished quickly
-          setGenerating(false);
-          loadSummaries();
+          setCurrentTaskId(null);
+          if (statusData.status === 'completed') {
+             loadSummaries(true);
+          } else {
+             loadSummaries();
+          }
         }
       }
     } catch (e) {
@@ -137,22 +157,34 @@ export default function SummaryView() {
     }
   };
 
-  const loadSummaries = async () => {
+  const loadSummaries = async (selectNewest = false) => {
     try {
       setLoading(true);
       const data = await fetchApi(`/summaries?note_id=${noteId}`);
       const filtered = data.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
-      setSummaries(filtered);
+      
+      setSummaries(prev => {
+        const isGenerating = prev.some(s => s.id === 'generating');
+        if (isGenerating && !selectNewest) {
+           return [prev.find(s => s.id === 'generating'), ...filtered];
+        }
+        return filtered;
+      });
+
       if (filtered.length > 0) {
-        if (summaryId) {
+        if (selectNewest === true) {
+          loadSummaryContent(filtered[0].id);
+        } else if (summaryId && summaryId !== 'generating') {
           const target = filtered.find(s => s.id === summaryId);
           if (target) {
             loadSummaryContent(target.id);
           } else {
             loadSummaryContent(filtered[0].id);
           }
-        } else {
+        } else if (summaryId !== 'generating') {
           loadSummaryContent(filtered[0].id);
+        } else {
+          setLoading(false);
         }
       } else {
         setLoading(false);
@@ -165,6 +197,11 @@ export default function SummaryView() {
   };
 
   const loadSummaryContent = async (id) => {
+    if (id === 'generating') {
+      setSelectedSummary(null);
+      navigate(`/note/${noteId}/summary/generating`, { replace: true });
+      return;
+    }
     try {
       setLoading(true);
       const data = await fetchApi(`/summaries/${id}`);
@@ -183,7 +220,26 @@ export default function SummaryView() {
     try {
       setGenerating(true);
       setModalOpened(false);
-      await fetchApi('/summaries/summary', {
+      setTaskStatus({ progress: 0, status: 'pending' });
+      setSelectedSummary(null);
+      
+      const nextVersion = summaries.filter(s => s.id !== 'generating').length > 0 
+        ? summaries.filter(s => s.id !== 'generating')[0].version + 1 
+        : 1;
+
+      const mockVersion = {
+        id: 'generating',
+        version: nextVersion,
+        created_at: new Date().toISOString(),
+        mode: mode,
+        output_format: outputFormat,
+        processing_method: processingMethod,
+      };
+
+      setSummaries(prev => [mockVersion, ...prev.filter(s => s.id !== 'generating')]);
+      navigate(`/note/${noteId}/summary/generating`, { replace: true });
+      
+      const res = await fetchApi('/summaries/summary', {
         method: 'POST',
         body: JSON.stringify({
           note_id: noteId,
@@ -192,7 +248,9 @@ export default function SummaryView() {
           processing_method: processingMethod
         })
       });
-      checkTaskStatus();
+      if (res && res.task_id) {
+         setCurrentTaskId(res.task_id);
+      }
     } catch (err) {
       console.error("Failed to generate summary", err);
       setError("Failed to start summary generation");
@@ -429,26 +487,30 @@ export default function SummaryView() {
           p={0}
         >
           <Container size="md" p={0} py="xl">
-            {generating ? (
+            {summaryId === 'generating' ? (
               <Box mt={100} ta="center">
-                <IconRobot size={64} color="var(--mantine-color-blue-6)" stroke={1.5} style={{ opacity: 0.8 }} />
-                <Title order={2} mt="xl" mb="sm" fw={800} c="#171738">Generating Summary...</Title>
-                <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
-                  Our AI is analyzing the notes and generating your customized summary.
-                </Text>
-                <Box maw={400} mx="auto">
-                  <Progress value={processingProgress} animated striped color="blue" size="xl" radius="xl" />
-                  <Text size="sm" c="dimmed" mt="xs" ta="right">{processingProgress}%</Text>
-                </Box>
+                {isFailed ? (
+                  <>
+                    <IconAlertCircle size={64} color="var(--mantine-color-red-6)" stroke={1.5} />
+                    <Title order={2} mt="xl" mb="sm" fw={800} c="red">Processing Failed</Title>
+                    <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                      {taskStatus?.error || 'An unexpected error occurred while generating the summary.'}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <IconRobot size={64} color="var(--mantine-color-blue-6)" stroke={1.5} style={{ opacity: 0.8 }} />
+                    <Title order={2} mt="xl" mb="sm" fw={800} c="#171738">Generating Summary...</Title>
+                    <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                      Our AI is analyzing the notes and generating your customized summary.
+                    </Text>
+                    <Box maw={400} mx="auto">
+                      <Progress value={processingProgress} animated striped color="blue" size="xl" radius="xl" />
+                      <Text size="sm" c="dimmed" mt="xs" ta="right">{processingProgress}%</Text>
+                    </Box>
+                  </>
+                )}
               </Box>
-            ) : isFailed ? (
-               <Box mt={100} ta="center">
-                <IconAlertCircle size={64} color="var(--mantine-color-red-6)" stroke={1.5} />
-                <Title order={2} mt="xl" mb="sm" fw={800} c="red">Processing Failed</Title>
-                <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
-                  {taskStatus?.error || 'An unexpected error occurred while generating the summary.'}
-                </Text>
-               </Box>
             ) : loading ? (
               <Center h="50vh"><Loader size="lg" /></Center>
             ) : error ? (
@@ -528,55 +590,54 @@ export default function SummaryView() {
               
               {sidebarOpen ? (
                 <Stack gap="xs">
-                  {summaries.map(summary => (
+                  {summaries.map(summary => {
+                    const isActive = (selectedSummary?.id === summary.id) || (summaryId === 'generating' && summary.id === 'generating');
+                    const details = [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+                    const title = summary.id === 'generating' ? 'Generating...' : (details || `Version ${summary.version}`);
+
+                    return (
                     <Paper 
                       key={summary.id} 
                       p="sm" 
                       withBorder 
                       style={{ 
                         cursor: 'pointer', 
-                        borderColor: selectedSummary?.id === summary.id ? 'var(--mantine-color-blue-5)' : 'var(--mantine-color-gray-3)',
-                        backgroundColor: selectedSummary?.id === summary.id ? 'var(--mantine-color-blue-0)' : '#fff'
+                        borderColor: isActive ? 'var(--mantine-color-blue-5)' : 'var(--mantine-color-gray-3)',
+                        backgroundColor: isActive ? 'var(--mantine-color-blue-0)' : '#fff'
                       }}
                       onClick={() => loadSummaryContent(summary.id)}
                     >
                       <Group justify="space-between">
-                        <Text size="sm" fw={selectedSummary?.id === summary.id ? 700 : 500}>
-                          Version {summary.version}
+                        <Text size="sm" fw={isActive ? 700 : 500}>
+                          {title}
                         </Text>
-                        {selectedSummary?.id === summary.id && <IconCheck size={16} color="var(--mantine-color-blue-6)" />}
                       </Group>
-                      {(() => {
-                        const details = [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).join(' • ');
-                        return (
-                          <>
-                            {details && (
-                              <Text size="xs" c="dimmed" mt={4} tt="capitalize">
-                                {details}
-                              </Text>
-                            )}
-                            <Text size="xs" c="dimmed" mt={details ? 2 : 4}>
-                              {formatDate(summary.created_at)}
-                            </Text>
-                          </>
-                        );
-                      })()}
+                      <Text size="xs" c="dimmed" mt={4}>
+                        {formatDate(summary.created_at)}
+                      </Text>
                     </Paper>
-                  ))}
+                    );
+                  })}
                 </Stack>
               ) : (
                 <Stack gap="xs" align="center" mt="md">
-                  {summaries.map(summary => (
-                    <Tooltip key={summary.id} label={`Version ${summary.version} (${formatDate(summary.created_at)})`} position="left">
+                  {summaries.map(summary => {
+                    const isActive = (selectedSummary?.id === summary.id) || (summaryId === 'generating' && summary.id === 'generating');
+                    const details = [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+                    const tooltipLabel = summary.id === 'generating' ? 'Generating...' : `${details || `Version ${summary.version}`} (${formatDate(summary.created_at)})`;
+
+                    return (
+                    <Tooltip key={summary.id} label={tooltipLabel} position="left">
                       <ActionIcon 
-                        variant={selectedSummary?.id === summary.id ? "light" : "subtle"}
-                        color={selectedSummary?.id === summary.id ? "blue" : "gray"}
+                        variant={isActive ? "light" : "subtle"}
+                        color={isActive ? "blue" : "gray"}
                         onClick={() => loadSummaryContent(summary.id)}
                       >
                         <Text size="xs" fw={700}>v{summary.version}</Text>
                       </ActionIcon>
                     </Tooltip>
-                  ))}
+                    );
+                  })}
                 </Stack>
               )}
             </Stack>
