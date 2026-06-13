@@ -112,10 +112,10 @@ function AppLayout({ children }) {
               <Menu.Target>
                 <UnstyledButton p="xs" style={{ borderRadius: '8px', flex: navOpen ? 1 : 'unset', transition: 'background-color 150ms ease' }}>
                   <Group gap="sm" wrap="nowrap">
-                    <Avatar radius="xl" color="blue" size="sm">{user?.username ? user.username.substring(0, 2).toUpperCase() : 'U'}</Avatar>
+                    <Avatar radius="xl" color="blue" size="sm">{user ? (user.nickname || user.username || 'U').substring(0, 2).toUpperCase() : 'U'}</Avatar>
                     {navOpen && (
                       <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <Text size="sm" fw={500} truncate>{user?.username || 'User'}</Text>
+                        <Text size="sm" fw={500} truncate>{user?.nickname || user?.username || 'User'}</Text>
                       </div>
                     )}
                   </Group>

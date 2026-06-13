@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Box, Container, Title, Textarea, Group, Button, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip } from '@mantine/core';
+import { Box, Container, Title, Textarea, Group, Button, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink } from '@mantine/core';
 import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -48,32 +48,58 @@ export default function NoteView() {
     const viewportRect = viewportRef.current.getBoundingClientRect();
     const viewportTop = viewportRect.top;
 
-    let currentAccumulatedTop = 0;
+      let activeEls = [];
+      let currentAccumulatedTop = 0;
 
-    for (let i = 1; i <= 6; i++) {
-      const tag = `h${i}`;
-      const elements = markdownRef.current.querySelectorAll(tag);
-      let activeEl = null;
+      for (let i = 1; i <= 6; i++) {
+        const tag = `h${i}`;
+        const elements = Array.from(markdownRef.current.querySelectorAll(tag));
+        let activeEl = null;
 
-      for (const el of elements) {
-        const rect = el.getBoundingClientRect();
-        if (rect.top <= viewportTop + currentAccumulatedTop + 5) {
-          activeEl = el;
+        for (const el of elements) {
+          const rect = el.getBoundingClientRect();
+          if (rect.top <= viewportTop + currentAccumulatedTop + 5) {
+            activeEl = el;
+          }
+        }
+
+        // Hierarchical invalidation: if this active element is structurally before an active higher-level header, invalidate it
+        if (activeEl) {
+          for (let j = 1; j < i; j++) {
+            if (activeEls[j]) {
+              if (activeEl.compareDocumentPosition(activeEls[j]) & Node.DOCUMENT_POSITION_FOLLOWING) {
+                activeEl = null;
+                break;
+              }
+            }
+          }
+        }
+        
+        activeEls[i] = activeEl;
+
+        for (const el of elements) {
+          if (el === activeEl) {
+            el.style.opacity = 1;
+            el.style.pointerEvents = 'auto';
+          } else if (el.getBoundingClientRect().top <= viewportTop + currentAccumulatedTop + 5) {
+            el.style.opacity = 0;
+            el.style.pointerEvents = 'none';
+          } else {
+            el.style.opacity = 1;
+            el.style.pointerEvents = 'auto';
+          }
+        }
+
+        let h = 0;
+        if (activeEl) {
+          h = activeEl.offsetHeight;
+        }
+
+        currentAccumulatedTop += h;
+        if (i < 6) {
+          markdownRef.current.style.setProperty(`--h${i + 1}-top`, `${currentAccumulatedTop}px`);
         }
       }
-
-      let h = 0;
-      if (activeEl) {
-        h = activeEl.offsetHeight;
-      } else if (elements.length > 0) {
-        h = elements[0].offsetHeight;
-      }
-
-      currentAccumulatedTop += h;
-      if (i < 6) {
-        markdownRef.current.style.setProperty(`--h${i + 1}-top`, `${currentAccumulatedTop}px`);
-      }
-    }
   };
 
   useEffect(() => {
@@ -175,8 +201,9 @@ export default function NoteView() {
           position: sticky;
           background-color: #ffffff;
           margin-top: 0;
-          padding-top: 0.5rem;
-          padding-bottom: 0.2rem;
+          padding-top: 0.3rem;
+          padding-bottom: 0.1rem;
+          line-height: 1.1;
           z-index: 10;
           border-bottom: 1px solid #eaeaea;
         }
@@ -287,105 +314,59 @@ export default function NoteView() {
 
         {/* Right Sidebar */}
         {isProcessed && (
-          <Box w={sidebarOpen ? 280 : 70} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#fafafa', overflowY: 'auto', transition: 'width 0.2s ease' }} p={sidebarOpen ? "md" : "xs"}>
-            <Stack gap="sm" align={sidebarOpen ? "stretch" : "center"}>
+          <Box w={sidebarOpen ? 250 : 80} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#fafafa', overflowY: 'auto', transition: 'width 0.2s ease' }} p="md">
+            <Stack gap={0} align="stretch">
               {sidebarOpen && <Title order={5} fw={600} c="dimmed" mb="xs">Smart Actions</Title>}
 
               {!isEditing ? (
                 <>
                   <Tooltip label="Edit Note" disabled={sidebarOpen} position="left">
-                    <Button
-                      variant="subtle"
-                      color="gray"
-                      fullWidth={sidebarOpen}
-                      w={sidebarOpen ? '100%' : 40}
-                      px={sidebarOpen ? 'sm' : 0}
-                      leftSection={<IconPencil size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                    <MantineNavLink
+                      label={sidebarOpen ? "Edit Note" : ""}
+                      leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
                       onClick={() => setIsEditing(true)}
-                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
-                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
-                    >
-                      {sidebarOpen && "Edit Note"}
-                    </Button>
+                    />
                   </Tooltip>
                   <Tooltip label="See Summaries" disabled={sidebarOpen} position="left">
-                    <Button
-                      variant="subtle"
-                      color="gray"
-                      fullWidth={sidebarOpen}
-                      w={sidebarOpen ? '100%' : 40}
-                      px={sidebarOpen ? 'sm' : 0}
-                      leftSection={<IconFileText size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                    <MantineNavLink
+                      label={sidebarOpen ? "See Summaries" : ""}
+                      leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
                       onClick={() => navigate(`/summaries?note_id=${id}`)}
-                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
-                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
-                    >
-                      {sidebarOpen && "See Summaries"}
-                    </Button>
+                    />
                   </Tooltip>
                   <Tooltip label="Quick Chat" disabled={sidebarOpen} position="left">
-                    <Button
-                      variant="subtle"
-                      color="gray"
-                      fullWidth={sidebarOpen}
-                      w={sidebarOpen ? '100%' : 40}
-                      px={sidebarOpen ? 'sm' : 0}
-                      leftSection={<IconMessageChatbot size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                    <MantineNavLink
+                      label={sidebarOpen ? "Quick Chat" : ""}
+                      leftSection={<IconMessageChatbot size="1.2rem" stroke={1.5} />}
                       onClick={() => setChatOpened(true)}
-                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
-                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
-                    >
-                      {sidebarOpen && "Quick Chat"}
-                    </Button>
+                    />
                   </Tooltip>
                   <Tooltip label="Generate Quiz" disabled={sidebarOpen} position="left">
-                    <Button
-                      variant="subtle"
-                      color="gray"
-                      fullWidth={sidebarOpen}
-                      w={sidebarOpen ? '100%' : 40}
-                      px={sidebarOpen ? 'sm' : 0}
-                      leftSection={<IconCards size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                    <MantineNavLink
+                      label={sidebarOpen ? "Generate Quiz" : ""}
+                      leftSection={<IconCards size="1.2rem" stroke={1.5} />}
                       onClick={() => navigate(`/quiz?note_id=${id}`)}
-                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
-                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
-                    >
-                      {sidebarOpen && "Generate Quiz"}
-                    </Button>
+                    />
                   </Tooltip>
                 </>
               ) : (
                 <>
                   <Tooltip label="Save Changes" disabled={sidebarOpen} position="left">
-                    <Button
-                      variant="filled"
-                      color="blue"
-                      fullWidth={sidebarOpen}
-                      w={sidebarOpen ? '100%' : 40}
-                      px={sidebarOpen ? 'sm' : 0}
-                      leftSection={<IconDeviceFloppy size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                    <MantineNavLink
+                      label={sidebarOpen ? "Save Changes" : ""}
+                      leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
                       onClick={handleSave}
-                      loading={saving}
-                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
-                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
-                    >
-                      {sidebarOpen && "Save Changes"}
-                    </Button>
+                      color="blue"
+                      variant="filled"
+                      active
+                    />
                   </Tooltip>
                   <Tooltip label="Cancel Editing" disabled={sidebarOpen} position="left">
-                    <Button
-                      variant="subtle"
-                      color="gray"
-                      fullWidth={sidebarOpen}
-                      w={sidebarOpen ? '100%' : 40}
-                      px={sidebarOpen ? 'sm' : 0}
-                      leftSection={<IconX size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                    <MantineNavLink
+                      label={sidebarOpen ? "Cancel Editing" : ""}
+                      leftSection={<IconX size="1.2rem" stroke={1.5} />}
                       onClick={() => setIsEditing(false)}
-                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
-                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
-                    >
-                      {sidebarOpen && "Cancel Editing"}
-                    </Button>
+                    />
                   </Tooltip>
                 </>
               )}
