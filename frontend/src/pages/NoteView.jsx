@@ -345,29 +345,36 @@ export default function NoteView() {
         .sticky-markdown th {
           background-color: #f8f9fa;
         }
+        .clickable-crumb {
+          cursor: pointer;
+        }
+        .clickable-crumb:hover {
+          text-decoration: underline;
+        }
       `}</style>
 
       {/* Sticky Header */}
-      <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
+      <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
         <Group justify="space-between">
           <Group>
             <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
+            {note?.subject && (
+              <Group gap="xs" ml="xs">
+                {note.subject.group && (
+                  <>
+                    <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${note.subject.group.id}`)}>{note.subject.group.name}</Text>
+                    <Text size="sm" c="dimmed">/</Text>
+                  </>
+                )}
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}`)}>{note.subject.name}</Text>
+              </Group>
+            )}
             {!isProcessed && (
               <Badge ml="md" color={isFailed ? 'red' : 'orange'} variant="light">
                 {isFailed ? 'Failed' : 'Processing...'}
               </Badge>
-            )}
-          </Group>
-
-          <Group gap="sm">
-            {isProcessed && (
-              <Tooltip label={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}>
-                <ActionIcon variant="light" color="gray" size="lg" onClick={toggleSidebar}>
-                  {sidebarOpen ? <IconLayoutSidebarRightCollapse size={20} /> : <IconLayoutSidebarRightExpand size={20} />}
-                </ActionIcon>
-              </Tooltip>
             )}
           </Group>
         </Group>
@@ -431,126 +438,136 @@ export default function NoteView() {
 
         {/* Right Sidebar */}
         {isProcessed && (
-          <Box w={sidebarOpen ? 250 : 80} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#fafafa', overflowY: 'auto', transition: 'width 0.2s ease' }} p="md">
-            <Stack gap={0} align="stretch">
-              {sidebarOpen && <Title order={5} fw={600} c="dimmed" mb="xs">Smart Actions</Title>}
+          <Box w={sidebarOpen ? 250 : 80} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
+            <Box style={{ flex: 1, overflowY: 'auto' }}>
+              <Stack gap={0} align="stretch">
+                {sidebarOpen && <Title order={5} fw={600} c="dimmed" mb="xs">Smart Actions</Title>}
 
-              {!isEditing ? (
-                <>
-                  <Tooltip label="Edit Note" disabled={sidebarOpen} position="left">
-                    <MantineNavLink
-                      label={sidebarOpen ? "Edit Note" : ""}
-                      leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
-                      onClick={startEditing}
-                    />
-                  </Tooltip>
-                  <Tooltip label="See Summaries" disabled={sidebarOpen} position="left">
-                    <MantineNavLink
-                      label={sidebarOpen ? "See Summaries" : ""}
-                      leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
-                      onClick={() => navigate(`/summaries?note_id=${id}`)}
-                    />
-                  </Tooltip>
-                  <Tooltip label="Quick Chat" disabled={sidebarOpen} position="left">
-                    <MantineNavLink
-                      label={sidebarOpen ? "Quick Chat" : ""}
-                      leftSection={<IconMessageChatbot size="1.2rem" stroke={1.5} />}
-                      onClick={() => setChatOpened(true)}
-                    />
-                  </Tooltip>
-                  <Tooltip label="Generate Quiz" disabled={sidebarOpen} position="left">
-                    <MantineNavLink
-                      label={sidebarOpen ? "Generate Quiz" : ""}
-                      leftSection={<IconCards size="1.2rem" stroke={1.5} />}
-                      onClick={() => navigate(`/quiz?note_id=${id}`)}
-                    />
-                  </Tooltip>
-                </>
-              ) : (
-                <>
-                  {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Actions</Text></Box>}
-                  <Tooltip label="Save Changes" disabled={sidebarOpen} position="left">
-                    <MantineNavLink
-                      label={sidebarOpen ? "Save Changes" : ""}
-                      leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
-                      onClick={() => setSaveModalOpened(true)}
-                      color="blue"
-                      variant="filled"
-                      active
-                    />
-                  </Tooltip>
-                  <Tooltip label="Cancel Editing" disabled={sidebarOpen} position="left">
-                    <MantineNavLink
-                      label={sidebarOpen ? "Cancel Editing" : ""}
-                      leftSection={<IconX size="1.2rem" stroke={1.5} />}
-                      onClick={() => setCancelModalOpened(true)}
-                      color="red"
-                    />
-                  </Tooltip>
+                {!isEditing ? (
+                  <>
+                    <Tooltip label="Edit Note" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Edit Note" : ""}
+                        leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
+                        onClick={startEditing}
+                      />
+                    </Tooltip>
+                    <Tooltip label="See Summaries" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "See Summaries" : ""}
+                        leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
+                        onClick={() => navigate(`/summaries?note_id=${id}`)}
+                      />
+                    </Tooltip>
+                    <Tooltip label="Quick Chat" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Quick Chat" : ""}
+                        leftSection={<IconMessageChatbot size="1.2rem" stroke={1.5} />}
+                        onClick={() => setChatOpened(true)}
+                      />
+                    </Tooltip>
+                    <Tooltip label="Generate Quiz" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Generate Quiz" : ""}
+                        leftSection={<IconCards size="1.2rem" stroke={1.5} />}
+                        onClick={() => navigate(`/quiz?note_id=${id}`)}
+                      />
+                    </Tooltip>
+                  </>
+                ) : (
+                  <>
+                    {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Actions</Text></Box>}
+                    <Tooltip label="Save Changes" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Save Changes" : ""}
+                        leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
+                        onClick={() => setSaveModalOpened(true)}
+                        color="blue"
+                        variant="filled"
+                        active
+                      />
+                    </Tooltip>
+                    <Tooltip label="Cancel Editing" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Cancel Editing" : ""}
+                        leftSection={<IconX size="1.2rem" stroke={1.5} />}
+                        onClick={() => setCancelModalOpened(true)}
+                        color="red"
+                      />
+                    </Tooltip>
 
-                  <Tooltip label={isRawMode ? "Visual Editor" : "Raw Markdown"} disabled={sidebarOpen} position="left">
-                    <MantineNavLink
-                      label={sidebarOpen ? (isRawMode ? "Visual Editor" : "Raw Markdown") : ""}
-                      leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
-                      onClick={handleToggleRaw}
-                    />
-                  </Tooltip>
+                    <Tooltip label={isRawMode ? "Visual Editor" : "Raw Markdown"} disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? (isRawMode ? "Visual Editor" : "Raw Markdown") : ""}
+                        leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
+                        onClick={handleToggleRaw}
+                      />
+                    </Tooltip>
 
-                  {(editor || isRawMode) && (
-                    <>
-                      {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Formatting</Text></Box>}
-                      <Tooltip label="Heading 1" disabled={sidebarOpen} position="left">
-                        <MantineNavLink
-                          label={sidebarOpen ? "Heading 1" : ""}
-                          leftSection={<IconH1 size="1.2rem" stroke={1.5} />}
-                          onClick={() => handleFormat('h1')}
-                          active={!isRawMode && editor?.isActive('heading', { level: 1 })}
-                        />
-                      </Tooltip>
-                      <Tooltip label="Heading 2" disabled={sidebarOpen} position="left">
-                        <MantineNavLink
-                          label={sidebarOpen ? "Heading 2" : ""}
-                          leftSection={<IconH2 size="1.2rem" stroke={1.5} />}
-                          onClick={() => handleFormat('h2')}
-                          active={!isRawMode && editor?.isActive('heading', { level: 2 })}
-                        />
-                      </Tooltip>
-                      <Tooltip label="Heading 3" disabled={sidebarOpen} position="left">
-                        <MantineNavLink
-                          label={sidebarOpen ? "Heading 3" : ""}
-                          leftSection={<IconH3 size="1.2rem" stroke={1.5} />}
-                          onClick={() => handleFormat('h3')}
-                          active={!isRawMode && editor?.isActive('heading', { level: 3 })}
-                        />
-                      </Tooltip>
-                      <Tooltip label="Bullet List" disabled={sidebarOpen} position="left">
-                        <MantineNavLink
-                          label={sidebarOpen ? "Bullet List" : ""}
-                          leftSection={<IconList size="1.2rem" stroke={1.5} />}
-                          onClick={() => handleFormat('bullet')}
-                          active={!isRawMode && editor?.isActive('bulletList')}
-                        />
-                      </Tooltip>
-                      <Tooltip label="Numbered List" disabled={sidebarOpen} position="left">
-                        <MantineNavLink
-                          label={sidebarOpen ? "Numbered List" : ""}
-                          leftSection={<IconListNumbers size="1.2rem" stroke={1.5} />}
-                          onClick={() => handleFormat('ordered')}
-                          active={!isRawMode && editor?.isActive('orderedList')}
-                        />
-                      </Tooltip>
-                      <Tooltip label="Insert Table" disabled={sidebarOpen} position="left">
-                        <MantineNavLink
-                          label={sidebarOpen ? "Insert Table" : ""}
-                          leftSection={<IconTable size="1.2rem" stroke={1.5} />}
-                          onClick={() => handleFormat('table')}
-                        />
-                      </Tooltip>
-                    </>
-                  )}
-                </>
-              )}
-            </Stack>
+                    {(editor || isRawMode) && (
+                      <>
+                        {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Formatting</Text></Box>}
+                        <Tooltip label="Heading 1" disabled={sidebarOpen} position="left">
+                          <MantineNavLink
+                            label={sidebarOpen ? "Heading 1" : ""}
+                            leftSection={<IconH1 size="1.2rem" stroke={1.5} />}
+                            onClick={() => handleFormat('h1')}
+                            active={!isRawMode && editor?.isActive('heading', { level: 1 })}
+                          />
+                        </Tooltip>
+                        <Tooltip label="Heading 2" disabled={sidebarOpen} position="left">
+                          <MantineNavLink
+                            label={sidebarOpen ? "Heading 2" : ""}
+                            leftSection={<IconH2 size="1.2rem" stroke={1.5} />}
+                            onClick={() => handleFormat('h2')}
+                            active={!isRawMode && editor?.isActive('heading', { level: 2 })}
+                          />
+                        </Tooltip>
+                        <Tooltip label="Heading 3" disabled={sidebarOpen} position="left">
+                          <MantineNavLink
+                            label={sidebarOpen ? "Heading 3" : ""}
+                            leftSection={<IconH3 size="1.2rem" stroke={1.5} />}
+                            onClick={() => handleFormat('h3')}
+                            active={!isRawMode && editor?.isActive('heading', { level: 3 })}
+                          />
+                        </Tooltip>
+                        <Tooltip label="Bullet List" disabled={sidebarOpen} position="left">
+                          <MantineNavLink
+                            label={sidebarOpen ? "Bullet List" : ""}
+                            leftSection={<IconList size="1.2rem" stroke={1.5} />}
+                            onClick={() => handleFormat('bullet')}
+                            active={!isRawMode && editor?.isActive('bulletList')}
+                          />
+                        </Tooltip>
+                        <Tooltip label="Numbered List" disabled={sidebarOpen} position="left">
+                          <MantineNavLink
+                            label={sidebarOpen ? "Numbered List" : ""}
+                            leftSection={<IconListNumbers size="1.2rem" stroke={1.5} />}
+                            onClick={() => handleFormat('ordered')}
+                            active={!isRawMode && editor?.isActive('orderedList')}
+                          />
+                        </Tooltip>
+                        <Tooltip label="Insert Table" disabled={sidebarOpen} position="left">
+                          <MantineNavLink
+                            label={sidebarOpen ? "Insert Table" : ""}
+                            leftSection={<IconTable size="1.2rem" stroke={1.5} />}
+                            onClick={() => handleFormat('table')}
+                          />
+                        </Tooltip>
+                      </>
+                    )}
+                  </>
+                )}
+              </Stack>
+            </Box>
+
+            <Box mt="auto" pt="sm">
+              <Tooltip label={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"} position="left">
+                <ActionIcon variant="subtle" color="gray" size="lg" onClick={toggleSidebar}>
+                  {sidebarOpen ? <IconLayoutSidebarRightCollapse size={20} /> : <IconLayoutSidebarRightExpand size={20} />}
+                </ActionIcon>
+              </Tooltip>
+            </Box>
           </Box>
         )}
       </Box>
