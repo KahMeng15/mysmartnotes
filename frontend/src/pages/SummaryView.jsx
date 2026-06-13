@@ -84,15 +84,21 @@ export default function SummaryView() {
   
   const [parameterType, setParameterType] = useState('multi'); // 'multi' or 'single'
   const [globalPrompts, setGlobalPrompts] = useState([]);
-  const [selectedPromptId, setSelectedPromptId] = useState('custom');
-  const [customPromptText, setCustomPromptText] = useState('');
-  const [promptInput, setPromptInput] = useState('');
-  const [generatingPrompt, setGeneratingPrompt] = useState(false);
+  const [selectedPromptId, setSelectedPromptId] = useState(null);
+  const [userPrompts, setUserPrompts] = useState([]);
+  const [createPromptModalOpened, setCreatePromptModalOpened] = useState(false);
+  const [newPromptName, setNewPromptName] = useState('');
+  const [newPromptContent, setNewPromptContent] = useState('');
+  const [newPromptInput, setNewPromptInput] = useState('');
+  const [generatingNewPrompt, setGeneratingNewPrompt] = useState(false);
 
   useEffect(() => {
     fetchApi('/admin/global-prompts').then(data => {
       setGlobalPrompts(data || []);
     }).catch(err => console.error("Failed to load global prompts", err));
+    fetchApi('/prompts').then(data => {
+      setUserPrompts(data || []);
+    }).catch(err => console.error("Failed to load user prompts", err));
   }, []);
 
   useEffect(() => {
@@ -131,35 +137,33 @@ export default function SummaryView() {
       }
     };
     loadNote();
-    loadSummaries().then(() => {
-      fetchApi('/search/tasks/active').then(activeData => {
-        if (activeData && activeData.tasks) {
-          const task = activeData.tasks.find(t => t.task_type === 'summary_generation' && String(t.input_data?.note_id) === String(noteId));
-          if (task) {
-            const genId = task.input_data?.summary_id || 'generating';
-            setCurrentTaskId(task.task_id);
-            setGenerating(true);
-            setGeneratingSummaryId(genId);
-            setTaskStatus(task);
-            setSummaries(prev => {
-              if (!prev.some(s => s.id === genId)) {
-                 const mockVersion = {
-                   id: genId,
-                   version: prev.length > 0 ? prev[0].version + 1 : 1,
-                   created_at: task.created_at || new Date().toISOString(),
-                   mode: task.input_data?.mode || 'Generating...',
-                   output_format: task.input_data?.output_format || '',
-                   processing_method: task.input_data?.processing_method || '',
-                   prompt_name: task.input_data?.prompt_name,
-                   prompt_icon: task.input_data?.prompt_icon
-                 };
-                 return [mockVersion, ...prev];
-              }
-              return prev;
-            });
-          }
+    Promise.all([
+      fetchApi(`/summaries?note_id=${noteId}`),
+      fetchApi('/search/tasks/active').catch(() => null)
+    ]).then(([summariesData, activeData]) => {
+      let activeTask = null;
+      let genId = null;
+
+      if (activeData && activeData.tasks) {
+        activeTask = activeData.tasks.find(t => {
+          const data = t.input_data?.kwargs || t.input_data || {};
+          return t.task_type === 'summary_generation' && String(data.note_id) === String(noteId) && ['pending', 'processing', 'running'].includes(t.status);
+        });
+        
+        if (activeTask) {
+          const data = activeTask.input_data?.kwargs || activeTask.input_data || {};
+          genId = data.summary_id || 'generating';
+          setCurrentTaskId(activeTask.task_id);
+          setGenerating(true);
+          setGeneratingSummaryId(genId);
+          setTaskStatus(activeTask);
         }
-      }).catch(e => console.error("Failed to fetch active tasks", e));
+      }
+
+      loadSummaries(false, false, summariesData, activeTask, genId);
+    }).catch(err => {
+      console.error("Failed to load initial data", err);
+      setLoading(false);
     });
   }, [noteId]);
 
@@ -193,32 +197,54 @@ export default function SummaryView() {
     }
   };
 
-  const loadSummaries = async (selectNewest = false, forceNotGenerating = false) => {
+  const loadSummaries = async (selectNewest = false, forceNotGenerating = false, preloadedData = null, activeTask = null, preloadedGenId = null) => {
     try {
       setLoading(true);
-      const data = await fetchApi(`/summaries?note_id=${noteId}`);
+      const data = preloadedData || await fetchApi(`/summaries?note_id=${noteId}`);
       const filtered = data.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
       
-      setSummaries(prev => {
-        const isGenerating = forceNotGenerating ? false : (generating && generatingSummaryId);
-        if (isGenerating && !selectNewest) {
-           return [prev.find(s => s.id === generatingSummaryId), ...filtered];
+      let finalSummaries = [...filtered];
+      const effectiveGenId = forceNotGenerating ? null : (preloadedGenId || generatingSummaryId);
+
+      // If we have an active task injected, create the mock version
+      if (activeTask && effectiveGenId) {
+        const tdata = activeTask.input_data?.kwargs || activeTask.input_data || {};
+        if (!finalSummaries.some(s => s.id === effectiveGenId)) {
+           const mockVersion = {
+             id: effectiveGenId,
+             version: finalSummaries.length > 0 ? finalSummaries[0].version + 1 : 1,
+             created_at: activeTask.created_at || new Date().toISOString(),
+             mode: tdata.mode || 'Generating...',
+             output_format: tdata.output_format || '',
+             processing_method: tdata.processing_method || '',
+             prompt_name: tdata.prompt_name,
+             prompt_icon: tdata.prompt_icon
+           };
+           finalSummaries = [mockVersion, ...finalSummaries];
         }
-        return filtered;
+      }
+
+      setSummaries(prev => {
+        const isGenerating = forceNotGenerating ? false : (generating || activeTask);
+        if (isGenerating && !selectNewest && !activeTask) {
+           const existing = prev.find(s => s.id === effectiveGenId);
+           return [existing, ...filtered].filter(Boolean);
+        }
+        return finalSummaries;
       });
 
-      if (filtered.length > 0) {
+      if (finalSummaries.length > 0) {
         if (selectNewest === true) {
-          loadSummaryContent(filtered[0].id, forceNotGenerating);
-        } else if (summaryId && summaryId !== (forceNotGenerating ? null : generatingSummaryId)) {
-          const target = filtered.find(s => s.id === summaryId);
+          loadSummaryContent(finalSummaries[0].id, forceNotGenerating);
+        } else if (summaryId && summaryId !== effectiveGenId) {
+          const target = finalSummaries.find(s => s.id === summaryId);
           if (target) {
             loadSummaryContent(target.id, forceNotGenerating);
           } else {
-            loadSummaryContent(filtered[0].id, forceNotGenerating);
+            loadSummaryContent(finalSummaries[0].id, forceNotGenerating);
           }
-        } else if (summaryId !== (forceNotGenerating ? null : generatingSummaryId)) {
-          loadSummaryContent(filtered[0].id, forceNotGenerating);
+        } else if (summaryId !== effectiveGenId) {
+          loadSummaryContent(finalSummaries[0].id, forceNotGenerating);
         } else {
           setLoading(false);
         }
@@ -341,6 +367,48 @@ export default function SummaryView() {
     }
   };
 
+  const handleGenerateNewPromptAI = async () => {
+    if (!newPromptInput.trim()) return;
+    try {
+      setGeneratingNewPrompt(true);
+      const res = await fetchApi('/summaries/generate-prompt', {
+        method: 'POST',
+        body: JSON.stringify({ user_input: newPromptInput })
+      });
+      if (res && res.prompt) {
+        setNewPromptContent(res.prompt);
+        if (res.name) {
+          setNewPromptName(res.name);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to generate prompt", err);
+    } finally {
+      setGeneratingNewPrompt(false);
+    }
+  };
+
+  const saveNewPrompt = async () => {
+    if (!newPromptName.trim() || !newPromptContent.trim()) return;
+    try {
+      const res = await fetchApi('/prompts', {
+        method: 'POST',
+        body: JSON.stringify({ name: newPromptName, content: newPromptContent })
+      });
+      if (res && res.id) {
+        setUserPrompts(prev => [...prev, res]);
+        setSelectedPromptId(`u_${res.id}`);
+        setCreatePromptModalOpened(false);
+        setModalOpened(true);
+        setNewPromptName('');
+        setNewPromptContent('');
+        setNewPromptInput('');
+      }
+    } catch (err) {
+      console.error("Failed to save new prompt", err);
+    }
+  };
+
   const startGenerateSummary = async () => {
     try {
       setGenerating(true);
@@ -356,16 +424,26 @@ export default function SummaryView() {
       let finalPromptName = null;
       let finalPromptIcon = null;
       if (parameterType === 'single') {
-        if (selectedPromptId === 'custom') {
-          finalPrompt = customPromptText;
-          finalPromptName = "Custom User Prompt";
-          finalPromptIcon = "IconUserEdit";
-        } else {
-          const gp = globalPrompts.find(p => p.id.toString() === selectedPromptId);
+        if (!selectedPromptId) {
+          setError("Please select a prompt template first");
+          setGenerating(false);
+          return;
+        }
+        if (selectedPromptId.startsWith('g_')) {
+          const id = selectedPromptId.replace('g_', '');
+          const gp = globalPrompts.find(p => p.id.toString() === id);
           if (gp) {
             finalPrompt = gp.content;
             finalPromptName = gp.name;
             finalPromptIcon = gp.icon;
+          }
+        } else if (selectedPromptId.startsWith('u_')) {
+          const id = selectedPromptId.replace('u_', '');
+          const up = userPrompts.find(p => p.id.toString() === id);
+          if (up) {
+            finalPrompt = up.content;
+            finalPromptName = up.name;
+            finalPromptIcon = 'IconUserEdit';
           }
         }
       }
@@ -646,6 +724,69 @@ export default function SummaryView() {
         )}
       </Modal>
 
+      <Modal opened={createPromptModalOpened} onClose={() => {
+        setCreatePromptModalOpened(false);
+        setModalOpened(true);
+      }} title="Create New Prompt Template" centered size="lg">
+        <Stack gap="md">
+          <TextInput
+            label="Template Name"
+            placeholder="e.g. My Detailed Analysis"
+            value={newPromptName}
+            onChange={(e) => setNewPromptName(e.currentTarget.value)}
+            required
+            data-autofocus
+          />
+          <Textarea
+            label="Custom Prompt"
+            placeholder="Enter your prompt here..."
+            value={newPromptContent}
+            onChange={(e) => setNewPromptContent(e.currentTarget.value)}
+            minRows={6}
+            autosize
+            maxRows={15}
+            required
+          />
+          <Paper withBorder p="sm" radius="md">
+            <Stack gap="xs">
+              <Text size="sm" fw={500}>Or generate a prompt with AI:</Text>
+              <Group gap="sm" align="flex-end">
+                <Textarea
+                  placeholder="E.g. generate a summary emphasizing key dates"
+                  value={newPromptInput}
+                  onChange={(e) => setNewPromptInput(e.currentTarget.value)}
+                  style={{ flex: 1 }}
+                  minRows={2}
+                  autosize
+                  maxRows={5}
+                />
+                <Button
+                  variant="light"
+                  onClick={handleGenerateNewPromptAI}
+                  loading={generatingNewPrompt}
+                  leftSection={<IconSparkles size={16} />}
+                >
+                  Generate
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
+          <Group justify="space-between" mt="md">
+            <Button variant="subtle" onClick={() => {
+              setCreatePromptModalOpened(false);
+              navigate('/settings');
+            }}>Manage Prompts in Settings</Button>
+            <Group>
+              <Button variant="default" onClick={() => {
+                setCreatePromptModalOpened(false);
+                setModalOpened(true);
+              }}>Cancel</Button>
+              <Button onClick={saveNewPrompt} disabled={!newPromptName.trim() || !newPromptContent.trim()}>Save Template</Button>
+            </Group>
+          </Group>
+        </Stack>
+      </Modal>
+
       <Modal opened={modalOpened} onClose={() => setModalOpened(false)} title="Summary Parameters" centered>
         <Stack>
           <SegmentedControl
@@ -719,18 +860,45 @@ export default function SummaryView() {
             <Stack>
               <Select
                 label="Prompt Template"
+                placeholder="Select a template..."
                 data={[
-                  ...globalPrompts.map(p => ({ value: p.id.toString(), label: p.name, icon: p.icon })),
-                  { value: 'custom', label: 'Custom Prompt', icon: 'IconUserEdit' }
+                  {
+                    group: 'Global Templates',
+                    items: globalPrompts.map(p => ({ value: `g_${p.id}`, label: p.name, icon: p.icon }))
+                  },
+                  {
+                    group: 'Your Templates',
+                    items: userPrompts.map(p => ({ value: `u_${p.id}`, label: p.name, icon: 'IconUserEdit' }))
+                  },
+                  {
+                    group: 'Actions',
+                    items: [
+                      { value: 'create', label: 'Create a new template...', icon: 'IconPlus' }
+                    ]
+                  }
                 ]}
                 value={selectedPromptId}
-                onChange={setSelectedPromptId}
+                onChange={(val) => {
+                  if (val === 'create') {
+                    setCreatePromptModalOpened(true);
+                    setModalOpened(false);
+                    setSelectedPromptId(null);
+                  } else {
+                    setSelectedPromptId(val);
+                  }
+                }}
                 leftSection={(() => {
-                  const selected = selectedPromptId === 'custom' 
-                    ? { icon: 'IconUserEdit' }
-                    : globalPrompts.find(p => p.id.toString() === selectedPromptId);
-                  const IconComp = getIconComponent(selected?.icon);
-                  return <IconComp size={16} />;
+                  if (!selectedPromptId) return <IconFileText size={16} />;
+                  if (selectedPromptId.startsWith('g_')) {
+                    const id = selectedPromptId.replace('g_', '');
+                    const gp = globalPrompts.find(p => p.id.toString() === id);
+                    const IconComp = getIconComponent(gp?.icon);
+                    return <IconComp size={16} />;
+                  } else if (selectedPromptId.startsWith('u_')) {
+                    const IconComp = getIconComponent('IconUserEdit');
+                    return <IconComp size={16} />;
+                  }
+                  return <IconFileText size={16} />;
                 })()}
                 renderOption={({ option }) => {
                   const IconComp = getIconComponent(option.icon);
@@ -743,41 +911,6 @@ export default function SummaryView() {
                 }}
               />
               
-              {selectedPromptId === 'custom' && (
-                <Stack gap="xs">
-                  <Textarea
-                    label="Custom Prompt"
-                    placeholder="Enter your prompt here..."
-                    value={customPromptText}
-                    onChange={(e) => setCustomPromptText(e.currentTarget.value)}
-                    minRows={10}
-                    autosize
-                    maxRows={20}
-                  />
-                  
-                  <Paper withBorder p="sm" radius="md" mt="xs">
-                    <Stack gap="xs">
-                      <Text size="sm" fw={500}>Or generate a prompt with AI:</Text>
-                      <Group gap="sm" align="flex-end">
-                        <TextInput
-                          placeholder="E.g. generate a summary emphasizing key dates"
-                          value={promptInput}
-                          onChange={(e) => setPromptInput(e.currentTarget.value)}
-                          style={{ flex: 1 }}
-                        />
-                        <Button
-                          variant="light"
-                          onClick={generateCustomPrompt}
-                          loading={generatingPrompt}
-                          leftSection={<IconSparkles size={16} />}
-                        >
-                          Generate
-                        </Button>
-                      </Group>
-                    </Stack>
-                  </Paper>
-                </Stack>
-              )}
             </Stack>
           )}
 

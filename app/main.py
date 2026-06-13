@@ -36,7 +36,7 @@ from app.config import get_settings
 from app.utils.db import init_db
 from app.utils.crypto import encrypt_secret
 from app.utils.observability import record_request
-from app.routers import auth, subjects, notes, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support, ws
+from app.routers import auth, subjects, notes, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support, ws, prompts
 
 # Configure logging
 from app.logging_config import setup_logging
@@ -449,6 +449,7 @@ app.include_router(processing.router)
 app.include_router(groups.router)
 app.include_router(snapshots.router)
 app.include_router(templates.router)
+app.include_router(prompts.router)
 app.include_router(admin.router)
 app.include_router(quiz.router)
 app.include_router(support.router)

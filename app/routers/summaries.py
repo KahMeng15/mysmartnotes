@@ -257,13 +257,32 @@ async def generate_prompt(
     db: Session = Depends(get_db)
 ):
     """Generate a custom prompt based on user's instruction"""
-    ai_client = AIClient(db, current_user.id)
-    system_instruction = "You are an expert prompt engineer. The user will give you instructions on how they want their study notes summarized. Your task is to output a single, clear, instructional prompt that can be directly passed to another AI to generate the summary. Do NOT include any filler text or conversational intro. Output ONLY the generated prompt itself."
+    ai_client = AIClient(user=current_user, db=db)
+    system_instruction = "You are an expert prompt engineer. The user will give you instructions on how they want their study notes summarized. Your task is to output a JSON object with two keys: 'name' (a short, descriptive title for the template) and 'prompt' (a detailed, well-structured, multi-line instructional prompt that can be directly passed to another AI to generate the summary. Use line breaks `\\n` and clear formatting). Do NOT include any filler text or conversational intro. Output ONLY valid JSON, do not use markdown code blocks."
     prompt = f"User's request: {request.user_input}"
     
     try:
-        generated_prompt = await ai_client.generate_text(prompt, max_tokens=1000, system_instruction=system_instruction)
-        return {"prompt": generated_prompt.strip()}
+        generated_response = await ai_client.generate_text(prompt, max_tokens=1000, system_instruction=system_instruction)
+        
+        # Try to parse JSON from response
+        import json
+        import re
+        
+        # Clean up potential markdown formatting
+        cleaned_text = generated_response.strip()
+        if cleaned_text.startswith("```json"):
+            cleaned_text = cleaned_text[7:]
+        if cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith("```"):
+            cleaned_text = cleaned_text[:-3]
+            
+        try:
+            data = json.loads(cleaned_text.strip())
+            return {"prompt": data.get("prompt", ""), "name": data.get("name", "")}
+        except json.JSONDecodeError:
+            # Fallback if AI didn't return valid JSON
+            return {"prompt": generated_response.strip(), "name": "Generated Prompt"}
     except Exception as e:
         logger.error(f"Failed to generate prompt: {e}")
         raise HTTPException(

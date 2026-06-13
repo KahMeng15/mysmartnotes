@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Paper, Tabs, TextInput, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader } from '@mantine/core';
+import { Box, Title, Paper, Tabs, TextInput, Textarea, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader, ActionIcon, Table } from '@mantine/core';
+import { IconEdit, IconTrash } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 
 export default function Settings() {
@@ -13,13 +14,19 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
 
+  const [userPrompts, setUserPrompts] = useState([]);
+  const [editingPrompt, setEditingPrompt] = useState(null);
+  const [promptName, setPromptName] = useState('');
+  const [promptContent, setPromptContent] = useState('');
+
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [profileData, statsData, quotasData] = await Promise.all([
+        const [profileData, statsData, quotasData, promptsData] = await Promise.all([
           fetchApi('/auth/me'),
           fetchApi('/auth/stats'),
-          fetchApi('/auth/quotas').catch(() => null) // Ignore if 404
+          fetchApi('/auth/quotas').catch(() => null), // Ignore if 404
+          fetchApi('/prompts').catch(() => [])
         ]);
         
         setProfile({
@@ -29,6 +36,7 @@ export default function Settings() {
         });
         setStats(statsData);
         setQuotas(quotasData);
+        setUserPrompts(promptsData || []);
       } catch (err) {
         console.error("Failed to load settings data", err);
       } finally {
@@ -71,6 +79,50 @@ export default function Settings() {
     }
   };
 
+  const handleSavePrompt = async () => {
+    try {
+      if (editingPrompt) {
+        const res = await fetchApi(`/prompts/${editingPrompt.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name: promptName, content: promptContent })
+        });
+        setUserPrompts(userPrompts.map(p => p.id === res.id ? res : p));
+      } else {
+        const res = await fetchApi('/prompts', {
+          method: 'POST',
+          body: JSON.stringify({ name: promptName, content: promptContent })
+        });
+        setUserPrompts([...userPrompts, res]);
+      }
+      setEditingPrompt(null);
+      setPromptName('');
+      setPromptContent('');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeletePrompt = async (id) => {
+    try {
+      await fetchApi(`/prompts/${id}`, { method: 'DELETE' });
+      setUserPrompts(userPrompts.filter(p => p.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditPrompt = (prompt) => {
+    setEditingPrompt(prompt);
+    setPromptName(prompt.name);
+    setPromptContent(prompt.content);
+  };
+
+  const handleCancelEditPrompt = () => {
+    setEditingPrompt(null);
+    setPromptName('');
+    setPromptContent('');
+  };
+
   if (loading) {
     return <Center h="50vh"><Loader size="lg" /></Center>;
   }
@@ -83,6 +135,7 @@ export default function Settings() {
         <Tabs.List mr="xl">
           <Tabs.Tab value="profile">Profile</Tabs.Tab>
           <Tabs.Tab value="account">Account & Security</Tabs.Tab>
+          <Tabs.Tab value="prompts">Prompt Templates</Tabs.Tab>
           <Tabs.Tab value="usage">Usage & Quotas</Tabs.Tab>
         </Tabs.List>
 
@@ -128,6 +181,74 @@ export default function Settings() {
               Once you delete your account, there is no going back. Please be certain.
             </Text>
             <Button color="red" variant="outline">Delete Account</Button>
+          </Paper>
+        </Tabs.Panel>
+
+        <Tabs.Panel value="prompts">
+          <Paper withBorder p="xl" radius="md">
+            <Title order={4} mb="md">Custom Prompt Templates</Title>
+            <Text size="sm" c="dimmed" mb="xl">
+              Manage your custom prompt templates used for generating summaries.
+            </Text>
+
+            <Paper withBorder p="md" mb="xl" bg="var(--mantine-color-gray-0)">
+              <Title order={5} mb="sm">{editingPrompt ? 'Edit Template' : 'Create New Template'}</Title>
+              <Stack>
+                <TextInput
+                  label="Template Name"
+                  placeholder="e.g. Executive Summary"
+                  value={promptName}
+                  onChange={(e) => setPromptName(e.currentTarget.value)}
+                  required
+                />
+                <Textarea
+                  label="Prompt Content"
+                  placeholder="Enter the instructions for the AI..."
+                  value={promptContent}
+                  onChange={(e) => setPromptContent(e.currentTarget.value)}
+                  minRows={3}
+                  autosize
+                  required
+                />
+                <Group justify="flex-end">
+                  {editingPrompt && <Button variant="default" onClick={handleCancelEditPrompt}>Cancel</Button>}
+                  <Button onClick={handleSavePrompt} disabled={!promptName.trim() || !promptContent.trim()}>
+                    {editingPrompt ? 'Update Template' : 'Create Template'}
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+
+            <Title order={5} mb="sm">Your Templates</Title>
+            {userPrompts.length === 0 ? (
+              <Text c="dimmed" size="sm">You haven't created any custom templates yet.</Text>
+            ) : (
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Name</Table.Th>
+                    <Table.Th style={{ width: '100px' }}>Actions</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {userPrompts.map(prompt => (
+                    <Table.Tr key={prompt.id}>
+                      <Table.Td>{prompt.name}</Table.Td>
+                      <Table.Td>
+                        <Group gap="xs" wrap="nowrap">
+                          <ActionIcon variant="subtle" color="blue" onClick={() => handleEditPrompt(prompt)}>
+                            <IconEdit size={16} />
+                          </ActionIcon>
+                          <ActionIcon variant="subtle" color="red" onClick={() => handleDeletePrompt(prompt.id)}>
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            )}
           </Paper>
         </Tabs.Panel>
 
