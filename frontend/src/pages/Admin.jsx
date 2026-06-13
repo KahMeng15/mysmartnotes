@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Title, Tabs, Table, Button, Group, Badge, Modal, Select, TextInput, NumberInput, Switch, Stack, Paper, Text, ScrollArea, Box, Radio, Divider } from '@mantine/core';
+import { Container, Title, Tabs, Table, Button, Group, Badge, Modal, Select, TextInput, NumberInput, Switch, Stack, Paper, Text, ScrollArea, Box, Radio, Divider, Textarea } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
-import { IconShieldCheck, IconUsers, IconMail, IconStack2, IconSettings, IconClock, IconServer, IconListDetails, IconDatabase, IconActivity } from '@tabler/icons-react';
+import { IconShieldCheck, IconUsers, IconMail, IconStack2, IconSettings, IconClock, IconServer, IconListDetails, IconDatabase, IconActivity, IconMessages } from '@tabler/icons-react';
 
 // Components for each tab
 
@@ -486,6 +486,143 @@ function AdminDiagnostics() {
   );
 }
 
+function AdminGlobalPrompts() {
+  const [prompts, setPrompts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState(null);
+  const [formData, setFormData] = useState({ name: '', content: '', icon: '' });
+
+  const loadPrompts = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchApi('/admin/global-prompts');
+      setPrompts(data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadPrompts(); }, []);
+
+  const handleSave = async () => {
+    if (!formData.name || !formData.content) return;
+    try {
+      if (editingPrompt) {
+        await fetchApi(`/admin/global-prompts/${editingPrompt.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(formData)
+        });
+      } else {
+        await fetchApi('/admin/global-prompts', {
+          method: 'POST',
+          body: JSON.stringify(formData)
+        });
+      }
+      setModalOpen(false);
+      loadPrompts();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this prompt?')) return;
+    try {
+      await fetchApi(`/admin/global-prompts/${id}`, { method: 'DELETE' });
+      loadPrompts();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const openModal = (prompt = null) => {
+    if (prompt) {
+      setEditingPrompt(prompt);
+      setFormData({ name: prompt.name, content: prompt.content, icon: prompt.icon || '' });
+    } else {
+      setEditingPrompt(null);
+      setFormData({ name: '', content: '', icon: '' });
+    }
+    setModalOpen(true);
+  };
+
+  return (
+    <Stack>
+      <Group justify="space-between">
+        <Title order={3}>Global Prompts</Title>
+        <Button onClick={() => openModal()}>Add Prompt</Button>
+      </Group>
+      
+      <ScrollArea>
+        <Table striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>ID</Table.Th>
+              <Table.Th>Name</Table.Th>
+              <Table.Th>Content</Table.Th>
+              <Table.Th>Actions</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {prompts.map(p => (
+              <Table.Tr key={p.id}>
+                <Table.Td>{p.id}</Table.Td>
+                <Table.Td>{p.name}</Table.Td>
+                <Table.Td>
+                  <Text lineClamp={1} size="sm">{p.content}</Text>
+                </Table.Td>
+                <Table.Td>
+                  <Group gap="xs">
+                    <Button size="xs" variant="light" onClick={() => openModal(p)}>Edit</Button>
+                    <Button size="xs" color="red" variant="light" onClick={() => handleDelete(p.id)}>Delete</Button>
+                  </Group>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+            {prompts.length === 0 && !loading && (
+              <Table.Tr>
+                <Table.Td colSpan={4} align="center">No global prompts found.</Table.Td>
+              </Table.Tr>
+            )}
+          </Table.Tbody>
+        </Table>
+      </ScrollArea>
+
+      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editingPrompt ? "Edit Prompt" : "New Prompt"}>
+        <Stack>
+          <TextInput
+            label="Name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.currentTarget.value })}
+            placeholder="E.g. Concise Bullets"
+            required
+          />
+          <TextInput
+            label="Icon"
+            value={formData.icon}
+            onChange={(e) => setFormData({ ...formData, icon: e.currentTarget.value })}
+            placeholder="e.g. IconBrain, IconSchool, IconWand"
+            description="Find valid Tabler Icon component names at https://tabler.io/icons (Must start with 'Icon' and be camel cased)."
+          />
+          <Textarea
+            label="Content (Instructions)"
+            value={formData.content}
+            onChange={(e) => setFormData({ ...formData, content: e.currentTarget.value })}
+            placeholder="Enter the instructions for the AI..."
+            minRows={10}
+            autosize
+            maxRows={20}
+            required
+          />
+          <Button onClick={handleSave}>{editingPrompt ? "Save Changes" : "Create Prompt"}</Button>
+        </Stack>
+      </Modal>
+    </Stack>
+  );
+}
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -532,6 +669,7 @@ export default function AdminPage() {
           <Tabs.Tab value="logs" leftSection={<IconListDetails size={16} />}>System Logs</Tabs.Tab>
           <Tabs.Tab value="database" leftSection={<IconDatabase size={16} />}>Database</Tabs.Tab>
           <Tabs.Tab value="diagnostics" leftSection={<IconActivity size={16} />}>Diagnostics</Tabs.Tab>
+          <Tabs.Tab value="global-prompts" leftSection={<IconMessages size={16} />}>Global Prompts</Tabs.Tab>
         </Tabs.List>
 
         <Box pl="md" style={{ flex: 1 }}>
@@ -545,6 +683,7 @@ export default function AdminPage() {
           <Tabs.Panel value="logs"><AdminSystemLogs /></Tabs.Panel>
           <Tabs.Panel value="database"><AdminDatabase /></Tabs.Panel>
           <Tabs.Panel value="diagnostics"><AdminDiagnostics /></Tabs.Panel>
+          <Tabs.Panel value="global-prompts"><AdminGlobalPrompts /></Tabs.Panel>
         </Box>
       </Tabs>
     </Container>

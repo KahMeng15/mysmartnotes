@@ -170,6 +170,9 @@ class Summary(Base):
     output_format = Column(String(50), nullable=True)  # sentence, pointform, numbered_list, table
     processing_method = Column(String(50), nullable=True)  # whole, section
     split_level = Column(String(10), nullable=True)  # h1, h2, h3 - header level for section splitting
+    custom_prompt = Column(Text, nullable=True) # Used for single parameter generation
+    prompt_name = Column(String(255), nullable=True)
+    prompt_icon = Column(String(50), nullable=True)
     processing_time = Column(Float, nullable=True)  # Processing time in seconds (legacy)
     processing_time_ms = Column(Integer, nullable=True)  # Processing time in milliseconds
     model = Column(String(100), nullable=True)  # AI model used
@@ -386,6 +389,31 @@ class SystemSettings(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class GlobalPrompt(Base):
+    """Admin-defined Global Prompts"""
+    __tablename__ = "global_prompts"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    icon = Column(String(50), default="IconFileText")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class UserPrompt(Base):
+    """User-defined Custom Prompts"""
+    __tablename__ = "user_prompts"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")
 
 
 class UserInvitation(Base):

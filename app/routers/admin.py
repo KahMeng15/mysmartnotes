@@ -7,10 +7,10 @@ from app.utils.quotas import ensure_default_tier_configs
 import datetime
 import secrets
 
-from app.models.db import User, SystemSettings, IPFilter, RateLimitConfig, UserLog, Note, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation, TierConfig
+from app.models.db import User, SystemSettings, IPFilter, RateLimitConfig, UserLog, Note, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation, TierConfig, GlobalPrompt
 from app.schemas.admin import (
     SystemSettingsSchema, EmailConfigSchema, IPFilterSchema, IPFilterCreate, RateLimitConfigSchema, UserLogSchema, UserAdminResponse, UserActionRequest,
-    UserInvitationCreate, UserInvitationResponse, TierConfigSchema
+    UserInvitationCreate, UserInvitationResponse, TierConfigSchema, GlobalPromptSchema, GlobalPromptCreate, GlobalPromptUpdate
 )
 from app.utils.db import get_db
 from app.routers.auth import get_current_user
@@ -275,6 +275,43 @@ def delete_ip_filter(filter_id: int, db: Session = Depends(get_db), admin: User 
     db.delete(db_filter)
     db.commit()
     return {"message": "Filter deleted"}
+
+# --- Global Prompts ---
+@router.get("/global-prompts", response_model=List[GlobalPromptSchema])
+def get_global_prompts(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return db.query(GlobalPrompt).all()
+
+@router.post("/global-prompts", response_model=GlobalPromptSchema)
+def create_global_prompt(prompt_data: GlobalPromptCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    new_prompt = GlobalPrompt(**prompt_data.model_dump())
+    db.add(new_prompt)
+    db.commit()
+    db.refresh(new_prompt)
+    return new_prompt
+
+@router.put("/global-prompts/{prompt_id}", response_model=GlobalPromptSchema)
+def update_global_prompt(prompt_id: int, update_data: GlobalPromptUpdate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    db_prompt = db.query(GlobalPrompt).filter(GlobalPrompt.id == prompt_id).first()
+    if not db_prompt:
+        raise HTTPException(status_code=404, detail="Global prompt not found")
+    
+    for key, value in update_data.model_dump(exclude_unset=True).items():
+        setattr(db_prompt, key, value)
+        
+    db_prompt.updated_at = datetime.datetime.utcnow()
+    db.commit()
+    db.refresh(db_prompt)
+    return db_prompt
+
+@router.delete("/global-prompts/{prompt_id}")
+def delete_global_prompt(prompt_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    db_prompt = db.query(GlobalPrompt).filter(GlobalPrompt.id == prompt_id).first()
+    if not db_prompt:
+        raise HTTPException(status_code=404, detail="Global prompt not found")
+    db.delete(db_prompt)
+    db.commit()
+    return {"message": "Global prompt deleted"}
+
 
 # --- Users Management ---
 @router.get("/users", response_model=List[UserAdminResponse])

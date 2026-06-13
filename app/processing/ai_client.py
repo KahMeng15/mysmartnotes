@@ -385,6 +385,7 @@ class AIClient:
         output_format: str = "sentence", 
         processing_method: str = "whole",
         split_level: str = "h2",
+        custom_prompt: Optional[str] = None,
         progress_callback: Optional[Callable[[int], None]] = None
     ) -> str:
         """
@@ -398,6 +399,7 @@ class AIClient:
             output_format, 
             processing_method=processing_method,
             split_level=split_level,
+            custom_prompt=custom_prompt,
             progress_callback=progress_callback
         )
 

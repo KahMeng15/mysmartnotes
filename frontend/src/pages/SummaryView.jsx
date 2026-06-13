@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink } from '@mantine/core';
+import React, { useState, useEffect, useRef } from 'react';
+import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput } from '@mantine/core';
 import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu } from '@tabler/icons-react';
+import * as TablerIcons from '@tabler/icons-react';
 
 const MODE_ICONS = {
   quick: <IconBolt size={14} />,
@@ -19,8 +20,20 @@ const FORMAT_ICONS = {
 
 const METHOD_ICONS = {
   whole: <IconFile size={14} />,
-  chunked: <IconLayersLinked size={14} />,
+  section: <IconLayersLinked size={14} />,
+  chunked: <IconCpu size={14} />,
   hierarchical: <IconBinaryTree size={14} />,
+};
+
+const getIconComponent = (iconName) => {
+  if (!iconName) return TablerIcons.IconFileText;
+  if (TablerIcons[iconName]) return TablerIcons[iconName];
+  
+  // Try to fix formatting: e.g. 'school' -> 'IconSchool', 'file-text' -> 'IconFileText'
+  const formattedName = 'Icon' + iconName.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join('');
+  if (TablerIcons[formattedName]) return TablerIcons[formattedName];
+  
+  return TablerIcons.IconFileText;
 };
 
 const formatDate = (dateString) => {
@@ -63,6 +76,19 @@ export default function SummaryView() {
   const [mode, setMode] = useState('normal');
   const [outputFormat, setOutputFormat] = useState('sentence');
   const [processingMethod, setProcessingMethod] = useState('whole');
+  
+  const [parameterType, setParameterType] = useState('multi'); // 'multi' or 'single'
+  const [globalPrompts, setGlobalPrompts] = useState([]);
+  const [selectedPromptId, setSelectedPromptId] = useState('custom');
+  const [customPromptText, setCustomPromptText] = useState('');
+  const [promptInput, setPromptInput] = useState('');
+  const [generatingPrompt, setGeneratingPrompt] = useState(false);
+
+  useEffect(() => {
+    fetchApi('/admin/global-prompts').then(data => {
+      setGlobalPrompts(data || []);
+    }).catch(err => console.error("Failed to load global prompts", err));
+  }, []);
 
   useEffect(() => {
     fetchApi('/auth/me').then(data => {
@@ -216,6 +242,24 @@ export default function SummaryView() {
     }
   };
 
+  const generateCustomPrompt = async () => {
+    if (!promptInput.trim()) return;
+    try {
+      setGeneratingPrompt(true);
+      const res = await fetchApi('/summaries/generate-prompt', {
+        method: 'POST',
+        body: JSON.stringify({ user_input: promptInput })
+      });
+      if (res && res.prompt) {
+        setCustomPromptText(res.prompt);
+      }
+    } catch (err) {
+      console.error("Failed to generate prompt", err);
+    } finally {
+      setGeneratingPrompt(false);
+    }
+  };
+
   const startGenerateSummary = async () => {
     try {
       setGenerating(true);
@@ -227,6 +271,24 @@ export default function SummaryView() {
         ? summaries.filter(s => s.id !== 'generating')[0].version + 1 
         : 1;
 
+      let finalPrompt = null;
+      let finalPromptName = null;
+      let finalPromptIcon = null;
+      if (parameterType === 'single') {
+        if (selectedPromptId === 'custom') {
+          finalPrompt = customPromptText;
+          finalPromptName = "Custom User Prompt";
+          finalPromptIcon = "IconUserEdit";
+        } else {
+          const gp = globalPrompts.find(p => p.id.toString() === selectedPromptId);
+          if (gp) {
+            finalPrompt = gp.content;
+            finalPromptName = gp.name;
+            finalPromptIcon = gp.icon;
+          }
+        }
+      }
+
       const mockVersion = {
         id: 'generating',
         version: nextVersion,
@@ -234,18 +296,23 @@ export default function SummaryView() {
         mode: mode,
         output_format: outputFormat,
         processing_method: processingMethod,
+        prompt_name: finalPromptName,
+        prompt_icon: finalPromptIcon
       };
 
       setSummaries(prev => [mockVersion, ...prev.filter(s => s.id !== 'generating')]);
       navigate(`/note/${noteId}/summary/generating`, { replace: true });
-      
+
       const res = await fetchApi('/summaries/summary', {
         method: 'POST',
         body: JSON.stringify({
           note_id: noteId,
           mode: mode,
           output_format: outputFormat,
-          processing_method: processingMethod
+          processing_method: processingMethod,
+          custom_prompt: finalPrompt,
+          prompt_name: finalPromptName,
+          prompt_icon: finalPromptIcon
         })
       });
       if (res && res.task_id) {
@@ -395,60 +462,139 @@ export default function SummaryView() {
       `}</style>
       <Modal opened={modalOpened} onClose={() => setModalOpened(false)} title="Summary Parameters" centered>
         <Stack>
-          <Select 
-            label="AI Mode" 
+          <SegmentedControl
+            value={parameterType}
+            onChange={setParameterType}
             data={[
-              { value: 'quick', label: 'Quick' },
-              { value: 'simple', label: 'Simple' },
-              { value: 'normal', label: 'Normal' },
-              { value: 'elaborate', label: 'Elaborate' },
-              { value: 'eli5', label: 'Explain like I am 5' }
-            ]} 
-            value={mode} 
-            onChange={setMode} 
-            leftSection={MODE_ICONS[mode]}
-            renderOption={({ option }) => (
-              <Group gap="sm">
-                {MODE_ICONS[option.value]}
-                <Text size="sm">{option.label}</Text>
-              </Group>
-            )}
+              { label: 'Multi Parameters', value: 'multi' },
+              { label: 'Single Parameter', value: 'single' },
+            ]}
+            fullWidth
           />
-          <Select 
-            label="Output Format" 
-            data={[
-              { value: 'sentence', label: 'Sentence' },
-              { value: 'pointform', label: 'Pointform' },
-              { value: 'numbered_list', label: 'Numbered List' },
-              { value: 'table', label: 'Table' }
-            ]} 
-            value={outputFormat} 
-            onChange={setOutputFormat} 
-            leftSection={FORMAT_ICONS[outputFormat]}
-            renderOption={({ option }) => (
-              <Group gap="sm">
-                {FORMAT_ICONS[option.value]}
-                <Text size="sm">{option.label}</Text>
-              </Group>
-            )}
-          />
-          <Select 
-            label="Processing Method" 
-            data={[
-              { value: 'whole', label: 'Whole Document (Fast)' },
-              { value: 'chunked', label: 'Chunked (Detailed)' },
-              { value: 'hierarchical', label: 'Hierarchical (Structured)' }
-            ]} 
-            value={processingMethod} 
-            onChange={setProcessingMethod} 
-            leftSection={METHOD_ICONS[processingMethod]}
-            renderOption={({ option }) => (
-              <Group gap="sm">
-                {METHOD_ICONS[option.value]}
-                <Text size="sm">{option.label}</Text>
-              </Group>
-            )}
-          />
+
+          {parameterType === 'multi' ? (
+            <>
+              <Select 
+                label="AI Mode" 
+                data={[
+                  { value: 'quick', label: 'Quick' },
+                  { value: 'simple', label: 'Simple' },
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'elaborate', label: 'Elaborate' },
+                  { value: 'eli5', label: 'Explain like I am 5' }
+                ]} 
+                value={mode} 
+                onChange={setMode} 
+                leftSection={MODE_ICONS[mode]}
+                renderOption={({ option }) => (
+                  <Group gap="sm">
+                    {MODE_ICONS[option.value]}
+                    <Text size="sm">{option.label}</Text>
+                  </Group>
+                )}
+              />
+              <Select 
+                label="Output Format" 
+                data={[
+                  { value: 'sentence', label: 'Sentence' },
+                  { value: 'pointform', label: 'Pointform' },
+                  { value: 'numbered_list', label: 'Numbered List' },
+                  { value: 'table', label: 'Table' }
+                ]} 
+                value={outputFormat} 
+                onChange={setOutputFormat} 
+                leftSection={FORMAT_ICONS[outputFormat]}
+                renderOption={({ option }) => (
+                  <Group gap="sm">
+                    {FORMAT_ICONS[option.value]}
+                    <Text size="sm">{option.label}</Text>
+                  </Group>
+                )}
+              />
+              <Select 
+                label="Processing Method" 
+                data={[
+                  { value: 'whole', label: 'Whole Document (Fast)' },
+                  { value: 'chunked', label: 'Chunked (Detailed)' },
+                  { value: 'hierarchical', label: 'Hierarchical (Structured)' }
+                ]} 
+                value={processingMethod} 
+                onChange={setProcessingMethod} 
+                leftSection={METHOD_ICONS[processingMethod]}
+                renderOption={({ option }) => (
+                  <Group gap="sm">
+                    {METHOD_ICONS[option.value]}
+                    <Text size="sm">{option.label}</Text>
+                  </Group>
+                )}
+              />
+            </>
+          ) : (
+            <Stack>
+              <Select
+                label="Prompt Template"
+                data={[
+                  ...globalPrompts.map(p => ({ value: p.id.toString(), label: p.name, icon: p.icon })),
+                  { value: 'custom', label: 'Custom Prompt', icon: 'IconUserEdit' }
+                ]}
+                value={selectedPromptId}
+                onChange={setSelectedPromptId}
+                leftSection={(() => {
+                  const selected = selectedPromptId === 'custom' 
+                    ? { icon: 'IconUserEdit' }
+                    : globalPrompts.find(p => p.id.toString() === selectedPromptId);
+                  const IconComp = getIconComponent(selected?.icon);
+                  return <IconComp size={16} />;
+                })()}
+                renderOption={({ option }) => {
+                  const IconComp = getIconComponent(option.icon);
+                  return (
+                    <Group gap="sm">
+                      <IconComp size={16} />
+                      <Text size="sm">{option.label}</Text>
+                    </Group>
+                  );
+                }}
+              />
+              
+              {selectedPromptId === 'custom' && (
+                <Stack gap="xs">
+                  <Textarea
+                    label="Custom Prompt"
+                    placeholder="Enter your prompt here..."
+                    value={customPromptText}
+                    onChange={(e) => setCustomPromptText(e.currentTarget.value)}
+                    minRows={10}
+                    autosize
+                    maxRows={20}
+                  />
+                  
+                  <Paper withBorder p="sm" radius="md" mt="xs">
+                    <Stack gap="xs">
+                      <Text size="sm" fw={500}>Or generate a prompt with AI:</Text>
+                      <Group gap="sm" align="flex-end">
+                        <TextInput
+                          placeholder="E.g. generate a summary emphasizing key dates"
+                          value={promptInput}
+                          onChange={(e) => setPromptInput(e.currentTarget.value)}
+                          style={{ flex: 1 }}
+                        />
+                        <Button
+                          variant="light"
+                          onClick={generateCustomPrompt}
+                          loading={generatingPrompt}
+                          leftSection={<IconSparkles size={16} />}
+                        >
+                          Generate
+                        </Button>
+                      </Group>
+                    </Stack>
+                  </Paper>
+                </Stack>
+              )}
+            </Stack>
+          )}
+
           <Button fullWidth mt="md" onClick={startGenerateSummary}>Start Generation</Button>
         </Stack>
       </Modal>
@@ -536,20 +682,31 @@ export default function SummaryView() {
                 </Title>
                 {selectedSummary && (
                   <Group gap="xs" mb="xl">
-                    {selectedSummary.mode && (
-                      <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
-                        {selectedSummary.mode}
-                      </Badge>
-                    )}
-                    {selectedSummary.output_format && (
-                      <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
-                        {selectedSummary.output_format}
-                      </Badge>
-                    )}
-                    {selectedSummary.processing_method && (
-                      <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
-                        {selectedSummary.processing_method}
-                      </Badge>
+                    {selectedSummary.prompt_name ? (() => {
+                      const IconComp = getIconComponent(selectedSummary.prompt_icon);
+                      return (
+                        <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
+                          {selectedSummary.prompt_name}
+                        </Badge>
+                      );
+                    })() : (
+                      <>
+                        {selectedSummary.mode && (
+                          <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
+                            {selectedSummary.mode}
+                          </Badge>
+                        )}
+                        {selectedSummary.output_format && (
+                          <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
+                            {selectedSummary.output_format}
+                          </Badge>
+                        )}
+                        {selectedSummary.processing_method && (
+                          <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
+                            {selectedSummary.processing_method}
+                          </Badge>
+                        )}
+                      </>
                     )}
                   </Group>
                 )}
@@ -592,7 +749,7 @@ export default function SummaryView() {
                 <Stack gap="xs">
                   {summaries.map(summary => {
                     const isActive = (selectedSummary?.id === summary.id) || (summaryId === 'generating' && summary.id === 'generating');
-                    const details = [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+                    const details = summary.prompt_name || [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
                     const title = summary.id === 'generating' ? 'Generating...' : (details || `Version ${summary.version}`);
 
                     return (

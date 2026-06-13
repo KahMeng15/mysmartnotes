@@ -303,6 +303,9 @@ class SummaryTask:
             output_format = kwargs.get("output_format", "sentence")
             processing_method = kwargs.get("processing_method", "whole")
             split_level = kwargs.get("split_level", "h2")
+            custom_prompt = kwargs.get("custom_prompt", None)
+            prompt_name = kwargs.get("prompt_name", None)
+            prompt_icon = kwargs.get("prompt_icon", None)
             
             user = db.query(User).filter(User.id == user_id).first()
             note = db.query(Note).filter(Note.id == note_id).first()
@@ -329,6 +332,7 @@ class SummaryTask:
                 output_format=output_format,
                 processing_method=processing_method,
                 split_level=split_level,
+                custom_prompt=custom_prompt,
                 progress_callback=progress_callback
             )
             
@@ -352,6 +356,9 @@ class SummaryTask:
                 output_format=output_format,
                 processing_method=processing_method,
                 split_level=split_level,
+                custom_prompt=custom_prompt,
+                prompt_name=prompt_name,
+                prompt_icon=prompt_icon,
                 processing_time=processing_time,
                 processing_time_ms=int(processing_time * 1000),
                 model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()

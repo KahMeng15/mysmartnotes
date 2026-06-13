@@ -55,6 +55,10 @@ class SummaryRequest(BaseModel):
     split_level: str = "h1"  # h1, h2, h3
     force_regenerate: bool = False
     include_quickread: bool = False  # Generate quick mode summary alongside main summary
+    custom_prompt: Optional[str] = None  # Single parameter mode prompt
+    prompt_name: Optional[str] = None
+    prompt_icon: Optional[str] = None
+
 
 
 class SummaryResponse(BaseModel):
@@ -74,6 +78,9 @@ class SummaryResponse(BaseModel):
     is_user_edited: bool = False
     id: Optional[str] = None
     version: Optional[int] = None
+    custom_prompt: Optional[str] = None
+    prompt_name: Optional[str] = None
+    prompt_icon: Optional[str] = None
 
 
 class CheatsheetRequest(BaseModel):
@@ -178,13 +185,14 @@ async def generate_summary_endpoint(
         )
 
     # Check for existing summary (unless forced)
-    if not request.force_regenerate:
+    if not request.force_regenerate and not request.custom_prompt:
         existing_summary = db.query(Summary).filter(
             Summary.note_id == request.note_id,
             Summary.summary_type == "summary",
             Summary.processing_method == request.processing_method,
             Summary.mode == request.mode,
-            Summary.output_format == request.output_format
+            Summary.output_format == request.output_format,
+            Summary.custom_prompt.is_(None)
         ).order_by(Summary.created_at.desc()).first()
 
         if existing_summary:
@@ -205,6 +213,9 @@ async def generate_summary_endpoint(
                 "is_user_edited": existing_summary.is_user_edited or False,
                 "id": existing_summary.id,
                 "version": existing_summary.version,
+                "custom_prompt": existing_summary.custom_prompt,
+                "prompt_name": existing_summary.prompt_name,
+                "prompt_icon": existing_summary.prompt_icon,
                 "status": "completed"
             }
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
@@ -220,10 +231,38 @@ async def generate_summary_endpoint(
         mode=request.mode,
         output_format=request.output_format,
         processing_method=request.processing_method,
-        split_level=request.split_level
+        split_level=request.split_level,
+        custom_prompt=request.custom_prompt,
+        prompt_name=request.prompt_name,
+        prompt_icon=request.prompt_icon
     )
 
     return {"task_id": task_id, "status": "pending"}
+
+class GeneratePromptRequest(BaseModel):
+    user_input: str
+
+@router.post("/generate-prompt", response_model=dict)
+async def generate_prompt(
+    request: GeneratePromptRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate a custom prompt based on user's instruction"""
+    ai_client = AIClient(db, current_user.id)
+    system_instruction = "You are an expert prompt engineer. The user will give you instructions on how they want their study notes summarized. Your task is to output a single, clear, instructional prompt that can be directly passed to another AI to generate the summary. Do NOT include any filler text or conversational intro. Output ONLY the generated prompt itself."
+    prompt = f"User's request: {request.user_input}"
+    
+    try:
+        generated_prompt = await ai_client.generate_text(prompt, max_tokens=1000, system_instruction=system_instruction)
+        return {"prompt": generated_prompt.strip()}
+    except Exception as e:
+        logger.error(f"Failed to generate prompt: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate prompt: {str(e)}"
+        )
+
 
 
 @router.post("/cheatsheet", response_model=CheatsheetResponse)

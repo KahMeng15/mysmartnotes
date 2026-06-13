@@ -22,6 +22,27 @@ class SystemSettingsSchema(BaseModel):
     class Config:
         from_attributes = True
 
+class GlobalPromptBase(BaseModel):
+    name: str
+    content: str
+    icon: Optional[str] = "IconFileText"
+
+class GlobalPromptCreate(GlobalPromptBase):
+    pass
+
+class GlobalPromptUpdate(BaseModel):
+    name: Optional[str] = None
+    content: Optional[str] = None
+    icon: Optional[str] = None
+
+class GlobalPromptSchema(GlobalPromptBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class UserInvitationCreate(BaseModel):
     email: Optional[EmailStr] = None
     tier: str = "free"

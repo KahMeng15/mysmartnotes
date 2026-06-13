@@ -26,6 +26,7 @@ class SummaryPipeline:
         output_format: str = "sentence", 
         processing_method: str = "whole",
         split_level: str = "h2",
+        custom_prompt: Optional[str] = None,
         progress_callback: Optional[Callable[[int, Optional[str], Optional[str]], None]] = None
     ) -> str:
         """
@@ -53,7 +54,7 @@ class SummaryPipeline:
             logger.info("Processing single segment summary...")
             header = raw_chunks[0]["header"]
             content = raw_chunks[0]["content"]
-            res = await self._summarize_chunk(0, content, actual_mode, output_format, is_first=True)
+            res = await self._summarize_chunk(0, content, actual_mode, output_format, is_first=True, custom_prompt=custom_prompt)
             if header:
                 res = f"{header}\n\n{res}"
             if progress_callback: progress_callback(100, "Complete", res)
@@ -79,7 +80,7 @@ class SummaryPipeline:
 
                     # Add a per-chunk timeout of 180 seconds to prevent total hang
                     result = await asyncio.wait_for(
-                        self._summarize_chunk(idx, content, actual_mode, output_format, is_first=is_first),
+                        self._summarize_chunk(idx, content, actual_mode, output_format, is_first=is_first, custom_prompt=custom_prompt),
                         timeout=180.0
                     )
                     
@@ -181,7 +182,15 @@ class SummaryPipeline:
 
         return [c for c in chunks if c]
 
-    async def _summarize_chunk(self, idx: int, chunk: str, mode: str, output_format: str, is_first: bool = False) -> str:
+    async def _summarize_chunk(
+        self, 
+        idx: int, 
+        chunk: str, 
+        mode: str, 
+        output_format: str, 
+        is_first: bool,
+        custom_prompt: Optional[str] = None
+    ) -> str:
         """Summarize a single chunk using streaming and markers."""
         
         # Dynamic instruction based on mode and format
@@ -205,7 +214,25 @@ class SummaryPipeline:
         else: # elaborate
             mode_instruction = "Provide a detailed, comprehensive summary covering all key technical points."
 
-        prompt = f"""Task: Summarize the following note segment.
+        if custom_prompt:
+            prompt = f"""Task: Summarize the following note segment according to the provided instructions.
+
+INSTRUCTIONS:
+{custom_prompt}
+
+START WITH THE MARKER ===START===
+END WITH THE MARKER ===END===
+NO PREAMBLE: Output ONLY the summary between the markers.
+NO REASONING: Do not explain your process.
+
+INPUT SEGMENT:
+{chunk}
+
+SUMMARY:
+===START===
+"""
+        else:
+            prompt = f"""Task: Summarize the following note segment.
 
 INSTRUCTIONS:
 1. Mode: {mode_instruction}
