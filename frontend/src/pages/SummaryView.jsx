@@ -84,7 +84,6 @@ export default function SummaryView() {
   
   const [parameterType, setParameterType] = useState('multi'); // 'multi' or 'single'
   const [globalPrompts, setGlobalPrompts] = useState([]);
-  const firstH1Ref = useRef({ id: null, offset: null });
   const [selectedPromptId, setSelectedPromptId] = useState('custom');
   const [customPromptText, setCustomPromptText] = useState('');
   const [promptInput, setPromptInput] = useState('');
@@ -864,103 +863,57 @@ export default function SummaryView() {
               </Center>
             ) : (
               <Box px="md">
-                {/* Pills are now rendered inside the ReactMarkdown's first h1 via the custom components prop */}
                 <Box ref={markdownRef} className="sticky-markdown" style={{ color: '#171738', fontSize: '16px', lineHeight: 1.8 }}>
-                  {!summaryContent?.includes('# ') && selectedSummary && (
-                    <Group gap="xs" mb="xl">
-                      {selectedSummary.prompt_name ? (() => {
-                        const IconComp = getIconComponent(selectedSummary.prompt_icon);
-                        return (
-                          <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
-                            {selectedSummary.prompt_name}
-                          </Badge>
-                        );
-                      })() : (
-                        <>
-                          {selectedSummary.mode && (
-                            <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
-                              {selectedSummary.mode}
-                            </Badge>
-                          )}
-                          {selectedSummary.output_format && (
-                            <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
-                              {selectedSummary.output_format}
-                            </Badge>
-                          )}
-                          {selectedSummary.processing_method && (
-                            <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
-                              {selectedSummary.processing_method}
-                            </Badge>
-                          )}
-                        </>
-                      )}
-                    </Group>
-                  )}
                   {(() => {
-                    if (firstH1Ref.current.id !== selectedSummary?.id) {
-                       firstH1Ref.current = { id: selectedSummary?.id, offset: null };
+                    let displayContent = summaryContent || '';
+                    let extractedTitle = selectedSummary?.title || 'Summary';
+                    
+                    const h1Regex = /^\s*#\s+(.+)$/m;
+                    const match = displayContent.match(h1Regex);
+                    if (match) {
+                      extractedTitle = match[1].trim();
+                      displayContent = displayContent.replace(h1Regex, '').trim();
                     }
+
                     return (
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          h1: ({node, ...props}) => {
-                            // Render pills for the first h1 we find.
-                            // We use a ref to track the offset of the first H1 to avoid StrictMode double-render bugs
-                            if (firstH1Ref.current.offset === null && node.position) {
-                               firstH1Ref.current.offset = node.position.start.offset;
-                            }
-                            
-                            const isFirstH1 = !node.position || node.position.start.offset === firstH1Ref.current.offset;
-                            
-                            console.log("H1 Node:", {
-                              text: node.children?.[0]?.value,
-                              position: node.position,
-                              trackedOffset: firstH1Ref.current.offset,
-                              isFirstH1
-                            });
-                            
-                            if (isFirstH1 && selectedSummary) {
+                      <>
+                        <div className="summary-header" style={{ marginBottom: '1.5rem', paddingTop: '1rem' }}>
+                          <Group gap="xs" mb="md">
+                            {selectedSummary?.prompt_name ? (() => {
+                              const IconComp = getIconComponent(selectedSummary.prompt_icon);
                               return (
-                                <div className="summary-header" style={{ marginBottom: '1.5rem', paddingTop: '1rem' }}>
-                                  <Group gap="xs" mb="md">
-                                    {selectedSummary.prompt_name ? (() => {
-                                      const IconComp = getIconComponent(selectedSummary.prompt_icon);
-                                      return (
-                                        <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
-                                          {selectedSummary.prompt_name}
-                                        </Badge>
-                                      );
-                                    })() : (
-                                      <>
-                                        {selectedSummary.mode && (
-                                          <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
-                                            {selectedSummary.mode}
-                                          </Badge>
-                                        )}
-                                        {selectedSummary.output_format && (
-                                          <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
-                                            {selectedSummary.output_format}
-                                          </Badge>
-                                        )}
-                                        {selectedSummary.processing_method && (
-                                          <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
-                                            {selectedSummary.processing_method}
-                                          </Badge>
-                                        )}
-                                      </>
-                                    )}
-                                  </Group>
-                                  <h1 {...props} style={{ marginTop: 0, marginBottom: 0 }} />
-                                </div>
+                                <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
+                                  {selectedSummary.prompt_name}
+                                </Badge>
                               );
-                            }
-                            return <h1 {...props} />;
-                          }
-                        }}
-                      >
-                        {summaryContent}
-                      </ReactMarkdown>
+                            })() : (
+                              <>
+                                {selectedSummary?.mode && (
+                                  <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
+                                    {selectedSummary.mode}
+                                  </Badge>
+                                )}
+                                {selectedSummary?.output_format && (
+                                  <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
+                                    {selectedSummary.output_format}
+                                  </Badge>
+                                )}
+                                {selectedSummary?.processing_method && (
+                                  <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
+                                    {selectedSummary.processing_method}
+                                  </Badge>
+                                )}
+                              </>
+                            )}
+                          </Group>
+                          <Title order={1} style={{ marginTop: 0, marginBottom: 0, color: '#171738', fontWeight: 700 }}>
+                            {extractedTitle}
+                          </Title>
+                        </div>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {displayContent}
+                        </ReactMarkdown>
+                      </>
                     );
                   })()}
                 </Box>
