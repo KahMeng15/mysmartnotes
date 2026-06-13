@@ -8,7 +8,8 @@ class EmbeddingsManager:
         from sentence_transformers import SentenceTransformer
         try:
             logger.info(f"Loading embeddings model: {model_name}")
-            self.model = SentenceTransformer(model_name)            self.embedding_dim = self.model.get_sentence_embedding_dimension()
+            self.model = SentenceTransformer(model_name)
+            self.embedding_dim = self.model.get_sentence_embedding_dimension()
             logger.info(f"Model loaded. Embedding dimension: {self.embedding_dim}")
         except Exception as e:
             logger.error(f"Error loading embeddings model: {e}")

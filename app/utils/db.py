@@ -42,14 +42,14 @@ def generate_random_id(db: Session, model, length: int = 8) -> str:
     Returns:
         A unique prefixed hex ID derived from UUID4
     """
-    from app.models.db import SubjectGroup, Subject, Lecture, Summary, Quiz, QuizGroup, ChatMessage
+    from app.models.db import SubjectGroup, Subject, Note, Summary, Quiz, QuizGroup, ChatMessage
     
     prefix = ""
     if model == SubjectGroup:
         prefix = "gp_"
     elif model == Subject:
         prefix = "sj_"
-    elif model == Lecture:
+    elif model == Note:
         prefix = "nt_"
     elif model == Summary:
         prefix = "sy_"
@@ -132,7 +132,7 @@ def apply_content_dissociation_migrations():
         with engine.begin() as conn:
             # 1. Tables where user_id should be NULLABLE for dissociation (SET NULL)
             dissociate_tables = [
-                'subject_groups', 'quiz_groups', 'subjects', 'lectures', 
+                'subject_groups', 'quiz_groups', 'subjects', 'notes', 
                 'quizzes', 'chat_messages', 'note_snapshots', 'export_templates'
             ]
             
@@ -262,7 +262,7 @@ def apply_postgresql_migrations():
                 logger.info("Restoring constraints...")
                 conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_reply_to_message_id_fkey FOREIGN KEY (reply_to_message_id) REFERENCES chat_messages(id)'))
                 conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)'))
-                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_lecture_id_fkey FOREIGN KEY (lecture_id) REFERENCES lectures(id)'))
+                conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_note_id_fkey FOREIGN KEY (note_id) REFERENCES notes(id)'))
                 conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_subject_id_fkey FOREIGN KEY (subject_id) REFERENCES subjects(id)'))
                 conn.execute(text('ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_group_id_fkey FOREIGN KEY (group_id) REFERENCES subject_groups(id)'))
                 

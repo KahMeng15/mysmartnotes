@@ -3,7 +3,7 @@ import logging
 import os
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from app.models.db import User, Quiz, QuizQuestion, Subject, Lecture, SubjectGroup
+from app.models.db import User, Quiz, QuizQuestion, Subject, Note, SubjectGroup
 from app.processing.ai_client import AIClient
 from app.utils.db import generate_random_id
 
@@ -30,14 +30,14 @@ async def generate_advanced_quiz(
     content = ""
     group_id = None
     subject_id = None
-    lecture_id = None
+    note_id = None
     
-    if scope_type == "lecture":
-        lecture = db.query(Lecture).filter(Lecture.id == scope_id, Lecture.user_id == user.id).first()
-        if lecture:
-            content = lecture.extracted_text
-            lecture_id = lecture.id
-            subject_id = lecture.subject_id
+    if scope_type == "note":
+        note = db.query(Note).filter(Note.id == scope_id, Note.user_id == user.id).first()
+        if note:
+            content = note.extracted_text
+            note_id = note.id
+            subject_id = note.subject_id
             # Also get the group_id if possible
             subject = db.query(Subject).filter(Subject.id == subject_id).first()
             if subject:
@@ -45,8 +45,8 @@ async def generate_advanced_quiz(
     elif scope_type == "subject":
         subject = db.query(Subject).filter(Subject.id == scope_id, Subject.user_id == user.id).first()
         if subject:
-            lectures = db.query(Lecture).filter(Lecture.subject_id == subject.id).all()
-            content = "\\n\\n".join([l.extracted_text for l in lectures if l.extracted_text])
+            notes = db.query(Note).filter(Note.subject_id == subject.id).all()
+            content = "\\n\\n".join([l.extracted_text for l in notes if l.extracted_text])
             subject_id = subject.id
             group_id = subject.group_id
     elif scope_type == "group":
@@ -54,8 +54,8 @@ async def generate_advanced_quiz(
         if group:
             subjects = db.query(Subject).filter(Subject.group_id == group.id).all()
             subject_ids = [s.id for s in subjects]
-            lectures = db.query(Lecture).filter(Lecture.subject_id.in_(subject_ids)).all()
-            content = "\\n\\n".join([l.extracted_text for l in lectures if l.extracted_text])
+            notes = db.query(Note).filter(Note.subject_id.in_(subject_ids)).all()
+            content = "\\n\\n".join([l.extracted_text for l in notes if l.extracted_text])
             group_id = group.id
             
     if not content:
@@ -111,7 +111,7 @@ Respond with ONLY the JSON array.
         scope_type=scope_type,
         group_id=group_id,
         subject_id=subject_id,
-        lecture_id=lecture_id,
+        note_id=note_id,
         quiz_group_id=quiz_group_id,
         model=ai_client.ai_model_name or ai_client.provider,
         processing_time_ms=processing_time_ms
@@ -147,17 +147,17 @@ async def generate_single_question(
     
     # Retrieve content based on quiz scope
     content = ""
-    if quiz.lecture_id:
-        lecture = db.query(Lecture).filter(Lecture.id == quiz.lecture_id).first()
-        if lecture: content = lecture.extracted_text
+    if quiz.note_id:
+        note = db.query(Note).filter(Note.id == quiz.note_id).first()
+        if note: content = note.extracted_text
     elif quiz.subject_id:
-        lectures = db.query(Lecture).filter(Lecture.subject_id == quiz.subject_id).all()
-        content = "\\n\\n".join([l.extracted_text for l in lectures if l.extracted_text])
+        notes = db.query(Note).filter(Note.subject_id == quiz.subject_id).all()
+        content = "\\n\\n".join([l.extracted_text for l in notes if l.extracted_text])
     elif quiz.group_id:
         subjects = db.query(Subject).filter(Subject.group_id == quiz.group_id).all()
         subject_ids = [s.id for s in subjects]
-        lectures = db.query(Lecture).filter(Lecture.subject_id.in_(subject_ids)).all()
-        content = "\\n\\n".join([l.extracted_text for l in lectures if l.extracted_text])
+        notes = db.query(Note).filter(Note.subject_id.in_(subject_ids)).all()
+        content = "\\n\\n".join([l.extracted_text for l in notes if l.extracted_text])
         
     if not content:
         # Fallback to any content if quiz has no scope (shouldn't happen with AI quizzes)

@@ -1694,14 +1694,14 @@ textarea {
   border-radius: var(--radius-lg);
 }
 
-/* Lecture List Item Styles (Shared) */
-.lecture-list {
+/* Note List Item Styles (Shared) */
+.note-list {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
 }
 
-.lecture-item {
+.note-item {
   background: var(--color-white);
   border: 1px solid var(--color-light-gray);
   border-radius: var(--radius-md);
@@ -1712,14 +1712,14 @@ textarea {
   transition: all var(--transition-base);
 }
 
-.lecture-item:hover {
+.note-item:hover {
   transform: translateX(4px);
   box-shadow: var(--shadow-sm);
   background: var(--color-background);
   /* Override default hover */
 }
 
-.lecture-info {
+.note-info {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
@@ -1727,7 +1727,7 @@ textarea {
   cursor: pointer;
 }
 
-.lecture-icon {
+.note-icon {
   width: 40px;
   height: 40px;
   background: var(--color-white);
@@ -1742,19 +1742,19 @@ textarea {
   /* Override subject-icon margin */
 }
 
-.lecture-details h4 {
+.note-details h4 {
   margin: 0;
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
 }
 
-.lecture-details p {
+.note-details p {
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--color-gray);
 }
 
-.lecture-actions {
+.note-actions {
   display: flex;
   gap: var(--spacing-sm);
 }
@@ -2901,13 +2901,13 @@ body.auth-page {
   line-height: 0.8;
 }
 
-.lecture-grid {
+.note-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: var(--spacing-lg);
 }
 
-.lecture-item {
+.note-item {
   background: var(--color-bg-card, #fff);
   border-radius: var(--radius-lg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
@@ -2915,7 +2915,7 @@ body.auth-page {
   transition: box-shadow 0.2s;
 }
 
-.lecture-item:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10); }
+.note-item:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10); }
 
 /* Sidebar Pomodoro Widget */
 .sidebar-pomo-widget {
@@ -2994,9 +2994,9 @@ body.auth-page {
   .card-stat-value { font-size: 2rem !important; }
   .card-stat-label { font-size: 11px !important; }
   .quick-actions { grid-template-columns: repeat(2, 1fr); padding: 0 var(--spacing-md); }
-  .lecture-grid { grid-template-columns: 1fr; padding: 0 var(--spacing-md); gap: 0; }
+  .note-grid { grid-template-columns: 1fr; padding: 0 var(--spacing-md); gap: 0; }
   
-  .lecture-item {
+  .note-item {
     border-radius: 0 !important;
     box-shadow: none !important;
     border: none !important;
@@ -3102,7 +3102,7 @@ body.auth-page {
   }
 
   /* Card border restoration overrides */
-  .lecture-item, .subject-card, .group-section {
+  .note-item, .subject-card, .group-section {
     border: 1px solid var(--color-light-gray) !important;
     border-radius: var(--radius-md) !important;
     margin-bottom: var(--spacing-sm) !important;
@@ -3132,15 +3132,15 @@ body.auth-page {
   }
 
   /* Keep note lists inline on mobile view */
-  .lecture-item {
+  .note-item {
     flex-direction: row !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: var(--spacing-md) !important;
   }
 
-  /* Hide view button on mobile for recent notes/lectures */
-  .lecture-item .lecture-actions {
+  /* Hide view button on mobile for recent notes/notes */
+  .note-item .note-actions {
     display: none !important;
   }
 
@@ -3324,7 +3324,7 @@ body.auth-page {
   }
   .group-header { flex-direction: column; align-items: flex-start; gap: var(--spacing-sm); }
   .subjects-grid { grid-template-columns: 1fr; }
-  .lecture-item { flex-direction: column; align-items: stretch; gap: var(--spacing-md); }
+  .note-item { flex-direction: column; align-items: stretch; gap: var(--spacing-md); }
 }
 
 /* NOTE PAGE MOBILE */
@@ -3546,7 +3546,7 @@ body.auth-page {
   background: var(--color-background) !important;
 }
 
-.skeleton-card .lecture-info {
+.skeleton-card .note-info {
   filter: grayscale(1);
 }
 

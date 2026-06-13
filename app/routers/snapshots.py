@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.models.db import NoteSnapshot, Lecture, User
+from app.models.db import NoteSnapshot, Note, User
 from app.schemas.schemas import NoteSnapshotCreate, NoteSnapshotResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
@@ -11,47 +11,47 @@ from app.utils.db import get_db
 router = APIRouter(prefix="/snapshots", tags=["snapshots"])
 
 
-@router.get("/{lecture_id}", response_model=List[NoteSnapshotResponse])
+@router.get("/{note_id}", response_model=List[NoteSnapshotResponse])
 async def list_snapshots(
-    lecture_id: str,
+    note_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """List all snapshots for a lecture"""
-    # Verify lecture belongs to user
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id,
-        Lecture.user_id == current_user.id
+    """List all snapshots for a note"""
+    # Verify note belongs to user
+    note = db.query(Note).filter(
+        Note.id == note_id,
+        Note.user_id == current_user.id
     ).first()
-    if not lecture:
-        raise HTTPException(status_code=404, detail="Lecture not found")
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
     
     snapshots = db.query(NoteSnapshot).filter(
-        NoteSnapshot.lecture_id == lecture_id,
+        NoteSnapshot.note_id == note_id,
         NoteSnapshot.user_id == current_user.id
     ).order_by(NoteSnapshot.created_at.desc()).all()
     
     return snapshots
 
 
-@router.post("/{lecture_id}", response_model=NoteSnapshotResponse, status_code=201)
+@router.post("/{note_id}", response_model=NoteSnapshotResponse, status_code=201)
 async def create_snapshot(
-    lecture_id: str,
+    note_id: str,
     body: NoteSnapshotCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a named snapshot of the current note content"""
-    # Verify lecture belongs to user
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id,
-        Lecture.user_id == current_user.id
+    # Verify note belongs to user
+    note = db.query(Note).filter(
+        Note.id == note_id,
+        Note.user_id == current_user.id
     ).first()
-    if not lecture:
-        raise HTTPException(status_code=404, detail="Lecture not found")
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
     
     snapshot = NoteSnapshot(
-        lecture_id=lecture_id,
+        note_id=note_id,
         user_id=current_user.id,
         name=body.name,
         content=body.content
@@ -62,9 +62,9 @@ async def create_snapshot(
     return snapshot
 
 
-@router.get("/{lecture_id}/{snapshot_id}", response_model=NoteSnapshotResponse)
+@router.get("/{note_id}/{snapshot_id}", response_model=NoteSnapshotResponse)
 async def get_snapshot(
-    lecture_id: str,
+    note_id: str,
     snapshot_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -72,7 +72,7 @@ async def get_snapshot(
     """Get a single snapshot's content"""
     snapshot = db.query(NoteSnapshot).filter(
         NoteSnapshot.id == snapshot_id,
-        NoteSnapshot.lecture_id == lecture_id,
+        NoteSnapshot.note_id == note_id,
         NoteSnapshot.user_id == current_user.id
     ).first()
     if not snapshot:
@@ -80,9 +80,9 @@ async def get_snapshot(
     return snapshot
 
 
-@router.delete("/{lecture_id}/{snapshot_id}", status_code=204)
+@router.delete("/{note_id}/{snapshot_id}", status_code=204)
 async def delete_snapshot(
-    lecture_id: str,
+    note_id: str,
     snapshot_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -90,7 +90,7 @@ async def delete_snapshot(
     """Delete a snapshot"""
     snapshot = db.query(NoteSnapshot).filter(
         NoteSnapshot.id == snapshot_id,
-        NoteSnapshot.lecture_id == lecture_id,
+        NoteSnapshot.note_id == note_id,
         NoteSnapshot.user_id == current_user.id
     ).first()
     if not snapshot:

@@ -10,7 +10,7 @@ import asyncio
 import uuid
 import logging
 
-from app.models.db import User, Lecture, ChatMessage, Subject, SubjectGroup
+from app.models.db import User, Note, ChatMessage, Subject, SubjectGroup
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id, generate_conversation_id
 from app.utils.quotas import enforce_quota_messages, check_quota_conversations, get_user_conversation_count, get_user_tier_config
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    lecture_id: Optional[str] = None
+    note_id: Optional[str] = None
     subject_id: Optional[str] = None
     group_id: Optional[str] = None
     message: str
@@ -44,7 +44,7 @@ class ChatMessageResponse(BaseModel):
     sources: list = []
     detailed_sources: list = []
     created_at: str
-    lecture_id: Optional[str] = None
+    note_id: Optional[str] = None
     subject_id: Optional[str] = None
     group_id: Optional[str] = None
     ai_mode: Optional[str] = None
@@ -67,7 +67,7 @@ class ConversationSummary(BaseModel):
     title: str
     message_count: int
     last_message_at: str
-    lecture_id: Optional[str] = None
+    note_id: Optional[str] = None
     subject_id: Optional[str] = None
     group_id: Optional[str] = None
     scope_type: Optional[str] = None
@@ -538,10 +538,10 @@ async def ask_question(
 ):
     """Ask a question as a background task."""
 
-    if not any([request.lecture_id, request.subject_id, request.group_id]):
+    if not any([request.note_id, request.subject_id, request.group_id]):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must provide lecture_id, subject_id, or group_id"
+            detail="Must provide note_id, subject_id, or group_id"
         )
 
     # Enforce tier quotas
@@ -564,7 +564,7 @@ async def ask_question(
         "chat_response",
         current_user.id,
         message=request.message,
-        lecture_id=request.lecture_id,
+        note_id=request.note_id,
         subject_id=request.subject_id,
         group_id=request.group_id,
         ai_mode=request.ai_mode,
@@ -583,7 +583,7 @@ async def ask_question_logic(**kwargs) -> dict:
     try:
         user_id = kwargs.get("user_id")
         message = kwargs.get("message")
-        lecture_id = kwargs.get("lecture_id")
+        note_id = kwargs.get("note_id")
         subject_id = kwargs.get("subject_id")
         group_id = kwargs.get("group_id")
         ai_mode = kwargs.get("ai_mode", "elaborate")
@@ -598,31 +598,31 @@ async def ask_question_logic(**kwargs) -> dict:
 
         t_start = time.time()
         step_times = {f"step{i}": 0.0 for i in range(1, 10)}
-        target_lecture_ids = []
+        target_note_ids = []
         sources = []
 
         # Identical logic to previous endpoint follows...
-        if lecture_id:
-            lecture = db.query(Lecture).filter(Lecture.id == lecture_id, Lecture.user_id == user_id).first()
-            if lecture:
-                target_lecture_ids = [lecture_id]
-                sources = [lecture.title]
+        if note_id:
+            note = db.query(Note).filter(Note.id == note_id, Note.user_id == user_id).first()
+            if note:
+                target_note_ids = [note_id]
+                sources = [note.title]
 
         elif subject_id:
             subject = db.query(Subject).filter(Subject.id == subject_id, Subject.user_id == user_id).first()
             if subject:
-                lectures = db.query(Lecture).filter(Lecture.subject_id == subject.id).all()
-                target_lecture_ids = [l.id for l in lectures]
-                sources = [l.title for l in lectures]
+                notes = db.query(Note).filter(Note.subject_id == subject.id).all()
+                target_note_ids = [l.id for l in notes]
+                sources = [l.title for l in notes]
 
         elif group_id:
             group = db.query(SubjectGroup).filter(SubjectGroup.id == group_id, SubjectGroup.user_id == user_id).first()
             if group:
                 subjects = db.query(Subject).filter(Subject.group_id == group.id).all()
                 for s in subjects:
-                    lectures = db.query(Lecture).filter(Lecture.subject_id == s.id).all()
-                    target_lecture_ids.extend([l.id for l in lectures])
-                    sources.extend([l.title for l in lectures])
+                    notes = db.query(Note).filter(Note.subject_id == s.id).all()
+                    target_note_ids.extend([l.id for l in notes])
+                    sources.extend([l.title for l in notes])
 
         step_times["step1"] = round((time.time() - t_start) * 1000.0, 2)
         retrieval_ms = (time.time() - t_start) * 1000.0
@@ -684,10 +684,10 @@ async def ask_question_logic(**kwargs) -> dict:
             prompt = "Decline politely."
         else:
             t_step4_start = time.time()
-            if target_lecture_ids:
+            if target_note_ids:
                 try:
                     from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
-                    raw_chunks = retrieve_relevant_chunks(query=message, lecture_ids=target_lecture_ids, db=db, top_k=5)
+                    raw_chunks = retrieve_relevant_chunks(query=message, note_ids=target_note_ids, db=db, top_k=5)
                     # Filter for confident chunks (score >= 15.0)
                     chunks = [c for c in raw_chunks if c["score"] >= 15.0]
                     
@@ -699,7 +699,7 @@ async def ask_question_logic(**kwargs) -> dict:
                                 "text_preview": chunk["text"][:150],
                                 "position": chunk["position"],
                                 "score": chunk["score"],
-                                "lecture_id": chunk["lecture_id"]
+                                "note_id": chunk["note_id"]
                             })
                         snippet_sources = list(set(sources))[:2]
                 except Exception as e:
@@ -747,7 +747,7 @@ async def ask_question_logic(**kwargs) -> dict:
         timings_dict = {"retrieval_ms": round(retrieval_ms, 2), "model_ms": round(model_ms, 2), "total_ms": round(total_ms, 2), "step_times": step_times}
         
         chat_msg = ChatMessage(
-            id=generate_random_id(db, ChatMessage), user_id=user_id, lecture_id=lecture_id, subject_id=subject_id, group_id=group_id,
+            id=generate_random_id(db, ChatMessage), user_id=user_id, note_id=note_id, subject_id=subject_id, group_id=group_id,
             message=message, response=response, sources=json.dumps(snippet_sources), conversation_id=conv_id, conversation_title=conv_title,
             ai_mode=ai_mode, output_format=output_format, ai_model=ai_model_info, reply_to_message_id=reply_to_message_id,
             detailed_sources_json=json.dumps(detailed_sources) if detailed_sources else None, timings_json=json.dumps(timings_dict),
@@ -776,7 +776,7 @@ async def get_conversations(
             func.max(ChatMessage.conversation_title).label("title"),
             func.count(ChatMessage.id).label("message_count"),
             func.max(ChatMessage.created_at).label("last_message_at"),
-            func.max(ChatMessage.lecture_id).label("lecture_id"),
+            func.max(ChatMessage.note_id).label("note_id"),
             func.max(ChatMessage.subject_id).label("subject_id"),
             func.max(ChatMessage.group_id).label("group_id"),
             func.max(cast(ChatMessage.is_pinned, Integer)).label("is_pinned"),
@@ -796,13 +796,13 @@ async def get_conversations(
 
     result = []
     for row in rows:
-        scope_type = "note" if row.lecture_id else ("subject" if row.subject_id else ("group" if row.group_id else None))
+        scope_type = "note" if row.note_id else ("subject" if row.subject_id else ("group" if row.group_id else None))
         result.append(ConversationSummary(
             conversation_id=row.conversation_id,
             title=row.title or "Untitled Conversation",
             message_count=row.message_count,
             last_message_at=row.last_message_at.isoformat(),
-            lecture_id=row.lecture_id,
+            note_id=row.note_id,
             subject_id=row.subject_id,
             group_id=row.group_id,
             scope_type=scope_type,
@@ -841,7 +841,7 @@ async def get_conversation_messages(
             sources=json.loads(m.sources) if m.sources else [],
             detailed_sources=json.loads(m.detailed_sources_json) if m.detailed_sources_json else [],
             created_at=m.created_at.isoformat(),
-            lecture_id=m.lecture_id,
+            note_id=m.note_id,
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,
@@ -874,7 +874,7 @@ async def get_all_chat_history(
             sources=json.loads(m.sources) if m.sources else [],
             detailed_sources=json.loads(m.detailed_sources_json) if m.detailed_sources_json else [],
             created_at=m.created_at.isoformat(),
-            lecture_id=m.lecture_id,
+            note_id=m.note_id,
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,
@@ -889,24 +889,24 @@ async def get_all_chat_history(
     ]
 
 
-@router.get("/history/{lecture_id}", response_model=List[ChatMessageResponse])
-async def get_lecture_chat_history(
-    lecture_id: str,
+@router.get("/history/{note_id}", response_model=List[ChatMessageResponse])
+async def get_note_chat_history(
+    note_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get chat history for a specific lecture."""
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id,
-        Lecture.user_id == current_user.id
+    """Get chat history for a specific note."""
+    note = db.query(Note).filter(
+        Note.id == note_id,
+        Note.user_id == current_user.id
     ).first()
 
-    if not lecture:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lecture not found")
+    if not note:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
 
     messages = db.query(ChatMessage).filter(
         ChatMessage.user_id == current_user.id,
-        ChatMessage.lecture_id == lecture_id
+        ChatMessage.note_id == note_id
     ).order_by(ChatMessage.created_at.desc()).all()
 
     return [
@@ -917,7 +917,7 @@ async def get_lecture_chat_history(
             sources=json.loads(m.sources) if m.sources else [],
             detailed_sources=json.loads(m.detailed_sources_json) if m.detailed_sources_json else [],
             created_at=m.created_at.isoformat(),
-            lecture_id=m.lecture_id,
+            note_id=m.note_id,
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,

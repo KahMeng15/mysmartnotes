@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from typing import Optional, Callable, Any
 
-from app.models.db import User, Lecture
+from app.models.db import User, Note
 from app.utils.db import SessionLocal
 from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
@@ -43,7 +43,7 @@ def ensure_valid_markdown_result(markdown: str) -> str:
 
 def extract_markdown_for_user(user: User, file_path: str, progress_callback: Optional[Callable] = None) -> str:
     """
-    Process a lecture with the configured SmartPipeline.
+    Process a note with the configured SmartPipeline.
     """
     pipeline = get_pipeline_for_user(user)
     try:
@@ -61,7 +61,7 @@ def extract_markdown_for_user(user: User, file_path: str, progress_callback: Opt
 
 def markdown_to_segments(markdown: str) -> list:
     """
-    Convert Markdown text to structured segments compatible with the existing lecture view UI.
+    Convert Markdown text to structured segments compatible with the existing note view UI.
     """
     import re
     segments = []
@@ -113,19 +113,19 @@ def markdown_to_segments(markdown: str) -> list:
 
     return segments
 
-def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool = False, **kwargs):
-    """Core logic to process a lecture, used by both worker and (optionally) API."""
-    task_id = kwargs.get("task_id") or f"ocr_{user_id}_{lecture_id}"
+def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = False, **kwargs):
+    """Core logic to process a note, used by both worker and (optionally) API."""
+    task_id = kwargs.get("task_id") or f"ocr_{user_id}_{note_id}"
     
     db = SessionLocal()
     try:
-        lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
+        note = db.query(Note).filter(Note.id == note_id).first()
         user = db.query(User).filter(User.id == user_id).first()
         
-        if not lecture or not user:
-            logger.error(f"Processing failed: Lecture {lecture_id} or User {user_id} not found")
-            TaskManager._update_db_task(task_id, status="failed", error="Lecture or User not found")
-            return {"status": "error", "message": "Lecture or User not found"}
+        if not note or not user:
+            logger.error(f"Processing failed: Note {note_id} or User {user_id} not found")
+            TaskManager._update_db_task(task_id, status="failed", error="Note or User not found")
+            return {"status": "error", "message": "Note or User not found"}
 
         def is_cancelled():
             """Check if the task has been marked as failed/cancelled in the DB"""
@@ -143,7 +143,7 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             logger.info(f"Task {task_id} aborted before start")
             return {"status": "cancelled"}
 
-        file_path = lecture.file_path
+        file_path = note.file_path
         if not os.path.exists(file_path):
             logger.error(f"Processing failed: File not found at {file_path}")
             TaskManager._update_db_task(task_id, status="failed", error="File not found on disk")
@@ -156,7 +156,7 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
         file_ext = os.path.splitext(file_path)[1].lower()
 
         if file_ext in ('.pdf', '.pptx'):
-            logger.info(f"Processing lecture {lecture_id} (SmartPipeline)")
+            logger.info(f"Processing note {note_id} (SmartPipeline)")
             progress_callback(15, "Initializing AI pipeline...")
             
             # Custom wrapper to pass messages through the pipeline's callback
@@ -178,8 +178,8 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             structured_segments = markdown_to_segments(markdown)
             
             # Save to file storage
-            StorageManager.save_lecture_text(lecture.id, markdown)
-            StorageManager.save_lecture_json(lecture.id, "structured", structured_segments)
+            StorageManager.save_note_text(note.id, markdown)
+            StorageManager.save_note_json(note.id, "structured", structured_segments)
             
             # Auto-title detection from H1
             if auto_detect_title:
@@ -187,11 +187,11 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
                     if line.strip().startswith('# '):
                         detected_title = line.strip()[2:].strip()
                         if detected_title:
-                            lecture.title = detected_title
+                            note.title = detected_title
                             break
             
-            lecture.processing_time_ms = int((time.time() - start_time) * 1000)
-            lecture.updated_at = datetime.utcnow()
+            note.processing_time_ms = int((time.time() - start_time) * 1000)
+            note.updated_at = datetime.utcnow()
             db.commit()
             
             # STEP 4: Compute and store embeddings
@@ -201,22 +201,22 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
                     return {"status": "cancelled"}
                 try:
                     progress_callback(95, "Generating search embeddings...")
-                    from app.processing.embeddings import update_lecture_embeddings
-                    update_lecture_embeddings(lecture.id, markdown, db)
+                    from app.processing.embeddings import update_note_embeddings
+                    update_note_embeddings(note.id, markdown, db)
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
             TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
-            logger.info(f"Processing complete for lecture {lecture_id}")
-            return {"status": "success", "lecture_id": lecture_id}
+            logger.info(f"Processing complete for note {note_id}")
+            return {"status": "success", "note_id": note_id}
 
         else:
             # Fallback to OCR for images
-            logger.info(f"Processing lecture {lecture_id} (OCR Fallback)")
+            logger.info(f"Processing note {note_id} (OCR Fallback)")
             if is_cancelled(): return {"status": "cancelled"}
             
             progress_callback(20, "OCR: Analyzing image...")
-            ocr_result = OCRProcessor.extract_text(file_path, lecture.file_type, lecture_id=lecture_id)
+            ocr_result = OCRProcessor.extract_text(file_path, note.file_type, note_id=note_id)
             
             if is_cancelled(): return {"status": "cancelled"}
             progress_callback(80, "Structuring content...")
@@ -226,25 +226,25 @@ def process_lecture_task(lecture_id: str, user_id: int, auto_detect_title: bool 
             images_data = ocr_result.get("images", [])
             
             # Save to file storage
-            StorageManager.save_lecture_text(lecture.id, raw_text)
-            StorageManager.save_lecture_json(lecture.id, "structured", structured_content)
-            StorageManager.save_lecture_json(lecture.id, "images", images_data)
+            StorageManager.save_note_text(note.id, raw_text)
+            StorageManager.save_note_json(note.id, "structured", structured_content)
+            StorageManager.save_note_json(note.id, "images", images_data)
 
-            lecture.processing_time_ms = int((time.time() - start_time) * 1000)
-            lecture.updated_at = datetime.utcnow()
+            note.processing_time_ms = int((time.time() - start_time) * 1000)
+            note.updated_at = datetime.utcnow()
             db.commit()
             
             if raw_text:
                 if is_cancelled(): return {"status": "cancelled"}
                 try:
                     progress_callback(95, "Generating search embeddings...")
-                    from app.processing.embeddings import update_lecture_embeddings
-                    update_lecture_embeddings(lecture.id, raw_text, db)
+                    from app.processing.embeddings import update_note_embeddings
+                    update_note_embeddings(note.id, raw_text, db)
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
             TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
-            return {"status": "success", "lecture_id": lecture_id}
+            return {"status": "success", "note_id": note_id}
 
     except Exception as e:
         if "Task cancelled by user" in str(e):

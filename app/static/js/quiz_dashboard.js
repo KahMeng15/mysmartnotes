@@ -2,7 +2,7 @@
 
 let allGroups = [];
 let allSubjects = [];
-let allLectures = [];
+let allNotes = [];
 let quizGroups = []; // New Quiz Groups
 let quizzesData = [];
 let searchTimeout = null;
@@ -550,15 +550,15 @@ function clearImportFile() {
 
 async function loadSelectionData() {
     try {
-        const [groupsRes, subjectsRes, lecturesRes] = await Promise.all([
+        const [groupsRes, subjectsRes, notesRes] = await Promise.all([
             fetch('/groups'),
             fetch('/subjects'),
-            fetch('/lectures')
+            fetch('/notes')
         ]);
         
         allGroups = await groupsRes.json();
         allSubjects = await subjectsRes.json();
-        allLectures = await lecturesRes.json();
+        allNotes = await notesRes.json();
         
         populateGroups();
     } catch (error) {
@@ -610,24 +610,24 @@ function onGroupChange() {
 function onSubjectChange() {
     const subjectId = document.getElementById('subjectSelect').value;
     const groupId = document.getElementById('groupSelect').value;
-    const lectureSelect = document.getElementById('lectureSelect');
-    if (!lectureSelect) return;
+    const noteSelect = document.getElementById('noteSelect');
+    if (!noteSelect) return;
     
-    lectureSelect.innerHTML = '<option value="all">All Notes in Subject</option>';
+    noteSelect.innerHTML = '<option value="all">All Notes in Subject</option>';
     
-    let filteredLectures = [];
+    let filteredNotes = [];
     if (subjectId === 'all') {
         const subjectIds = allSubjects.filter(s => s.group_id === groupId).map(s => s.id);
-        filteredLectures = allLectures.filter(l => subjectIds.includes(l.subject_id));
+        filteredNotes = allNotes.filter(l => subjectIds.includes(l.subject_id));
     } else {
-        filteredLectures = allLectures.filter(l => l.subject_id === subjectId);
+        filteredNotes = allNotes.filter(l => l.subject_id === subjectId);
     }
     
-    filteredLectures.forEach(lecture => {
+    filteredNotes.forEach(note => {
         const opt = document.createElement('option');
-        opt.value = lecture.id;
-        opt.textContent = lecture.title;
-        lectureSelect.appendChild(opt);
+        opt.value = note.id;
+        opt.textContent = note.title;
+        noteSelect.appendChild(opt);
     });
 }
 
@@ -661,7 +661,7 @@ async function submitCreateQuiz() {
         if (method === 'ai') {
             const groupId = document.getElementById('groupSelect').value;
             const subjectId = document.getElementById('subjectSelect').value;
-            const lectureId = document.getElementById('lectureSelect').value;
+            const noteId = document.getElementById('noteSelect').value;
             const numQuestions = parseInt(document.getElementById('numQuestions').value) || 5;
 
             if (numQuestions < 1) throw new Error('Please enter at least 1 question');
@@ -670,10 +670,10 @@ async function submitCreateQuiz() {
             let scopeType, scopeId;
             let defaultTitle = '';
             
-            if (lectureId && lectureId !== 'all') {
-                scopeType = 'lecture';
-                scopeId = lectureId;
-                defaultTitle = document.getElementById('lectureSelect').options[document.getElementById('lectureSelect').selectedIndex].text;
+            if (noteId && noteId !== 'all') {
+                scopeType = 'note';
+                scopeId = noteId;
+                defaultTitle = document.getElementById('noteSelect').options[document.getElementById('noteSelect').selectedIndex].text;
             } else if (subjectId && subjectId !== 'all') {
                 scopeType = 'subject';
                 scopeId = subjectId;

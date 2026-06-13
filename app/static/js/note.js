@@ -1,5 +1,5 @@
-let lectureId = null;
-let lectureData = null;
+let noteId = null;
+let noteData = null;
 let pollingInterval = null;
 let isEditing = false;
 
@@ -114,13 +114,13 @@ function scrollToPosition(position) {
 window.addEventListener('load', () => {
     // Extract UUID or integer ID from path /note/123
     const pathParts = window.location.pathname.split('/');
-    lectureId = pathParts[pathParts.length - 1];
+    noteId = pathParts[pathParts.length - 1];
 
-    if (!lectureId || lectureId === 'note') {
-        showError('No lecture ID provided in URL path');
+    if (!noteId || noteId === 'note') {
+        showError('No note ID provided in URL path');
         return;
     }
-    loadLecture();
+    loadNote();
 
     // Handle reference navigation from chat (hash-based)
     const hash = window.location.hash;
@@ -132,13 +132,13 @@ window.addEventListener('load', () => {
     }
 });
 
-// ===== LOAD LECTURE =====
-async function loadLecture() {
+// ===== LOAD NOTE =====
+async function loadNote() {
     try {
-        const response = await fetch(`/lectures/${lectureId}`);
-        if (!response.ok) throw new Error('Failed to load lecture');
-        lectureData = await response.json();
-        displayLecture();
+        const response = await fetch(`/notes/${noteId}`);
+        if (!response.ok) throw new Error('Failed to load note');
+        noteData = await response.json();
+        displayNote();
         checkExtractionStatus();
         loadSnapshots();
     } catch (error) {
@@ -146,22 +146,22 @@ async function loadLecture() {
     }
 }
 
-// ===== DISPLAY LECTURE =====
-function displayLecture() {
+// ===== DISPLAY NOTE =====
+function displayNote() {
     document.getElementById('loadingContainer').style.display = 'none';
-    document.getElementById('lectureContainer').style.display = 'block';
+    document.getElementById('noteContainer').style.display = 'block';
     document.querySelector('.note-action-panel').style.display = '';
 
     // Note title will be extracted from first h1 in markdown, no longer set here
 
     // Subject color dot
-    const subjectColor = lectureData.subject?.color || '#593C8F';
+    const subjectColor = noteData.subject?.color || '#593C8F';
     const dot = document.getElementById('subjectDot');
     if (dot) dot.style.background = subjectColor;
 
     // Metadata
-    const subjectName = lectureData.subject?.name || 'Unknown Subject';
-    const subjectId = lectureData.subject_id;
+    const subjectName = noteData.subject?.name || 'Unknown Subject';
+    const subjectId = noteData.subject_id;
     const metaSubject = document.getElementById('metaSubject');
     if (metaSubject) {
         metaSubject.textContent = subjectName;
@@ -170,13 +170,13 @@ function displayLecture() {
 
     const metaNote = document.getElementById('metaNote');
     if (metaNote) {
-        metaNote.textContent = lectureData.title;
-        metaNote.href = `/note/${lectureId}`;
+        metaNote.textContent = noteData.title;
+        metaNote.href = `/note/${noteId}`;
     }
 
     // Fetch group name
-    if (lectureData.subject?.group_id) {
-        fetchGroupName(lectureData.subject.group_id);
+    if (noteData.subject?.group_id) {
+        fetchGroupName(noteData.subject.group_id);
     } else {
         const mg = document.getElementById('metaGroup');
         if (mg) mg.textContent = 'Ungrouped';
@@ -185,21 +185,21 @@ function displayLecture() {
 
 
     // Sidebar info
-    document.getElementById('fileName').textContent = lectureData.file_name || '-';
-    const uploadDate = new Date(lectureData.created_at);
-    document.getElementById('uploadedDate').textContent = window.formatDate(lectureData.created_at);
+    document.getElementById('fileName').textContent = noteData.file_name || '-';
+    const uploadDate = new Date(noteData.created_at);
+    document.getElementById('uploadedDate').textContent = window.formatDate(noteData.created_at);
 
-    const fileType = lectureData.file_type || '';
+    const fileType = noteData.file_type || '';
     if (fileType.includes('pdf')) document.getElementById('fileType').textContent = 'PDF';
     else if (fileType.includes('presentation') || fileType.includes('powerpoint')) document.getElementById('fileType').textContent = 'PPTX';
     else if (fileType.includes('image')) document.getElementById('fileType').textContent = 'Image';
     else document.getElementById('fileType').textContent = fileType.split('/').pop()?.toUpperCase() || 'File';
 
-    document.getElementById('fileSize').textContent = formatFileSize(lectureData.file_size);
+    document.getElementById('fileSize').textContent = formatFileSize(noteData.file_size);
 
     // Processing time
-    if (lectureData.processing_time_ms !== null && lectureData.processing_time_ms !== undefined) {
-        const diffMs = lectureData.processing_time_ms;
+    if (noteData.processing_time_ms !== null && noteData.processing_time_ms !== undefined) {
+        const diffMs = noteData.processing_time_ms;
         if (diffMs < 1000) {
             document.getElementById('processingTime').textContent = `${diffMs}ms`;
         } else {
@@ -215,7 +215,7 @@ function displayLecture() {
         document.getElementById('processingTime').textContent = 'N/A';
     }
 
-    document.title = lectureData.title + ' - MySmartNotes';
+    document.title = noteData.title + ' - MySmartNotes';
     updateExtractedText();
 }
 
@@ -256,14 +256,14 @@ function updateExtractedText() {
     const extractionStatus = document.getElementById('extractionStatus');
     if (extractionStatus) extractionStatus.style.display = 'none';
 
-    if (lectureData.extracted_text) {
+    if (noteData.extracted_text) {
         // ... (rest of function unchanged)
         // Remove loading bar if present
         const bar = document.getElementById('noteLoadingBar');
         if (bar) bar.remove();
 
         try {
-            textContainer.innerHTML = marked.parse(lectureData.extracted_text);
+            textContainer.innerHTML = marked.parse(noteData.extracted_text);
             if (pollingInterval) clearInterval(pollingInterval);
             setupH1Editing();
             setupStickyHeaderFading();
@@ -273,7 +273,7 @@ function updateExtractedText() {
         }
     } else {
         // Show skeleton loading if still processing
-        const taskId = `ocr_${lectureData.user_id}_${lectureData.id}`;
+        const taskId = `ocr_${noteData.user_id}_${noteData.id}`;
         const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
         const activeTask = activeTasks.get(taskId);
         
@@ -314,12 +314,12 @@ function updateExtractedText() {
 // Listen for task updates to refresh the note content in real-time
 window.addEventListener('taskUpdate', (e) => {
     const task = e.detail;
-    if (task.task_id === `ocr_${lectureData.user_id}_${lectureId}`) {
+    if (task.task_id === `ocr_${noteData.user_id}_${noteId}`) {
         const fill = document.getElementById('noteLoadingBarFill');
         if (fill) fill.style.width = task.progress + '%';
 
         if (task.status === 'completed') {
-            loadLecture();
+            loadNote();
         } else if (task.status === 'failed') {
             const bar = document.getElementById('noteLoadingBar');
             if (bar) bar.remove();
@@ -346,8 +346,8 @@ function setupH1Editing() {
         firstH1.addEventListener('blur', function () {
             firstH1.style.outline = 'none';
             const newTitle = firstH1.textContent.trim();
-            if (newTitle && newTitle !== lectureData.title) {
-                updateLectureTitle(newTitle);
+            if (newTitle && newTitle !== noteData.title) {
+                updateNoteTitle(newTitle);
             }
         });
 
@@ -368,10 +368,10 @@ function setupH1Editing() {
     }
 }
 
-// Update lecture title in the database
-async function updateLectureTitle(newTitle) {
+// Update note title in the database
+async function updateNoteTitle(newTitle) {
     try {
-        const response = await fetch(`/lectures/${lectureId}`, {
+        const response = await fetch(`/notes/${noteId}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json'
@@ -379,19 +379,19 @@ async function updateLectureTitle(newTitle) {
             body: JSON.stringify({ title: newTitle })
         });
         if (response.ok) {
-            lectureData.title = newTitle;
+            noteData.title = newTitle;
             document.title = newTitle + ' - MySmartNotes';
         } else {
-            console.error('Failed to update lecture title');
+            console.error('Failed to update note title');
             // Revert the change
             const firstH1 = document.querySelector('.markdown-content h1');
-            if (firstH1) firstH1.textContent = lectureData.title;
+            if (firstH1) firstH1.textContent = noteData.title;
         }
     } catch (e) {
-        console.error('Error updating lecture title:', e);
+        console.error('Error updating note title:', e);
         // Revert the change
         const firstH1 = document.querySelector('.markdown-content h1');
-        if (firstH1) firstH1.textContent = lectureData.title;
+        if (firstH1) firstH1.textContent = noteData.title;
     }
 }
 
@@ -448,15 +448,15 @@ function setupStickyHeaderFading() {
 
 // ===== EXTRACTION STATUS =====
 async function checkExtractionStatus() {
-    if (lectureData.extracted_text) return;
+    if (noteData.extracted_text) return;
     try {
-        const response = await fetch(`/search/task?lecture_id=${lectureId}`);
+        const response = await fetch(`/search/task?note_id=${noteId}`);
         if (response.ok) {
             const task = await response.json();
             document.getElementById('extractionStatus').style.display = 'block';
             if (task.status === 'pending') { showPending(); startPolling(); }
             else if (task.status === 'running') { showRunning(); startPolling(); }
-            else if (task.status === 'completed') { reloadLecture(); }
+            else if (task.status === 'completed') { reloadNote(); }
             else if (task.status === 'failed') { showFailed(); }
         }
     } catch (error) { console.error('Error checking task status:', error); }
@@ -492,20 +492,20 @@ function startPolling() { pollingInterval = setInterval(pollStatus, 2000); }
 
 async function pollStatus() {
     try {
-        const response = await fetch(`/search/task?lecture_id=${lectureId}`);
+        const response = await fetch(`/search/task?note_id=${noteId}`);
         if (response.ok) {
             const task = await response.json();
-            if (task.status === 'completed') { clearInterval(pollingInterval); reloadLecture(); }
+            if (task.status === 'completed') { clearInterval(pollingInterval); reloadNote(); }
             else if (task.status === 'failed') { clearInterval(pollingInterval); showFailed(); }
         }
     } catch (error) { console.error('Error polling:', error); }
 }
 
-async function reloadLecture() {
+async function reloadNote() {
     try {
-        const response = await fetch(`/lectures/${lectureId}`);
+        const response = await fetch(`/notes/${noteId}`);
         if (response.ok) {
-            lectureData = await response.json();
+            noteData = await response.json();
             updateExtractedText();
             document.getElementById('progressContainer').style.display = 'none';
             document.getElementById('errorContainerInline').style.display = 'none';
@@ -531,11 +531,11 @@ function toggleEdit() {
 
         // Update URL without reloading
         if (!window.location.pathname.endsWith('/edit')) {
-            history.pushState(null, '', `/note/${lectureId}/edit`);
+            history.pushState(null, '', `/note/${noteId}/edit`);
         }
 
         const area = document.getElementById('wysiwygArea');
-        const md = lectureData.extracted_text || '';
+        const md = noteData.extracted_text || '';
         try {
             area.innerHTML = marked.parse(md);
         } catch (e) {
@@ -557,14 +557,14 @@ function cancelEdit() {
     viewContainer.style.display = 'block';
 
     // Revert URL
-    history.pushState(null, '', `/note/${lectureId}`);
+    history.pushState(null, '', `/note/${noteId}`);
 }
 
-function viewLecture() {
+function viewNote() {
     if (isEditing) {
         cancelEdit();
     } else {
-        window.location.href = `/note/${lectureId}`;
+        window.location.href = `/note/${noteId}`;
     }
 }
 
@@ -797,9 +797,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Auto open editor if URL path ends with /edit
     if (window.location.pathname.endsWith('/edit')) {
-        // Polling wait until lectureData is loaded to open edit view
+        // Polling wait until noteData is loaded to open edit view
         const checkAndEdit = setInterval(() => {
-            if (lectureData) {
+            if (noteData) {
                 clearInterval(checkAndEdit);
                 toggleEdit();
             }
@@ -1248,7 +1248,7 @@ async function saveContent() {
         mdText = htmlToMarkdown(document.getElementById('wysiwygArea').innerHTML);
     }
     try {
-        const res = await fetch(`/lectures/${lectureId}/content`, {
+        const res = await fetch(`/notes/${noteId}/content`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
@@ -1256,7 +1256,7 @@ async function saveContent() {
             body: JSON.stringify({ extracted_text: mdText })
         });
         if (res.ok) {
-            lectureData.extracted_text = mdText;
+            noteData.extracted_text = mdText;
             updateExtractedText();
 
             // Show a quick success indicator before returning to view
@@ -1278,7 +1278,7 @@ async function saveContent() {
 // ===== SNAPSHOTS =====
 async function loadSnapshots() {
     try {
-        const res = await fetch(`/snapshots/${lectureId}`);
+        const res = await fetch(`/snapshots/${noteId}`);
         if (res.ok) {
             const snapshots = await res.json();
             renderSnapshots(snapshots);
@@ -1322,9 +1322,9 @@ async function createSnapshot() {
     const name = nameInput.value.trim();
     if (!name) { alert('Please enter a snapshot name'); return; }
 
-    const content = lectureData.extracted_text || '';
+    const content = noteData.extracted_text || '';
     try {
-        const res = await fetch(`/snapshots/${lectureId}`, {
+        const res = await fetch(`/snapshots/${noteId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1353,7 +1353,7 @@ function promptCreateSnapshot() {
 
 async function viewSnapshot(snapshotId) {
     try {
-        const res = await fetch(`/snapshots/${lectureId}/${snapshotId}`);
+        const res = await fetch(`/snapshots/${noteId}/${snapshotId}`);
         if (res.ok) {
             const snapshot = await res.json();
             // Show snapshot content in the main view
@@ -1378,7 +1378,7 @@ async function viewSnapshot(snapshotId) {
 async function deleteSnapshot(snapshotId) {
     if (!confirm('Delete this snapshot?')) return;
     try {
-        const res = await fetch(`/snapshots/${lectureId}/${snapshotId}`, {
+        const res = await fetch(`/snapshots/${noteId}/${snapshotId}`, {
             method: 'DELETE'
         });
         if (res.status === 204) {
@@ -1389,19 +1389,19 @@ async function deleteSnapshot(snapshotId) {
 
 // ===== ACTIONS =====
 function goToChat() {
-    window.location.href = `/chat.html?lecture_id=${lectureId}`;
+    window.location.href = `/chat.html?note_id=${noteId}`;
 }
 
 
 
 // ===== SUMMARIZATION =====
 function handleSummarizeClick() {
-    if (!lectureId) return;
-    const lastVersionId = localStorage.getItem(`lastSummaryVersion_${lectureId}`);
+    if (!noteId) return;
+    const lastVersionId = localStorage.getItem(`lastSummaryVersion_${noteId}`);
     if (lastVersionId) {
-        window.location.href = `/note/${lectureId}/summary/${lastVersionId}`;
+        window.location.href = `/note/${noteId}/summary/${lastVersionId}`;
     } else {
-        window.location.href = `/note/${lectureId}/summary`;
+        window.location.href = `/note/${noteId}/summary`;
     }
 }
 
@@ -1467,7 +1467,7 @@ async function doExport() {
         };
         if (templateId) payload.template_id = templateId;
 
-        const response = await fetch(`/lectures/${lectureId}/export`, {
+        const response = await fetch(`/notes/${noteId}/export`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1492,7 +1492,7 @@ async function doExport() {
                 a.style.display = 'none';
                 a.href = url;
                 const ext = format === 'docx' ? 'docx' : 'pdf';
-                a.download = `${lectureData.title || 'note'}.${ext}`;
+                a.download = `${noteData.title || 'note'}.${ext}`;
                 document.body.appendChild(a);
                 a.click();
                 setTimeout(() => {
@@ -1521,7 +1521,7 @@ function updateExportProgress(text, percent) {
 
 async function downloadOriginalFile() {
     try {
-        const response = await fetch(`/lectures/${lectureId}/download-file`);
+        const response = await fetch(`/notes/${noteId}/download-file`);
         if (response.ok) {
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
@@ -1529,7 +1529,7 @@ async function downloadOriginalFile() {
             a.style.display = 'none';
             a.href = url;
 
-            let filename = lectureData.file_name || 'file';
+            let filename = noteData.file_name || 'file';
             const disposition = response.headers.get('Content-Disposition');
             if (disposition && disposition.indexOf('filename=') !== -1) {
                 const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
@@ -1585,7 +1585,7 @@ async function confirmReprocess() {
     }, 5000);
 
     try {
-        const response = await fetch(`/lectures/${lectureId}/reprocess`, {
+        const response = await fetch(`/notes/${noteId}/reprocess`, {
             method: 'POST'
         });
         if (response.ok) {
@@ -1613,21 +1613,21 @@ async function confirmReprocess() {
     }
 }
 
-async function deleteLecture() {
-    if (!confirm('Delete this lecture? This cannot be undone.')) return;
+async function deleteNote() {
+    if (!confirm('Delete this note? This cannot be undone.')) return;
     try {
-        const response = await fetch(`/lectures/${lectureId}`, {
+        const response = await fetch(`/notes/${noteId}`, {
             method: 'DELETE'
         });
         if (response.ok || response.status === 204) {
-            alert('Lecture deleted');
-            if (lectureData.subject_id) {
-                window.location.href = `/subject.html?id=${lectureData.subject_id}`;
+            alert('Note deleted');
+            if (noteData.subject_id) {
+                window.location.href = `/subject.html?id=${noteData.subject_id}`;
             } else {
                 window.location.href = '/mynotes.html';
             }
         } else {
-            alert('Failed to delete lecture');
+            alert('Failed to delete note');
         }
     } catch (error) { alert('Error: ' + error.message); }
 }
@@ -1635,7 +1635,7 @@ async function deleteLecture() {
 // ===== UTILITIES =====
 function showError(message) {
     document.getElementById('loadingContainer').style.display = 'none';
-    document.getElementById('lectureContainer').style.display = 'none';
+    document.getElementById('noteContainer').style.display = 'none';
     document.querySelector('.note-action-panel').style.display = 'none';
     document.getElementById('errorContainer').style.display = 'block';
     document.getElementById('errorMessage').textContent = message;
@@ -1834,7 +1834,7 @@ async function loadNoteChatHistory() {
         if (!res.ok) return;
         const convos = await res.json();
         // Find the most recent conversation for this note
-        const noteConvo = convos.find(c => c.scope_type === 'note' && c.scope_id == lectureId);
+        const noteConvo = convos.find(c => c.scope_type === 'note' && c.scope_id == noteId);
         if (noteConvo) {
             chatConversationId = noteConvo.conversation_id;
             // Load messages
@@ -1855,7 +1855,7 @@ async function loadNoteChatHistory() {
 async function sendNoteChat() {
     const input = document.getElementById('noteChatInput');
     const message = input.value.trim();
-    if (!message || !lectureId) return;
+    if (!message || !noteId) return;
 
     if (!chatConversationId) chatConversationId = generateUUID();
 
@@ -1908,7 +1908,7 @@ async function sendNoteChat() {
                 ai_mode: chatAiMode,
                 output_format: chatOutputFormat,
                 conversation_id: chatConversationId,
-                lecture_id: lectureId,
+                note_id: noteId,
                 auto_detect_conversation: true,
                 reply_to_message_id: replyInfo ? replyInfo.id : null
             })
@@ -2069,7 +2069,7 @@ function displayChatMessages() {
                             </div>`;
                     }
 
-                    const refLectureId = src.lecture_id || lectureId;
+                    const refNoteId = src.note_id || noteId;
                     // Truncate to ~10 words to prevent width expansion
                     let previewStr = src.text_preview || 'View reference';
                     const words = previewStr.split(' ');
@@ -2077,7 +2077,7 @@ function displayChatMessages() {
                         previewStr = words.slice(0, 15).join(' ') + '...';
                     }
                     return `
-                        <div class="source-item" onclick="openSourceReference(${refLectureId}, ${src.position || 0})">
+                        <div class="source-item" onclick="openSourceReference(${refNoteId}, ${src.position || 0})">
                             <div style="font-weight:600;color:#1976d2;margin-bottom:2px;">
                                 <i class="ph ph-file-text"></i> [${citationNum}] Reference${score}
                             </div>
@@ -2197,15 +2197,15 @@ function toggleMetadata(sectionId, msgId, event) {
     content.classList.toggle('expanded');
 }
 
-function openSourceReference(lectureId, position) {
-    if (!lectureId) return;
-    const currentLectureId = window.location.pathname.split('/').pop();
-    // If it's the current lecture, just navigate to position on same page
-    if (lectureId == currentLectureId) {
+function openSourceReference(noteId, position) {
+    if (!noteId) return;
+    const currentNoteId = window.location.pathname.split('/').pop();
+    // If it's the current note, just navigate to position on same page
+    if (noteId == currentNoteId) {
         navigateToReferencePosition(position);
     } else {
-        // Otherwise navigate to the other lecture and scroll to position
-        window.location.href = `/note/${lectureId}#pos-${position}`;
+        // Otherwise navigate to the other note and scroll to position
+        window.location.href = `/note/${noteId}#pos-${position}`;
     }
 }
 
@@ -2261,7 +2261,7 @@ function highlightCitation(event, citationNum) {
 }
 
 function goToChat() {
-    window.location.href = `/chat.html?lecture_id=${lectureId}`;
+    window.location.href = `/chat.html?note_id=${noteId}`;
 }
 
 if (typeof marked === 'undefined') {

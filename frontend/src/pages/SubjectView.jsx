@@ -10,7 +10,7 @@ export default function SubjectView() {
   const navigate = useNavigate();
   
   const [subject, setSubject] = useState(null);
-  const [lectures, setLectures] = useState([]);
+  const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -21,25 +21,25 @@ export default function SubjectView() {
   const [editSubjectDesc, setEditSubjectDesc] = useState('');
   const [editSubjectColor, setEditSubjectColor] = useState('#593C8F');
 
-  // Lecture Action Modals
+  // Note Action Modals
   const [renameModalOpened, { open: openRenameModal, close: closeRenameModal }] = useDisclosure(false);
-  const [deleteLectureModalOpened, { open: openDeleteLectureModal, close: closeDeleteLectureModal }] = useDisclosure(false);
-  const [editingLecture, setEditingLecture] = useState(null);
+  const [deleteNoteModalOpened, { open: openDeleteNoteModal, close: closeDeleteNoteModal }] = useDisclosure(false);
+  const [editingNote, setEditingNote] = useState(null);
   const [newTitle, setNewTitle] = useState('');
-  const [deletingLecture, setDeletingLecture] = useState(null);
+  const [deletingNote, setDeletingNote] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [subjectsData, allLectures] = await Promise.all([
+        const [subjectsData, allNotes] = await Promise.all([
           fetchApi('/subjects'),
-          fetchApi('/lectures')
+          fetchApi('/notes')
         ]);
         
         const currentSub = subjectsData.find(s => s.id == id);
         setSubject(currentSub);
         
-        setLectures(allLectures.filter(l => l.subject_id == id));
+        setNotes(allNotes.filter(l => l.subject_id == id));
       } catch (err) {
         console.error("Failed to load subject data", err);
       } finally {
@@ -90,26 +90,26 @@ export default function SubjectView() {
     }
   };
 
-  const openRename = (lecture) => {
-    setEditingLecture(lecture);
-    setNewTitle(lecture.title);
+  const openRename = (note) => {
+    setEditingNote(note);
+    setNewTitle(note.title);
     openRenameModal();
   };
 
-  const openDelete = (lecture) => {
-    setDeletingLecture(lecture);
-    openDeleteLectureModal();
+  const openDelete = (note) => {
+    setDeletingNote(note);
+    openDeleteNoteModal();
   };
 
   const handleRename = async () => {
-    if (!newTitle.trim() || !editingLecture) return;
+    if (!newTitle.trim() || !editingNote) return;
     setSubmitting(true);
     try {
-      await fetchApi(`/lectures/${editingLecture.id}`, {
+      await fetchApi(`/notes/${editingNote.id}`, {
         method: 'PUT',
         body: JSON.stringify({ title: newTitle.trim() })
       });
-      setLectures(lectures.map(l => l.id === editingLecture.id ? { ...l, title: newTitle.trim() } : l));
+      setNotes(notes.map(l => l.id === editingNote.id ? { ...l, title: newTitle.trim() } : l));
       closeRenameModal();
     } catch (err) {
       alert("Failed to rename note: " + err.message);
@@ -118,13 +118,13 @@ export default function SubjectView() {
     }
   };
 
-  const executeDeleteLecture = async () => {
-    if (!deletingLecture) return;
+  const executeDeleteNote = async () => {
+    if (!deletingNote) return;
     setSubmitting(true);
     try {
-      await fetchApi(`/lectures/${deletingLecture.id}`, { method: 'DELETE' });
-      setLectures(lectures.filter(l => l.id !== deletingLecture.id));
-      closeDeleteLectureModal();
+      await fetchApi(`/notes/${deletingNote.id}`, { method: 'DELETE' });
+      setNotes(notes.filter(l => l.id !== deletingNote.id));
+      closeDeleteNoteModal();
     } catch (err) {
       alert("Failed to delete note: " + err.message);
     } finally {
@@ -168,13 +168,13 @@ export default function SubjectView() {
         </Group>
       </Group>
 
-      {lectures.length > 0 ? (
+      {notes.length > 0 ? (
         <Stack spacing="sm">
-          {lectures.map((lecture) => {
-            const isProcessed = lecture.processing_time_ms != null || lecture.extracted_text != null || lecture.output_pdf_path != null;
+          {notes.map((note) => {
+            const isProcessed = note.processing_time_ms != null || note.extracted_text != null || note.output_pdf_path != null;
             return (
               <Card
-                key={lecture.id}
+                key={note.id}
                 shadow="sm"
                 padding="md"
                 radius="md"
@@ -182,21 +182,21 @@ export default function SubjectView() {
               >
                 <Group justify="space-between" wrap="nowrap">
                   <Box style={{ flex: 1 }}>
-                    <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/lecture/${lecture.id}`)}>
-                      {lecture.title}
+                    <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${note.id}`)}>
+                      {note.title}
                     </Text>
                     <Group gap="xs" mt={4}>
                       <Badge color={isProcessed ? 'teal' : 'orange'} variant="light" size="sm">
                         {isProcessed ? 'Processed' : 'Processing...'}
                       </Badge>
                       <Text size="xs" c="dimmed">
-                        {lecture.file_type?.split('/').pop().toUpperCase() || 'DOCUMENT'} • {new Date(lecture.created_at).toLocaleDateString()}
+                        {note.file_type?.split('/').pop().toUpperCase() || 'DOCUMENT'} • {new Date(note.created_at).toLocaleDateString()}
                       </Text>
                     </Group>
                   </Box>
 
                   <Group gap="xs">
-                    <Button variant="light" size="sm" onClick={() => navigate(`/lecture/${lecture.id}`)}>
+                    <Button variant="light" size="sm" onClick={() => navigate(`/note/${note.id}`)}>
                       View Note
                     </Button>
                     <Menu position="bottom-end" withinPortal>
@@ -206,8 +206,8 @@ export default function SubjectView() {
                         </ActionIcon>
                       </Menu.Target>
                       <Menu.Dropdown>
-                        <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRename(lecture)}>Rename</Menu.Item>
-                        <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDelete(lecture)}>Delete</Menu.Item>
+                        <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRename(note)}>Rename</Menu.Item>
+                        <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDelete(note)}>Delete</Menu.Item>
                       </Menu.Dropdown>
                     </Menu>
                   </Group>
@@ -220,7 +220,7 @@ export default function SubjectView() {
         <Center h={200}>
           <Box ta="center">
             <IconFile size={48} color="var(--mantine-color-gray-4)" />
-            <Text c="dimmed" mt="md">No lectures uploaded to this subject yet.</Text>
+            <Text c="dimmed" mt="md">No notes uploaded to this subject yet.</Text>
             <Button mt="md" variant="light" onClick={() => navigate(`/upload?subject_id=${subject.id}`)}>
               Upload your first file
             </Button>
@@ -267,12 +267,12 @@ export default function SubjectView() {
         </form>
       </Modal>
 
-      <Modal opened={deleteLectureModalOpened} onClose={closeDeleteLectureModal} title="Confirm Delete" centered>
-        <form onSubmit={(e) => { e.preventDefault(); executeDeleteLecture(); }}>
+      <Modal opened={deleteNoteModalOpened} onClose={closeDeleteNoteModal} title="Confirm Delete" centered>
+        <form onSubmit={(e) => { e.preventDefault(); executeDeleteNote(); }}>
           <Stack>
-            <Text size="sm">Are you sure you want to delete the note <b>{deletingLecture?.title}</b>? This action cannot be undone.</Text>
+            <Text size="sm">Are you sure you want to delete the note <b>{deletingNote?.title}</b>? This action cannot be undone.</Text>
             <Group justify="flex-end" mt="md">
-              <Button variant="default" onClick={closeDeleteLectureModal}>Cancel</Button>
+              <Button variant="default" onClick={closeDeleteNoteModal}>Cancel</Button>
               <Button type="submit" color="red" loading={submitting} data-autofocus>Delete Note</Button>
             </Group>
           </Stack>

@@ -10,7 +10,7 @@ export default function SummaryView() {
   const location = useLocation();
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
-  const lectureId = searchParams.get('lecture_id');
+  const noteId = searchParams.get('note_id');
 
   const [summaries, setSummaries] = useState([]);
   const [selectedSummary, setSelectedSummary] = useState(null);
@@ -26,7 +26,7 @@ export default function SummaryView() {
   const [processingMethod, setProcessingMethod] = useState('whole');
 
   useEffect(() => {
-    if (!lectureId) {
+    if (!noteId) {
       navigate('/dashboard');
       return;
     }
@@ -34,7 +34,7 @@ export default function SummaryView() {
     
     // Initial task check
     checkTaskStatus();
-  }, [lectureId]);
+  }, [noteId]);
 
   useEffect(() => {
     let interval;
@@ -46,7 +46,7 @@ export default function SummaryView() {
 
   const checkTaskStatus = async () => {
     try {
-      const statusData = await fetchApi(`/search/task?lecture_id=${lectureId}`);
+      const statusData = await fetchApi(`/search/task?note_id=${noteId}`);
       if (statusData && statusData.task_type === 'summary_generation') {
         setTaskStatus(statusData);
         if (statusData.status === 'completed' || statusData.status === 'failed') {
@@ -71,7 +71,7 @@ export default function SummaryView() {
   const loadSummaries = async () => {
     try {
       setLoading(true);
-      const data = await fetchApi(`/summaries?lecture_id=${lectureId}`);
+      const data = await fetchApi(`/summaries?note_id=${noteId}`);
       const filtered = data.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
       setSummaries(filtered);
       if (filtered.length > 0) {
@@ -107,7 +107,7 @@ export default function SummaryView() {
       await fetchApi('/summaries/summary', {
         method: 'POST',
         body: JSON.stringify({
-          lecture_id: lectureId,
+          note_id: noteId,
           mode: mode,
           output_format: outputFormat,
           processing_method: processingMethod
@@ -121,7 +121,7 @@ export default function SummaryView() {
     }
   };
 
-  if (!lectureId) return null;
+  if (!noteId) return null;
 
   const isFailed = taskStatus?.status === 'failed';
   const processingProgress = taskStatus?.progress || 10;
@@ -170,13 +170,13 @@ export default function SummaryView() {
       <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
         <Group justify="space-between" align="center" maw={1200} mx="auto" w="100%">
           <Group gap="sm">
-            <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => navigate(`/lecture/${lectureId}`)}>
+            <ActionIcon variant="subtle" color="gray" size="lg" onClick={() => navigate(`/note/${noteId}`)}>
               <IconArrowLeft size={20} />
             </ActionIcon>
             <div>
               <Text size="xs" c="dimmed" fw={600} tt="uppercase" letterSpacing={1}>AI Summary</Text>
               <Title order={3} fw={800} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
-                {selectedSummary ? selectedSummary.title : "Lecture Summaries"}
+                {selectedSummary ? selectedSummary.title : "Note Summaries"}
               </Title>
             </div>
           </Group>

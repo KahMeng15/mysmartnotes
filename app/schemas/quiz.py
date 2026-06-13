@@ -37,7 +37,7 @@ class QuizBase(BaseModel):
     scope_type: str
     group_id: Optional[str] = None
     subject_id: Optional[str] = None
-    lecture_id: Optional[str] = None
+    note_id: Optional[str] = None
     quiz_group_id: Optional[str] = None
     model: Optional[str] = None
     processing_time_ms: Optional[int] = None
@@ -51,7 +51,7 @@ class QuizUpdate(BaseModel):
     scope_type: Optional[str] = None
     group_id: Optional[str] = None
     subject_id: Optional[str] = None
-    lecture_id: Optional[str] = None
+    note_id: Optional[str] = None
 
 class QuizResponse(QuizBase):
     id: str

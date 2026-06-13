@@ -10,7 +10,7 @@ window.replyingToMessageContent = null; // Content of message being replied to
 
 let allGroups = [];
 let allSubjects = [];
-let allLectures = [];
+let allNotes = [];
 
 let currentScope = { type: null, id: null, title: 'Select a scope to start' };
 let currentAiMode = localStorage.getItem('globalAiMode') || 'normal';
@@ -36,7 +36,7 @@ function saveScopeToStorage(scope) {
 function buildHierarchyTitle(type, id) {
     /** Build title for just the current item (note/subject/group) */
     if (type === 'note') {
-        const note = allLectures.find(l => l.id == id);
+        const note = allNotes.find(l => l.id == id);
         return note ? note.title : 'Note';
     } else if (type === 'subject') {
         const subject = allSubjects.find(s => s.id == id);
@@ -52,7 +52,7 @@ function buildHierarchyTitle(type, id) {
 function buildHierarchyBreadcrumb(type, id) {
     /** Build breadcrumb path like "Group > Subject > Note" */
     if (type === 'note') {
-        const note = allLectures.find(l => l.id == id);
+        const note = allNotes.find(l => l.id == id);
         if (!note) return '';
         const subject = allSubjects.find(s => s.id == note.subject_id);
         if (!subject) return '';
@@ -247,13 +247,13 @@ async function loadData() {
         const [gRes, sRes, lRes, cRes] = await Promise.all([
             fetch('/groups'),
             fetch('/subjects'),
-            fetch('/lectures'),
+            fetch('/notes'),
             fetch('/chat/conversations'),
         ]);
 
         if (gRes.ok) allGroups = await gRes.json();
         if (sRes.ok) allSubjects = await sRes.json();
-        if (lRes.ok) allLectures = await lRes.json();
+        if (lRes.ok) allNotes = await lRes.json();
         if (cRes.ok) conversations = await cRes.json();
 
         renderConversationList();
@@ -268,16 +268,16 @@ async function loadData() {
         } else {
             // URL param pre-selection
             const urlParams = new URLSearchParams(window.location.search);
-            const urlNoteId = urlParams.get('lecture_id') || urlParams.get('note_id');
+            const urlNoteId = urlParams.get('note_id') || urlParams.get('note_id');
             if (urlNoteId) {
-                const note = allLectures.find(l => l.id == urlNoteId);
+                const note = allNotes.find(l => l.id == urlNoteId);
                 if (note) { setScope('note', note.id, `Note: ${note.title}`); }
                 else { openScopeModal(); }
             } else {
                 const savedScope = loadSavedScope();
                 if (savedScope && savedScope.type && savedScope.id) {
                     let exists = false;
-                    if (savedScope.type === 'note') exists = allLectures.some(l => l.id == savedScope.id);
+                    if (savedScope.type === 'note') exists = allNotes.some(l => l.id == savedScope.id);
                     if (savedScope.type === 'subject') exists = allSubjects.some(s => s.id == savedScope.id);
                     if (savedScope.type === 'group') exists = allGroups.some(g => g.id == savedScope.id);
                     if (exists) { setScope(savedScope.type, savedScope.id, savedScope.title); }
@@ -316,7 +316,7 @@ function openScopeModal() {
         }
     } else if (currentScope.type === 'note' && currentScope.id) {
         // Find note's subject and group, then set all three
-        const note = allLectures.find(l => l.id == currentScope.id);
+        const note = allNotes.find(l => l.id == currentScope.id);
         if (note) {
             const subject = allSubjects.find(s => s.id == note.subject_id);
             if (subject) {
@@ -375,7 +375,7 @@ function onSubjectChange() {
     if (tempSubjectId) {
         noteSelect.disabled = false;
         noteSelect.innerHTML = '<option value="">-- Entire Subject --</option>';
-        allLectures.filter(l => l.subject_id == tempSubjectId)
+        allNotes.filter(l => l.subject_id == tempSubjectId)
             .forEach(n => { noteSelect.innerHTML += `<option value="${n.id}">${n.title}</option>`; });
     } else {
         noteSelect.disabled = true;
@@ -401,7 +401,7 @@ function confirmScope() {
     const subId = document.getElementById('subjectSelect').value;
     const grpId = document.getElementById('groupSelect').value;
     if (noteId) {
-        const note = allLectures.find(l => l.id == noteId);
+        const note = allNotes.find(l => l.id == noteId);
         setScope('note', noteId, `Note: ${note ? note.title : 'Unknown'}`);
     } else if (subId) {
         const sub = allSubjects.find(s => s.id == subId);
@@ -536,7 +536,7 @@ async function sendMessage() {
         auto_detect_conversation: true,  // Enable auto-detection
         reply_to_message_id: replyInfo ? replyInfo.id : null  // Send ID to backend
     };
-    if (currentScope.type === 'note') payload.lecture_id = currentScope.id;
+    if (currentScope.type === 'note') payload.note_id = currentScope.id;
     else if (currentScope.type === 'subject') payload.subject_id = currentScope.id;
     else if (currentScope.type === 'group') payload.group_id = currentScope.id;
 
@@ -765,10 +765,10 @@ function displayMessages() {
                             </div>`;
                     }
 
-                    const lectureId = src.lecture_id || currentScope.id;
+                    const noteId = src.note_id || currentScope.id;
                     const preview = src.text_preview || 'View reference';
                     return `
-                        <div class="source-item" onclick="openSourceReference('${lectureId}', ${src.position || 0})"
+                        <div class="source-item" onclick="openSourceReference('${noteId}', ${src.position || 0})"
                                 style="cursor:pointer;padding:6px 10px;margin:4px 0;background:white;border:1px solid #e0e0e0;border-radius:4px;transition:all 0.2s;font-size:11px;">
                             <div style="font-weight:600;color:#1976d2;margin-bottom:2px;">
                                 <i class="ph ph-file-text"></i> [${citationNum}] Reference${score}
@@ -961,7 +961,7 @@ function renderConversationList() {
             let scopeDetail = scope;
 
             if (c.scope_type === 'note') {
-                const note = allLectures.find(x => x.id == c.lecture_id);
+                const note = allNotes.find(x => x.id == c.note_id);
                 if (note) convTitle = note.title;
 
                 let subjId = c.subject_id;
@@ -1093,9 +1093,9 @@ async function loadConversation(convId) {
         conversationMessages = historyMessages; // Restore scope from first message
         const first = msgs[0];
         let scopeType = null, scopeId = null, scopeTitle = 'Past Conversation';
-        if (first.lecture_id) {
-            scopeType = 'note'; scopeId = first.lecture_id;
-            const l = allLectures.find(x => x.id == first.lecture_id);
+        if (first.note_id) {
+            scopeType = 'note'; scopeId = first.note_id;
+            const l = allNotes.find(x => x.id == first.note_id);
             if (l) scopeTitle = `Note: ${l.title}`;
         } else if (first.subject_id) {
             scopeType = 'subject'; scopeId = first.subject_id;
@@ -1249,9 +1249,9 @@ function getDateInTimezone(date) {
     return new Date(localDateStr + 'T00:00:00');
 }
 
-function openSourceReference(lectureId, position) {
-    if (!lectureId) { alert('Source reference not available'); return; }
-    window.open(`/note/${lectureId}#pos-${position}`, '_blank');
+function openSourceReference(noteId, position) {
+    if (!noteId) { alert('Source reference not available'); return; }
+    window.open(`/note/${noteId}#pos-${position}`, '_blank');
 }
 
 function toggleMetadata(sectionId, msgId, event) {

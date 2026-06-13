@@ -14,13 +14,13 @@ from app.logging_config import setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-from app.processing.lecture_processor import process_lecture_task
+from app.processing.note_processor import process_note_task
 
 # Registry of supported tasks (can be sync or async)
 TASK_REGISTRY = {
     "ocr": OCRTask.process_file,
     "embedding": EmbeddingsTask.generate_embeddings,
-    "lecture_processing": process_lecture_task,
+    "note_processing": process_note_task,
     "quiz_generation": QuizTask.generate,
     "summary_generation": SummaryTask.generate,
     "chat_response": ChatTask.respond,

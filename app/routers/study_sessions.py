@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
-from app.models.db import User, StudySession, Lecture
+from app.models.db import User, StudySession, Note
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/study-sessions", tags=["study-sessions"])
 
 
 class StudySessionCreate(BaseModel):
-    lecture_id: Optional[str] = None
+    note_id: Optional[str] = None
     session_type: str  # "quiz", "reading", "pomodoro_study", "pomodoro_break", "stopwatch"
     duration_minutes: int
     questions_attempted: int = 0
@@ -26,7 +26,7 @@ class StudySessionCreate(BaseModel):
 
 class StudySessionResponse(BaseModel):
     id: int
-    lecture_id: Optional[str] = None
+    note_id: Optional[str] = None
     session_type: str
     duration_minutes: int
     questions_attempted: int
@@ -142,7 +142,7 @@ async def get_study_calendar(
 
 @router.get("", response_model=List[StudySessionResponse])
 async def get_study_sessions(
-    lecture_id: str = None,
+    note_id: str = None,
     session_type: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -151,8 +151,8 @@ async def get_study_sessions(
     
     query = db.query(StudySession).filter(StudySession.user_id == current_user.id)
     
-    if lecture_id:
-        query = query.filter(StudySession.lecture_id == lecture_id)
+    if note_id:
+        query = query.filter(StudySession.note_id == note_id)
     
     if session_type:
         query = query.filter(StudySession.session_type == session_type)
@@ -169,17 +169,17 @@ async def create_study_session(
 ):
     """Create a new study session record"""
     
-    # Verify lecture belongs to user if provided
-    if session.lecture_id:
-        lecture = db.query(Lecture).filter(
-            Lecture.id == session.lecture_id,
-            Lecture.user_id == current_user.id
+    # Verify note belongs to user if provided
+    if session.note_id:
+        note = db.query(Note).filter(
+            Note.id == session.note_id,
+            Note.user_id == current_user.id
         ).first()
         
-        if not lecture:
+        if not note:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Lecture not found"
+                detail="Note not found"
             )
     
     # Calculate score if questions attempted
@@ -189,7 +189,7 @@ async def create_study_session(
     
     db_session = StudySession(
         user_id=current_user.id,
-        lecture_id=session.lecture_id,
+        note_id=session.note_id,
         session_type=session.session_type,
         duration_minutes=session.duration_minutes,
         questions_attempted=session.questions_attempted,

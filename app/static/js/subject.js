@@ -2,7 +2,7 @@ const API_URL = '';
 const urlParams = new URLSearchParams(window.location.search);
 const subjectId = urlParams.get('id');
 
-let allLectures = [];
+let allNotes = [];
 let currentSubject = null;
 
 window.toggleSortModal = function(event) {
@@ -47,7 +47,7 @@ window.addEventListener('load', () => {
     }
     
     // Load saved sort preference
-    const savedSort = localStorage.getItem('lectures_sort') || 'name';
+    const savedSort = localStorage.getItem('notes_sort') || 'name';
     const sortSelect = document.getElementById('sortSelect');
     if (sortSelect) {
         sortSelect.value = savedSort;
@@ -55,7 +55,7 @@ window.addEventListener('load', () => {
     window.updateSortModalUI(savedSort);
 
     loadSubjectDetails();
-    loadLectures();
+    loadNotes();
 });
 
 async function loadSubjectDetails() {
@@ -93,23 +93,23 @@ async function loadSubjectDetails() {
     }
 }
 
-async function loadLectures() {
+async function loadNotes() {
     try {
-        const response = await fetch(`${API_URL}/lectures?subject_id=${subjectId}`);
+        const response = await fetch(`${API_URL}/notes?subject_id=${subjectId}`);
 
         if (response.ok) {
             let data = await response.json();
-            allLectures = data.filter(l => l.subject_id == subjectId);
-            filterLectures(); // Apply sort and display
+            allNotes = data.filter(l => l.subject_id == subjectId);
+            filterNotes(); // Apply sort and display
         }
     } catch (error) {
         console.error('Error:', error);
-        document.getElementById('lecturesList').innerHTML = '<div class="empty-state">Error loading lectures</div>';
+        document.getElementById('notesList').innerHTML = '<div class="empty-state">Error loading notes</div>';
     }
 }
 
-function filterLectures() {
-    let filtered = [...allLectures];
+function filterNotes() {
+    let filtered = [...allNotes];
     const search = document.getElementById('searchInput').value.toLowerCase();
     if (search) {
         filtered = filtered.filter(l => l.title.toLowerCase().includes(search));
@@ -117,7 +117,7 @@ function filterLectures() {
 
     const sort = document.getElementById('sortSelect').value;
     // Save preference
-    localStorage.setItem('lectures_sort', sort);
+    localStorage.setItem('notes_sort', sort);
 
     if (sort === 'recent') {
         filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -127,17 +127,17 @@ function filterLectures() {
         filtered.sort((a, b) => a.title.localeCompare(b.title));
     }
 
-    displayLectures(filtered);
+    displayNotes(filtered);
 }
 
-function displayLectures(lectures) {
-    const listContainer = document.getElementById('lecturesList');
-    if (!lectures || (lectures.length === 0 && (!window.ProgressManager || window.ProgressManager.activeTasks.size === 0))) {
+function displayNotes(notes) {
+    const listContainer = document.getElementById('notesList');
+    if (!notes || (notes.length === 0 && (!window.ProgressManager || window.ProgressManager.activeTasks.size === 0))) {
         listContainer.innerHTML = `
             <div class="empty-state">
                 <i class="ph ph-files" style="font-size: 48px; margin-bottom: 1rem;"></i>
-                <p>No lectures found in this subject.</p>
-                <button onclick="goToUpload()" class="btn btn-primary" style="margin-top: 1rem;">Upload First Lecture</button>
+                <p>No notes found in this subject.</p>
+                <button onclick="goToUpload()" class="btn btn-primary" style="margin-top: 1rem;">Upload First Note</button>
             </div>
         `;
         return;
@@ -145,8 +145,8 @@ function displayLectures(lectures) {
 
     const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
 
-    listContainer.innerHTML = lectures.map(lecture => {
-        const taskId = `ocr_${lecture.user_id}_${lecture.id}`;
+    listContainer.innerHTML = notes.map(note => {
+        const taskId = `ocr_${note.user_id}_${note.id}`;
         const activeTask = activeTasks.get(taskId);
         const isProcessing = activeTask && (activeTask.status === 'processing' || activeTask.status === 'pending' || activeTask.status === 'running');
         const progress = activeTask ? activeTask.progress : 0;
@@ -160,27 +160,27 @@ function displayLectures(lectures) {
             }
         }
 
-        const fileTypeLabel = getFriendlyFileType(lecture.file_type);
+        const fileTypeLabel = getFriendlyFileType(note.file_type);
 
         return `
-            <div class="lecture-item ${isProcessing ? 'skeleton-card' : ''}" id="lecture-${lecture.id}">
-                <div class="lecture-info" onclick="${isProcessing ? '' : `openLecture('${lecture.id}')`}" style="cursor: ${isProcessing ? 'default' : 'pointer'};">
-                    <div class="lecture-icon">
-                        <i class="ph ${getIconForType(lecture.file_type)}"></i>
+            <div class="note-item ${isProcessing ? 'skeleton-card' : ''}" id="note-${note.id}">
+                <div class="note-info" onclick="${isProcessing ? '' : `openNote('${note.id}')`}" style="cursor: ${isProcessing ? 'default' : 'pointer'};">
+                    <div class="note-icon">
+                        <i class="ph ${getIconForType(note.file_type)}"></i>
                     </div>
-                    <div class="lecture-details">
-                        <h4 style="display: flex; align-items: center;">${lecture.title}${statusBadge}</h4>
-                        <p>${isProcessing ? 'Processing content...' : `${window.formatDate(lecture.created_at)} • ${fileTypeLabel}`}</p>
+                    <div class="note-details">
+                        <h4 style="display: flex; align-items: center;">${note.title}${statusBadge}</h4>
+                        <p>${isProcessing ? 'Processing content...' : `${window.formatDate(note.created_at)} • ${fileTypeLabel}`}</p>
                     </div>
                 </div>
-                <div class="lecture-actions">
+                <div class="note-actions">
                     ${isProcessing ? `
                         <div style="font-size: 11px; font-weight: 600; color: var(--color-primary);">${progress}%</div>
                     ` : `
-                        <button onclick="openLecture('${lecture.id}')" class="btn btn-view-note" style="background: none; border: none; padding: 8px; color: var(--color-primary); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-lg);" title="View Note">
+                        <button onclick="openNote('${note.id}')" class="btn btn-view-note" style="background: none; border: none; padding: 8px; color: var(--color-primary); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-lg);" title="View Note">
                             <i class="ph ph-eye"></i>
                         </button>
-                        <button onclick="deleteLecture('${lecture.id}')" class="btn btn-delete-note" style="background: none; border: none; padding: 8px; color: var(--color-error); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-lg);" title="Delete Note">
+                        <button onclick="deleteNote('${note.id}')" class="btn btn-delete-note" style="background: none; border: none; padding: 8px; color: var(--color-error); display: flex; align-items: center; justify-content: center; font-size: var(--font-size-lg);" title="Delete Note">
                             <i class="ph ph-trash"></i>
                         </button>
                     `}
@@ -205,21 +205,21 @@ function getFriendlyFileType(mimeType) {
 window.addEventListener('taskUpdate', (e) => {
     const task = e.detail;
     if (task.task_id.startsWith('ocr_')) {
-        // Find the lecture element and update its progress bar
-        const lectureId = task.task_id.split('_').pop();
-        const lectureEl = document.getElementById(`lecture-${lectureId}`);
-        if (lectureEl) {
-            const bar = lectureEl.querySelector('.skeleton-progress-bar');
-            const percentText = lectureEl.querySelector('.lecture-actions div');
+        // Find the note element and update its progress bar
+        const noteId = task.task_id.split('_').pop();
+        const noteEl = document.getElementById(`note-${noteId}`);
+        if (noteEl) {
+            const bar = noteEl.querySelector('.skeleton-progress-bar');
+            const percentText = noteEl.querySelector('.note-actions div');
             if (bar) bar.style.width = task.progress + '%';
             if (percentText) percentText.textContent = task.progress + '%';
 
             if (task.status === 'completed') {
                 // Refresh the whole list once completed to remove skeleton styles
-                loadLectures();
+                loadNotes();
             } else if (task.status === 'failed') {
-                lectureEl.classList.remove('skeleton-card');
-                const details = lectureEl.querySelector('.lecture-details p');
+                noteEl.classList.remove('skeleton-card');
+                const details = noteEl.querySelector('.note-details p');
                 if (details) details.textContent = 'Processing failed';
                 if (bar) bar.style.display = 'none';
             }
@@ -235,7 +235,7 @@ function getIconForType(mimeType) {
     return 'ph-file-text';
 }
 
-function openLecture(id) {
+function openNote(id) {
     window.location.href = `/note/${id}`;
 }
 
@@ -294,7 +294,7 @@ async function handleEditSubject(e) {
 }
 
 async function deleteSubject() {
-    showConfirmModal('Are you sure you want to delete this subject? All lectures within it will also be deleted.', async function() {
+    showConfirmModal('Are you sure you want to delete this subject? All notes within it will also be deleted.', async function() {
         try {
             const response = await fetch(`${API_URL}/subjects/${subjectId}`, {
                 method: 'DELETE'
@@ -312,21 +312,21 @@ async function deleteSubject() {
     });
 }
 
-async function deleteLecture(id) {
-    showConfirmModal('Delete this lecture?', async function() {
+async function deleteNote(id) {
+    showConfirmModal('Delete this note?', async function() {
         try {
-            const response = await fetch(`${API_URL}/lectures/${id}`, {
+            const response = await fetch(`${API_URL}/notes/${id}`, {
                 method: 'DELETE'
             });
             if (response.ok) {
-                showSuccessModal('Lecture Deleted', 'The lecture has been deleted successfully!', () => {
-                    loadLectures();
+                showSuccessModal('Note Deleted', 'The note has been deleted successfully!', () => {
+                    loadNotes();
                 });
             } else {
-                alert('Failed to delete lecture');
+                alert('Failed to delete note');
             }
         } catch (error) {
-            alert('Error deleting lecture');
+            alert('Error deleting note');
         }
     });
 }

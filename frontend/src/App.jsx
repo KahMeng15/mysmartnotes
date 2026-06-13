@@ -2,7 +2,7 @@ import SummaryView from "./pages/SummaryView";
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from 'react-router-dom';
-import { AppShell, Burger, Group, Text, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip } from '@mantine/core';
+import { AppShell, Burger, Group, Text, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconDashboard, 
@@ -25,7 +25,7 @@ import UploadDocs from './pages/UploadDocs';
 import ChatInterface from './pages/ChatInterface';
 import QuizSystem from './pages/QuizSystem';
 import SubjectView from './pages/SubjectView';
-import LectureView from './pages/LectureView';
+import NoteView from './pages/NoteView';
 import Settings from './pages/Settings';
 import GroupView from './pages/GroupView';
 import { fetchApi } from './lib/api';
@@ -33,14 +33,18 @@ import { fetchApi } from './lib/api';
 function AppLayout({ children }) {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
   const [navOpen, setNavOpen] = useState(true);
+  const [user, setUser] = useState(null);
   const location = useLocation();
 
   useEffect(() => {
     // Only fetch if logged in
     if (localStorage.getItem('token')) {
       fetchApi('/auth/me').then(data => {
-        if (data && data.nav_sidebar_open !== undefined) {
-          setNavOpen(data.nav_sidebar_open);
+        if (data) {
+          setUser(data);
+          if (data.nav_sidebar_open !== undefined) {
+            setNavOpen(data.nav_sidebar_open);
+          }
         }
       }).catch(err => console.error("Failed to load user preferences", err));
     }
@@ -70,7 +74,7 @@ function AppLayout({ children }) {
         breakpoint: 'sm',
         collapsed: { mobile: !mobileOpened },
       }}
-      padding={location.pathname.startsWith('/lecture/') ? 0 : "md"}
+      padding={location.pathname.startsWith('/note/') ? 0 : "md"}
       bg="#ffffff"
     >
       <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
@@ -81,21 +85,12 @@ function AppLayout({ children }) {
               MySmartNotes
             </Text>
           </Group>
-          <ActionIcon variant="subtle" color="gray" onClick={toggleNav} hiddenFrom="sm" display="none">
-             {/* Hidden on mobile, they use burger */}
-          </ActionIcon>
-          <ActionIcon variant="subtle" color="gray" onClick={toggleNav} visibleFrom="sm">
-            {navOpen ? <IconLayoutSidebarLeftCollapse size={20} /> : <IconLayoutSidebarLeftExpand size={20} />}
-          </ActionIcon>
           <Burger opened={mobileOpened} onClick={toggleMobile} hiddenFrom="sm" size="sm" />
         </Group>
 
         <AppShell.Section grow component={ScrollArea}>
           <Tooltip label="Dashboard" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/dashboard" label={navOpen ? "Dashboard" : ""} leftSection={<IconDashboard size="1.2rem" stroke={1.5} />} />
-          </Tooltip>
-          <Tooltip label="Upload" disabled={navOpen} position="right">
-            <MantineNavLink component={NavLink} to="/upload" label={navOpen ? "Upload" : ""} leftSection={<IconUpload size="1.2rem" stroke={1.5} />} />
           </Tooltip>
           <Tooltip label="My Notes" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/mynotes" label={navOpen ? "My Notes" : ""} leftSection={<IconBooks size="1.2rem" stroke={1.5} />} />
@@ -106,15 +101,42 @@ function AppLayout({ children }) {
           <Tooltip label="Quiz Engine" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/quiz" label={navOpen ? "Quiz Engine" : ""} leftSection={<IconBolt size="1.2rem" stroke={1.5} />} />
           </Tooltip>
+          <Tooltip label="Upload" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/upload" label={navOpen ? "Upload" : ""} leftSection={<IconUpload size="1.2rem" stroke={1.5} />} />
+          </Tooltip>
         </AppShell.Section>
         
-        <AppShell.Section>
-          <Tooltip label="Settings" disabled={navOpen} position="right">
-            <MantineNavLink component={NavLink} to="/settings" label={navOpen ? "Settings" : ""} leftSection={<IconSettings size="1.2rem" stroke={1.5} />} />
-          </Tooltip>
-          <Tooltip label="Logout" disabled={navOpen} position="right">
-            <MantineNavLink component={NavLink} to="/login" label={navOpen ? "Logout" : ""} leftSection={<IconLogin size="1.2rem" stroke={1.5} />} onClick={() => localStorage.removeItem('token')} />
-          </Tooltip>
+        <AppShell.Section style={{ borderTop: '1px solid #eaeaea', paddingTop: '10px' }}>
+          <Group justify={navOpen ? "space-between" : "center"} wrap="nowrap" gap="xs">
+            <Menu position="right-end" withArrow>
+              <Menu.Target>
+                <UnstyledButton p="xs" style={{ borderRadius: '8px', flex: navOpen ? 1 : 'unset', transition: 'background-color 150ms ease' }}>
+                  <Group gap="sm" wrap="nowrap">
+                    <Avatar radius="xl" color="blue" size="sm">{user?.username ? user.username.substring(0, 2).toUpperCase() : 'U'}</Avatar>
+                    {navOpen && (
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <Text size="sm" fw={500} truncate>{user?.username || 'User'}</Text>
+                      </div>
+                    )}
+                  </Group>
+                </UnstyledButton>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item component={NavLink} to="/settings" leftSection={<IconSettings size={14} />}>Settings</Menu.Item>
+                <Menu.Item component={NavLink} to="/login" color="red" leftSection={<IconLogin size={14} />} onClick={() => localStorage.removeItem('token')}>Logout</Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+            <ActionIcon variant="subtle" color="gray" onClick={toggleNav} visibleFrom="sm" style={{ display: navOpen ? 'flex' : 'none' }}>
+              <IconLayoutSidebarLeftCollapse size={20} />
+            </ActionIcon>
+          </Group>
+          {!navOpen && (
+            <Center mt="sm">
+              <ActionIcon variant="subtle" color="gray" onClick={toggleNav} visibleFrom="sm">
+                <IconLayoutSidebarLeftExpand size={20} />
+              </ActionIcon>
+            </Center>
+          )}
         </AppShell.Section>
       </AppShell.Navbar>
 
@@ -141,7 +163,7 @@ function App() {
           <Route path="/quiz" element={<QuizSystem />} />
           <Route path="/group/:id" element={<GroupView />} />
           <Route path="/subject/:id" element={<SubjectView />} />
-          <Route path="/lecture/:id" element={<LectureView />} />
+          <Route path="/note/:id" element={<NoteView />} />
           <Route path="/summaries" element={<SummaryView />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

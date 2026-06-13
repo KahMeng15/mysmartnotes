@@ -334,8 +334,8 @@ const ProgressManager = {
         if (kwargs.file_name) return kwargs.file_name;
         if (kwargs.title) return kwargs.title;
         
-        if (task.task_type === 'lecture_processing') return 'Note: ' + (kwargs.lecture_id || 'Document');
-        if (task.task_type === 'summary_generation') return 'Summary: ' + (kwargs.lecture_id || 'Note');
+        if (task.task_type === 'note_processing') return 'Note: ' + (kwargs.note_id || 'Document');
+        if (task.task_type === 'summary_generation') return 'Summary: ' + (kwargs.note_id || 'Note');
         if (task.task_type === 'quiz_generation') return 'Quiz: ' + (kwargs.title || 'Generation');
         
         return task.task_id.startsWith('ocr_') ? 'Note Processing' : 'Background Task';
@@ -343,11 +343,11 @@ const ProgressManager = {
 
     getTaskUrl: function(task) {
         const kwargs = task.input_data?.kwargs || {};
-        if (task.task_type === 'lecture_processing' && kwargs.lecture_id) {
-            return `/note.html?id=${kwargs.lecture_id}`;
+        if (task.task_type === 'note_processing' && kwargs.note_id) {
+            return `/note.html?id=${kwargs.note_id}`;
         }
-        if (task.task_type === 'summary_generation' && kwargs.lecture_id) {
-            return `/note/${kwargs.lecture_id}/summary`;
+        if (task.task_type === 'summary_generation' && kwargs.note_id) {
+            return `/note/${kwargs.note_id}/summary`;
         }
         if (task.task_type === 'quiz_generation') {
             return `/quiz_dashboard.html`;

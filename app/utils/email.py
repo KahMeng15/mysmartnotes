@@ -140,7 +140,7 @@ def send_welcome_email(db: Session, recipient_email: str, full_name: str) -> boo
             <p>MySmartNotes is designed to help you organize your study materials, generate AI-powered summaries, and practice with smart quizzes.</p>
             <p>Here are a few things you can do to get started:</p>
             <ul>
-                <li><strong>Upload Lectures:</strong> Upload your PDFs or PPTX files to get structured notes.</li>
+                <li><strong>Upload Notes:</strong> Upload your PDFs or PPTX files to get structured notes.</li>
                 <li><strong>Chat with AI:</strong> Ask questions about your materials and get instant clarifications.</li>
                 <li><strong>Take Quizzes:</strong> Test your knowledge with AI-generated questions from your own notes.</li>
             </ul>

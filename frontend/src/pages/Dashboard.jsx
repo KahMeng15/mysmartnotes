@@ -54,24 +54,24 @@ export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userName = user.nickname || user.full_name || user.username || 'Student';
 
-  const [recentLectures, setRecentLectures] = useState([]);
-  const [loadingLectures, setLoadingLectures] = useState(true);
+  const [recentNotes, setRecentNotes] = useState([]);
+  const [loadingNotes, setLoadingNotes] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [summaryData, lecturesData] = await Promise.all([
+        const [summaryData, notesData] = await Promise.all([
           fetchApi('/analytics/dashboard-summary'),
-          fetchApi('/lectures')
+          fetchApi('/notes')
         ]);
         setSummary(summaryData);
-        // Sort lectures by newest first and take top 5
-        const sorted = lecturesData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
-        setRecentLectures(sorted);
+        // Sort notes by newest first and take top 5
+        const sorted = notesData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
+        setRecentNotes(sorted);
       } catch (err) {
         console.error("Failed to load dashboard data", err);
       } finally {
-        setLoadingLectures(false);
+        setLoadingNotes(false);
       }
     };
     loadData();
@@ -170,21 +170,21 @@ export default function Dashboard() {
         </Button>
       </Group>
       
-      {loadingLectures ? (
+      {loadingNotes ? (
         <Card withBorder radius="md" padding="xl">
           <Center style={{ height: 150 }}>
             <Stack align="center" spacing="xs">
               <Loader color="blue" type="bars" />
-              <Text c="dimmed">Loading lectures...</Text>
+              <Text c="dimmed">Loading notes...</Text>
             </Stack>
           </Center>
         </Card>
-      ) : recentLectures.length > 0 ? (
+      ) : recentNotes.length > 0 ? (
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
-          {recentLectures.map(lecture => (
-            <Card key={lecture.id} withBorder radius="md" padding="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/lecture/${lecture.id}`)}>
-              <Text fw={600} mb="xs" c="#171738">{lecture.title}</Text>
-              <Text size="sm" c="dimmed">Uploaded: {new Date(lecture.created_at).toLocaleDateString()}</Text>
+          {recentNotes.map(note => (
+            <Card key={note.id} withBorder radius="md" padding="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${note.id}`)}>
+              <Text fw={600} mb="xs" c="#171738">{note.title}</Text>
+              <Text size="sm" c="dimmed">Uploaded: {new Date(note.created_at).toLocaleDateString()}</Text>
             </Card>
           ))}
         </SimpleGrid>

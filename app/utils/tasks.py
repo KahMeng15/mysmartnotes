@@ -289,7 +289,7 @@ class SummaryTask:
     @staticmethod
     async def generate(**kwargs) -> dict:
         from app.processing.ai_client import AIClient
-        from app.models.db import User, Lecture, Summary
+        from app.models.db import User, Note, Summary
         from app.utils.storage import StorageManager
         from app.utils.db import generate_random_id
         from sqlalchemy import func
@@ -298,16 +298,16 @@ class SummaryTask:
         db = SessionLocal()
         try:
             user_id = kwargs.get("user_id")
-            lecture_id = kwargs.get("lecture_id")
+            note_id = kwargs.get("note_id")
             mode = kwargs.get("mode", "elaborate")
             output_format = kwargs.get("output_format", "sentence")
             processing_method = kwargs.get("processing_method", "whole")
             split_level = kwargs.get("split_level", "h2")
             
             user = db.query(User).filter(User.id == user_id).first()
-            lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
+            note = db.query(Note).filter(Note.id == note_id).first()
             
-            lecture_content = StorageManager.get_lecture_text(lecture_id) or ""
+            note_content = StorageManager.get_note_text(note_id) or ""
             ai_client = AIClient(user, db=db)
             
             start_time = time.time()
@@ -324,7 +324,7 @@ class SummaryTask:
                     TaskManager.update_task_progress(task_id, percent, message=msg, intermediate_result=intermediate_result)
 
             summary_content = await ai_client.generate_summary(
-                content=lecture_content,
+                content=note_content,
                 mode=mode,
                 output_format=output_format,
                 processing_method=processing_method,
@@ -336,7 +336,7 @@ class SummaryTask:
             
             # Versioning
             max_version = db.query(func.max(Summary.version)).filter(
-                Summary.lecture_id == lecture_id
+                Summary.note_id == note_id
             ).scalar() or 0
             next_version = max_version + 1
 
@@ -344,10 +344,10 @@ class SummaryTask:
             doc = Summary(
                 id=doc_id,
                 version=next_version,
-                lecture_id=lecture_id,
-                title=f"Summary - {lecture.title}",
+                note_id=note_id,
+                title=f"Summary - {note.title}",
                 summary_type="summary",
-                file_path=f"summary_{lecture.id}_{next_version}.md",
+                file_path=f"summary_{note.id}_{next_version}.md",
                 mode=mode,
                 output_format=output_format,
                 processing_method=processing_method,
@@ -366,7 +366,7 @@ class SummaryTask:
             
             return {
                 "id": doc_id,
-                "lecture_id": lecture_id,
+                "note_id": note_id,
                 "title": doc.title,
                 "content": summary_content,
                 "mode": mode,

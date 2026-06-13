@@ -138,7 +138,7 @@ export default function Settings() {
             {stats && (
               <Group grow mb="xl">
                 <Box>
-                  <Text size="xl" fw={700}>{stats.total_lectures || 0}</Text>
+                  <Text size="xl" fw={700}>{stats.total_notes || 0}</Text>
                   <Text size="sm" c="dimmed">Total Notes Processed</Text>
                 </Box>
                 <Box>
@@ -161,16 +161,16 @@ export default function Settings() {
                     size={120}
                     roundCaps
                     thickness={8}
-                    sections={[{ value: (quotas.lectures_used / quotas.lectures_limit) * 100, color: 'blue' }]}
+                    sections={[{ value: (quotas.notes_used / quotas.notes_limit) * 100, color: 'blue' }]}
                     label={
                       <Text ta="center" size="xs" fw={700}>
-                        {Math.round((quotas.lectures_used / quotas.lectures_limit) * 100)}%
+                        {Math.round((quotas.notes_used / quotas.notes_limit) * 100)}%
                       </Text>
                     }
                   />
                   <Box>
                     <Text fw={500}>Document Processing Quota</Text>
-                    <Text size="sm" c="dimmed">{quotas.lectures_used} of {quotas.lectures_limit} documents used this month.</Text>
+                    <Text size="sm" c="dimmed">{quotas.notes_used} of {quotas.notes_limit} documents used this month.</Text>
                   </Box>
                 </Group>
               </>

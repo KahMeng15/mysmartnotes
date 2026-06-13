@@ -1,5 +1,5 @@
 // Summary Page Logic
-let lectureId = null;
+let noteId = null;
 let summaryData = null;
 let quickreadData = null;
 let currentSummaryMode = localStorage.getItem('globalAiMode') || 'normal';
@@ -35,13 +35,13 @@ const FORMAT_META = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Extract lectureId from URL path: /note/{id}/summary
+    // Extract noteId from URL path: /note/{id}/summary
     const pathParts = window.location.pathname.split('/');
-    lectureId = pathParts[2]; 
+    noteId = pathParts[2]; 
     let initialSummaryId = pathParts[4] || null; // /note/{id}/summary/{summary_id}
     const shouldEdit = pathParts[5] === 'edit';
 
-    if (!lectureId) {
+    if (!noteId) {
         alert('Invalid Note ID');
         window.location.href = '/dashboard';
         return;
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Navigation buttons
     const sidebarBackBtn = document.getElementById('sidebarBackBtn');
-    if (sidebarBackBtn) sidebarBackBtn.onclick = () => window.location.href = `/note/${lectureId}`;
+    if (sidebarBackBtn) sidebarBackBtn.onclick = () => window.location.href = `/note/${noteId}`;
 
     // Load persistent display choices
     const savedObjectives = localStorage.getItem('summaryShowObjectives');
@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function updateURL() {
-    let url = `/note/${lectureId}/summary`;
+    let url = `/note/${noteId}/summary`;
     if (currentVersionId && currentVersionNum) {
         url += `/v${currentVersionNum}`;
         if (isEditMode) {
@@ -120,17 +120,17 @@ function updateURL() {
 
 async function loadSummaryVersions() {
     try {
-        const res = await fetch(`/summaries?lecture_id=${lectureId}`);
+        const res = await fetch(`/summaries?note_id=${noteId}`);
         if (res.ok) {
             const docs = await res.json();
             const summaries = docs.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
             const list = document.getElementById('summaryList');
             if (!list) return summaries;
 
-            // Check if there is an active summary task for this lecture
+            // Check if there is an active summary task for this note
             const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
             const summaryTask = Array.from(activeTasks.values()).find(t => 
-                t.task_type === 'summary_generation' && t.input_data?.kwargs?.lecture_id === lectureId
+                t.task_type === 'summary_generation' && t.input_data?.kwargs?.note_id === noteId
             );
             
             let processingItem = '';
@@ -190,7 +190,7 @@ async function loadSummaryVersion(docId, pushURL = true) {
     try {
         let fetchUrl = `/summaries/${docId}`;
         if (docId.toString().startsWith('v')) {
-            fetchUrl += `?lecture_id=${lectureId}`;
+            fetchUrl += `?note_id=${noteId}`;
         }
         
         const res = await fetch(fetchUrl);
@@ -198,7 +198,7 @@ async function loadSummaryVersion(docId, pushURL = true) {
             const data = await res.json();
             if (data.content) {
                 // Save last selected version ID
-                localStorage.setItem(`lastSummaryVersion_${lectureId}`, data.id);
+                localStorage.setItem(`lastSummaryVersion_${noteId}`, data.id);
                 
                 summaryData = data.content;
                 quickreadData = data.quickread || null;
@@ -326,22 +326,22 @@ function showNoSummaryUI() {
     const progressContainer = document.getElementById('summaryProgressContainer');
     if (!summaryText) return;
 
-    // Check if there is an active summary task for this lecture
+    // Check if there is an active summary task for this note
     const activeTasks = window.ProgressManager ? window.ProgressManager.activeTasks : new Map();
-    console.log(`[Summary] showNoSummaryUI called. LectureID: ${lectureId}, Total active tasks from ProgressManager: ${activeTasks.size}`);
+    console.log(`[Summary] showNoSummaryUI called. NoteID: ${noteId}, Total active tasks from ProgressManager: ${activeTasks.size}`);
     
     if (activeTasks.size > 0) {
-        console.log('[Summary] showNoSummaryUI - Map contents:', Array.from(activeTasks.values()).map(t => ({ id: t.task_id, status: t.status, lectureId: t.input_data?.kwargs?.lecture_id })));
+        console.log('[Summary] showNoSummaryUI - Map contents:', Array.from(activeTasks.values()).map(t => ({ id: t.task_id, status: t.status, noteId: t.input_data?.kwargs?.note_id })));
     }
     
     const summaryTask = Array.from(activeTasks.values()).find(t => 
-        t.task_type === 'summary_generation' && t.input_data?.kwargs?.lecture_id === lectureId
+        t.task_type === 'summary_generation' && t.input_data?.kwargs?.note_id === noteId
     );
 
     if (summaryTask) {
         console.log(`[Summary] Found matching task for UI:`, summaryTask);
     } else {
-        console.log(`[Summary] No matching task found for lectureId: ${lectureId}`);
+        console.log(`[Summary] No matching task found for noteId: ${noteId}`);
     }
 
     if (summaryTask && (summaryTask.status === 'processing' || summaryTask.status === 'pending' || summaryTask.status === 'running')) {
@@ -419,11 +419,11 @@ async function processInitialTaskState(summaries) {
     console.log(`[Summary] processInitialTaskState: Checking for active tasks in Map (size: ${activeTasks.size})`);
     
     if (activeTasks.size > 0) {
-        console.log('[Summary] Map contents:', Array.from(activeTasks.values()).map(t => ({ id: t.task_id, status: t.status, lectureId: t.input_data?.kwargs?.lecture_id })));
+        console.log('[Summary] Map contents:', Array.from(activeTasks.values()).map(t => ({ id: t.task_id, status: t.status, noteId: t.input_data?.kwargs?.note_id })));
     }
 
     const summaryTask = Array.from(activeTasks.values()).find(t => 
-        t.task_type === 'summary_generation' && t.input_data?.kwargs?.lecture_id === lectureId
+        t.task_type === 'summary_generation' && t.input_data?.kwargs?.note_id === noteId
     );
     const isTaskRunning = summaryTask && !['completed', 'failed'].includes(summaryTask.status);
 
@@ -448,7 +448,7 @@ async function processInitialTaskState(summaries) {
 
         // Load the latest summary if no task is running and summaries exist
         if (!currentVersionId) {
-            const lastVersionId = localStorage.getItem(`lastSummaryVersion_${lectureId}`);
+            const lastVersionId = localStorage.getItem(`lastSummaryVersion_${noteId}`);
             let versionToLoad = summaries[0];
             if (lastVersionId) {
                 const found = summaries.find(s => s.id == lastVersionId);
@@ -469,7 +469,7 @@ async function processInitialTaskState(summaries) {
 const handleTasksLoadedEvent = (tasks) => {
     console.log('[Summary] handleTasksLoadedEvent triggered with tasks count:', tasks ? tasks.length : 0);
     if (tasks && tasks.length > 0) {
-        console.log('[Summary] Event detail tasks:', tasks.map(t => ({ id: t.task_id, status: t.status, lectureId: t.input_data?.kwargs?.lecture_id })));
+        console.log('[Summary] Event detail tasks:', tasks.map(t => ({ id: t.task_id, status: t.status, noteId: t.input_data?.kwargs?.note_id })));
     }
     loadSummaryVersions().then(summaries => {
         // ALWAYS re-process initial state when tasks are loaded to ensure progress bar visibility
@@ -486,7 +486,7 @@ if (window.ProgressManager && window.ProgressManager.tasksLoaded) {
 
 window.addEventListener('taskUpdate', (e) => {
     const task = e.detail;
-    if (task.task_type === 'summary_generation' && task.input_data?.kwargs?.lecture_id === lectureId) {
+    if (task.task_type === 'summary_generation' && task.input_data?.kwargs?.note_id === noteId) {
         console.log(`[Summary] Received relevant taskUpdate for ${task.task_id}: ${task.progress}% - ${task.status}`);
         
         // Ensure progress container is visible if task is active
@@ -547,7 +547,7 @@ function resetSummaryDetails() {
 
 async function loadNoteMetadata() {
     try {
-        const res = await fetch(`/lectures/${lectureId}`);
+        const res = await fetch(`/notes/${noteId}`);
         if (res.ok) {
             const note = await res.json();
             const noteTitleEl = document.getElementById('noteTitle');
@@ -575,7 +575,7 @@ async function loadNoteMetadata() {
                 breadcrumbHTML += `<span class="note-nav-sep">›</span>`;
                 breadcrumbHTML += `<a href="/subject.html?id=${note.subject.id}" class="note-nav-crumb-link">${note.subject.name}</a>`;
                 breadcrumbHTML += `<span class="note-nav-sep">›</span>`;
-                breadcrumbHTML += `<a href="/note/${lectureId}" class="note-nav-crumb-link">${note.title}</a>`;
+                breadcrumbHTML += `<a href="/note/${noteId}" class="note-nav-crumb-link">${note.title}</a>`;
                 breadcrumbHTML += `<span class="note-nav-sep">›</span>`;
                 
                 if (currentVersionId) {
@@ -942,7 +942,7 @@ async function generateSummary() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                lecture_id: lectureId,
+                note_id: noteId,
                 mode: currentSummaryMode,
                 output_format: currentSummaryFormat,
                 processing_method: method,
@@ -965,7 +965,7 @@ async function generateSummary() {
                         task_type: 'summary_generation',
                         status: 'pending',
                         progress: 0,
-                        input_data: { kwargs: { lecture_id: lectureId, title: currentNoteTitleForBreadcrumb } }
+                        input_data: { kwargs: { note_id: noteId, title: currentNoteTitleForBreadcrumb } }
                     };
                     window.ProgressManager.activeTasks.set(data.task_id, taskToUpdate);
                     window.ProgressManager.saveActiveTasks();

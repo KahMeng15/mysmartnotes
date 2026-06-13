@@ -1413,7 +1413,7 @@ async function sendFollowUp() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                lecture_id: currentQuiz.lecture_id,
+                note_id: currentQuiz.note_id,
                 subject_id: currentQuiz.subject_id,
                 group_id: currentQuiz.group_id,
                 message: `[Context: Q: ${q.question_text} | A: ${q.answer_text}] Follow-up: ${text}`,

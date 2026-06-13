@@ -54,7 +54,7 @@
             <div class="controls-bar">
                 <div class="search-box">
                     <i class="ph ph-magnifying-glass search-icon"></i>
-                    <input type="text" id="searchInput" placeholder="Search lectures..." onkeyup="filterLectures()">
+                    <input type="text" id="searchInput" placeholder="Search notes..." onkeyup="filterNotes()">
                 </div>
                 <div class="sort-container">
                     <button type="button" id="sortBtn" class="btn btn-outline" onclick="toggleSortModal(event)" style="height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px;">
@@ -70,7 +70,7 @@
                         <button type="button" class="sort-option-btn" id="opt-oldest" onclick="selectSortOption('oldest', 'Oldest First')">Oldest First</button>
                     </div>
                 </div>
-                <select id="sortSelect" class="form-control" onchange="filterLectures()" style="display: none;">
+                <select id="sortSelect" class="form-control" onchange="filterNotes()" style="display: none;">
                     <option value="name">Name (A-Z)</option>
                     <option value="recent">Most Recent</option>
                     <option value="oldest">Oldest First</option>
@@ -79,12 +79,12 @@
         </div>
 
         <div class="page-card-content" style="padding-top: var(--spacing-md);">
-            <!-- Lecture List Container -->
+            <!-- Note List Container -->
             <div class="group-section flat-mobile">
-                <div id="lecturesList" class="lecture-list">
+                <div id="notesList" class="note-list">
                     <div class="empty-state">
                         <i class="ph ph-spinner-gap ph-spin" style="font-size: 32px;"></i>
-                        <p>Loading lectures...</p>
+                        <p>Loading notes...</p>
                     </div>
                 </div>
             </div>

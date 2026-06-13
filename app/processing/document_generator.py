@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 class HeaderFooter:
     """Handles headers and footers for PDF pages"""
 
-    def __init__(self, lecture_title: str, page_size=letter):
-        self.lecture_title = lecture_title
+    def __init__(self, note_title: str, page_size=letter):
+        self.note_title = note_title
         self.page_size = page_size
         self.page_number = 0
 
@@ -47,7 +47,7 @@ class HeaderFooter:
         
         # Header
         canvas_obj.setFont("Helvetica-Bold", 10)
-        canvas_obj.drawString(0.5 * inch, page_height - 0.4 * inch, self.lecture_title)
+        canvas_obj.drawString(0.5 * inch, page_height - 0.4 * inch, self.note_title)
         
         # Footer
         canvas_obj.setFont("Helvetica", 8)
@@ -181,15 +181,15 @@ class DocumentGenerator:
 
     def __init__(
         self,
-        lecture_id: int,
-        lecture_title: str,
+        note_id: int,
+        note_title: str,
         base_output_dir: str = "generated",
         page_size=letter,
     ):
-        self.lecture_id = lecture_id
-        self.lecture_title = lecture_title
+        self.note_id = note_id
+        self.note_title = note_title
         self.base_output_dir = base_output_dir
-        self.output_dir = os.path.join(base_output_dir, str(lecture_id))
+        self.output_dir = os.path.join(base_output_dir, str(note_id))
         self.page_size = page_size
         self._template_config = None
         # Resolved footer settings (set during generate_pdf, used in _on_page callback)
@@ -442,7 +442,7 @@ class DocumentGenerator:
         else: # bottom
             story.append(Spacer(1, 7.0 * inch))
             
-        title_text = cover_cfg.get("h1_text") or self.lecture_title
+        title_text = cover_cfg.get("h1_text") or self.note_title
         title_font_size = cover_cfg.get("title_size", 36)
         title_color = cover_cfg.get("title_color", "#1A1A2E")
         

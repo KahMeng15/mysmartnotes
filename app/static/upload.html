@@ -63,10 +63,10 @@
                         </div>
                     </div>
 
-                    <!-- Lecture Title -->
+                    <!-- Note Title -->
                     <div class="form-group">
-                        <label>Lecture Title</label>
-                        <input type="text" id="lectureTitle" placeholder="Leave empty to auto-detect from content">
+                        <label>Note Title</label>
+                        <input type="text" id="noteTitle" placeholder="Leave empty to auto-detect from content">
                     </div>
 
                     <!-- File Upload -->
@@ -454,7 +454,7 @@
             selectedFiles.forEach(file => {
                 formData.append('files', file);
             });
-            formData.append('title', document.getElementById('lectureTitle').value);
+            formData.append('title', document.getElementById('noteTitle').value);
             formData.append('subject_id', subjectId);
 
             try {
@@ -464,14 +464,14 @@
                 document.getElementById('progressPercent').textContent = '...';
                 
                 // 1. Initial Upload
-                const response = await fetch('/lectures/upload', {
+                const response = await fetch('/notes/upload', {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` },
                     body: formData
                 });
 
                 if (response.ok) {
-                    const lectures = await response.json();
+                    const notes = await response.json();
                     
                     document.getElementById('progressModal').classList.remove('active');
                     // Redirect to subject page so they can see the processing cards

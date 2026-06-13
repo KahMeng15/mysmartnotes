@@ -23,13 +23,13 @@ class OCRProcessor:
     """Handle text extraction from various file types with structured output"""
     
     @staticmethod
-    def extract_from_pdf(file_path: str, lecture_id: int = 0, structured: bool = True, use_v2: bool = True) -> Tuple[str, List[ContentSegment], List]:
+    def extract_from_pdf(file_path: str, note_id: int = 0, structured: bool = True, use_v2: bool = True) -> Tuple[str, List[ContentSegment], List]:
         """
         Extract text from PDF using OCR with optional structured processing
         
         Args:
             file_path: Path to PDF file
-            lecture_id: Lecture ID for organizing extracted images
+            note_id: Note ID for organizing extracted images
             structured: Whether to return structured segments
             use_v2: Whether to use enhanced v2 text processor (default True)
             
@@ -54,11 +54,11 @@ class OCRProcessor:
                     logger.debug(f"Processed with v1: {len(segments)} segments from page {page_num + 1}")
                     all_segments.extend(segments)
             
-            # Extract images if lecture_id provided
+            # Extract images if note_id provided
             images_extracted = []
-            if lecture_id > 0:
+            if note_id > 0:
                 try:
-                    image_extractor = ImageExtractor(lecture_id=lecture_id)
+                    image_extractor = ImageExtractor(note_id=note_id)
                     images_extracted = image_extractor.extract_images_from_pdf(file_path)
                     logger.info(f"Extracted {len(images_extracted)} images from PDF")
                 except Exception as e:
@@ -71,13 +71,13 @@ class OCRProcessor:
             raise
     
     @staticmethod
-    def extract_from_pptx(file_path: str, lecture_id: int = 0, structured: bool = True, use_v2: bool = True) -> Tuple[str, List[ContentSegment], List]:
+    def extract_from_pptx(file_path: str, note_id: int = 0, structured: bool = True, use_v2: bool = True) -> Tuple[str, List[ContentSegment], List]:
         """
         Extract text from PowerPoint presentation
         
         Args:
             file_path: Path to PPTX file
-            lecture_id: Lecture ID for organizing extracted images
+            note_id: Note ID for organizing extracted images
             structured: Whether to return structured segments
             use_v2: Whether to use enhanced v2 text processor (default True)
             
@@ -145,14 +145,14 @@ class OCRProcessor:
             raise
     
     @staticmethod
-    def extract_text(file_path: str, file_type: str, lecture_id: int = 0, use_v2: bool = True) -> Dict[str, Any]:
+    def extract_text(file_path: str, file_type: str, note_id: int = 0, use_v2: bool = True) -> Dict[str, Any]:
         """
         Extract text based on file type with full structured output
         
         Args:
             file_path: Path to the file
             file_type: MIME type or file extension
-            lecture_id: Lecture ID for organizing output
+            note_id: Note ID for organizing output
             use_v2: Whether to use enhanced v2 text processor (default True)
             
         Returns:
@@ -162,14 +162,14 @@ class OCRProcessor:
             if "pdf" in file_type.lower():
                 raw_text, segments, images = OCRProcessor.extract_from_pdf(
                     file_path, 
-                    lecture_id=lecture_id, 
+                    note_id=note_id, 
                     structured=True,
                     use_v2=use_v2
                 )
             elif "pptx" in file_type.lower() or "presentation" in file_type.lower():
                 raw_text, segments, images = OCRProcessor.extract_from_pptx(
                     file_path, 
-                    lecture_id=lecture_id, 
+                    note_id=note_id, 
                     structured=True,
                     use_v2=use_v2
                 )

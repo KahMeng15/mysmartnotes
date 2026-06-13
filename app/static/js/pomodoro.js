@@ -26,7 +26,7 @@ window.addEventListener('load', async () => {
     checkPopout();
     initEventListeners();
     await loadSettings(); // Load user preferences first
-    loadLectures();
+    loadNotes();
     loadCalendar();
     loadDailyStats();
     
@@ -245,7 +245,7 @@ async function saveSessionToDB() {
         if (duration < 0.5 && timerMode !== 'stopwatch') return;
 
         const payload = {
-            lecture_id: document.getElementById('lectureSelect').value || null,
+            note_id: document.getElementById('noteSelect').value || null,
             session_type: `pomodoro_${timerMode === 'pomodoro' ? 'study' : 'break'}`,
             duration_minutes: duration,
             start_time: startTime ? startTime.toISOString() : new Date().toISOString(),
@@ -265,12 +265,12 @@ async function saveSessionToDB() {
     }
 }
 
-async function loadLectures() {
+async function loadNotes() {
     try {
-        const res = await fetch('/lectures');
-        const lectures = await res.json();
-        const select = document.getElementById('lectureSelect');
-        lectures.forEach(l => {
+        const res = await fetch('/notes');
+        const notes = await res.json();
+        const select = document.getElementById('noteSelect');
+        notes.forEach(l => {
             const opt = document.createElement('option');
             opt.value = l.id;
             opt.textContent = l.title;

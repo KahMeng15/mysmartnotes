@@ -19,18 +19,18 @@ export default function ChatInterface() {
   
   // Data for context dropdowns
   const [subjects, setSubjects] = useState([]);
-  const [lectures, setLectures] = useState([]);
+  const [notes, setNotes] = useState([]);
 
   useEffect(() => {
-    // Pre-fetch subjects and lectures for the context dropdowns
+    // Pre-fetch subjects and notes for the context dropdowns
     const loadData = async () => {
       try {
         const [subjData, lectData] = await Promise.all([
           fetchApi('/subjects').catch(() => []),
-          fetchApi('/lectures').catch(() => [])
+          fetchApi('/notes').catch(() => [])
         ]);
         setSubjects(subjData || []);
-        setLectures(lectData || []);
+        setNotes(lectData || []);
       } catch (err) {
         console.error("Failed to load context data", err);
       }
@@ -88,8 +88,8 @@ export default function ChatInterface() {
       chatTitle = `Subject: ${subj.name}`;
       chatSubtitle = 'Asking questions about this subject';
     }
-  } else if (contextType === 'lecture' && contextId) {
-    const lect = lectures.find(l => l.id.toString() === contextId.toString());
+  } else if (contextType === 'note' && contextId) {
+    const lect = notes.find(l => l.id.toString() === contextId.toString());
     if (lect) {
       chatTitle = `Note: ${lect.title}`;
       chatSubtitle = 'Asking questions about this specific note';
@@ -201,7 +201,7 @@ export default function ChatInterface() {
             data={[
               { value: 'global', label: 'Global (All Notes)' },
               { value: 'subject', label: 'Specific Subject' },
-              { value: 'lecture', label: 'Specific Note' }
+              { value: 'note', label: 'Specific Note' }
             ]}
             value={contextType}
             onChange={(val) => {
@@ -221,11 +221,11 @@ export default function ChatInterface() {
             />
           )}
 
-          {contextType === 'lecture' && (
+          {contextType === 'note' && (
             <Select
               label="Select Note"
               placeholder="Choose a note..."
-              data={lectures.map(l => ({ value: l.id.toString(), label: l.title }))}
+              data={notes.map(l => ({ value: l.id.toString(), label: l.title }))}
               value={contextId}
               onChange={setContextId}
               searchable

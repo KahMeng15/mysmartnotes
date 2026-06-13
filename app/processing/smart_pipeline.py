@@ -386,7 +386,7 @@ class SmartPipeline:
 
     def _normalize_pdf_bullets(self, text: str) -> str:
         """
-        Normalize non-standard bullet characters used in lecture PDFs
+        Normalize non-standard bullet characters used in note PDFs
         (e.g. Ø, q, n, v as line-start decorators) into proper Markdown list markers.
         """
         import re
@@ -888,7 +888,7 @@ class SmartPipeline:
 
         # 2. Check for common programming keywords with strict boundary enforcement
         import re
-        # Specialized keywords that are rarely used in plain lecture text without code
+        # Specialized keywords that are rarely used in plain note text without code
         keywords = ("public", "private", "class", "void", "static", "System.out", "println", "import", "def", "return", "function", "const", "let")
         kw_pattern = r'\b(' + '|'.join(keywords) + r')\b'
         matches = re.findall(kw_pattern, text)
@@ -999,7 +999,7 @@ class SmartPipeline:
                     else:
                         seen_h1 = True
                 # Remove "End of Topic/Chapter" lines
-                if re.match(r'^#{1,3}\s+(End of|end of)\s+(Topic|Chapter|Lecture)', line, re.IGNORECASE):
+                if re.match(r'^#{1,3}\s+(End of|end of)\s+(Topic|Chapter|Note)', line, re.IGNORECASE):
                     continue
                 cleaned.append(line)
 
@@ -1043,13 +1043,13 @@ class SmartPipeline:
         if is_first_chunk:
             title_instruction = """TITLE RULE: The first line of your output MUST be a single H1 heading (# ) with the 
 EXACT topic title from the slides (e.g., "# Topic 3: Inheritance"). 
-Remove university names, course codes, and lecturer names.
+Remove university names, course codes, and noter names.
 """
         else:
             title_instruction = """HEADING RULE: Do NOT use H1 (# ) headings. Use only H2 (## ) or H3 (### ).
 """
 
-        prompt = f"""Task: Clean and format the following lecture notes into clean Markdown.
+        prompt = f"""Task: Clean and format the following note notes into clean Markdown.
 
 CRITICAL RULES:
 1. START WITH THE MARKER ===START===

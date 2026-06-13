@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
 
-from app.models.db import User, Lecture, Task
+from app.models.db import User, Note, Task
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 
@@ -24,15 +24,15 @@ def get_embeddings_manager():
 
 class SearchQuery(BaseModel):
     query: str
-    lecture_id: int = None
+    note_id: int = None
     top_k: int = 5
 
 
 class SearchResult(BaseModel):
     content: str
     score: float
-    lecture_id: int
-    lecture_title: str
+    note_id: int
+    note_title: str
 
 
 class SearchResponse(BaseModel):
@@ -48,51 +48,51 @@ async def semantic_search(
     db: Session = Depends(get_db)
 ):
     """
-    Perform semantic search across user's lectures
+    Perform semantic search across user's notes
     """
     try:
-        # Get lectures to search
-        if request.lecture_id:
-            lectures = db.query(Lecture).filter(
-                Lecture.id == request.lecture_id,
-                Lecture.user_id == current_user.id
+        # Get notes to search
+        if request.note_id:
+            notes = db.query(Note).filter(
+                Note.id == request.note_id,
+                Note.user_id == current_user.id
             ).all()
         else:
-            lectures = db.query(Lecture).filter(
-                Lecture.user_id == current_user.id
+            notes = db.query(Note).filter(
+                Note.user_id == current_user.id
             ).all()
         
-        if not lectures:
+        if not notes:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No lectures found to search"
+                detail="No notes found to search"
             )
         
-        # Collect all chunks from lectures
+        # Collect all chunks from notes
         all_chunks = []
-        chunk_metadata = []  # Track which lecture each chunk comes from
+        chunk_metadata = []  # Track which note each chunk comes from
         
-        for lecture in lectures:
-            text = StorageManager.get_lecture_text(lecture.id)
+        for note in notes:
+            text = StorageManager.get_note_text(note.id)
             if not text:
                 continue
             
-            # Split lecture content into chunks
+            # Split note content into chunks
             from app.processing.ocr import OCRProcessor
             chunks = OCRProcessor.chunk_text(text)
             
             for chunk in chunks:
                 all_chunks.append(chunk)
                 chunk_metadata.append({
-                    "lecture_id": lecture.id,
-                    "lecture_title": lecture.title,
+                    "note_id": note.id,
+                    "note_title": note.title,
                     "content": chunk
                 })
         
         if not all_chunks:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No text content available in lectures for search"
+                detail="No text content available in notes for search"
             )
         
         # Perform semantic search
@@ -112,8 +112,8 @@ async def semantic_search(
                     search_results.append(SearchResult(
                         content=chunk,
                         score=float(score),
-                        lecture_id=metadata["lecture_id"],
-                        lecture_title=metadata["lecture_title"]
+                        note_id=metadata["note_id"],
+                        note_title=metadata["note_title"]
                     ))
                     break
         
@@ -132,53 +132,53 @@ async def semantic_search(
         )
 
 
-@router.get("/similar/{lecture_id}")
-async def get_similar_lectures(
-    lecture_id: int,
+@router.get("/similar/{note_id}")
+async def get_similar_notes(
+    note_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Find similar lectures based on content similarity
+    Find similar notes based on content similarity
     """
     try:
-        # Get source lecture
-        source_lecture = db.query(Lecture).filter(
-            Lecture.id == lecture_id,
-            Lecture.user_id == current_user.id
+        # Get source note
+        source_note = db.query(Note).filter(
+            Note.id == note_id,
+            Note.user_id == current_user.id
         ).first()
         
-        source_text = StorageManager.get_lecture_text(lecture_id)
-        if not source_lecture or not source_text:
+        source_text = StorageManager.get_note_text(note_id)
+        if not source_note or not source_text:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Lecture not found or has no content"
+                detail="Note not found or has no content"
             )
         
-        # Get all other lectures
-        other_lectures = db.query(Lecture).filter(
-            Lecture.user_id == current_user.id,
-            Lecture.id != lecture_id
+        # Get all other notes
+        other_notes = db.query(Note).filter(
+            Note.user_id == current_user.id,
+            Note.id != note_id
         ).all()
         
-        # Filter for lectures that actually have text on disk
-        valid_other_lectures = []
+        # Filter for notes that actually have text on disk
+        valid_other_notes = []
         other_contents = []
-        for l in other_lectures:
-            text = StorageManager.get_lecture_text(l.id)
+        for l in other_notes:
+            text = StorageManager.get_note_text(l.id)
             if text:
-                valid_other_lectures.append(l)
+                valid_other_notes.append(l)
                 other_contents.append(text[:1000])
 
-        if not valid_other_lectures:
-            return {"similar_lectures": []}
+        if not valid_other_notes:
+            return {"similar_notes": []}
         
-        # Extract first chunk from source lecture as query
+        # Extract first chunk from source note as query
         from app.processing.ocr import OCRProcessor
         source_chunks = OCRProcessor.chunk_text(source_text)
         
         if not source_chunks:
-            return {"similar_lectures": []}
+            return {"similar_notes": []}
         
         source_chunk = source_chunks[0]
         
@@ -191,12 +191,12 @@ async def get_similar_lectures(
             top_k=5
         )
         
-        similar_lectures = []
+        similar_notes = []
         for content, score in results:
             for i, text_snippet in enumerate(other_contents):
                 if text_snippet.startswith(content[:500]):
-                    l = valid_other_lectures[i]
-                    similar_lectures.append({
+                    l = valid_other_notes[i]
+                    similar_notes.append({
                         "id": l.id,
                         "title": l.title,
                         "similarity_score": float(score),
@@ -204,14 +204,14 @@ async def get_similar_lectures(
                     })
                     break
         
-        return {"similar_lectures": similar_lectures}
+        return {"similar_notes": similar_notes}
     
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error finding similar lectures: {str(e)}"
+            detail=f"Error finding similar notes: {str(e)}"
         )
 
 
@@ -261,30 +261,30 @@ async def get_task_status(
 
 
 @router.get("/task")
-async def get_lecture_task_status(
-    lecture_id: str,
+async def get_note_task_status(
+    note_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get status of OCR task for a lecture"""
+    """Get status of OCR task for a note"""
     import logging
     logger = logging.getLogger(__name__)
     
-    # Verify lecture belongs to user
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id,
-        Lecture.user_id == current_user.id
+    # Verify note belongs to user
+    note = db.query(Note).filter(
+        Note.id == note_id,
+        Note.user_id == current_user.id
     ).first()
     
-    if not lecture:
-        logger.warning(f"Lecture {lecture_id} not found for user {current_user.id}")
+    if not note:
+        logger.warning(f"Note {note_id} not found for user {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lecture not found"
+            detail="Note not found"
         )
     
-    # Try to find the latest OCR task by lecture_id pattern (ocr_<user_id>_<lecture_id>_<hash>)
-    task_id_pattern = f"ocr_{current_user.id}_{lecture_id}%"
+    # Try to find the latest OCR task by note_id pattern (ocr_<user_id>_<note_id>_<hash>)
+    task_id_pattern = f"ocr_{current_user.id}_{note_id}%"
     db_task = db.query(Task).filter(
         Task.user_id == current_user.id,
         Task.task_id.like(task_id_pattern)
@@ -303,8 +303,8 @@ async def get_lecture_task_status(
     
     # No active task
     from app.utils.storage import StorageManager
-    has_text = bool(StorageManager.get_lecture_text(lecture.id))
-    logger.info(f"No active task. Lecture extracted_text: {'EXISTS' if has_text else 'NULL'}")
+    has_text = bool(StorageManager.get_note_text(note.id))
+    logger.info(f"No active task. Note extracted_text: {'EXISTS' if has_text else 'NULL'}")
     if has_text:
         # Text exists, extraction is complete
         logger.info(f"Text exists, returning completed status")

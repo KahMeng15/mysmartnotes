@@ -9,7 +9,7 @@ import logging
 import random
 import string
 
-from app.models.db import User, Lecture, Summary
+from app.models.db import User, Note, Summary
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
 from app.utils.tasks import TaskManager
@@ -42,13 +42,13 @@ class QuizQuestion(BaseModel):
 
 
 class QuizResponse(BaseModel):
-    lecture_id: str
+    note_id: str
     questions: List[QuizQuestion]
     total_questions: int
 
 
 class SummaryRequest(BaseModel):
-    lecture_id: str
+    note_id: str
     mode: str = "elaborate"  # quick, simple, elaborate, eli5
     output_format: str = "sentence"  # sentence, pointform, numbered_list, table
     processing_method: str = "whole"  # whole, section
@@ -58,7 +58,7 @@ class SummaryRequest(BaseModel):
 
 
 class SummaryResponse(BaseModel):
-    lecture_id: str
+    note_id: str
     title: str
     content: str
     is_cached: bool
@@ -77,12 +77,12 @@ class SummaryResponse(BaseModel):
 
 
 class CheatsheetRequest(BaseModel):
-    lecture_id: str
+    note_id: str
     format: str = "markdown"  # markdown or html
 
 
 class CheatsheetResponse(BaseModel):
-    lecture_id: str
+    note_id: str
     title: str
     content: str
 
@@ -90,7 +90,7 @@ class CheatsheetResponse(BaseModel):
 class SummaryItemResponse(BaseModel):
     id: str
     version: int
-    lecture_id: str
+    note_id: str
     title: str
     summary_type: str
     file_path: str
@@ -108,29 +108,29 @@ class SummaryItemResponse(BaseModel):
 
 @router.post("/quiz", response_model=QuizResponse)
 async def generate_quiz(
-    lecture_id: str,
+    note_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate quiz questions from a lecture"""
+    """Generate quiz questions from a note"""
     
-    # Verify lecture belongs to user
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id,
-        Lecture.user_id == current_user.id
+    # Verify note belongs to user
+    note = db.query(Note).filter(
+        Note.id == note_id,
+        Note.user_id == current_user.id
     ).first()
     
-    if not lecture:
+    if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lecture not found"
+            detail="Note not found"
         )
     
-    lecture_content = StorageManager.get_lecture_text(lecture.id) or ""
-    if not lecture_content:
+    note_content = StorageManager.get_note_text(note.id) or ""
+    if not note_content:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Lecture content not available yet. Please wait for processing."
+            detail="Note content not available yet. Please wait for processing."
         )
     
     # Generate quiz using AI
@@ -138,12 +138,12 @@ async def generate_quiz(
     
     try:
         questions = ai_client.generate_quiz(
-            content=lecture_content,
+            content=note_content,
             num_questions=10
         )
         
         return QuizResponse(
-            lecture_id=lecture_id,
+            note_id=note_id,
             questions=questions,
             total_questions=len(questions)
         )
@@ -160,27 +160,27 @@ async def generate_summary_endpoint(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate or retrieve cached summary for a lecture"""
+    """Generate or retrieve cached summary for a note"""
     
     # Enforce tier quotas
     enforce_quota_summaries(current_user, db)
     
-    # Verify lecture belongs to user
-    lecture = db.query(Lecture).filter(
-        Lecture.id == request.lecture_id,
-        Lecture.user_id == current_user.id
+    # Verify note belongs to user
+    note = db.query(Note).filter(
+        Note.id == request.note_id,
+        Note.user_id == current_user.id
     ).first()
     
-    if not lecture:
+    if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lecture not found"
+            detail="Note not found"
         )
 
     # Check for existing summary (unless forced)
     if not request.force_regenerate:
         existing_summary = db.query(Summary).filter(
-            Summary.lecture_id == request.lecture_id,
+            Summary.note_id == request.note_id,
             Summary.summary_type == "summary",
             Summary.processing_method == request.processing_method,
             Summary.mode == request.mode,
@@ -189,7 +189,7 @@ async def generate_summary_endpoint(
 
         if existing_summary:
             return {
-                "lecture_id": request.lecture_id,
+                "note_id": request.note_id,
                 "title": existing_summary.title,
                 "content": StorageManager.get_summary_text(existing_summary.id) or "",
                 "is_cached": True,
@@ -210,13 +210,13 @@ async def generate_summary_endpoint(
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
 
     import time
-    task_id = f"summary_{current_user.id}_{request.lecture_id}_{int(time.time())}"
+    task_id = f"summary_{current_user.id}_{request.note_id}_{int(time.time())}"
     TaskManager.submit_task(
         task_id, 
         "summary_generation", 
         current_user.id, 
-        lecture_id=lecture.id,
-        title=lecture.title, 
+        note_id=note.id,
+        title=note.title, 
         mode=request.mode,
         output_format=request.output_format,
         processing_method=request.processing_method,
@@ -232,28 +232,28 @@ async def generate_cheatsheet(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate study cheatsheet from lecture"""
+    """Generate study cheatsheet from note"""
     
     # Enforce tier quotas
     enforce_quota_summaries(current_user, db)
     
-    # Verify lecture belongs to user
-    lecture = db.query(Lecture).filter(
-        Lecture.id == request.lecture_id,
-        Lecture.user_id == current_user.id
+    # Verify note belongs to user
+    note = db.query(Note).filter(
+        Note.id == request.note_id,
+        Note.user_id == current_user.id
     ).first()
     
-    if not lecture:
+    if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lecture not found"
+            detail="Note not found"
         )
     
-    lecture_content = StorageManager.get_lecture_text(lecture.id) or ""
-    if not lecture_content:
+    note_content = StorageManager.get_note_text(note.id) or ""
+    if not note_content:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Lecture content not available yet. Please wait for processing."
+            detail="Note content not available yet. Please wait for processing."
         )
     
     # Generate cheatsheet using AI
@@ -261,7 +261,7 @@ async def generate_cheatsheet(
     
     try:
         content = await ai_client.generate_summary(
-            content=lecture_content,
+            content=note_content,
             output_format=request.format
         )
         
@@ -269,10 +269,10 @@ async def generate_cheatsheet(
         doc_id = generate_random_id(db, Summary)
         doc = Summary(
             id=doc_id,
-            lecture_id=request.lecture_id,
-            title=f"Cheatsheet - {lecture.title}",
+            note_id=request.note_id,
+            title=f"Cheatsheet - {note.title}",
             summary_type="cheatsheet",
-            file_path=f"cheatsheet_{lecture.id}.md"
+            file_path=f"cheatsheet_{note.id}.md"
         )
         db.add(doc)
 
@@ -282,8 +282,8 @@ async def generate_cheatsheet(
         db.commit()
 
         return CheatsheetResponse(
-            lecture_id=request.lecture_id,
-            title=f"Cheatsheet - {lecture.title}",
+            note_id=request.note_id,
+            title=f"Cheatsheet - {note.title}",
             content=content
         )
     except Exception as e:
@@ -312,9 +312,9 @@ async def update_generated_summary(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
         
-    # Verify ownership through lecture
-    lecture = db.query(Lecture).filter(Lecture.id == doc.lecture_id, Lecture.user_id == current_user.id).first()
-    if not lecture:
+    # Verify ownership through note
+    note = db.query(Note).filter(Note.id == doc.note_id, Note.user_id == current_user.id).first()
+    if not note:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this summary")
         
     # Save to storage
@@ -336,7 +336,7 @@ async def update_generated_summary(
     return SummaryItemResponse(
         id=doc.id,
         version=doc.version,
-        lecture_id=doc.lecture_id,
+        note_id=doc.note_id,
         title=doc.title,
         summary_type=doc.summary_type,
         file_path=doc.file_path,
@@ -356,17 +356,17 @@ async def update_generated_summary(
 @router.get("", response_model=List[SummaryItemResponse])
 async def list_summaries(
     request: Request,
-    lecture_id: str = None,
+    note_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """List all generated summaries for current user"""
-    query = db.query(Summary).join(Lecture).filter(
-        Lecture.user_id == current_user.id
+    query = db.query(Summary).join(Note).filter(
+        Note.user_id == current_user.id
     )
     
-    if lecture_id:
-        query = query.filter(Summary.lecture_id == lecture_id)
+    if note_id:
+        query = query.filter(Summary.note_id == note_id)
     
     summaries = query.all()
     
@@ -374,7 +374,7 @@ async def list_summaries(
         SummaryItemResponse(
             id=d.id,
             version=d.version,
-            lecture_id=d.lecture_id,
+            note_id=d.note_id,
             title=d.title,
             summary_type=d.summary_type,
             file_path=d.file_path,
@@ -395,20 +395,20 @@ async def list_summaries(
 async def get_summary(
     request: Request,
     summary_id: str,
-    lecture_id: Optional[str] = None,
+    note_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get a specific generated summary by ID or version (if lecture_id provided)"""
-    query = db.query(Summary).join(Lecture).filter(
-        Lecture.user_id == current_user.id
+    """Get a specific generated summary by ID or version (if note_id provided)"""
+    query = db.query(Summary).join(Note).filter(
+        Note.user_id == current_user.id
     )
     
-    if lecture_id and summary_id.startswith('v'):
+    if note_id and summary_id.startswith('v'):
         try:
             version_num = int(summary_id[1:])
             summary = query.filter(
-                Summary.lecture_id == lecture_id,
+                Summary.note_id == note_id,
                 Summary.version == version_num
             ).first()
         except ValueError:
@@ -425,7 +425,7 @@ async def get_summary(
     return SummaryItemResponse(
         id=summary.id,
         version=summary.version,
-        lecture_id=summary.lecture_id,
+        note_id=summary.note_id,
         title=summary.title,
         summary_type=summary.summary_type,
         file_path=summary.file_path,
@@ -450,9 +450,9 @@ async def delete_summary(
     db: Session = Depends(get_db)
 ):
     """Delete a generated summary"""
-    summary = db.query(Summary).join(Lecture).filter(
+    summary = db.query(Summary).join(Note).filter(
         Summary.id == summary_id,
-        Lecture.user_id == current_user.id
+        Note.user_id == current_user.id
     ).first()
 
     if not summary:
@@ -482,19 +482,19 @@ async def export_summary(
     import uuid
     from datetime import datetime
     from pathlib import Path
-    from app.models.db import Summary, Lecture, ExportTemplate
+    from app.models.db import Summary, Note, ExportTemplate
     from app.processing.text_processor import ContentSegment, ContentType
     
     # 1. Verify existence and ownership
-    doc = db.query(Summary).join(Lecture).filter(
+    doc = db.query(Summary).join(Note).filter(
         Summary.id == summary_id,
-        Lecture.user_id == current_user.id
+        Note.user_id == current_user.id
     ).first()
     
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
         
-    lecture = db.query(Lecture).filter(Lecture.id == doc.lecture_id).first()
+    note = db.query(Note).filter(Note.id == doc.note_id).first()
     
     # 2. Extract options
     export_format = body.get("format", "pdf").lower()
@@ -530,10 +530,10 @@ async def export_summary(
     
     # 4. Generate the summary
     generated_dir = "generated"
-    output_dir = os.path.join(generated_dir, str(doc.lecture_id))
+    output_dir = os.path.join(generated_dir, str(doc.note_id))
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     
-    safe_title = "".join(c for c in (doc.title or lecture.title) if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_title = "".join(c for c in (doc.title or note.title) if c.isalnum() or c in (' ', '-', '_')).strip()
     filename = f"{safe_title}_{uuid.uuid4().hex[:6]}.{export_format}"
     output_path = os.path.join(output_dir, filename)
     
@@ -543,8 +543,8 @@ async def export_summary(
         if export_format == "pdf":
             from app.processing.document_generator import DocumentGenerator
             generator = DocumentGenerator(
-                lecture_id=doc.lecture_id,
-                lecture_title=lecture.title,
+                note_id=doc.note_id,
+                note_title=note.title,
                 base_output_dir=generated_dir
             )
             # Generator uses its own internal path, we need to move it after
@@ -554,8 +554,8 @@ async def export_summary(
         else:
             from app.processing.docx_generator import DocxGenerator
             generator = DocxGenerator(
-                lecture_id=doc.lecture_id,
-                lecture_title=lecture.title,
+                note_id=doc.note_id,
+                note_title=note.title,
                 base_output_dir=generated_dir
             )
             temp_path = generator.generate_docx(segments, [], template_config=template_config)
@@ -564,7 +564,7 @@ async def export_summary(
             
         # 5. Store export in Summary as a permanent export record
         new_export = Summary(
-            lecture_id=doc.lecture_id,
+            note_id=doc.note_id,
             title=f"Export: {doc.title or 'Summary'} ({export_format.upper()})",
             file_path=output_path,
             summary_type=export_format,
@@ -596,13 +596,13 @@ async def download_summary_export(
     """Download a previously generated summary export"""
     import os
     from fastapi.responses import FileResponse
-    from app.models.db import Summary, Lecture
+    from app.models.db import Summary, Note
     
     try:
-        # Verify export summary exists and user owns the parent lecture
-        export_doc = db.query(Summary).join(Lecture).filter(
+        # Verify export summary exists and user owns the parent note
+        export_doc = db.query(Summary).join(Note).filter(
             Summary.id == export_id,
-            Lecture.user_id == current_user.id
+            Note.user_id == current_user.id
         ).first()
         
         if not export_doc:

@@ -104,14 +104,14 @@ class Subject(Base):
     # Relationships
     owner = relationship("User", back_populates="subjects")
     group = relationship("SubjectGroup", back_populates="subjects")
-    lectures = relationship("Lecture", back_populates="subject", cascade="all, delete-orphan")
+    notes = relationship("Note", back_populates="subject", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="subject", cascade="all, delete-orphan")
     quizzes = relationship("Quiz", back_populates="subject", cascade="all, delete-orphan")
 
 
-class Lecture(Base):
-    """Lecture/Document"""
-    __tablename__ = "lectures"
+class Note(Base):
+    """Note/Document"""
+    __tablename__ = "notes"
     
     id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -129,13 +129,13 @@ class Lecture(Base):
     
     # Relationships
     user = relationship("User")
-    subject = relationship("Subject", back_populates="lectures")
-    summaries = relationship("Summary", back_populates="lecture", cascade="all, delete-orphan")
-    embeddings = relationship("LectureEmbedding", back_populates="lecture", cascade="all, delete-orphan")
-    study_sessions = relationship("StudySession", back_populates="lecture", cascade="all, delete-orphan")
-    chat_messages = relationship("ChatMessage", back_populates="lecture", cascade="all, delete-orphan")
-    snapshots = relationship("NoteSnapshot", back_populates="lecture", cascade="all, delete-orphan")
-    quizzes = relationship("Quiz", back_populates="lecture", cascade="all, delete-orphan")
+    subject = relationship("Subject", back_populates="notes")
+    summaries = relationship("Summary", back_populates="note", cascade="all, delete-orphan")
+    embeddings = relationship("NoteEmbedding", back_populates="note", cascade="all, delete-orphan")
+    study_sessions = relationship("StudySession", back_populates="note", cascade="all, delete-orphan")
+    chat_messages = relationship("ChatMessage", back_populates="note", cascade="all, delete-orphan")
+    snapshots = relationship("NoteSnapshot", back_populates="note", cascade="all, delete-orphan")
+    quizzes = relationship("Quiz", back_populates="note", cascade="all, delete-orphan")
 
 
 class ExportTemplate(Base):
@@ -160,8 +160,8 @@ class Summary(Base):
     __tablename__ = "summaries"
     
     id = Column(String(16), primary_key=True)
-    version = Column(Integer, nullable=False, default=1)  # v1, v2, etc. per lecture
-    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=False, index=True)
+    version = Column(Integer, nullable=False, default=1)  # v1, v2, etc. per note
+    note_id = Column(String(16), ForeignKey("notes.id"), nullable=False, index=True)
     summary_type = Column(String(50))  # cheatsheet, quiz, summary
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
@@ -176,24 +176,24 @@ class Summary(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    lecture = relationship("Lecture", back_populates="summaries")
+    note = relationship("Note", back_populates="summaries")
 
 
-class LectureEmbedding(Base):
-    """Pre-computed embeddings for lecture chunks (vector DB)"""
-    __tablename__ = "lecture_embeddings"
+class NoteEmbedding(Base):
+    """Pre-computed embeddings for note chunks (vector DB)"""
+    __tablename__ = "note_embeddings"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=False, index=True)
+    note_id = Column(String(16), ForeignKey("notes.id"), nullable=False, index=True)
     chunk_text = Column(Text, nullable=False)  # Original text of this chunk
-    chunk_index = Column(Integer, nullable=False)  # Order of this chunk in lecture
+    chunk_index = Column(Integer, nullable=False)  # Order of this chunk in note
     embedding = Column(JSON, nullable=False)  # Embedding vector as list of floats
     position = Column(Integer)  # Character position in original text
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    lecture = relationship("Lecture", back_populates="embeddings")
+    note = relationship("Note", back_populates="embeddings")
 
 
 class Quiz(Base):
@@ -203,10 +203,10 @@ class Quiz(Base):
     id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(255), nullable=False)
-    scope_type = Column(String(50))  # "group", "subject" or "lecture"
+    scope_type = Column(String(50))  # "group", "subject" or "note"
     group_id = Column(String(16), ForeignKey("subject_groups.id"), nullable=True, index=True)
     subject_id = Column(String(16), ForeignKey("subjects.id"), nullable=True, index=True)
-    lecture_id = Column(String(16), ForeignKey("lectures.id"), nullable=True, index=True)
+    note_id = Column(String(16), ForeignKey("notes.id"), nullable=True, index=True)
     quiz_group_id = Column(String(16), ForeignKey("quiz_groups.id"), nullable=True, index=True)
     model = Column(String(100), nullable=True)  # AI model used
     processing_time_ms = Column(Integer, nullable=True)  # Processing time in milliseconds
@@ -217,7 +217,7 @@ class Quiz(Base):
     user = relationship("User")
     group = relationship("SubjectGroup", back_populates="quizzes")
     subject = relationship("Subject", back_populates="quizzes")
-    lecture = relationship("Lecture", back_populates="quizzes")
+    note = relationship("Note", back_populates="quizzes")
     quiz_group = relationship("QuizGroup", back_populates="quizzes")
     questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
     progress = relationship("QuizProgress", back_populates="quiz", cascade="all, delete-orphan")
@@ -275,7 +275,7 @@ class StudySession(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    lecture_id = Column(String(16), ForeignKey("lectures.id", ondelete="SET NULL"), nullable=True, index=True)
+    note_id = Column(String(16), ForeignKey("notes.id", ondelete="SET NULL"), nullable=True, index=True)
     session_type = Column(String(50))  # quiz, chat, pomodoro_study, pomodoro_break, stopwatch
     duration_minutes = Column(Integer)
     questions_attempted = Column(Integer, default=0)
@@ -288,7 +288,7 @@ class StudySession(Base):
     
     # Relationships
     user = relationship("User", back_populates="study_sessions")
-    lecture = relationship("Lecture", back_populates="study_sessions")
+    note = relationship("Note", back_populates="study_sessions")
 
 
 class Task(Base):
@@ -317,7 +317,7 @@ class ChatMessage(Base):
     
     id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    lecture_id = Column(String(16), ForeignKey("lectures.id", ondelete="SET NULL"), nullable=True, index=True)
+    note_id = Column(String(16), ForeignKey("notes.id", ondelete="SET NULL"), nullable=True, index=True)
     subject_id = Column(String(16), ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True)
     group_id = Column(String(16), ForeignKey("subject_groups.id", ondelete="SET NULL"), nullable=True, index=True)
     message = Column(Text, nullable=False)
@@ -340,17 +340,17 @@ class ChatMessage(Base):
     
     # Relationships
     user = relationship("User")
-    lecture = relationship("Lecture", back_populates="chat_messages")
+    note = relationship("Note", back_populates="chat_messages")
     subject = relationship("Subject", back_populates="chat_messages")
     group = relationship("SubjectGroup", back_populates="chat_messages")
 
 
 class NoteSnapshot(Base):
-    """Named snapshots of lecture notes for version history"""
+    """Named snapshots of note notes for version history"""
     __tablename__ = "note_snapshots"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    lecture_id = Column(String(16), ForeignKey("lectures.id", ondelete="CASCADE"), nullable=False, index=True)
+    note_id = Column(String(16), ForeignKey("notes.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
@@ -358,7 +358,7 @@ class NoteSnapshot(Base):
     
     # Relationships
     user = relationship("User")
-    lecture = relationship("Lecture", back_populates="snapshots")
+    note = relationship("Note", back_populates="snapshots")
 
 
 class SystemSettings(Base):
@@ -532,24 +532,24 @@ class TierConfig(Base):
 
 # --- Event Listeners for File Cleanup ---
 
-@event.listens_for(Lecture, 'after_delete')
+@event.listens_for(Note, 'after_delete')
 def receive_after_delete(mapper, connection, target):
-    """Delete original file and generated PDF when a lecture is deleted"""
+    """Delete original file and generated PDF when a note is deleted"""
     # Delete original file
     if target.file_path and os.path.exists(target.file_path):
         try:
             os.remove(target.file_path)
-            logger.info(f"Deleted original file for lecture {target.id}: {target.file_path}")
+            logger.info(f"Deleted original file for note {target.id}: {target.file_path}")
         except Exception as e:
-            logger.warning(f"Error deleting original file for lecture {target.id}: {e}")
+            logger.warning(f"Error deleting original file for note {target.id}: {e}")
             
     # Delete generated output PDF
     if target.output_pdf_path and os.path.exists(target.output_pdf_path):
         try:
             os.remove(target.output_pdf_path)
-            logger.info(f"Deleted output PDF for lecture {target.id}: {target.output_pdf_path}")
+            logger.info(f"Deleted output PDF for note {target.id}: {target.output_pdf_path}")
         except Exception as e:
-            logger.warning(f"Error deleting output PDF for lecture {target.id}: {e}")
+            logger.warning(f"Error deleting output PDF for note {target.id}: {e}")
 
 
 @event.listens_for(Summary, 'after_delete')

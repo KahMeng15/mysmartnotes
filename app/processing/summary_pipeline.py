@@ -205,7 +205,7 @@ class SummaryPipeline:
         else: # elaborate
             mode_instruction = "Provide a detailed, comprehensive summary covering all key technical points."
 
-        prompt = f"""Task: Summarize the following lecture segment.
+        prompt = f"""Task: Summarize the following note segment.
 
 INSTRUCTIONS:
 1. Mode: {mode_instruction}

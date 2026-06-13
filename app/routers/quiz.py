@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from app.models.db import User, Quiz, QuizQuestion, Subject, Lecture, QuizProgress, Summary, SubjectGroup, QuizGroup
+from app.models.db import User, Quiz, QuizQuestion, Subject, Note, QuizProgress, Summary, SubjectGroup, QuizGroup
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
 from app.utils.quotas import enforce_quota_quizzes
@@ -57,7 +57,7 @@ def get_quizzes(
             Quiz.questions.any(QuizQuestion.question_text.ilike(f"%{q}%")),
             Quiz.questions.any(QuizQuestion.answer_text.ilike(f"%{q}%")),
             # Note info
-            Quiz.lecture.has(Lecture.title.ilike(f"%{q}%")),
+            Quiz.note.has(Note.title.ilike(f"%{q}%")),
             Quiz.subject.has(Subject.name.ilike(f"%{q}%")),
             Quiz.group.has(SubjectGroup.name.ilike(f"%{q}%"))
         )
@@ -156,7 +156,7 @@ def create_quiz(
         scope_type=quiz_in.scope_type,
         group_id=quiz_in.group_id,
         subject_id=quiz_in.subject_id,
-        lecture_id=quiz_in.lecture_id,
+        note_id=quiz_in.note_id,
         quiz_group_id=quiz_in.quiz_group_id
     )
     db.add(quiz)
@@ -438,24 +438,24 @@ async def explain_question_endpoint(
     
     # 1. Get Context from Source
     if request.scope in ["source", "both"]:
-        lecture_ids = []
-        if quiz.lecture_id:
-            lecture_ids = [quiz.lecture_id]
+        note_ids = []
+        if quiz.note_id:
+            note_ids = [quiz.note_id]
         elif quiz.subject_id:
-            lectures = db.query(Lecture).filter(Lecture.subject_id == quiz.subject_id).all()
-            lecture_ids = [l.id for l in lectures]
+            notes = db.query(Note).filter(Note.subject_id == quiz.subject_id).all()
+            note_ids = [l.id for l in notes]
         elif quiz.group_id:
             subjects = db.query(Subject).filter(Subject.group_id == quiz.group_id).all()
             for s in subjects:
-                lectures = db.query(Lecture).filter(Lecture.subject_id == s.id).all()
-                lecture_ids.extend([l.id for l in lectures])
+                notes = db.query(Note).filter(Note.subject_id == s.id).all()
+                note_ids.extend([l.id for l in notes])
         
-        if lecture_ids:
+        if note_ids:
             try:
                 from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
                 chunks = retrieve_relevant_chunks(
                     query=f"{question.question_text} {question.answer_text}",
-                    lecture_ids=lecture_ids,
+                    note_ids=note_ids,
                     db=db,
                     top_k=5
                 )
@@ -697,8 +697,8 @@ async def export_quiz(
         if export_format == "pdf":
             from app.processing.document_generator import DocumentGenerator
             generator = DocumentGenerator(
-                lecture_id=quiz.id, # using quiz.id as a unique dir folder
-                lecture_title=f"Quiz: {quiz.title}",
+                note_id=quiz.id, # using quiz.id as a unique dir folder
+                note_title=f"Quiz: {quiz.title}",
                 base_output_dir=GENERATED_DIR,
             )
             output_path = generator.generate_pdf(
@@ -712,8 +712,8 @@ async def export_quiz(
         else:
             from app.processing.docx_generator import DocxGenerator
             generator = DocxGenerator(
-                lecture_id=quiz.id,
-                lecture_title=f"Quiz: {quiz.title}",
+                note_id=quiz.id,
+                note_title=f"Quiz: {quiz.title}",
                 base_output_dir=GENERATED_DIR,
             )
             output_path = generator.generate_docx(
@@ -726,7 +726,7 @@ async def export_quiz(
             )
             
         gen_doc = Summary(
-            lecture_id=quiz.lecture_id or 1, # fallback if subject-based quiz
+            note_id=quiz.note_id or 1, # fallback if subject-based quiz
             title=f"{quiz.title} ({export_format.upper()})",
             file_path=output_path,
             summary_type=f"quiz_{export_format}",

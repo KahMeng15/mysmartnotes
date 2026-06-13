@@ -6,7 +6,7 @@ window.addEventListener('load', async () => {
     loadUserInfo();
     loadDashboardSummary();
     await loadSubjects(); 
-    loadRecentLectures(); 
+    loadRecentNotes(); 
 });
 
 async function loadDashboardSummary() {
@@ -83,26 +83,26 @@ async function loadSubjects() {
     }
 }
 
-async function loadRecentLectures() {
+async function loadRecentNotes() {
     try {
-        const response = await fetch(`${API_URL}/lectures`);
+        const response = await fetch(`${API_URL}/notes`);
         if (response.ok) {
-            const lectures = await response.json();
-            document.getElementById('totalNotesValue').textContent = lectures.length;
+            const notes = await response.json();
+            document.getElementById('totalNotesValue').textContent = notes.length;
 
             // Sort by date descending
-            lectures.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            displayRecentLectures(lectures.slice(0, 5));
+            notes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            displayRecentNotes(notes.slice(0, 5));
         }
     } catch (error) {
-        console.error('Error loading lectures:', error);
+        console.error('Error loading notes:', error);
     }
 }
 
-function displayRecentLectures(lectures) {
-    const list = document.getElementById('recentLectures');
+function displayRecentNotes(notes) {
+    const list = document.getElementById('recentNotes');
     
-    if (!lectures || lectures.length === 0) {
+    if (!notes || notes.length === 0) {
         list.innerHTML = `
             <div class="empty-state">
                 <i class="ph ph-files" style="font-size: 48px; margin-bottom: 1rem;"></i>
@@ -113,28 +113,28 @@ function displayRecentLectures(lectures) {
         return;
     }
 
-    list.innerHTML = `<div class='lecture-grid'>` + lectures.map(lecture => {
-        const subject = window.allSubjects ? window.allSubjects.find(s => s.id == lecture.subject_id) : null;
+    list.innerHTML = `<div class='note-grid'>` + notes.map(note => {
+        const subject = window.allSubjects ? window.allSubjects.find(s => s.id == note.subject_id) : null;
         const subjectName = subject ? subject.name : 'Unknown Subject';
         const groupName = subject && subject.groupName ? subject.groupName : null;
-        const fileTypeLabel = getFriendlyFileType(lecture.file_type);
+        const fileTypeLabel = getFriendlyFileType(note.file_type);
 
         return `
-            <div class="lecture-item" onclick="openLecture('${lecture.id}')" style="cursor: pointer;">
-                <div class="lecture-info">
-                    <div class="lecture-icon">
-                        <i class="ph ${getIconForType(lecture.file_type)}"></i>
+            <div class="note-item" onclick="openNote('${note.id}')" style="cursor: pointer;">
+                <div class="note-info">
+                    <div class="note-icon">
+                        <i class="ph ${getIconForType(note.file_type)}"></i>
                     </div>
-                    <div class="lecture-details">
-                        <h4>${lecture.title}</h4>
+                    <div class="note-details">
+                        <h4>${note.title}</h4>
                         <p>
                             ${subjectName} • 
                             ${groupName ? ` ${groupName} • ` : ''}
-                            ${window.formatDate(lecture.created_at)} • ${fileTypeLabel}
+                            ${window.formatDate(note.created_at)} • ${fileTypeLabel}
                         </p>
                     </div>
                 </div>
-                <div class="lecture-actions">
+                <div class="note-actions">
                     <button class="btn btn-outline btn-small">
                         View
                     </button>
@@ -186,7 +186,7 @@ async function createSubject(event) {
     }
 }
 
-function openLecture(id) {
+function openNote(id) {
     window.location.href = `/note/${id}`;
 }
 

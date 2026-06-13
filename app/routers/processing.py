@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app.processing.smart_pipeline import SmartPipeline
-from app.models.db import User, Lecture
+from app.models.db import User, Note
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 
@@ -162,35 +162,35 @@ async def smart_extract_download(
             pass
 
 
-@router.post("/lectures/{lecture_id}/reprocess-smart")
+@router.post("/notes/{note_id}/reprocess-smart")
 async def reprocess_smart(
-    lecture_id: str,
+    note_id: str,
     use_ai: bool = False,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Reprocess an existing lecture using the smart font-aware pipeline.
+    Reprocess an existing note using the smart font-aware pipeline.
     
     This replaces the existing OCR-based extraction with the multi-method
     font-aware pipeline that produces cleaner, more accurate Markdown.
     
-    The result is stored in the lecture's extracted_text field as Markdown,
+    The result is stored in the note's extracted_text field as Markdown,
     and in extracted_content_structured as structured JSON segments.
     """
-    lecture = db.query(Lecture).filter(
-        Lecture.id == lecture_id,
-        Lecture.user_id == current_user.id
+    note = db.query(Note).filter(
+        Note.id == note_id,
+        Note.user_id == current_user.id
     ).first()
 
-    if not lecture:
-        raise HTTPException(status_code=404, detail="Lecture not found")
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
 
-    if not os.path.exists(lecture.file_path):
-        raise HTTPException(status_code=404, detail="Lecture file not found on disk")
+    if not os.path.exists(note.file_path):
+        raise HTTPException(status_code=404, detail="Note file not found on disk")
 
     # Only PDF and PPTX supported by smart pipeline
-    file_ext = Path(lecture.file_path).suffix.lower()
+    file_ext = Path(note.file_path).suffix.lower()
     if file_ext not in (".pdf", ".pptx"):
         raise HTTPException(
             status_code=400,
@@ -198,24 +198,24 @@ async def reprocess_smart(
         )
 
     try:
-        logger.info(f"Smart reprocessing lecture {lecture_id} (ai={use_ai})")
+        logger.info(f"Smart reprocessing note {note_id} (ai={use_ai})")
 
         pipeline = SmartPipeline(
             use_layout_detection=use_ai,
             use_table_transformer=use_ai,
         )
-        markdown = pipeline.process(lecture.file_path)
+        markdown = pipeline.process(note.file_path)
 
         # Convert markdown to structured segments for compatibility with existing UI
         structured_segments = _markdown_to_segments(markdown)
 
-        # Update lecture record (save to file storage)
-        StorageManager.save_lecture_text(lecture_id, markdown)
-        StorageManager.save_lecture_json(lecture_id, "structured", structured_segments)
+        # Update note record (save to file storage)
+        StorageManager.save_note_text(note_id, markdown)
+        StorageManager.save_note_json(note_id, "structured", structured_segments)
         
-        lecture.updated_at = datetime.utcnow()
+        note.updated_at = datetime.utcnow()
         db.commit()
-        db.refresh(lecture)
+        db.refresh(note)
 
         # Compute stats
         lines = markdown.split("\n")
@@ -228,7 +228,7 @@ async def reprocess_smart(
 
         return JSONResponse({
             "success": True,
-            "lecture_id": lecture_id,
+            "note_id": note_id,
             "markdown_length": len(markdown),
             "stats": {
                 "headings": headings,
@@ -236,18 +236,18 @@ async def reprocess_smart(
                 "table_rows": table_rows,
                 "total_lines": len(lines),
             },
-            "message": "Lecture reprocessed with smart pipeline"
+            "message": "Note reprocessed with smart pipeline"
         })
 
     except Exception as e:
-        logger.error(f"Smart reprocess failed for lecture {lecture_id}: {e}", exc_info=True)
+        logger.error(f"Smart reprocess failed for note {note_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Smart reprocessing failed: {str(e)}")
 
 
 def _markdown_to_segments(markdown: str) -> list:
     """
     Convert Markdown text to structured segments compatible with the existing
-    lecture view UI (which expects ContentSegment-style JSON objects).
+    note view UI (which expects ContentSegment-style JSON objects).
     """
     import re
     segments = []

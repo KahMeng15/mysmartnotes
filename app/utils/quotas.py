@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 
 from app.models.db import (
-    User, TierConfig, Lecture, Subject, SubjectGroup, ChatMessage, Quiz, Summary
+    User, TierConfig, Note, Subject, SubjectGroup, ChatMessage, Quiz, Summary
 )
 
 DEFAULT_TIER_CONFIGS = {
@@ -127,9 +127,9 @@ def get_user_tier_config(user: User, db: Session) -> TierConfig:
 
 
 def get_user_note_count(user: User, db: Session) -> int:
-    """Get the number of notes (lectures) a user has"""
-    count = db.query(func.count(Lecture.id)).filter(
-        Lecture.user_id == user.id
+    """Get the number of notes (notes) a user has"""
+    count = db.query(func.count(Note.id)).filter(
+        Note.user_id == user.id
     ).scalar() or 0
     return count
 
@@ -189,8 +189,8 @@ def get_user_quiz_count(user: User, db: Session) -> int:
 def get_user_summary_count(user: User, db: Session, reset_period: str = None) -> int:
     """Get the number of summaries a user has (optionally filtered by period)"""
     query = db.query(func.count(Summary.id)).filter(
-        Summary.lecture_id.in_(
-            db.query(Lecture.id).filter(Lecture.user_id == user.id)
+        Summary.note_id.in_(
+            db.query(Note.id).filter(Note.user_id == user.id)
         )
     )
     
@@ -204,8 +204,8 @@ def get_user_summary_count(user: User, db: Session, reset_period: str = None) ->
 
 def get_user_storage_used_bytes(user: User, db: Session) -> int:
     """Get total storage used by a user in bytes"""
-    total_bytes = db.query(func.sum(Lecture.file_size)).filter(
-        Lecture.user_id == user.id
+    total_bytes = db.query(func.sum(Note.file_size)).filter(
+        Note.user_id == user.id
     ).scalar() or 0
     return total_bytes
 

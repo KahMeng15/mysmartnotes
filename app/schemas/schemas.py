@@ -134,17 +134,17 @@ class SubjectGroupResponse(SubjectGroup):
     subjects: List[SubjectResponse] = []
 
 
-# ========== Lecture Schemas ==========
-class LectureBase(BaseModel):
+# ========== Note Schemas ==========
+class NoteBase(BaseModel):
     title: str
     subject_id: str
 
 
-class LectureCreate(LectureBase):
+class NoteCreate(NoteBase):
     pass
 
 
-class Lecture(LectureBase):
+class Note(NoteBase):
     id: str
     file_path: str
     file_type: str
@@ -164,8 +164,8 @@ class Lecture(LectureBase):
         from_attributes = True
 
 
-class LectureResponse(Lecture):
-    """Response schema for lecture endpoints"""
+class NoteResponse(Note):
+    """Response schema for note endpoints"""
     subject: Optional[SubjectResponse] = None
 
 
@@ -177,7 +177,7 @@ class SummaryBase(BaseModel):
 
 class Summary(SummaryBase):
     id: int
-    lecture_id: str
+    note_id: str
     file_path: str
     created_at: datetime
     
@@ -187,7 +187,7 @@ class Summary(SummaryBase):
 
 # ========== Study Session Schemas ==========
 class StudySessionCreate(BaseModel):
-    lecture_id: Optional[str] = None
+    note_id: Optional[str] = None
     session_type: str
     duration_minutes: int
     questions_attempted: int = 0
@@ -223,7 +223,7 @@ class TaskResponse(BaseModel):
 
 # ========== Chat Schemas ==========
 class ChatMessage(BaseModel):
-    lecture_id: str
+    note_id: str
     message: str
 
 
@@ -241,7 +241,7 @@ class NoteSnapshotCreate(BaseModel):
 
 class NoteSnapshotResponse(BaseModel):
     id: int
-    lecture_id: str
+    note_id: str
     user_id: int
     name: str
     content: str
@@ -251,8 +251,8 @@ class NoteSnapshotResponse(BaseModel):
         from_attributes = True
 
 
-# ========== Lecture Content Update ==========
-class LectureContentUpdate(BaseModel):
+# ========== Note Content Update ==========
+class NoteContentUpdate(BaseModel):
     extracted_text: str
 
 

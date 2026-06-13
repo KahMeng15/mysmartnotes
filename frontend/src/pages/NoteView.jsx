@@ -6,10 +6,10 @@ import { fetchApi } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-export default function LectureView() {
+export default function NoteView() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [lecture, setLecture] = useState(null);
+  const [note, setNote] = useState(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,34 +81,34 @@ export default function LectureView() {
   }, [content, isEditing]);
 
   useEffect(() => {
-    const loadLecture = async () => {
+    const loadNote = async () => {
       try {
-        const data = await fetchApi(`/lectures/${id}?t=${Date.now()}`);
-        setLecture(data);
+        const data = await fetchApi(`/notes/${id}?t=${Date.now()}`);
+        setNote(data);
         setContent(data.extracted_text || '');
       } catch (err) {
-        console.error("Failed to load lecture", err);
+        console.error("Failed to load note", err);
       } finally {
         setLoading(false);
       }
     };
-    loadLecture();
+    loadNote();
   }, [id]);
 
   useEffect(() => {
-    if (!lecture) return;
-    if (isProcessedCheck(lecture)) return;
+    if (!note) return;
+    if (isProcessedCheck(note)) return;
 
     let interval;
     const pollTask = async () => {
       try {
-        const statusData = await fetchApi(`/search/task?lecture_id=${id}`);
+        const statusData = await fetchApi(`/search/task?note_id=${id}`);
         setTaskStatus(statusData);
 
         if (statusData && statusData.status === 'completed') {
-          // Task just finished, reload lecture with cache buster to get the fresh extracted_text
-          const data = await fetchApi(`/lectures/${id}?t=${Date.now()}`);
-          setLecture(data);
+          // Task just finished, reload note with cache buster to get the fresh extracted_text
+          const data = await fetchApi(`/notes/${id}?t=${Date.now()}`);
+          setNote(data);
           setContent(data.extracted_text || '');
           clearInterval(interval);
         } else if (statusData && statusData.status === 'failed') {
@@ -123,17 +123,17 @@ export default function LectureView() {
     interval = setInterval(pollTask, 2000); // Poll every 2 seconds
 
     return () => clearInterval(interval);
-  }, [id, lecture?.processing_time_ms, lecture?.extracted_text, lecture?.output_pdf_path]);
+  }, [id, note?.processing_time_ms, note?.extracted_text, note?.output_pdf_path]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetchApi(`/lectures/${id}`, {
+      await fetchApi(`/notes/${id}`, {
         method: 'PUT',
         body: JSON.stringify({ extracted_text: content })
       });
       setIsEditing(false);
-      setLecture({ ...lecture, extracted_text: content });
+      setNote({ ...note, extracted_text: content });
     } catch (err) {
       console.error("Failed to save", err);
     } finally {
@@ -145,15 +145,15 @@ export default function LectureView() {
     return lec.processing_time_ms != null || lec.extracted_text != null || lec.output_pdf_path != null;
   };
 
-  if (loading && !lecture) {
+  if (loading && !note) {
     return <Center h="50vh"><Loader size="lg" /></Center>;
   }
 
-  if (!lecture) {
-    return <Center h="50vh"><Text c="dimmed">Lecture not found.</Text></Center>;
+  if (!note) {
+    return <Center h="50vh"><Text c="dimmed">Note not found.</Text></Center>;
   }
 
-  const isProcessed = isProcessedCheck(lecture) || (taskStatus?.status === 'completed');
+  const isProcessed = isProcessedCheck(note) || (taskStatus?.status === 'completed');
   const isFailed = taskStatus?.status === 'failed';
   const processingProgress = taskStatus?.progress || 10;
 
@@ -163,7 +163,7 @@ export default function LectureView() {
         .sticky-markdown {
           font-family: 'Instrument Sans', sans-serif;
           color: #171738;
-          line-height: 1.8;
+          line-height: 1.0;
           font-size: 16px;
         }
         .sticky-markdown h1,
@@ -175,8 +175,8 @@ export default function LectureView() {
           position: sticky;
           background-color: #ffffff;
           margin-top: 0;
-          padding-top: 1rem;
-          padding-bottom: 0.5rem;
+          padding-top: 0.5rem;
+          padding-bottom: 0.2rem;
           z-index: 10;
           border-bottom: 1px solid #eaeaea;
         }
@@ -186,9 +186,9 @@ export default function LectureView() {
         .sticky-markdown h4 { top: var(--h4-top, 9rem); z-index: 13; font-size: 1.25rem; }
         .sticky-markdown h5 { top: var(--h5-top, 11rem); z-index: 12; font-size: 1.1rem; }
         .sticky-markdown h6 { top: var(--h6-top, 13rem); z-index: 11; font-size: 1rem; }
-        .sticky-markdown p { margin-bottom: 1.2rem; }
-        .sticky-markdown ul, .sticky-markdown ol { margin-bottom: 1.2rem; padding-left: 2rem; }
-        .sticky-markdown li { margin-bottom: 0.5rem; }
+        .sticky-markdown p { margin-bottom: 0.5rem; }
+        .sticky-markdown ul, .sticky-markdown ol { margin-bottom: 0.5rem; padding-left: 1.5rem; }
+        .sticky-markdown li { margin-bottom: 0.2rem; }
         .sticky-markdown strong { font-weight: 700; }
         .sticky-markdown blockquote {
           border-left: 4px solid #3b82f6;
@@ -239,9 +239,9 @@ export default function LectureView() {
           viewportRef={viewportRef}
           onScrollPositionChange={handleScroll}
           style={{ flex: 1, backgroundColor: isEditing ? '#f8f9fa' : '#fff' }}
-          p="md"
+          p="xs"
         >
-          <Container size="md" py="xl">
+          <Container size="md" py="xs">
             {isFailed ? (
               <Box mt={100} ta="center">
                 <IconAlertCircle size={64} color="var(--mantine-color-red-6)" stroke={1.5} />
@@ -286,77 +286,107 @@ export default function LectureView() {
         </ScrollArea>
 
         {/* Right Sidebar */}
-        {isProcessed && sidebarOpen && (
-          <Box w={280} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#fafafa', overflowY: 'auto' }} p="md">
-            <Stack gap="md">
-              <Title order={5} fw={600} c="dimmed">Smart Actions</Title>
+        {isProcessed && (
+          <Box w={sidebarOpen ? 280 : 70} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#fafafa', overflowY: 'auto', transition: 'width 0.2s ease' }} p={sidebarOpen ? "md" : "xs"}>
+            <Stack gap="sm" align={sidebarOpen ? "stretch" : "center"}>
+              {sidebarOpen && <Title order={5} fw={600} c="dimmed" mb="xs">Smart Actions</Title>}
 
               {!isEditing ? (
                 <>
-                  <Button
-                    variant="light"
-                    color="gray"
-                    fullWidth
-                    leftSection={<IconPencil size={18} />}
-                    onClick={() => setIsEditing(true)}
-                    style={{ justifyContent: 'flex-start' }}
-                  >
-                    Edit Note
-                  </Button>
-                  <Button
-                    variant="light"
-                    color="indigo"
-                    fullWidth
-                    leftSection={<IconFileText size={18} />}
-                    onClick={() => navigate(`/summaries?lecture_id=${id}`)}
-                    style={{ justifyContent: 'flex-start' }}
-                  >
-                    See Summaries
-                  </Button>
-                  <Button
-                    variant="light"
-                    color="blue"
-                    fullWidth
-                    leftSection={<IconMessageChatbot size={18} />}
-                    onClick={() => setChatOpened(true)}
-                    style={{ justifyContent: 'flex-start' }}
-                  >
-                    Quick Chat
-                  </Button>
-                  <Button
-                    variant="light"
-                    color="pink"
-                    fullWidth
-                    leftSection={<IconCards size={18} />}
-                    onClick={() => navigate(`/quiz?lecture_id=${id}`)}
-                    style={{ justifyContent: 'flex-start' }}
-                  >
-                    Generate Quiz
-                  </Button>
+                  <Tooltip label="Edit Note" disabled={sidebarOpen} position="left">
+                    <Button
+                      variant="subtle"
+                      color="gray"
+                      fullWidth={sidebarOpen}
+                      w={sidebarOpen ? '100%' : 40}
+                      px={sidebarOpen ? 'sm' : 0}
+                      leftSection={<IconPencil size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                      onClick={() => setIsEditing(true)}
+                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
+                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
+                    >
+                      {sidebarOpen && "Edit Note"}
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="See Summaries" disabled={sidebarOpen} position="left">
+                    <Button
+                      variant="subtle"
+                      color="gray"
+                      fullWidth={sidebarOpen}
+                      w={sidebarOpen ? '100%' : 40}
+                      px={sidebarOpen ? 'sm' : 0}
+                      leftSection={<IconFileText size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                      onClick={() => navigate(`/summaries?note_id=${id}`)}
+                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
+                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
+                    >
+                      {sidebarOpen && "See Summaries"}
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Quick Chat" disabled={sidebarOpen} position="left">
+                    <Button
+                      variant="subtle"
+                      color="gray"
+                      fullWidth={sidebarOpen}
+                      w={sidebarOpen ? '100%' : 40}
+                      px={sidebarOpen ? 'sm' : 0}
+                      leftSection={<IconMessageChatbot size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                      onClick={() => setChatOpened(true)}
+                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
+                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
+                    >
+                      {sidebarOpen && "Quick Chat"}
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Generate Quiz" disabled={sidebarOpen} position="left">
+                    <Button
+                      variant="subtle"
+                      color="gray"
+                      fullWidth={sidebarOpen}
+                      w={sidebarOpen ? '100%' : 40}
+                      px={sidebarOpen ? 'sm' : 0}
+                      leftSection={<IconCards size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                      onClick={() => navigate(`/quiz?note_id=${id}`)}
+                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
+                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
+                    >
+                      {sidebarOpen && "Generate Quiz"}
+                    </Button>
+                  </Tooltip>
                 </>
               ) : (
                 <>
-                  <Button
-                    variant="filled"
-                    color="blue"
-                    fullWidth
-                    leftSection={<IconDeviceFloppy size={18} />}
-                    onClick={handleSave}
-                    loading={saving}
-                    style={{ justifyContent: 'flex-start' }}
-                  >
-                    Save Changes
-                  </Button>
-                  <Button
-                    variant="light"
-                    color="gray"
-                    fullWidth
-                    leftSection={<IconX size={18} />}
-                    onClick={() => setIsEditing(false)}
-                    style={{ justifyContent: 'flex-start' }}
-                  >
-                    Cancel Editing
-                  </Button>
+                  <Tooltip label="Save Changes" disabled={sidebarOpen} position="left">
+                    <Button
+                      variant="filled"
+                      color="blue"
+                      fullWidth={sidebarOpen}
+                      w={sidebarOpen ? '100%' : 40}
+                      px={sidebarOpen ? 'sm' : 0}
+                      leftSection={<IconDeviceFloppy size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                      onClick={handleSave}
+                      loading={saving}
+                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
+                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
+                    >
+                      {sidebarOpen && "Save Changes"}
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label="Cancel Editing" disabled={sidebarOpen} position="left">
+                    <Button
+                      variant="subtle"
+                      color="gray"
+                      fullWidth={sidebarOpen}
+                      w={sidebarOpen ? '100%' : 40}
+                      px={sidebarOpen ? 'sm' : 0}
+                      leftSection={<IconX size={20} style={{ margin: sidebarOpen ? undefined : '0 auto' }} />}
+                      onClick={() => setIsEditing(false)}
+                      style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center', padding: sidebarOpen ? undefined : 0 }}
+                      styles={{ section: { margin: sidebarOpen ? undefined : 0 } }}
+                    >
+                      {sidebarOpen && "Cancel Editing"}
+                    </Button>
+                  </Tooltip>
                 </>
               )}
             </Stack>

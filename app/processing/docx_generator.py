@@ -36,14 +36,14 @@ class DocxGenerator:
 
     def __init__(
         self,
-        lecture_id: int,
-        lecture_title: str,
+        note_id: int,
+        note_title: str,
         base_output_dir: str = "generated",
     ):
-        self.lecture_id = lecture_id
-        self.lecture_title = lecture_title
+        self.note_id = note_id
+        self.note_title = note_title
         self.base_output_dir = base_output_dir
-        self.output_dir = os.path.join(base_output_dir, str(lecture_id))
+        self.output_dir = os.path.join(base_output_dir, str(note_id))
 
         # Create output directory
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
@@ -301,7 +301,7 @@ class DocxGenerator:
         h_align = _get_docx_alignment(h_align_str)
 
         # Title
-        title_text = cover_cfg.get("h1_text") or self.lecture_title
+        title_text = cover_cfg.get("h1_text") or self.note_title
         title_para = doc.add_paragraph()
         title_para.alignment = h_align
         run = title_para.add_run(title_text)

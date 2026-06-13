@@ -36,7 +36,7 @@ from app.config import get_settings
 from app.utils.db import init_db
 from app.utils.crypto import encrypt_secret
 from app.utils.observability import record_request
-from app.routers import auth, subjects, lectures, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support, ws
+from app.routers import auth, subjects, notes, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support, ws
 
 # Configure logging
 from app.logging_config import setup_logging
@@ -438,7 +438,7 @@ async def system_settings_middleware(request: Request, call_next):
 # Include routers
 app.include_router(auth.router)
 app.include_router(subjects.router)
-app.include_router(lectures.router)
+app.include_router(notes.router)
 app.include_router(chat.router)
 app.include_router(summaries.router)
 

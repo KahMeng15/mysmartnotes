@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime, timedelta
 
-from app.models.db import User, Lecture, StudySession, Subject, ChatMessage
+from app.models.db import User, Note, StudySession, Subject, ChatMessage
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.schemas.analytics import DashboardSummary
@@ -15,35 +15,35 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
 class ProgressStat(BaseModel):
-    lecture_id: str
-    lecture_title: str
+    note_id: str
+    note_title: str
     completion_percentage: float
 
 
 class TimeSpentStat(BaseModel):
-    lecture_id: str
-    lecture_title: str
+    note_id: str
+    note_title: str
     total_minutes: float
     sessions_count: int
 
 
 class CompletionStat(BaseModel):
-    lecture_title: str
+    note_title: str
     completion_percentage: float
     status: str  # not_started, in_progress, completed
 
 
 class ProgressResponse(BaseModel):
-    total_lectures: int
+    total_notes: int
     overall_completion: float
-    by_lecture: List[ProgressStat]
+    by_note: List[ProgressStat]
 
 
 class TimeSpentResponse(BaseModel):
     total_study_time_minutes: float
     average_session_minutes: float
     total_sessions: int
-    by_lecture: List[TimeSpentStat]
+    by_note: List[TimeSpentStat]
 
 
 class CompletionResponse(BaseModel):
@@ -61,39 +61,39 @@ async def get_learning_progress(
     db: Session = Depends(get_db)
 ):
     """Get learning progress statistics"""
-    lectures = db.query(Lecture).filter(
-        Lecture.user_id == current_user.id
+    notes = db.query(Note).filter(
+        Note.user_id == current_user.id
     ).all()
     
-    if not lectures:
+    if not notes:
         return ProgressResponse(
-            total_lectures=0,
+            total_notes=0,
             overall_completion=0.0,
-            by_lecture=[]
+            by_note=[]
         )
     
-    by_lecture = []
+    by_note = []
     total_completion = 0
     
-    for lecture in lectures:
+    for note in notes:
         # Placeholder completion logic since standalone flashcards are removed
-        has_summary = lecture.summaries is not None and len(lecture.summaries) > 0
+        has_summary = note.summaries is not None and len(note.summaries) > 0
         completion_pct = 100.0 if has_summary else 0.0
         
-        by_lecture.append(ProgressStat(
-            lecture_id=lecture.id,
-            lecture_title=lecture.title,
+        by_note.append(ProgressStat(
+            note_id=note.id,
+            note_title=note.title,
             completion_percentage=completion_pct
         ))
         
         total_completion += completion_pct
     
-    overall_completion = (total_completion / len(lectures)) if lectures else 0
+    overall_completion = (total_completion / len(notes)) if notes else 0
     
     return ProgressResponse(
-        total_lectures=len(lectures),
+        total_notes=len(notes),
         overall_completion=overall_completion,
-        by_lecture=by_lecture
+        by_note=by_note
     )
 
 
@@ -114,35 +114,35 @@ async def get_time_spent_analytics(
             total_study_time_minutes=0.0,
             average_session_minutes=0.0,
             total_sessions=0,
-            by_lecture=[]
+            by_note=[]
         )
     
-    # Group by lecture
-    by_lecture_dict = {}
+    # Group by note
+    by_note_dict = {}
     total_minutes = 0
     
     for session in sessions:
         duration_minutes = session.duration_minutes or 0
         total_minutes += duration_minutes
         
-        if session.lecture_id not in by_lecture_dict:
-            by_lecture_dict[session.lecture_id] = {
-                "lecture_title": db.query(Lecture).get(session.lecture_id).title,
+        if session.note_id not in by_note_dict:
+            by_note_dict[session.note_id] = {
+                "note_title": db.query(Note).get(session.note_id).title,
                 "total_minutes": 0,
                 "sessions_count": 0
             }
         
-        by_lecture_dict[session.lecture_id]["total_minutes"] += duration_minutes
-        by_lecture_dict[session.lecture_id]["sessions_count"] += 1
+        by_note_dict[session.note_id]["total_minutes"] += duration_minutes
+        by_note_dict[session.note_id]["sessions_count"] += 1
     
-    by_lecture = [
+    by_note = [
         TimeSpentStat(
-            lecture_id=lecture_id,
-            lecture_title=data["lecture_title"],
+            note_id=note_id,
+            note_title=data["note_title"],
             total_minutes=data["total_minutes"],
             sessions_count=data["sessions_count"]
         )
-        for lecture_id, data in by_lecture_dict.items()
+        for note_id, data in by_note_dict.items()
     ]
     
     average_minutes = (total_minutes / len(sessions)) if sessions else 0
@@ -151,7 +151,7 @@ async def get_time_spent_analytics(
         total_study_time_minutes=total_minutes,
         average_session_minutes=average_minutes,
         total_sessions=len(sessions),
-        by_lecture=by_lecture
+        by_note=by_note
     )
 
 
@@ -162,12 +162,12 @@ async def get_completion_rates(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get completion rates for lectures"""
-    lectures = db.query(Lecture).filter(
-        Lecture.user_id == current_user.id
+    """Get completion rates for notes"""
+    notes = db.query(Note).filter(
+        Note.user_id == current_user.id
     ).all()
     
-    if not lectures:
+    if not notes:
         return CompletionResponse(
             completed_count=0,
             in_progress_count=0,
@@ -180,9 +180,9 @@ async def get_completion_rates(
     not_started_count = 0
     completion_rates = []
     
-    for lecture in lectures:
+    for note in notes:
         # Placeholder completion logic since standalone flashcards are removed
-        has_summary = lecture.summaries is not None and len(lecture.summaries) > 0
+        has_summary = note.summaries is not None and len(note.summaries) > 0
         completion_pct = 100.0 if has_summary else 0.0
         
         if completion_pct == 0:
@@ -196,7 +196,7 @@ async def get_completion_rates(
             in_progress_count += 1
         
         completion_rates.append(CompletionStat(
-            lecture_title=lecture.title,
+            note_title=note.title,
             completion_percentage=completion_pct,
             status=status
         ))
@@ -221,7 +221,7 @@ async def get_dashboard_summary(
     
     # 1. Totals
     total_subjects = db.query(func.count(Subject.id)).filter(Subject.user_id == current_user.id).scalar() or 0
-    total_notes = db.query(func.count(Lecture.id)).filter(Lecture.user_id == current_user.id).scalar() or 0
+    total_notes = db.query(func.count(Note.id)).filter(Note.user_id == current_user.id).scalar() or 0
     
     # 2. Last 7 Days Range
     seven_days_ago = datetime.utcnow() - timedelta(days=7)

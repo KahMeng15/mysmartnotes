@@ -28,8 +28,8 @@ def record_request(path: str, status_code: int, duration_ms: int) -> None:
         bucket = path
         if path.startswith("/note/"):
             bucket = "/note/{id}"
-        elif path.startswith("/lectures/"):
-            bucket = "/lectures/{id}"
+        elif path.startswith("/notes/"):
+            bucket = "/notes/{id}"
         elif path.startswith("/chat/"):
             bucket = "/chat/*"
 
