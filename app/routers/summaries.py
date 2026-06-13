@@ -223,12 +223,15 @@ async def generate_summary_endpoint(
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
 
     import time
+    from app.utils.db import generate_random_id
+    doc_id = generate_random_id(db, Summary)
     task_id = f"summary_{current_user.id}_{request.note_id}_{int(time.time())}"
     TaskManager.submit_task(
         task_id, 
         "summary_generation", 
         current_user.id, 
         note_id=note.id,
+        summary_id=doc_id,
         title=note.title, 
         mode=request.mode,
         output_format=request.output_format,
@@ -239,7 +242,7 @@ async def generate_summary_endpoint(
         prompt_icon=request.prompt_icon
     )
 
-    return {"task_id": task_id, "status": "pending"}
+    return {"task_id": task_id, "summary_id": doc_id, "status": "pending"}
 
 class GeneratePromptRequest(BaseModel):
     user_input: str

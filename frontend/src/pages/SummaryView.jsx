@@ -66,6 +66,7 @@ export default function SummaryView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [generating, setGenerating] = useState(false);
+  const [generatingSummaryId, setGeneratingSummaryId] = useState(null);
   const [modalOpened, setModalOpened] = useState(false);
   const [taskStatus, setTaskStatus] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -79,6 +80,7 @@ export default function SummaryView() {
   
   const [parameterType, setParameterType] = useState('multi'); // 'multi' or 'single'
   const [globalPrompts, setGlobalPrompts] = useState([]);
+  const firstH1Ref = useRef({ id: null, offset: null });
   const [selectedPromptId, setSelectedPromptId] = useState('custom');
   const [customPromptText, setCustomPromptText] = useState('');
   const [promptInput, setPromptInput] = useState('');
@@ -129,20 +131,24 @@ export default function SummaryView() {
     loadSummaries().then(() => {
       fetchApi('/search/tasks/active').then(activeData => {
         if (activeData && activeData.tasks) {
-          const task = activeData.tasks.find(t => t.task_type === 'summary_generation' && String(t.note_id) === String(noteId));
+          const task = activeData.tasks.find(t => t.task_type === 'summary_generation' && String(t.input_data?.note_id) === String(noteId));
           if (task) {
+            const genId = task.input_data?.summary_id || 'generating';
             setCurrentTaskId(task.task_id);
             setGenerating(true);
+            setGeneratingSummaryId(genId);
             setTaskStatus(task);
             setSummaries(prev => {
-              if (!prev.some(s => s.id === 'generating')) {
+              if (!prev.some(s => s.id === genId)) {
                  const mockVersion = {
-                   id: 'generating',
+                   id: genId,
                    version: prev.length > 0 ? prev[0].version + 1 : 1,
                    created_at: task.created_at || new Date().toISOString(),
-                   mode: 'Generating...',
-                   output_format: '',
-                   processing_method: '',
+                   mode: task.input_data?.mode || 'Generating...',
+                   output_format: task.input_data?.output_format || '',
+                   processing_method: task.input_data?.processing_method || '',
+                   prompt_name: task.input_data?.prompt_name,
+                   prompt_icon: task.input_data?.prompt_icon
                  };
                  return [mockVersion, ...prev];
               }
@@ -170,6 +176,7 @@ export default function SummaryView() {
         setTaskStatus(statusData);
         if (statusData.status === 'completed' || statusData.status === 'failed') {
           setGenerating(false);
+          setGeneratingSummaryId(null);
           setCurrentTaskId(null);
           if (statusData.status === 'completed') {
              loadSummaries(true);
@@ -190,9 +197,9 @@ export default function SummaryView() {
       const filtered = data.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
       
       setSummaries(prev => {
-        const isGenerating = prev.some(s => s.id === 'generating');
+        const isGenerating = generating && generatingSummaryId;
         if (isGenerating && !selectNewest) {
-           return [prev.find(s => s.id === 'generating'), ...filtered];
+           return [prev.find(s => s.id === generatingSummaryId), ...filtered];
         }
         return filtered;
       });
@@ -200,14 +207,14 @@ export default function SummaryView() {
       if (filtered.length > 0) {
         if (selectNewest === true) {
           loadSummaryContent(filtered[0].id);
-        } else if (summaryId && summaryId !== 'generating') {
+        } else if (summaryId && summaryId !== generatingSummaryId) {
           const target = filtered.find(s => s.id === summaryId);
           if (target) {
             loadSummaryContent(target.id);
           } else {
             loadSummaryContent(filtered[0].id);
           }
-        } else if (summaryId !== 'generating') {
+        } else if (summaryId !== generatingSummaryId) {
           loadSummaryContent(filtered[0].id);
         } else {
           setLoading(false);
@@ -223,9 +230,9 @@ export default function SummaryView() {
   };
 
   const loadSummaryContent = async (id) => {
-    if (id === 'generating') {
+    if (generating && id === generatingSummaryId) {
       setSelectedSummary(null);
-      navigate(`/note/${noteId}/summary/generating`, { replace: true });
+      navigate(`/note/${noteId}/summary/${id}`, { replace: true });
       return;
     }
     try {
@@ -267,8 +274,8 @@ export default function SummaryView() {
       setTaskStatus({ progress: 0, status: 'pending' });
       setSelectedSummary(null);
       
-      const nextVersion = summaries.filter(s => s.id !== 'generating').length > 0 
-        ? summaries.filter(s => s.id !== 'generating')[0].version + 1 
+      const nextVersion = summaries.filter(s => !(generating && s.id === generatingSummaryId)).length > 0 
+        ? summaries.filter(s => !(generating && s.id === generatingSummaryId))[0].version + 1 
         : 1;
 
       let finalPrompt = null;
@@ -289,20 +296,6 @@ export default function SummaryView() {
         }
       }
 
-      const mockVersion = {
-        id: 'generating',
-        version: nextVersion,
-        created_at: new Date().toISOString(),
-        mode: mode,
-        output_format: outputFormat,
-        processing_method: processingMethod,
-        prompt_name: finalPromptName,
-        prompt_icon: finalPromptIcon
-      };
-
-      setSummaries(prev => [mockVersion, ...prev.filter(s => s.id !== 'generating')]);
-      navigate(`/note/${noteId}/summary/generating`, { replace: true });
-
       const res = await fetchApi('/summaries/summary', {
         method: 'POST',
         body: JSON.stringify({
@@ -315,8 +308,26 @@ export default function SummaryView() {
           prompt_icon: finalPromptIcon
         })
       });
-      if (res && res.task_id) {
+      if (res && res.task_id && res.summary_id) {
+         setGeneratingSummaryId(res.summary_id);
          setCurrentTaskId(res.task_id);
+         
+         const mockVersion = {
+           id: res.summary_id,
+           version: nextVersion,
+           created_at: new Date().toISOString(),
+           mode: mode,
+           output_format: outputFormat,
+           processing_method: processingMethod,
+           prompt_name: finalPromptName,
+           prompt_icon: finalPromptIcon
+         };
+
+         setSummaries(prev => [mockVersion, ...prev.filter(s => s.id !== res.summary_id && s.id !== 'generating')]);
+         navigate(`/note/${noteId}/summary/${res.summary_id}`, { replace: true });
+      } else {
+         setGenerating(false);
+         setError("Failed to start summary generation");
       }
     } catch (err) {
       console.error("Failed to generate summary", err);
@@ -339,7 +350,8 @@ export default function SummaryView() {
         let activeEl = null;
 
         for (const el of elements) {
-          const rect = el.getBoundingClientRect();
+          const targetEl = el.closest('.summary-header') || el;
+          const rect = targetEl.getBoundingClientRect();
           if (rect.top <= viewportTop + currentAccumulatedTop + 5) {
             activeEl = el;
           }
@@ -359,21 +371,23 @@ export default function SummaryView() {
         activeEls[i] = activeEl;
 
         for (const el of elements) {
+          const targetEl = el.closest('.summary-header') || el;
           if (el === activeEl) {
-            el.style.opacity = 1;
-            el.style.pointerEvents = 'auto';
-          } else if (el.getBoundingClientRect().top <= viewportTop + currentAccumulatedTop + 5) {
-            el.style.opacity = 0;
-            el.style.pointerEvents = 'none';
+            targetEl.style.opacity = 1;
+            targetEl.style.pointerEvents = 'auto';
+          } else if (targetEl.getBoundingClientRect().top <= viewportTop + currentAccumulatedTop + 5) {
+            targetEl.style.opacity = 0;
+            targetEl.style.pointerEvents = 'none';
           } else {
-            el.style.opacity = 1;
-            el.style.pointerEvents = 'auto';
+            targetEl.style.opacity = 1;
+            targetEl.style.pointerEvents = 'auto';
           }
         }
 
         let h = 0;
         if (activeEl) {
-          h = activeEl.offsetHeight;
+          const targetActiveEl = activeEl.closest('.summary-header') || activeEl;
+          h = targetActiveEl.offsetHeight;
         }
 
         currentAccumulatedTop += h;
@@ -642,8 +656,8 @@ export default function SummaryView() {
           style={{ flex: 1, backgroundColor: '#fff' }} 
           p={0}
         >
-          <Container size="md" p={0} py="xl">
-            {summaryId === 'generating' ? (
+          <Container size="md" p={0} pt={0} pb="xl">
+            {generating && summaryId === generatingSummaryId ? (
               <Box mt={100} ta="center">
                 {isFailed ? (
                   <>
@@ -720,14 +734,21 @@ export default function SummaryView() {
                     </Group>
                   )}
                   {(() => {
+                    if (firstH1Ref.current.id !== selectedSummary?.id) {
+                       firstH1Ref.current = { id: selectedSummary?.id, offset: null };
+                    }
                     return (
                       <ReactMarkdown 
                         remarkPlugins={[remarkGfm]}
                         components={{
                           h1: ({node, ...props}) => {
-                            // Render pills for the first h1 we find near the top of the document
-                            // Using a position check avoids Strict Mode double-render issues with local state
-                            const isFirstH1 = !node.position || node.position.start.line <= 5;
+                            // Render pills for the first h1 we find.
+                            // We use a ref to track the offset of the first H1 to avoid StrictMode double-render bugs
+                            if (firstH1Ref.current.offset === null && node.position) {
+                               firstH1Ref.current.offset = node.position.start.offset;
+                            }
+                            
+                            const isFirstH1 = !node.position || node.position.start.offset === firstH1Ref.current.offset;
                             
                             if (isFirstH1 && selectedSummary) {
                               return (
@@ -806,9 +827,9 @@ export default function SummaryView() {
               {sidebarOpen ? (
                 <Stack gap="xs">
                   {summaries.map(summary => {
-                    const isActive = (selectedSummary?.id === summary.id) || (summaryId === 'generating' && summary.id === 'generating');
+                    const isActive = (selectedSummary?.id === summary.id) || (generating && summary.id === generatingSummaryId && summaryId === generatingSummaryId);
                     const details = summary.prompt_name || [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
-                    const title = summary.id === 'generating' ? 'Generating...' : (details || `Version ${summary.version}`);
+                    const title = details || `Version ${summary.version}`;
 
                     return (
                     <Paper 
@@ -837,9 +858,9 @@ export default function SummaryView() {
               ) : (
                 <Stack gap="xs" align="center" mt="md">
                   {summaries.map(summary => {
-                    const isActive = (selectedSummary?.id === summary.id) || (summaryId === 'generating' && summary.id === 'generating');
-                    const details = [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
-                    const tooltipLabel = summary.id === 'generating' ? 'Generating...' : `${details || `Version ${summary.version}`} (${formatDate(summary.created_at)})`;
+                    const isActive = (selectedSummary?.id === summary.id) || (generating && summary.id === generatingSummaryId && summaryId === generatingSummaryId);
+                    const details = summary.prompt_name || [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+                    const tooltipLabel = `${details || `Version ${summary.version}`} (${formatDate(summary.created_at)})`;
 
                     return (
                     <Tooltip key={summary.id} label={tooltipLabel} position="left">

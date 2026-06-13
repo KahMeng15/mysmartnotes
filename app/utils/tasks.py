@@ -344,7 +344,7 @@ class SummaryTask:
             ).scalar() or 0
             next_version = max_version + 1
 
-            doc_id = generate_random_id(db, Summary)
+            doc_id = kwargs.get("summary_id") or generate_random_id(db, Summary)
             doc = Summary(
                 id=doc_id,
                 version=next_version,
