@@ -183,9 +183,9 @@ export default function SummaryView() {
           setGeneratingSummaryId(null);
           setCurrentTaskId(null);
           if (statusData.status === 'completed') {
-             loadSummaries(true);
+             loadSummaries(true, true);
           } else {
-             loadSummaries();
+             loadSummaries(false, true);
           }
         }
       }
@@ -194,14 +194,14 @@ export default function SummaryView() {
     }
   };
 
-  const loadSummaries = async (selectNewest = false) => {
+  const loadSummaries = async (selectNewest = false, forceNotGenerating = false) => {
     try {
       setLoading(true);
       const data = await fetchApi(`/summaries?note_id=${noteId}`);
       const filtered = data.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
       
       setSummaries(prev => {
-        const isGenerating = generating && generatingSummaryId;
+        const isGenerating = forceNotGenerating ? false : (generating && generatingSummaryId);
         if (isGenerating && !selectNewest) {
            return [prev.find(s => s.id === generatingSummaryId), ...filtered];
         }
@@ -210,16 +210,16 @@ export default function SummaryView() {
 
       if (filtered.length > 0) {
         if (selectNewest === true) {
-          loadSummaryContent(filtered[0].id);
-        } else if (summaryId && summaryId !== generatingSummaryId) {
+          loadSummaryContent(filtered[0].id, forceNotGenerating);
+        } else if (summaryId && summaryId !== (forceNotGenerating ? null : generatingSummaryId)) {
           const target = filtered.find(s => s.id === summaryId);
           if (target) {
-            loadSummaryContent(target.id);
+            loadSummaryContent(target.id, forceNotGenerating);
           } else {
-            loadSummaryContent(filtered[0].id);
+            loadSummaryContent(filtered[0].id, forceNotGenerating);
           }
-        } else if (summaryId !== generatingSummaryId) {
-          loadSummaryContent(filtered[0].id);
+        } else if (summaryId !== (forceNotGenerating ? null : generatingSummaryId)) {
+          loadSummaryContent(filtered[0].id, forceNotGenerating);
         } else {
           setLoading(false);
         }
@@ -233,8 +233,9 @@ export default function SummaryView() {
     }
   };
 
-  const loadSummaryContent = async (id) => {
-    if (generating && id === generatingSummaryId) {
+  const loadSummaryContent = async (id, forceNotGenerating = false) => {
+    const isStillGenerating = forceNotGenerating ? false : (generating && id === generatingSummaryId);
+    if (isStillGenerating) {
       setSelectedSummary(null);
       navigate(`/note/${noteId}/summary/${id}`, { replace: true });
       return;
