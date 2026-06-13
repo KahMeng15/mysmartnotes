@@ -99,9 +99,9 @@ window.formatDate = function(dateInput) {
         const date = new Date(dateInput);
         if (isNaN(date.getTime())) return '-';
         
-        return date.toLocaleDateString(undefined, {
+        return date.toLocaleDateString('en-GB', {
             day: 'numeric',
-            month: 'short',
+            month: 'long',
             year: 'numeric'
         });
     } catch (e) {

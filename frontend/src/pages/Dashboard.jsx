@@ -184,7 +184,7 @@ export default function Dashboard() {
           {recentNotes.map(note => (
             <Card key={note.id} withBorder radius="md" padding="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${note.id}`)}>
               <Text fw={600} mb="xs" c="#171738">{note.title}</Text>
-              <Text size="sm" c="dimmed">Uploaded: {new Date(note.created_at).toLocaleDateString()}</Text>
+              <Text size="sm" c="dimmed">Uploaded: {new Date(note.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
             </Card>
           ))}
         </SimpleGrid>

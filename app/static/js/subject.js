@@ -133,13 +133,24 @@ function filterNotes() {
 function displayNotes(notes) {
     const listContainer = document.getElementById('notesList');
     if (!notes || (notes.length === 0 && (!window.ProgressManager || window.ProgressManager.activeTasks.size === 0))) {
-        listContainer.innerHTML = `
-            <div class="empty-state">
-                <i class="ph ph-files" style="font-size: 48px; margin-bottom: 1rem;"></i>
-                <p>No notes found in this subject.</p>
-                <button onclick="goToUpload()" class="btn btn-primary" style="margin-top: 1rem;">Upload First Note</button>
-            </div>
-        `;
+        const searchInput = document.getElementById('searchInput');
+        const hasSearch = searchInput && searchInput.value.trim() !== '';
+        if (hasSearch) {
+            listContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="ph ph-magnifying-glass" style="font-size: 48px; margin-bottom: 1rem;"></i>
+                    <p>No notes found matching "${searchInput.value.replace(/"/g, '&quot;')}"</p>
+                </div>
+            `;
+        } else {
+            listContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="ph ph-files" style="font-size: 48px; margin-bottom: 1rem;"></i>
+                    <p>No notes uploaded to this subject yet.</p>
+                    <button onclick="goToUpload()" class="btn btn-primary" style="margin-top: 1rem;">Upload First Note</button>
+                </div>
+            `;
+        }
         return;
     }
 
@@ -195,10 +206,16 @@ function getFriendlyFileType(mimeType) {
     if (!mimeType) return 'FILE';
     const type = mimeType.toLowerCase();
     if (type.includes('pdf')) return 'PDF';
-    if (type.includes('presentation') || type.includes('powerpoint') || type.includes('pptx')) return 'PowerPoint';
-    if (type.includes('image') || type.includes('png') || type.includes('jpeg')) return 'Image';
-    if (type.includes('word') || type.includes('docx')) return 'Word';
-    return type.split('/')[1].toUpperCase();
+    if (type.includes('presentation') || type.includes('powerpoint') || type.includes('pptx') || type.includes('presentationml')) return 'PowerPoint';
+    if (type.includes('image') || type.includes('png') || type.includes('jpeg') || type.includes('jpg')) return 'Image';
+    if (type.includes('word') || type.includes('docx') || type.includes('wordprocessingml') || type.includes('document')) return 'Word';
+    if (type.includes('spreadsheet') || type.includes('excel') || type.includes('xlsx') || type.includes('spreadsheetml')) return 'Excel';
+    
+    const part = type.includes('/') ? type.split('/')[1] : type;
+    if (part.includes('presentation')) return 'PowerPoint';
+    if (part.includes('wordprocessingml') || part.includes('document')) return 'Word';
+    if (part.includes('spreadsheetml')) return 'Excel';
+    return part.toUpperCase();
 }
 
 // Listen for task updates to refresh the list in real-time

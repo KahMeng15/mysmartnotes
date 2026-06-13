@@ -5,6 +5,33 @@ import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 
+const getFriendlyFileType = (mimeType) => {
+  if (!mimeType) return 'DOCUMENT';
+  const type = mimeType.toLowerCase();
+  if (type.includes('pdf')) return 'PDF';
+  if (type.includes('presentation') || type.includes('powerpoint') || type.includes('pptx') || type.includes('presentationml')) return 'PowerPoint';
+  if (type.includes('image') || type.includes('png') || type.includes('jpeg') || type.includes('jpg')) return 'Image';
+  if (type.includes('word') || type.includes('docx') || type.includes('wordprocessingml') || type.includes('document')) return 'Word';
+  if (type.includes('spreadsheet') || type.includes('excel') || type.includes('xlsx') || type.includes('spreadsheetml')) return 'Excel';
+  
+  const part = type.includes('/') ? type.split('/')[1] : type;
+  if (part.includes('presentation')) return 'PowerPoint';
+  if (part.includes('wordprocessingml') || part.includes('document')) return 'Word';
+  if (part.includes('spreadsheetml')) return 'Excel';
+  return part.toUpperCase();
+};
+
+const formatNoteDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  const day = date.getDate();
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const month = monthNames[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
+};
+
 export default function SubjectView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -278,11 +305,13 @@ export default function SubjectView() {
                       {note.title}
                     </Text>
                     <Group gap="xs" mt={4}>
-                      <Badge color={isProcessed ? 'teal' : 'orange'} variant="light" size="sm">
-                        {isProcessed ? 'Processed' : 'Processing...'}
-                      </Badge>
+                      {!isProcessed && (
+                        <Badge color="orange" variant="light" size="sm">
+                          Processing...
+                        </Badge>
+                      )}
                       <Text size="xs" c="dimmed">
-                        {note.file_type?.split('/').pop().toUpperCase() || 'DOCUMENT'} • {new Date(note.created_at).toLocaleDateString()}
+                        {getFriendlyFileType(note.file_type)} • {formatNoteDate(note.created_at)}
                       </Text>
                     </Group>
                   </Box>
@@ -308,6 +337,13 @@ export default function SubjectView() {
             );
           })}
         </Stack>
+      ) : search.trim() ? (
+        <Center h={200}>
+          <Box ta="center">
+            <IconSearch size={48} color="var(--mantine-color-gray-4)" />
+            <Text c="dimmed" mt="md">No notes found matching "{search}"</Text>
+          </Box>
+        </Center>
       ) : (
         <Center h={200}>
           <Box ta="center">

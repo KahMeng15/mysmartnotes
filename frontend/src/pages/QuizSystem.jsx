@@ -180,7 +180,7 @@ export default function QuizSystem() {
                 <IconCards size={20} color="var(--mantine-color-pink-6)" />
               </Group>
               <Text size="sm" c="dimmed" mb="lg">
-                {quiz.questions?.length || 0} Questions • Created {new Date(quiz.created_at).toLocaleDateString()}
+                {quiz.questions?.length || 0} Questions • Created {new Date(quiz.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
               </Text>
               
               <Group grow>

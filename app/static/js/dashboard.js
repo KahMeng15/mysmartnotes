@@ -148,10 +148,16 @@ function getFriendlyFileType(mimeType) {
     if (!mimeType) return 'FILE';
     const type = mimeType.toLowerCase();
     if (type.includes('pdf')) return 'PDF';
-    if (type.includes('presentation') || type.includes('powerpoint') || type.includes('pptx')) return 'PowerPoint';
-    if (type.includes('image') || type.includes('png') || type.includes('jpeg')) return 'Image';
-    if (type.includes('word') || type.includes('docx')) return 'Word';
-    return type.split('/')[1].toUpperCase();
+    if (type.includes('presentation') || type.includes('powerpoint') || type.includes('pptx') || type.includes('presentationml')) return 'PowerPoint';
+    if (type.includes('image') || type.includes('png') || type.includes('jpeg') || type.includes('jpg')) return 'Image';
+    if (type.includes('word') || type.includes('docx') || type.includes('wordprocessingml') || type.includes('document')) return 'Word';
+    if (type.includes('spreadsheet') || type.includes('excel') || type.includes('xlsx') || type.includes('spreadsheetml')) return 'Excel';
+    
+    const part = type.includes('/') ? type.split('/')[1] : type;
+    if (part.includes('presentation')) return 'PowerPoint';
+    if (part.includes('wordprocessingml') || part.includes('document')) return 'Word';
+    if (part.includes('spreadsheetml')) return 'Excel';
+    return part.toUpperCase();
 }
 
 function getIconForType(mimeType) {
