@@ -112,6 +112,8 @@ class SummaryItemResponse(BaseModel):
     processing_time_ms: Optional[int] = None  # Processing time in milliseconds
     model: Optional[str] = None  # AI model used
     is_user_edited: bool = False  # Whether the user has edited this summary
+    prompt_name: Optional[str] = None
+    prompt_icon: Optional[str] = None
 
 @router.post("/quiz", response_model=QuizResponse)
 async def generate_quiz(
@@ -424,7 +426,9 @@ async def list_summaries(
             output_format=d.output_format,
             processing_method=d.processing_method,
             split_level=d.split_level,
-            is_user_edited=d.is_user_edited or False
+            is_user_edited=d.is_user_edited or False,
+            prompt_name=d.prompt_name,
+            prompt_icon=d.prompt_icon
         )
         for d in summaries
     ]
@@ -478,7 +482,9 @@ async def get_summary(
         processing_time=summary.processing_time,
         processing_time_ms=summary.processing_time_ms,
         model=summary.model,
-        is_user_edited=summary.is_user_edited or False
+        is_user_edited=summary.is_user_edited or False,
+        prompt_name=summary.prompt_name,
+        prompt_icon=summary.prompt_icon
     )
 
 

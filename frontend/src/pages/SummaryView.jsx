@@ -407,6 +407,7 @@ export default function SummaryView() {
           line-height: 1.0;
           font-size: 16px;
         }
+        .sticky-markdown .summary-header,
         .sticky-markdown h1,
         .sticky-markdown h2,
         .sticky-markdown h3,
@@ -421,6 +422,15 @@ export default function SummaryView() {
           line-height: 1.1;
           z-index: 10;
           border-bottom: 1px solid #eaeaea;
+        }
+        .sticky-markdown .summary-header { top: 0; z-index: 16; }
+        .sticky-markdown .summary-header h1 {
+          position: static;
+          background-color: transparent;
+          border-bottom: none;
+          padding: 0;
+          font-size: 2.2rem;
+          margin: 0;
         }
         .sticky-markdown h1 { top: 0; z-index: 16; font-size: 2.2rem; }
         .sticky-markdown h2 { top: var(--h2-top, 3.5rem); z-index: 15; font-size: 1.8rem; }
@@ -677,43 +687,91 @@ export default function SummaryView() {
               </Center>
             ) : (
               <Box px="md">
-                <Title order={1} fw={800} mb="xs" c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
-                  {selectedSummary ? selectedSummary.title.replace(/^Summary - /, '') : "Note Summaries"}
-                </Title>
-                {selectedSummary && (
-                  <Group gap="xs" mb="xl">
-                    {selectedSummary.prompt_name ? (() => {
-                      const IconComp = getIconComponent(selectedSummary.prompt_icon);
-                      return (
-                        <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
-                          {selectedSummary.prompt_name}
-                        </Badge>
-                      );
-                    })() : (
-                      <>
-                        {selectedSummary.mode && (
-                          <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
-                            {selectedSummary.mode}
-                          </Badge>
-                        )}
-                        {selectedSummary.output_format && (
-                          <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
-                            {selectedSummary.output_format}
-                          </Badge>
-                        )}
-                        {selectedSummary.processing_method && (
-                          <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
-                            {selectedSummary.processing_method}
-                          </Badge>
-                        )}
-                      </>
-                    )}
-                  </Group>
-                )}
+                {/* Pills are now rendered inside the ReactMarkdown's first h1 via the custom components prop */}
                 <Box ref={markdownRef} className="sticky-markdown" style={{ color: '#171738', fontSize: '16px', lineHeight: 1.8 }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {summaryContent}
-                  </ReactMarkdown>
+                  {!summaryContent?.includes('# ') && selectedSummary && (
+                    <Group gap="xs" mb="xl">
+                      {selectedSummary.prompt_name ? (() => {
+                        const IconComp = getIconComponent(selectedSummary.prompt_icon);
+                        return (
+                          <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
+                            {selectedSummary.prompt_name}
+                          </Badge>
+                        );
+                      })() : (
+                        <>
+                          {selectedSummary.mode && (
+                            <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
+                              {selectedSummary.mode}
+                            </Badge>
+                          )}
+                          {selectedSummary.output_format && (
+                            <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
+                              {selectedSummary.output_format}
+                            </Badge>
+                          )}
+                          {selectedSummary.processing_method && (
+                            <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
+                              {selectedSummary.processing_method}
+                            </Badge>
+                          )}
+                        </>
+                      )}
+                    </Group>
+                  )}
+                  {(() => {
+                    return (
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          h1: ({node, ...props}) => {
+                            // Render pills for the first h1 we find near the top of the document
+                            // Using a position check avoids Strict Mode double-render issues with local state
+                            const isFirstH1 = !node.position || node.position.start.line <= 5;
+                            
+                            if (isFirstH1 && selectedSummary) {
+                              return (
+                                <div className="summary-header" style={{ marginBottom: '1.5rem', paddingTop: '1rem' }}>
+                                  <Group gap="xs" mb="md">
+                                    {selectedSummary.prompt_name ? (() => {
+                                      const IconComp = getIconComponent(selectedSummary.prompt_icon);
+                                      return (
+                                        <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
+                                          {selectedSummary.prompt_name}
+                                        </Badge>
+                                      );
+                                    })() : (
+                                      <>
+                                        {selectedSummary.mode && (
+                                          <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
+                                            {selectedSummary.mode}
+                                          </Badge>
+                                        )}
+                                        {selectedSummary.output_format && (
+                                          <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
+                                            {selectedSummary.output_format}
+                                          </Badge>
+                                        )}
+                                        {selectedSummary.processing_method && (
+                                          <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
+                                            {selectedSummary.processing_method}
+                                          </Badge>
+                                        )}
+                                      </>
+                                    )}
+                                  </Group>
+                                  <h1 {...props} style={{ marginTop: 0, marginBottom: 0 }} />
+                                </div>
+                              );
+                            }
+                            return <h1 {...props} />;
+                          }
+                        }}
+                      >
+                        {summaryContent}
+                      </ReactMarkdown>
+                    );
+                  })()}
                 </Box>
               </Box>
             )}
