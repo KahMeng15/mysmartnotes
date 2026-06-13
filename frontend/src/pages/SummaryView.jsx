@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput, Menu, Code } from '@mantine/core';
-import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu } from '@tabler/icons-react';
+import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu, IconDeviceFloppy, IconPencil, IconX, IconH1, IconH2, IconH3, IconCode, IconEye } from '@tabler/icons-react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Markdown } from 'tiptap-markdown';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
 import * as TablerIcons from '@tabler/icons-react';
 
 const MODE_ICONS = {
@@ -75,8 +82,27 @@ export default function SummaryView() {
   const [taskStatus, setTaskStatus] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [isRawMode, setIsRawMode] = useState(false);
+  const [saveModalOpened, setSaveModalOpened] = useState(false);
+  const [cancelModalOpened, setCancelModalOpened] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const viewportRef = useRef(null);
   const markdownRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Markdown,
+    ],
+    content: summaryContent,
+  });
 
   const [mode, setMode] = useState('normal');
   const [outputFormat, setOutputFormat] = useState('sentence');
@@ -554,7 +580,95 @@ export default function SummaryView() {
 
   useEffect(() => {
     setTimeout(handleScroll, 100);
-  }, [summaryContent]);
+  }, [summaryContent, isEditing, isRawMode]);
+
+  const startEditing = () => {
+    if (editor) {
+      editor.commands.setContent(summaryContent || '');
+    }
+    setIsEditing(true);
+    setIsRawMode(false);
+  };
+
+  const handleToggleRaw = () => {
+    if (isRawMode) {
+      editor?.commands.setContent(summaryContent || '');
+      setIsRawMode(false);
+    } else {
+      if (editor) {
+        setSummaryContent(editor.storage.markdown.getMarkdown());
+      }
+      setIsRawMode(true);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    let finalContent = summaryContent;
+    if (!isRawMode && editor) {
+      finalContent = editor.storage.markdown.getMarkdown();
+    }
+
+    try {
+      await fetchApi(`/summaries/${selectedSummary.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ content: finalContent })
+      });
+      setIsEditing(false);
+      setIsRawMode(false);
+      setSummaryContent(finalContent);
+      setSummaries(summaries.map(s => s.id === selectedSummary.id ? { ...s, content: finalContent, is_user_edited: true } : s));
+      setSelectedSummary({ ...selectedSummary, content: finalContent, is_user_edited: true });
+    } catch (err) {
+      console.error("Failed to save", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFormat = (type) => {
+    if (!isRawMode) {
+      if (!editor) return;
+      switch(type) {
+        case 'h1': editor.chain().focus().toggleHeading({ level: 1 }).run(); break;
+        case 'h2': editor.chain().focus().toggleHeading({ level: 2 }).run(); break;
+        case 'h3': editor.chain().focus().toggleHeading({ level: 3 }).run(); break;
+        case 'bullet': editor.chain().focus().toggleBulletList().run(); break;
+        case 'ordered': editor.chain().focus().toggleOrderedList().run(); break;
+        case 'table': editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); break;
+      }
+    } else {
+      if (!textareaRef.current) return;
+      const el = textareaRef.current;
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const before = summaryContent.substring(0, start);
+      const selected = summaryContent.substring(start, end);
+      const after = summaryContent.substring(end);
+
+      let inserted = '';
+      switch(type) {
+        case 'h1': inserted = '# ' + selected; break;
+        case 'h2': inserted = '## ' + selected; break;
+        case 'h3': inserted = '### ' + selected; break;
+        case 'bullet': inserted = '- ' + selected; break;
+        case 'ordered': inserted = '1. ' + selected; break;
+        case 'table': inserted = `\n| Column 1 | Column 2 | Column 3 |\n| -------- | -------- | -------- |\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |\n`; break;
+      }
+
+      const newContent = before + inserted + after;
+      setSummaryContent(newContent);
+      
+      setTimeout(() => {
+        el.focus();
+        if (type !== 'table') {
+           el.setSelectionRange(start, start + inserted.length);
+        } else {
+           el.setSelectionRange(start + inserted.length, start + inserted.length);
+        }
+      }, 0);
+    }
+  };
 
   if (!noteId) return null;
 
@@ -638,7 +752,34 @@ export default function SummaryView() {
         .sticky-markdown th {
           background-color: #f8f9fa;
         }
+        .sticky-markdown .ProseMirror {
+          min-height: 50vh;
+        }
+        .sticky-markdown .ProseMirror:focus {
+          outline: none;
+        }
       `}</style>
+      
+      <Modal opened={saveModalOpened} onClose={() => setSaveModalOpened(false)} title="Save Changes" centered withCloseButton={false}>
+        <form onSubmit={(e) => { e.preventDefault(); setSaveModalOpened(false); handleSave(); }}>
+          <Text size="sm" mb="md">Are you sure you want to save these changes?</Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setSaveModalOpened(false)}>Cancel</Button>
+            <Button type="submit" color="blue" data-autofocus loading={saving}>Confirm Save</Button>
+          </Group>
+        </form>
+      </Modal>
+
+      <Modal opened={cancelModalOpened} onClose={() => setCancelModalOpened(false)} title="Cancel Editing" centered withCloseButton={false}>
+        <form onSubmit={(e) => { e.preventDefault(); setCancelModalOpened(false); setIsEditing(false); setIsRawMode(false); }}>
+          <Text size="sm" mb="md">Are you sure you want to cancel? Any unsaved changes will be lost.</Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setCancelModalOpened(false)}>Go Back</Button>
+            <Button type="submit" color="red" data-autofocus>Discard Changes</Button>
+          </Group>
+        </form>
+      </Modal>
+
       <Modal opened={!!deleteModalSummary} onClose={() => setDeleteModalSummary(null)} title="Delete Summary" centered>
         <Text size="sm" mb="lg">
           Are you sure you want to delete <b>{deleteModalSummary?.title || (deleteModalSummary && `Version ${deleteModalSummary.version}`) || 'this summary'}</b>? This action cannot be undone.
@@ -996,8 +1137,51 @@ export default function SummaryView() {
               </Center>
             ) : (
               <Box px="md">
+                <Box mb="md" pt="md">
+                  <Group gap="xs">
+                    {selectedSummary?.prompt_name ? (() => {
+                      const IconComp = getIconComponent(selectedSummary.prompt_icon);
+                      return (
+                        <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
+                          {selectedSummary.prompt_name}
+                        </Badge>
+                      );
+                    })() : (
+                      <>
+                        {selectedSummary?.mode && (
+                          <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
+                            {selectedSummary.mode}
+                          </Badge>
+                        )}
+                        {selectedSummary?.output_format && (
+                          <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
+                            {selectedSummary.output_format}
+                          </Badge>
+                        )}
+                        {selectedSummary?.processing_method && (
+                          <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
+                            {selectedSummary.processing_method}
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </Group>
+                </Box>
+                {isEditing && isRawMode ? (
+                  <Textarea
+                    ref={textareaRef}
+                    minRows={30}
+                    autosize
+                    value={summaryContent}
+                    onChange={(e) => setSummaryContent(e.currentTarget.value)}
+                    variant="unstyled"
+                    styles={{ input: { fontFamily: 'monospace', fontSize: '14px', lineHeight: 1.6 } }}
+                  />
+                ) : (
                 <Box ref={markdownRef} className="sticky-markdown" style={{ color: '#171738', fontSize: '16px', lineHeight: 1.8 }}>
-                  {(() => {
+                  {isEditing && !isRawMode ? (
+                    <EditorContent editor={editor} />
+                  ) : (() => {
                     let displayContent = summaryContent || '';
                     let extractedTitle = selectedSummary?.title || 'Summary';
                     
@@ -1010,35 +1194,7 @@ export default function SummaryView() {
 
                     return (
                       <>
-                        <div className="summary-header" style={{ marginBottom: '1.5rem', paddingTop: '1rem' }}>
-                          <Group gap="xs" mb="md">
-                            {selectedSummary?.prompt_name ? (() => {
-                              const IconComp = getIconComponent(selectedSummary.prompt_icon);
-                              return (
-                                <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
-                                  {selectedSummary.prompt_name}
-                                </Badge>
-                              );
-                            })() : (
-                              <>
-                                {selectedSummary?.mode && (
-                                  <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
-                                    {selectedSummary.mode}
-                                  </Badge>
-                                )}
-                                {selectedSummary?.output_format && (
-                                  <Badge leftSection={FORMAT_ICONS[selectedSummary.output_format] || <IconFileText size={12} />} variant="light" color="teal" size="md" tt="capitalize" fw={600}>
-                                    {selectedSummary.output_format}
-                                  </Badge>
-                                )}
-                                {selectedSummary?.processing_method && (
-                                  <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
-                                    {selectedSummary.processing_method}
-                                  </Badge>
-                                )}
-                              </>
-                            )}
-                          </Group>
+                        <div className="summary-header" style={{ marginBottom: '1.5rem' }}>
                           <Title order={1} style={{ marginTop: 0, marginBottom: 0, color: '#171738', fontWeight: 700 }}>
                             {extractedTitle}
                           </Title>
@@ -1050,6 +1206,7 @@ export default function SummaryView() {
                     );
                   })()}
                 </Box>
+                )}
               </Box>
             )}
           </Container>
@@ -1061,27 +1218,124 @@ export default function SummaryView() {
             <Stack gap={0} align="stretch">
               {sidebarOpen && <Title order={5} fw={600} c="dimmed" mb="xs">Smart Actions</Title>}
 
-              <Tooltip label="Generate New Summary" disabled={sidebarOpen} position="left">
-                <MantineNavLink
-                  label={sidebarOpen ? "Generate New" : ""}
-                  leftSection={<IconSparkles size="1.2rem" stroke={1.5} />}
-                  onClick={() => setModalOpened(true)}
-                  disabled={generating}
-                />
-              </Tooltip>
+              {!isEditing ? (
+                <>
+                  <Tooltip label="Edit Summary" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Edit Summary" : ""}
+                      leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
+                      onClick={startEditing}
+                    />
+                  </Tooltip>
 
-              <Tooltip label="Back to Note" disabled={sidebarOpen} position="left">
-                <MantineNavLink
-                  label={sidebarOpen ? "Back to Note" : ""}
-                  leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
-                  onClick={() => navigate(`/note/${noteId}`)}
-                />
-              </Tooltip>
+                  <Tooltip label="Generate New Summary" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Generate New" : ""}
+                      leftSection={<IconSparkles size="1.2rem" stroke={1.5} />}
+                      onClick={() => setModalOpened(true)}
+                      disabled={generating}
+                    />
+                  </Tooltip>
 
-              {sidebarOpen && <Title order={5} fw={600} c="dimmed" mt="xl" mb="md">Versions</Title>}
-              
-              {sidebarOpen ? (
-                <Stack gap="xs">
+                  <Tooltip label="Back to Note" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Back to Note" : ""}
+                      leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
+                      onClick={() => navigate(`/note/${noteId}`)}
+                    />
+                  </Tooltip>
+                </>
+              ) : (
+                <>
+                  {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Actions</Text></Box>}
+                  <Tooltip label="Save Changes" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Save Changes" : ""}
+                      leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
+                      onClick={() => setSaveModalOpened(true)}
+                      color="blue"
+                      variant="filled"
+                      active
+                    />
+                  </Tooltip>
+                  <Tooltip label="Cancel Editing" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Cancel Editing" : ""}
+                      leftSection={<IconX size="1.2rem" stroke={1.5} />}
+                      onClick={() => setCancelModalOpened(true)}
+                      color="red"
+                    />
+                  </Tooltip>
+
+                  <Tooltip label={isRawMode ? "Visual Editor" : "Raw Markdown"} disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? (isRawMode ? "Visual Editor" : "Raw Markdown") : ""}
+                      leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
+                      onClick={handleToggleRaw}
+                    />
+                  </Tooltip>
+
+                  {(editor || isRawMode) && (
+                    <>
+                      {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Formatting</Text></Box>}
+                      <Tooltip label="Heading 1" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Heading 1" : ""}
+                          leftSection={<IconH1 size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('h1')}
+                          active={!isRawMode && editor?.isActive('heading', { level: 1 })}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Heading 2" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Heading 2" : ""}
+                          leftSection={<IconH2 size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('h2')}
+                          active={!isRawMode && editor?.isActive('heading', { level: 2 })}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Heading 3" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Heading 3" : ""}
+                          leftSection={<IconH3 size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('h3')}
+                          active={!isRawMode && editor?.isActive('heading', { level: 3 })}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Bullet List" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Bullet List" : ""}
+                          leftSection={<IconList size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('bullet')}
+                          active={!isRawMode && editor?.isActive('bulletList')}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Numbered List" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Numbered List" : ""}
+                          leftSection={<IconListNumbers size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('ordered')}
+                          active={!isRawMode && editor?.isActive('orderedList')}
+                        />
+                      </Tooltip>
+                      <Tooltip label="Insert Table" disabled={sidebarOpen} position="left">
+                        <MantineNavLink
+                          label={sidebarOpen ? "Insert Table" : ""}
+                          leftSection={<IconTable size="1.2rem" stroke={1.5} />}
+                          onClick={() => handleFormat('table')}
+                        />
+                      </Tooltip>
+                    </>
+                  )}
+                </>
+              )}
+
+              {!isEditing && (
+                <>
+                  {sidebarOpen && <Title order={5} fw={600} c="dimmed" mt="xl" mb="md">Versions</Title>}
+                  
+                  {sidebarOpen ? (
+                    <Stack gap="xs">
                   {summaries.map(summary => {
                     const isActive = (selectedSummary?.id === summary.id) || (generating && summary.id === generatingSummaryId && summaryId === generatingSummaryId);
                     const details = summary.prompt_name || [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
@@ -1157,6 +1411,8 @@ export default function SummaryView() {
                     );
                   })}
                 </Stack>
+              )}
+                </>
               )}
             </Stack>
           </Box>
