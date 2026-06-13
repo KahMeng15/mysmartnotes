@@ -1220,26 +1220,26 @@ export default function SummaryView() {
 
               {!isEditing ? (
                 <>
-                  <Tooltip label="Edit Summary" disabled={sidebarOpen} position="left">
+                  <Tooltip label="Generate" disabled={sidebarOpen} position="left">
                     <MantineNavLink
-                      label={sidebarOpen ? "Edit Summary" : ""}
-                      leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
-                      onClick={startEditing}
-                    />
-                  </Tooltip>
-
-                  <Tooltip label="Generate New Summary" disabled={sidebarOpen} position="left">
-                    <MantineNavLink
-                      label={sidebarOpen ? "Generate New" : ""}
+                      label={sidebarOpen ? "Generate" : ""}
                       leftSection={<IconSparkles size="1.2rem" stroke={1.5} />}
                       onClick={() => setModalOpened(true)}
                       disabled={generating}
                     />
                   </Tooltip>
 
-                  <Tooltip label="Back to Note" disabled={sidebarOpen} position="left">
+                  <Tooltip label="Edit" disabled={sidebarOpen} position="left">
                     <MantineNavLink
-                      label={sidebarOpen ? "Back to Note" : ""}
+                      label={sidebarOpen ? "Edit" : ""}
+                      leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
+                      onClick={startEditing}
+                    />
+                  </Tooltip>
+
+                  <Tooltip label="Back to note" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Back to note" : ""}
                       leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
                       onClick={() => navigate(`/note/${noteId}`)}
                     />

@@ -445,16 +445,16 @@ export default function NoteView() {
 
                 {!isEditing ? (
                   <>
-                    <Tooltip label="Edit Note" disabled={sidebarOpen} position="left">
+                    <Tooltip label="Edit" disabled={sidebarOpen} position="left">
                       <MantineNavLink
-                        label={sidebarOpen ? "Edit Note" : ""}
+                        label={sidebarOpen ? "Edit" : ""}
                         leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
                         onClick={startEditing}
                       />
                     </Tooltip>
-                    <Tooltip label="See Summaries" disabled={sidebarOpen} position="left">
+                    <Tooltip label="Summary" disabled={sidebarOpen} position="left">
                       <MantineNavLink
-                        label={sidebarOpen ? "See Summaries" : ""}
+                        label={sidebarOpen ? "Summary" : ""}
                         leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
                         onClick={() => navigate(`/note/${id}/summary`)}
                       />
