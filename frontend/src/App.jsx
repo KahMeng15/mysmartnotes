@@ -16,7 +16,8 @@ import {
   IconChartBar,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
-  IconBook2
+  IconBook2,
+  IconShieldCheck
 } from '@tabler/icons-react';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -28,6 +29,7 @@ import SubjectView from './pages/SubjectView';
 import NoteView from './pages/NoteView';
 import Settings from './pages/Settings';
 import GroupView from './pages/GroupView';
+import AdminPage from './pages/Admin';
 import { fetchApi } from './lib/api';
 
 function AppLayout({ children }) {
@@ -104,6 +106,11 @@ function AppLayout({ children }) {
           <Tooltip label="Upload" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/upload" label={navOpen ? "Upload" : ""} leftSection={<IconUpload size="1.2rem" stroke={1.5} />} />
           </Tooltip>
+          {user?.is_admin && (
+            <Tooltip label="Admin" disabled={navOpen} position="right">
+              <MantineNavLink component={NavLink} to="/admin" label={navOpen ? "Admin" : ""} leftSection={<IconShieldCheck size="1.2rem" stroke={1.5} color="purple" />} />
+            </Tooltip>
+          )}
         </AppShell.Section>
         
         <AppShell.Section style={{ borderTop: '1px solid #eaeaea', paddingTop: '10px' }}>
@@ -167,6 +174,7 @@ function App() {
           <Route path="/note/:noteId/summary" element={<SummaryView />} />
           <Route path="/note/:noteId/summary/:summaryId" element={<SummaryView />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </AppLayout>
     </Router>
