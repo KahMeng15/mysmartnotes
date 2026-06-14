@@ -189,19 +189,21 @@ RULES FOR final_answer:
 
     if conversation_context:
         prompt += f"""
-PREVIOUS CONVERSATION (for context):
+<previous_conversation>
 {conversation_context}
-
-Use this to understand the discussion, but focus on the current question.
+</previous_conversation>
 """
 
     prompt += f"""
-CONTEXT:
+<context>
 {context}
+</context>
 
-QUESTION: {question}
+<question>
+{question}
+</question>
 
-ANSWER (be accurate and honest):"""
+Respond with the JSON object now:"""
     
     return prompt
 

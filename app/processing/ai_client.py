@@ -186,16 +186,27 @@ class AIClient:
         if not text: return ""
         
         # 0. Try strict JSON parse first (Chat enforces JSON schema)
+        import json
+        import re
+        
         try:
-            import json
+            # Look for JSON block within markdown
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, flags=re.DOTALL | re.IGNORECASE)
+            if json_match:
+                parsed = json.loads(json_match.group(1))
+                if "final_answer" in parsed:
+                    return str(parsed["final_answer"]).strip()
+            
+            # Fallback: Look for the outermost curly braces anywhere in the text
+            brace_match = re.search(r'(\{.*\})', text, flags=re.DOTALL)
+            if brace_match:
+                parsed = json.loads(brace_match.group(1))
+                if "final_answer" in parsed:
+                    return str(parsed["final_answer"]).strip()
+                    
+            # Legacy fallback for perfectly formatted clean text without braces
             clean_text = text.strip()
-            if clean_text.startswith("```json"):
-                clean_text = clean_text[7:]
-            if clean_text.startswith("```"):
-                clean_text = clean_text[3:]
-            if clean_text.endswith("```"):
-                clean_text = clean_text[:-3]
-            parsed = json.loads(clean_text.strip())
+            parsed = json.loads(clean_text)
             if "final_answer" in parsed:
                 return str(parsed["final_answer"]).strip()
         except Exception:
