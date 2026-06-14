@@ -167,6 +167,7 @@ function App() {
           <Route path="/mynotes" element={<NotesManager />} />
           <Route path="/upload" element={<UploadDocs />} />
           <Route path="/chat" element={<ChatInterface />} />
+          <Route path="/chat/:cvid" element={<ChatInterface />} />
           <Route path="/quiz" element={<QuizSystem />} />
           <Route path="/group/:id" element={<GroupView />} />
           <Route path="/subject/:id" element={<SubjectView />} />

@@ -370,7 +370,7 @@ class AIClient:
 
     async def answer_question(self, context: str, question: str, system_prompt: Optional[str] = None) -> str:
         prompt = system_prompt if system_prompt else f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"
-        return await self.generate_text(prompt)
+        return await self.generate_text(prompt, max_tokens=2000)
     
     async def generate_quiz(self, content: str, num_questions: int = 5) -> List[dict]:
         prompt = f"Generate {num_questions} quiz questions (JSON): {content}"
