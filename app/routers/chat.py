@@ -538,12 +538,6 @@ async def ask_question(
 ):
     """Ask a question as a background task."""
 
-    if not any([request.note_id, request.subject_id, request.group_id]):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must provide note_id, subject_id, or group_id"
-        )
-
     # Enforce tier quotas
     enforce_quota_messages(current_user, db)
     
@@ -623,6 +617,10 @@ async def ask_question_logic(**kwargs) -> dict:
                     notes = db.query(Note).filter(Note.subject_id == s.id).all()
                     target_note_ids.extend([l.id for l in notes])
                     sources.extend([l.title for l in notes])
+        else:
+            notes = db.query(Note).filter(Note.user_id == user_id).all()
+            target_note_ids = [l.id for l in notes]
+            sources = [l.title for l in notes]
 
         step_times["step1"] = round((time.time() - t_start) * 1000.0, 2)
         retrieval_ms = (time.time() - t_start) * 1000.0

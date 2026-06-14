@@ -76,7 +76,7 @@ function AppLayout({ children }) {
         breakpoint: 'sm',
         collapsed: { mobile: !mobileOpened },
       }}
-      padding={location.pathname.startsWith('/note/') ? 0 : "md"}
+      padding={(location.pathname.startsWith('/note/') || location.pathname.startsWith('/chat')) ? 0 : "md"}
       bg="#ffffff"
     >
       <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
@@ -97,8 +97,8 @@ function AppLayout({ children }) {
           <Tooltip label="My Notes" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/mynotes" label={navOpen ? "My Notes" : ""} leftSection={<IconBooks size="1.2rem" stroke={1.5} />} />
           </Tooltip>
-          <Tooltip label="AI Chat" disabled={navOpen} position="right">
-            <MantineNavLink component={NavLink} to="/chat" label={navOpen ? "AI Chat" : ""} leftSection={<IconMessageDots size="1.2rem" stroke={1.5} />} />
+          <Tooltip label="Chat" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/chat" label={navOpen ? "Chat" : ""} leftSection={<IconMessageDots size="1.2rem" stroke={1.5} />} />
           </Tooltip>
           <Tooltip label="Quiz Engine" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/quiz" label={navOpen ? "Quiz Engine" : ""} leftSection={<IconBolt size="1.2rem" stroke={1.5} />} />
