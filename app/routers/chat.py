@@ -135,8 +135,8 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
 
     # Base mode instructions with STRICTER constraints
     mode_instructions = {
-        "quick": "You are a concise assistant. Extract the most important facts from the context. Be specific and factual. If context lacks details, say 'I am unable to find any information based on your question.'",
-        "simple": "Explain using ONLY the provided context. Use plain, everyday language. Avoid jargon. If unclear in context, say 'I am unable to find any information based on your question.'",
+        "quick": "You are a concise assistant. Extract the most important facts from the context. Be specific and factual. If context lacks details, say 'Sorry, I am unable to find any answers for your question based on the context.'",
+        "simple": "Explain using ONLY the provided context. Use plain, everyday language. Avoid jargon. If unclear in context, say 'Sorry, I am unable to find any answers for your question based on the context.'",
         "normal": "Provide a balanced response using ONLY the provided context. Be clear and informative without being overly brief or excessively detailed.",
         "elaborate": "Provide thorough, well-structured explanations grounded in the context. Be detailed but accurate. Never assume facts not in context.",
         "eli5": "Explain like to a 5-year-old using ONLY context material. Use short sentences and relatable analogies from the context only.",
@@ -158,9 +158,17 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
         guard = (
             "CRITICAL: Answer using ONLY the web search snippets provided. "
             "Do NOT add external knowledge. "
-            "If the answer is NOT found in snippets, respond with EXACTLY AND ONLY: \"I am unable to find any information based on your question.\" "
+            "If the answer is NOT found in snippets, respond in final_answer with EXACTLY AND ONLY: \"Sorry, I am unable to find any answers for your question based on the context.\" "
             "Never hallucinate or guess."
         )
+    else:
+        guard = (
+            "CRITICAL: Answer ONLY using the provided context blocks (e.g. [Source 1]: ...). "
+            "If the answer is NOT found in the context, respond in final_answer with EXACTLY AND ONLY: \"Sorry, I am unable to find any answers for your question based on the context.\" "
+            "Do NOT make up facts, hallucinate information, or guess. "
+            "Never provide information outside the provided context."
+        )
+
     prompt = f"""{mode_inst}
 
 {guard}
@@ -179,10 +187,10 @@ RULES FOR final_answer:
 - NO introductory phrases like "Based on...", "Let me explain...", "Here's what..."
 - Answer directly and concisely
 - PARAPHRASE the context in your own words—do NOT copy-paste source text
-- Do NOT include quotes or brackets
 - Do NOT include author names or dates in the answer
-- Simply answer naturally; numerical citations [1], [2], etc. will be added automatically
-- If you found the answer, provide IT and NOTHING ELSE. Do NOT append "I am unable to find any information..." to a valid answer.
+- ALWAYS cite the specific source you used by inserting [1], [2], etc. inside your text where appropriate.
+- Do NOT make up your own citations. ONLY use the [Source X] numbers provided in the context blocks.
+- If you found the answer, provide IT and NOTHING ELSE. Do NOT append apologies to a valid answer.
 - Never add information outside the provided context
 - Check facts twice before responding
 """
@@ -681,7 +689,7 @@ async def ask_question_logic(**kwargs) -> dict:
             prompt = f"Friendly study assistant. Response warm. Question: {message}"
         elif intent == "OFF_TOPIC":
             context = "User asking off-topic."
-            prompt = "Decline politely."
+            prompt = "You MUST output EXACTLY AND ONLY this JSON: {\"reasoning\": \"The user asked an off-topic question.\", \"final_answer\": \"Sorry I am not made to answer that, im here to help you study better and smarter...\"}"
         else:
             t_step4_start = time.time()
             if target_note_ids:
@@ -692,16 +700,18 @@ async def ask_question_logic(**kwargs) -> dict:
                     chunks = [c for c in raw_chunks if c["score"] >= 15.0]
                     
                     if chunks:
-                        snippets = [{"text": chunk["text"], "position": chunk["position"], "score": chunk["score"]} for chunk in chunks]
-                        context = combine_snippets(snippets, max_chars=3000)
-                        for chunk in chunks:
+                        context = ""
+                        for idx, chunk in enumerate(chunks):
+                            if len(context) + len(chunk["text"]) > 3000:
+                                break
+                            context += f"[Source {idx+1}]: {chunk['text']}\n\n"
                             detailed_sources.append({
                                 "text_preview": chunk["text"][:150],
                                 "position": chunk["position"],
                                 "score": chunk["score"],
                                 "note_id": chunk["note_id"]
                             })
-                        snippet_sources = list(set(sources))[:2]
+                        # snippet_sources isn't used directly here for DB, wait, it might be.
                 except Exception as e:
                     import logging
                     logging.getLogger(__name__).error(f"Error retrieving chunks: {e}")
@@ -713,9 +723,10 @@ async def ask_question_logic(**kwargs) -> dict:
             if not context or (len(context) < 50 and len(detailed_sources) == 0):
                 web_snippet, web_sources, web_error = await web_search(message, timeout=10.0)
                 if web_snippet:
-                    context = web_snippet
-                    snippet_sources = [s["url"] for s in web_sources if s.get("url")] or ["Web Search"]
-                    detailed_sources = [{"text_preview": s["text_preview"], "is_web": True, "url": s["url"]} for s in web_sources]
+                    context = ""
+                    for idx, s in enumerate(web_sources):
+                        context += f"[Source {idx+1}]: {s.get('text_preview', '')}\n\n"
+                        detailed_sources.append({"text_preview": s.get("text_preview", ""), "is_web": True, "url": s.get("url", "")})
                     
             step_times["step5"] = round((time.time() - t_step5_start) * 1000.0, 2)
 
@@ -735,8 +746,8 @@ async def ask_question_logic(**kwargs) -> dict:
         step_times["step7"] = round((time.time() - t_step7_start) * 1000.0, 2)
 
         t_step8_start = time.time()
-        if detailed_sources:
-            response = inject_citations(response, detailed_sources)
+        # if detailed_sources:
+        #     response = inject_citations(response, detailed_sources)
         step_times["step8"] = round((time.time() - t_step8_start) * 1000.0, 2)
 
         t_step9_start = time.time()

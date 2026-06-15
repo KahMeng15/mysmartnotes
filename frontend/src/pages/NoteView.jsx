@@ -186,41 +186,68 @@ export default function NoteView() {
       const selection = window.getSelection();
       selection?.removeAllRanges();
       
-      let cleanSearch = highlightText.replace(/[*_#`~\[\]()]/g, '').trim();
-      cleanSearch = cleanSearch.length > 30 ? cleanSearch.substring(0, 30) : cleanSearch;
+      let cleanSearch = highlightText.replace(/[*_#`~\[\]()]/g, ' ').replace(/\s+/g, ' ').trim();
+      const words = cleanSearch.split(' ').filter(w => w.length > 0);
       
-      if (!cleanSearch) return;
+      let found = false;
+      let matchedRange = null;
 
-      const found = window.find(cleanSearch, false, false, true);
-      if (found && selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        
-        if (markdownRef.current.contains(range.commonAncestorContainer)) {
-           let targetRect = null;
-           try {
-             const mark = document.createElement('mark');
-             mark.style.backgroundColor = '#ffd8a8';
-             mark.style.color = 'inherit';
-             mark.style.borderRadius = '2px';
-             range.surroundContents(mark);
-             targetRect = mark.getBoundingClientRect();
-             selection.removeAllRanges();
-           } catch(e) {
-             targetRect = range.getBoundingClientRect();
-           }
+      const windowSize = Math.min(6, words.length);
+      
+      for (let i = 0; i <= words.length - windowSize; i++) {
+         const searchStr = words.slice(i, i + windowSize).join(' ');
+         
+         const selection = window.getSelection();
+         selection?.removeAllRanges();
+         
+         try {
+            const range = document.createRange();
+            range.selectNodeContents(markdownRef.current);
+            range.collapse(true);
+            selection.addRange(range);
+         } catch(e) {}
+         
+         let attempts = 0;
+         while (window.find(searchStr, false, false, true) && attempts < 10) {
+            attempts++;
+            if (selection && selection.rangeCount > 0) {
+              const range = selection.getRangeAt(0);
+              if (markdownRef.current.contains(range.commonAncestorContainer)) {
+                found = true;
+                matchedRange = range;
+                break;
+              }
+            }
+         }
+         
+         if (found) break;
+      }
 
-           if (targetRect && viewportRef.current) {
-             const viewportRect = viewportRef.current.getBoundingClientRect();
-             const scrollTop = viewportRef.current.scrollTop + (targetRect.top - viewportRect.top) - (viewportRect.height / 2);
-             
-             viewportRef.current.scrollTo({
-               top: scrollTop,
-               behavior: 'smooth'
-             });
-           }
-        } else {
+      if (found && matchedRange) {
+         let targetRect = null;
+         try {
+           const mark = document.createElement('mark');
+           mark.style.backgroundColor = '#ffd8a8';
+           mark.style.color = 'inherit';
+           mark.style.borderRadius = '2px';
+           matchedRange.surroundContents(mark);
+           targetRect = mark.getBoundingClientRect();
            selection.removeAllRanges();
-        }
+         } catch(e) {
+           targetRect = matchedRange.getBoundingClientRect();
+         }
+
+         if (targetRect && viewportRef.current) {
+           const viewportRect = viewportRef.current.getBoundingClientRect();
+           const scrollTop = viewportRef.current.scrollTop + (targetRect.top - viewportRect.top) - (viewportRect.height / 2);
+           
+           viewportRef.current.scrollTo({
+             top: scrollTop,
+             behavior: 'smooth'
+           });
+         }
+      } else {
+         selection?.removeAllRanges();
       }
     }, 600);
     
