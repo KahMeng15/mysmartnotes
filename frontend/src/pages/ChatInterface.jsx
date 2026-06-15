@@ -52,7 +52,7 @@ const parseAiMessage = (text) => {
     if (answerMatch && answerMatch[1]) {
       finalAnswer = answerMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
     } else if (reasoningMatch) {
-      finalAnswer = ""; 
+      finalAnswer = "*(The response was cut off before an answer could be generated. Please try again.)*"; 
     }
   }
   
@@ -373,8 +373,10 @@ export default function ChatInterface() {
   };
 
   const renderMessageContent = (text, sources) => {
-    const { finalAnswer } = parseAiMessage(text);
-    if (!finalAnswer) return <Loader size="sm" type="dots" />;
+    let { finalAnswer } = parseAiMessage(text);
+    if (!finalAnswer) {
+      finalAnswer = text || "*(No response provided)*";
+    }
 
     const processedAnswer = finalAnswer.replace(/\[(\d+)\]/g, '[$1](#source-$1)');
 
@@ -657,14 +659,14 @@ export default function ChatInterface() {
               ))}
               {loading && (
                 <Group align="flex-start" wrap="nowrap" mt="md">
-                  <Paper p="sm" radius="lg" style={{ backgroundColor: '#f1f3f5', borderBottomLeftRadius: '4px' }}>
+                  <Box style={{ padding: '0 8px' }}>
                     <Group gap="xs">
                       <Loader size="xs" type="dots" color="indigo" />
                       <Text size="sm" c="dimmed" style={{ fontStyle: 'italic' }}>
                         {taskStatus?.progress_message || 'Thinking...'}
                       </Text>
                     </Group>
-                  </Paper>
+                  </Box>
                 </Group>
               )}
             </Stack>

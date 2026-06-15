@@ -282,7 +282,7 @@ class AIClient:
             res = await self._with_retries_and_timeout(f"gemini_{tier.model_name}", _gemini_call)
             if res.candidates and res.candidates[0].content.parts:
                 parts = res.candidates[0].content.parts
-                text = parts[-1].text if len(parts) > 1 else "".join(p.text for p in parts if hasattr(p, 'text'))
+                text = "".join(p.text for p in parts if hasattr(p, 'text'))
                 self.last_successful_tier = tier
                 logger.info(f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})")
                 return self._extract_polished_answer(text)
@@ -381,7 +381,7 @@ class AIClient:
 
     async def answer_question(self, context: str, question: str, system_prompt: Optional[str] = None) -> str:
         prompt = system_prompt if system_prompt else f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"
-        return await self.generate_text(prompt, max_tokens=2000)
+        return await self.generate_text(prompt, max_tokens=8192)
     
     async def generate_quiz(self, content: str, num_questions: int = 5) -> List[dict]:
         prompt = f"Generate {num_questions} quiz questions (JSON): {content}"
