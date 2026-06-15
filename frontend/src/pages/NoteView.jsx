@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu } from '@mantine/core';
 import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload } from '@tabler/icons-react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,6 +17,10 @@ import { TableHeader } from '@tiptap/extension-table-header';
 export default function NoteView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const highlightText = searchParams.get('highlight');
+  
   const [note, setNote] = useState(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -174,6 +178,54 @@ export default function NoteView() {
   useEffect(() => {
     setTimeout(handleScroll, 100);
   }, [content, isEditing, isRawMode]);
+
+  useEffect(() => {
+    if (!highlightText || loading || !markdownRef.current || isEditing || isRawMode) return;
+    
+    const highlightTimer = setTimeout(() => {
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      
+      let cleanSearch = highlightText.replace(/[*_#`~\[\]()]/g, '').trim();
+      cleanSearch = cleanSearch.length > 30 ? cleanSearch.substring(0, 30) : cleanSearch;
+      
+      if (!cleanSearch) return;
+
+      const found = window.find(cleanSearch, false, false, true);
+      if (found && selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        
+        if (markdownRef.current.contains(range.commonAncestorContainer)) {
+           let targetRect = null;
+           try {
+             const mark = document.createElement('mark');
+             mark.style.backgroundColor = '#ffd8a8';
+             mark.style.color = 'inherit';
+             mark.style.borderRadius = '2px';
+             range.surroundContents(mark);
+             targetRect = mark.getBoundingClientRect();
+             selection.removeAllRanges();
+           } catch(e) {
+             targetRect = range.getBoundingClientRect();
+           }
+
+           if (targetRect && viewportRef.current) {
+             const viewportRect = viewportRef.current.getBoundingClientRect();
+             const scrollTop = viewportRef.current.scrollTop + (targetRect.top - viewportRect.top) - (viewportRect.height / 2);
+             
+             viewportRef.current.scrollTo({
+               top: scrollTop,
+               behavior: 'smooth'
+             });
+           }
+        } else {
+           selection.removeAllRanges();
+        }
+      }
+    }, 600);
+    
+    return () => clearTimeout(highlightTimer);
+  }, [highlightText, loading, content, isEditing, isRawMode]);
 
   useEffect(() => {
     const loadNote = async () => {

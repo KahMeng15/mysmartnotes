@@ -372,12 +372,46 @@ export default function ChatInterface() {
     return `${contextType} Scope`;
   };
 
-  const renderMessageContent = (text) => {
+  const renderMessageContent = (text, sources) => {
     const { finalAnswer } = parseAiMessage(text);
     if (!finalAnswer) return <Loader size="sm" type="dots" />;
+
+    const processedAnswer = finalAnswer.replace(/\[(\d+)\]/g, '[$1](#source-$1)');
+
+    const LinkRenderer = (props) => {
+      const { href, children } = props;
+      if (href && href.startsWith('#source-')) {
+        const sourceIndex = parseInt(href.replace('#source-', ''), 10) - 1;
+        return (
+          <sup style={{ margin: '0 2px' }}>
+            <a 
+              href={href}
+              onClick={(e) => {
+                e.preventDefault();
+                if (sources && sources[sourceIndex]) {
+                  const src = sources[sourceIndex];
+                  if (src.is_web) {
+                    window.open(src.url, '_blank');
+                  } else if (src.note_id) {
+                    window.open(`/note/${src.note_id}?highlight=${encodeURIComponent(src.text_preview)}`, '_blank');
+                  }
+                }
+              }}
+              style={{ textDecoration: 'none', color: '#1c7ed6', fontWeight: 'bold' }}
+            >
+              {children}
+            </a>
+          </sup>
+        );
+      }
+      return <a {...props}>{children}</a>;
+    };
+
     return (
       <Box className="markdown-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{finalAnswer}</ReactMarkdown>
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: LinkRenderer }}>
+          {processedAnswer}
+        </ReactMarkdown>
       </Box>
     );
   };
@@ -477,7 +511,22 @@ export default function ChatInterface() {
                 )}
                 <Stack spacing="xs">
                   {msg.detailed_sources.map((src, idx) => (
-                    <Paper key={idx} p="xs" withBorder bg="white">
+                    <Paper 
+                      key={idx} 
+                      p="xs" 
+                      withBorder 
+                      bg="white"
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f3f5'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                      onClick={() => {
+                        if (src.is_web) {
+                          window.open(src.url, '_blank');
+                        } else if (src.note_id) {
+                          window.open(`/note/${src.note_id}?highlight=${encodeURIComponent(src.text_preview)}`, '_blank');
+                        }
+                      }}
+                    >
                       {src.is_web ? (
                         <Box>
                           <Text size="xs" fw={600} c="blue"><IconWorld size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} /> [{idx + 1}] Web Reference</Text>
@@ -599,7 +648,7 @@ export default function ChatInterface() {
                   ) : (
                     <Box style={{ width: '100%', padding: '0 8px' }}>
                       <Box style={{ fontSize: '15px', lineHeight: 1.6, color: '#171738' }}>
-                        {renderMessageContent(msg.text)}
+                        {renderMessageContent(msg.text, msg.detailed_sources)}
                       </Box>
                       <MetadataBlock msg={msg} messageIndex={i} />
                     </Box>
