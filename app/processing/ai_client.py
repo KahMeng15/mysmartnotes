@@ -115,6 +115,8 @@ class AIClient:
                 self._init_gemini_tier(tier)
             elif tier.provider == "huggingface":
                 self._init_huggingface_tier(tier)
+            elif tier.provider == "groq":
+                self._init_groq_tier(tier)
 
     def _init_gemini_tier(self, tier: AITier):
         try:
@@ -139,6 +141,14 @@ class AIClient:
             tier.model = InferenceClient(api_key=tier.api_key)
         except Exception as e:
             logger.error(f"Failed to init HuggingFace tier ({tier.model_name}): {e}")
+
+    def _init_groq_tier(self, tier: AITier):
+        try:
+            from groq import AsyncGroq
+            if not tier.api_key: return
+            tier.model = AsyncGroq(api_key=tier.api_key)
+        except Exception as e:
+            logger.error(f"Failed to init Groq tier ({tier.model_name}): {e}")
 
     async def _with_retries_and_timeout(self, operation_name: str, operation: Callable[[], Awaitable[T]]) -> T:
         last_error: Optional[Exception] = None
@@ -304,6 +314,26 @@ class AIClient:
             self.last_successful_tier = tier
             return self._extract_polished_answer(res)
         
+        elif tier.provider == "groq" and tier.model:
+            async def _groq_call():
+                messages = []
+                if system_instruction:
+                    messages.append({"role": "system", "content": system_instruction})
+                messages.append({"role": "user", "content": modified_prompt})
+                
+                res = await tier.model.chat.completions.create(
+                    model=tier.model_name,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=0.7
+                )
+                return res.choices[0].message.content
+            
+            res = await self._with_retries_and_timeout(f"groq_{tier.model_name}", _groq_call)
+            self.last_successful_tier = tier
+            logger.info(f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})")
+            return self._extract_polished_answer(res)
+        
         return ""
 
     async def generate_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None) -> str:
@@ -358,6 +388,41 @@ class AIClient:
                         if chunk.candidates and chunk.candidates[0].content.parts:
                             for part in chunk.candidates[0].content.parts:
                                 if hasattr(part, 'text'): all_parts.append(part.text)
+                    
+                    self.last_successful_tier = tier
+                    yield self._extract_polished_answer("".join(all_parts))
+                    return # Success!
+
+                elif tier.provider == "groq":
+                    if not tier.model: raise ValueError("Groq model not initialized")
+                    
+                    is_reasoning = "versatile" in tier.model_name.lower() or tier.reasoning_level == "high"
+                    if is_reasoning:
+                        instr = f"\nREASONING DEPTH: {tier.reasoning_level.upper()}\n"
+                        modified_prompt = prompt.replace("===START===", instr + "===START===") if "===START===" in prompt else instr + prompt
+                    else:
+                        modified_prompt = prompt
+                        
+                    async def _groq_stream():
+                        messages = []
+                        if system_instruction:
+                            messages.append({"role": "system", "content": system_instruction})
+                        messages.append({"role": "user", "content": modified_prompt})
+                        
+                        stream = await tier.model.chat.completions.create(
+                            model=tier.model_name,
+                            messages=messages,
+                            max_tokens=max_tokens,
+                            temperature=0.7,
+                            stream=True
+                        )
+                        return stream
+
+                    response_stream = await self._with_retries_and_timeout(f"Tier{i+1}_groq_stream", _groq_stream)
+                    all_parts = []
+                    async for chunk in response_stream:
+                        if chunk.choices and len(chunk.choices) > 0 and chunk.choices[0].delta.content is not None:
+                            all_parts.append(chunk.choices[0].delta.content)
                     
                     self.last_successful_tier = tier
                     yield self._extract_polished_answer("".join(all_parts))

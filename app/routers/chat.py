@@ -131,7 +131,13 @@ _BASE_GUARD = (
 def build_mode_prompt(context: str, question: str, mode: str, output_format: str = "sentence", is_web_search: bool = False, conversation_context: str = "") -> str:
     """Return the full system prompt based on AI mode and output format."""
     if question.strip().lower() in {"hi", "hello", "how are you", "how are you?"}:
-        return f"You are a friendly assistant. Respond warmly and ONLY output the final greeting. Do NOT show your internal reasoning, constraints, or options. Just say 'Hello' or 'Hi' with a friendly follow-up. Question: '{question}'"
+        return f"""You are a friendly assistant. Respond warmly.
+CRITICAL: You MUST output your response as a valid JSON object matching:
+{{
+  "reasoning": "Internal thoughts",
+  "final_answer": "Hello! How can I help you today?"
+}}
+Question: '{question}'"""
 
     # Base mode instructions with STRICTER constraints
     mode_instructions = {
@@ -694,7 +700,13 @@ async def ask_question_logic(**kwargs) -> dict:
 
         if intent == "CONVERSATIONAL":
             context = "User is just making conversation."
-            prompt = f"Friendly study assistant. Response warm. Question: {message}"
+            prompt = f"""You are a friendly study assistant. Respond warmly to the user.
+CRITICAL: You MUST output your response as a valid JSON object matching:
+{{
+  "reasoning": "Internal thoughts",
+  "final_answer": "Your friendly response here"
+}}
+Question: {message}"""
         elif intent == "OFF_TOPIC":
             context = "User asking off-topic."
             prompt = "You MUST output EXACTLY AND ONLY this JSON: {\"reasoning\": \"The user asked an off-topic question.\", \"final_answer\": \"Sorry I am not made to answer that, im here to help you study better and smarter...\"}"
@@ -768,7 +780,7 @@ async def ask_question_logic(**kwargs) -> dict:
                 title_prompt += f"\nMessage: {message}"
                 conv_title_raw = await ai_client.answer_question(question=message, context="", system_prompt=title_prompt)
                 try:
-                    import json, re
+                    import re
                     json_match = re.search(r'(\{.*\})', conv_title_raw, flags=re.DOTALL)
                     if json_match:
                         parsed = json.loads(json_match.group(1))
