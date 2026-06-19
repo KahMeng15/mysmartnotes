@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Box, Title, Paper, ScrollArea, TextInput, ActionIcon, Group, Text, Stack, Loader, Flex, Divider, Center, Select, Badge } from '@mantine/core';
+import { Box, Title, Paper, ScrollArea, TextInput, ActionIcon, Group, Text, Stack, Loader, Flex, Divider, Center, Select, Badge, Menu, Modal, Button } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconSend, IconPlus, IconClockHour4, IconMessageCircle2, IconAdjustmentsHorizontal,
   IconRobot, IconWorld, IconFolder, IconBook, IconFile,
   IconSchool, IconBolt, IconList, IconFileText, IconX,
   IconWand, IconBrain, IconBabyCarriage, IconListNumbers, IconTable,
-  IconInfoCircle, IconRefresh
+  IconInfoCircle, IconRefresh, IconDotsVertical, IconPencil, IconPin, IconTrash, IconPinFilled
 } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -95,6 +95,50 @@ export default function ChatInterface() {
 
   // Sidebar sizing
   const [sidebarWidth, setSidebarWidth] = useState(300);
+
+  const [renameModalOpened, setRenameModalOpened] = useState(false);
+  const [conversationToRename, setConversationToRename] = useState(null);
+  const [newTitle, setNewTitle] = useState('');
+
+  const handleRename = async () => {
+    if (!conversationToRename || !newTitle.trim()) return;
+    try {
+      await fetchApi(`/chat/conversations/${conversationToRename.conversation_id}/title`, {
+        method: 'PUT',
+        body: JSON.stringify({ title: newTitle.trim() })
+      });
+      setRenameModalOpened(false);
+      fetchConversations();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handlePin = async (conv, e) => {
+    e.stopPropagation();
+    try {
+      await fetchApi(`/chat/conversations/${conv.conversation_id}/pin`, { method: 'PUT' });
+      fetchConversations();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDelete = async (conv, e) => {
+    e.stopPropagation();
+    if (confirm("Are you sure you want to delete this conversation?")) {
+      try {
+        await fetchApi(`/chat/conversations/${conv.conversation_id}`, { method: 'DELETE' });
+        if (currentConversationId === conv.conversation_id) {
+          navigate('/chat');
+        } else {
+          fetchConversations();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
 
   const fetchConversations = async () => {
     try {
@@ -552,6 +596,21 @@ export default function ChatInterface() {
   };
 
   return (
+    <>
+      <Modal opened={renameModalOpened} onClose={() => setRenameModalOpened(false)} title="Rename Conversation" centered>
+        <TextInput
+          label="New Title"
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.currentTarget.value)}
+          data-autofocus
+          onKeyDown={(e) => { if (e.key === 'Enter') handleRename(); }}
+        />
+        <Group justify="flex-end" mt="md">
+          <Button variant="default" onClick={() => setRenameModalOpened(false)}>Cancel</Button>
+          <Button onClick={handleRename}>Save</Button>
+        </Group>
+      </Modal>
+
     <Flex h="100vh">
       {/* Sidebar: Conversations */}
       <Box 
@@ -582,7 +641,7 @@ export default function ChatInterface() {
             </Center>
           ) : (
             <Stack gap={2}>
-              {conversations.map(conv => (
+              {[...conversations].sort((a, b) => b.is_pinned - a.is_pinned).map(conv => (
                 <Paper 
                   key={conv.conversation_id} 
                   p={6} 
@@ -595,9 +654,32 @@ export default function ChatInterface() {
                   }}
                   onClick={() => navigate(`/chat/${conv.conversation_id}`)}
                 >
-                  <Text size="sm" fw={currentConversationId === conv.conversation_id ? 600 : 500} lineClamp={1}>
-                    {conv.title}
-                  </Text>
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group gap="xs" style={{ flex: 1, overflow: 'hidden' }} wrap="nowrap">
+                      {conv.is_pinned && <IconPinFilled size={12} style={{ flexShrink: 0, color: '#f59f00' }} />}
+                      <Text size="sm" fw={currentConversationId === conv.conversation_id ? 600 : 500} lineClamp={1}>
+                        {conv.title}
+                      </Text>
+                    </Group>
+                    <Menu shadow="md" width={150} position="bottom-end" withinPortal>
+                      <Menu.Target>
+                        <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
+                          <IconDotsVertical size={16} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconPencil size={14} />} onClick={(e) => { e.stopPropagation(); setConversationToRename(conv); setNewTitle(conv.title); setRenameModalOpened(true); }}>
+                          Rename
+                        </Menu.Item>
+                        <Menu.Item leftSection={<IconPin size={14} />} onClick={(e) => handlePin(conv, e)}>
+                          {conv.is_pinned ? 'Unpin' : 'Pin'}
+                        </Menu.Item>
+                        <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => handleDelete(conv, e)}>
+                          Delete
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </Group>
                 </Paper>
               ))}
             </Stack>
@@ -902,5 +984,6 @@ export default function ChatInterface() {
         </Box>
       </Box>
     </Flex>
+    </>
   );
 }

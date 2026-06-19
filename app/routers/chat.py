@@ -674,6 +674,14 @@ async def ask_question_logic(**kwargs) -> dict:
         if not conv_id:
             conv_id = generate_conversation_id(db)
         
+        chat_msg_id = generate_random_id(db, ChatMessage)
+        chat_msg = ChatMessage(
+            id=chat_msg_id, user_id=user_id, note_id=note_id, subject_id=subject_id, group_id=group_id,
+            message=message, response="", sources="[]", conversation_id=conv_id, conversation_title=""
+        )
+        db.add(chat_msg)
+        db.commit()
+
         step_times["step2"] = round((time.time() - t_step2_start) * 1000.0, 2)
         t_step3_start = time.time()
         
@@ -751,20 +759,46 @@ async def ask_question_logic(**kwargs) -> dict:
         step_times["step8"] = round((time.time() - t_step8_start) * 1000.0, 2)
 
         t_step9_start = time.time()
-        conv_title = generate_conversation_title(message)
+        existing_msg = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).first()
+        if existing_msg and existing_msg.conversation_title:
+            conv_title = existing_msg.conversation_title
+        else:
+            try:
+                title_prompt = "You MUST output EXACTLY AND ONLY this JSON format: {\"reasoning\": \"brief reasoning here\", \"final_answer\": \"Short 3-5 word title\"}\nGenerate a title for the conversation starting with this message."
+                title_prompt += f"\nMessage: {message}"
+                conv_title_raw = await ai_client.answer_question(question=message, context="", system_prompt=title_prompt)
+                try:
+                    import json, re
+                    json_match = re.search(r'(\{.*\})', conv_title_raw, flags=re.DOTALL)
+                    if json_match:
+                        parsed = json.loads(json_match.group(1))
+                        conv_title = parsed.get("final_answer", parsed.get("title", ""))
+                    else:
+                        conv_title = ""
+                except Exception:
+                    conv_title = ""
+                    
+                if not conv_title or len(conv_title) > 100 or "reasoning" in conv_title.lower() or "{" in conv_title:
+                    conv_title = generate_conversation_title(message)
+            except Exception:
+                conv_title = generate_conversation_title(message)
         step_times["step9"] = round((time.time() - t_step9_start) * 1000.0, 2)
         total_ms = (time.time() - t_start) * 1000.0
 
         timings_dict = {"retrieval_ms": round(retrieval_ms, 2), "model_ms": round(model_ms, 2), "total_ms": round(total_ms, 2), "step_times": step_times}
         
-        chat_msg = ChatMessage(
-            id=generate_random_id(db, ChatMessage), user_id=user_id, note_id=note_id, subject_id=subject_id, group_id=group_id,
-            message=message, response=response, sources=json.dumps(snippet_sources), conversation_id=conv_id, conversation_title=conv_title,
-            ai_mode=ai_mode, output_format=output_format, ai_model=ai_model_info, reply_to_message_id=reply_to_message_id,
-            detailed_sources_json=json.dumps(detailed_sources) if detailed_sources else None, timings_json=json.dumps(timings_dict),
-        )
-        db.add(chat_msg)
-        db.commit()
+        chat_msg = db.query(ChatMessage).filter(ChatMessage.id == chat_msg_id).first()
+        if chat_msg:
+            chat_msg.response = response
+            chat_msg.sources = json.dumps(snippet_sources)
+            chat_msg.conversation_title = conv_title
+            chat_msg.ai_mode = ai_mode
+            chat_msg.output_format = output_format
+            chat_msg.ai_model = ai_model_info
+            chat_msg.reply_to_message_id = reply_to_message_id
+            chat_msg.detailed_sources_json = json.dumps(detailed_sources) if detailed_sources else None
+            chat_msg.timings_json = json.dumps(timings_dict)
+            db.commit()
 
         return {
             "message": message, "response": response, "sources": snippet_sources, "ai_mode": ai_mode, "output_format": output_format,
@@ -994,6 +1028,30 @@ async def toggle_favourite_conversation(
         msg.is_favourite = new_state
     db.commit()
     return {"is_favourite": new_state}
+
+@router.put("/conversations/{conversation_id}/title")
+async def update_conversation_title(
+    conversation_id: str,
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update the title of a conversation."""
+    title = payload.get("title")
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+        
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.conversation_id == conversation_id,
+        ChatMessage.user_id == current_user.id
+    ).all()
+    if not messages:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    for msg in messages:
+        msg.conversation_title = title
+    db.commit()
+    return {"title": title}
 
 
 @router.delete("/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
