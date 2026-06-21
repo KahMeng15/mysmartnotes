@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Title, Text, Group, Card, Button, ActionIcon, Center, Loader, SimpleGrid, TextInput, Modal, Select, Progress, Paper, Radio, Checkbox, Stack } from '@mantine/core';
-import { IconChevronLeft, IconCards, IconSearch, IconArrowsSort, IconTrophy } from '@tabler/icons-react';
+import { Box, Title, Text, Group, Card, Button, ActionIcon, Center, Loader, SimpleGrid, TextInput, Modal, Select, Progress, Paper, Radio, Checkbox, Stack, Badge, Menu } from '@mantine/core';
+import { IconChevronLeft, IconCards, IconSearch, IconArrowsSort, IconTrophy, IconDotsVertical, IconPencil, IconTrash, IconInfoCircle, IconX, IconPlus } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useDisclosure } from '@mantine/hooks';
 import { fetchApi } from '../lib/api';
+import GenerateQuizModal from '../components/GenerateQuizModal';
 
 export default function QuizGroupView() {
   const { id } = useParams();
@@ -21,6 +23,76 @@ export default function QuizGroupView() {
   const [takingQuiz, setTakingQuiz] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
+
+  // Generate Quiz Modal
+  const [generateOpened, { open: openGenerate, close: closeGenerate }] = useDisclosure(false);
+
+  const handleGenerateSuccess = (newQuiz) => {
+    setQuizzes(prev => [newQuiz, ...prev]);
+  };
+
+  // Menu Action States
+  const [submitting, setSubmitting] = useState(false);
+  const [editingQuiz, setEditingQuiz] = useState(null);
+  const [newTitle, setNewTitle] = useState('');
+  const [renameModalOpened, setRenameModalOpened] = useState(false);
+  const [deleteQuizModalOpened, setDeleteQuizModalOpened] = useState(false);
+  const [quizToDelete, setQuizToDelete] = useState(null);
+  const [infoModalQuiz, setInfoModalQuiz] = useState(null);
+
+  const openRename = (quiz) => {
+    setEditingQuiz(quiz);
+    setNewTitle(quiz.title);
+    setRenameModalOpened(true);
+  };
+
+  const openDelete = (quiz) => {
+    setQuizToDelete(quiz);
+    setDeleteQuizModalOpened(true);
+  };
+
+  const handleRename = async () => {
+    if (!newTitle.trim() || !editingQuiz) return;
+    setSubmitting(true);
+    try {
+      await fetchApi(`/quizzes/${editingQuiz.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ title: newTitle.trim() })
+      });
+      setQuizzes(quizzes.map(q => q.id === editingQuiz.id ? { ...q, title: newTitle.trim() } : q));
+      setRenameModalOpened(false);
+    } catch (err) {
+      alert("Failed to rename quiz: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const executeDeleteQuiz = async () => {
+    if (!quizToDelete) return;
+    setSubmitting(true);
+    try {
+      await fetchApi(`/quizzes/${quizToDelete.id}`, { method: 'DELETE' });
+      setQuizzes(quizzes.filter(q => q.id !== quizToDelete.id));
+      setDeleteQuizModalOpened(false);
+    } catch (err) {
+      alert("Failed to delete quiz: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancelGeneration = async (quiz, taskId) => {
+    try {
+      if (taskId) {
+        await fetchApi(`/search/tasks/${taskId}/cancel`, { method: 'POST' });
+      }
+      await fetchApi(`/quizzes/${quiz.id}`, { method: 'DELETE' });
+      setQuizzes(quizzes => quizzes.filter(q => q.id !== quiz.id));
+    } catch (err) {
+      alert("Failed to cancel generation: " + err.message);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -161,6 +233,9 @@ export default function QuizGroupView() {
           <Title order={1}>{group.name}</Title>
           <Text c="dimmed">{quizzes.length} Quizzes</Text>
         </Box>
+        <Button color="pink" leftSection={<IconPlus size={16} />} onClick={openGenerate}>
+          Add Quiz
+        </Button>
       </Group>
 
       <Group mb="xl" align="flex-end">
@@ -216,6 +291,26 @@ export default function QuizGroupView() {
                     <Button variant="light" color="pink" size="sm" onClick={() => startTakingQuiz(quiz)} disabled={isGenerating || !quiz.questions || quiz.questions.length === 0}>
                       Take Quiz
                     </Button>
+                    <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                      <Menu position="bottom-end" withinPortal>
+                        <Menu.Target>
+                          <ActionIcon component="div" variant="subtle" color="gray">
+                            <IconDotsVertical size={16} />
+                          </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          {isGenerating ? (
+                            <Menu.Item color="red" leftSection={<IconX size={14} />} onClick={() => handleCancelGeneration(quiz, activeTask?.task_id)}>Cancel Generation</Menu.Item>
+                          ) : (
+                            <>
+                              <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRename(quiz)}>Rename</Menu.Item>
+                              <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={() => setInfoModalQuiz(quiz)}>System Info</Menu.Item>
+                              <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDelete(quiz)}>Delete</Menu.Item>
+                            </>
+                          )}
+                        </Menu.Dropdown>
+                      </Menu>
+                    </div>
                   </Group>
                 </Group>
               </Card>
@@ -331,11 +426,72 @@ export default function QuizGroupView() {
             </Box>
           ) : (
             <Center h={200}>
-              <Text c="dimmed">No questions available for this quiz.</Text>
+              <Text c="dimmed">This quiz has no questions.</Text>
             </Center>
           )}
         </Modal>
       )}
+
+      {/* Modals */}
+      <Modal opened={renameModalOpened} onClose={() => setRenameModalOpened(false)} title="Rename Quiz" centered>
+        <form onSubmit={(e) => { e.preventDefault(); handleRename(); }}>
+          <Stack>
+            <TextInput label="Quiz Title" value={newTitle} onChange={(e) => setNewTitle(e.currentTarget.value)} data-autofocus />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => setRenameModalOpened(false)}>Cancel</Button>
+              <Button type="submit" loading={submitting}>Save</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      <Modal opened={deleteQuizModalOpened} onClose={() => setDeleteQuizModalOpened(false)} title="Confirm Delete" centered>
+        <form onSubmit={(e) => { e.preventDefault(); executeDeleteQuiz(); }}>
+          <Stack>
+            <Text size="sm">Are you sure you want to delete the quiz <b>{quizToDelete?.title}</b>? This action cannot be undone.</Text>
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => setDeleteQuizModalOpened(false)}>Cancel</Button>
+              <Button type="submit" color="red" loading={submitting} data-autofocus>Delete Quiz</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      <Modal opened={!!infoModalQuiz} onClose={() => setInfoModalQuiz(null)} title="Quiz Information" centered size="lg">
+        {infoModalQuiz && (
+          <Stack gap="sm">
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Quiz ID</Text>
+              <Text size="sm" style={{ fontFamily: 'monospace' }}>{infoModalQuiz.id}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Created</Text>
+              <Text size="sm">{new Date(infoModalQuiz.created_at).toLocaleString()}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>Questions</Text>
+              <Text size="sm">{infoModalQuiz.questions?.length || 0}</Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" fw={500}>AI Model</Text>
+              <Badge color="pink" variant="light">{infoModalQuiz.model || 'Unknown'}</Badge>
+            </Group>
+            {infoModalQuiz.processing_time_ms && (
+              <Group justify="space-between">
+                <Text size="sm" fw={500}>Processing Time</Text>
+                <Text size="sm" c="dimmed">{(infoModalQuiz.processing_time_ms / 1000).toFixed(2)}s</Text>
+              </Group>
+            )}
+          </Stack>
+        )}
+      </Modal>
+
+      <GenerateQuizModal 
+        opened={generateOpened}
+        onClose={closeGenerate}
+        onSuccess={handleGenerateSuccess}
+        initialQuizGroupId={id === 'ungrouped' ? null : id}
+      />
     </Box>
   );
 }

@@ -204,7 +204,7 @@ function App() {
           <Route path="/note/:id" element={<NoteView />} />
           <Route path="/note/:noteId/summary" element={<SummaryView />} />
           <Route path="/note/:noteId/summary/:summaryId" element={<SummaryView />} />
-          <Route path="/quiz-group/:id" element={<QuizGroupView />} />
+          <Route path="/quiz/group/:id" element={<QuizGroupView />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin" element={<AdminPage />} />
         </Routes>
