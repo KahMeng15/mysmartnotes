@@ -347,6 +347,8 @@ class ChatMessage(Base):
     timings_json = Column(Text, nullable=True)                         # JSON: {retrieval_ms, model_ms, total_ms}
     is_pinned = Column(Boolean, default=False)
     is_favourite = Column(Boolean, default=False)
+    rating = Column(Integer, nullable=True)  # 0 to 5 stars
+    rating_comment = Column(Text, nullable=True)
     
     # Relationships
     user = relationship("User")

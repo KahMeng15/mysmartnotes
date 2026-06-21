@@ -54,6 +54,8 @@ class ChatMessageResponse(BaseModel):
     conversation_title: Optional[str] = None
     reply_to_message_id: Optional[str] = None
     timings: Optional[dict] = None
+    rating: Optional[int] = None
+    rating_comment: Optional[str] = None
 
     @field_validator('id', 'conversation_id', 'reply_to_message_id', mode='before')
     @classmethod
@@ -839,11 +841,8 @@ Sorry, I am here to help you study better and smarter with your notes. I am unab
                 
         model_ms = (time.time() - t_model_start) * 1000.0
         step_times["step7"] = round((time.time() - t_step7_start) * 1000.0, 2)
-
-        t_step8_start = time.time()
-        # if detailed_sources:
-        #     response = inject_citations(response, detailed_sources)
-        step_times["step8"] = round((time.time() - t_step8_start) * 1000.0, 2)
+        if "step8" in step_times:
+            del step_times["step8"]
 
         t_step9_start = time.time()
         existing_msg = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).first()
@@ -888,7 +887,7 @@ Sorry, I am here to help you study better and smarter with your notes. I am unab
             db.commit()
 
         return {
-            "message": message, "response": response, "sources": snippet_sources, "ai_mode": ai_mode, "output_format": output_format,
+            "id": chat_msg_id, "message": message, "response": response, "sources": snippet_sources, "ai_mode": ai_mode, "output_format": output_format,
             "ai_model": ai_model_info, "detailed_sources": detailed_sources, "conversation_id": conv_id, "conversation_title": conv_title,
             "timings": timings_dict
         }
@@ -983,10 +982,11 @@ async def get_conversation_messages(
             reply_to_message_id=m.reply_to_message_id,
             output_format=m.output_format,
             timings=json.loads(m.timings_json) if m.timings_json else None,
+            rating=m.rating,
+            rating_comment=m.rating_comment,
         )
         for m in messages
     ]
-
 
 @router.get("/history", response_model=List[ChatMessageResponse])
 async def get_all_chat_history(
@@ -1016,10 +1016,11 @@ async def get_all_chat_history(
             reply_to_message_id=m.reply_to_message_id,
             output_format=m.output_format,
             timings=json.loads(m.timings_json) if m.timings_json else None,
+            rating=m.rating,
+            rating_comment=m.rating_comment,
         )
         for m in messages
     ]
-
 
 @router.get("/history/{note_id}", response_model=List[ChatMessageResponse])
 async def get_note_chat_history(
@@ -1056,6 +1057,8 @@ async def get_note_chat_history(
             reply_to_message_id=m.reply_to_message_id,
             output_format=m.output_format,
             timings=json.loads(m.timings_json) if m.timings_json else None,
+            rating=m.rating,
+            rating_comment=m.rating_comment,
         )
         for m in messages
     ]
@@ -1148,16 +1151,49 @@ async def delete_chat_message(
     db: Session = Depends(get_db)
 ):
     """Delete a specific chat message."""
-    message = db.query(ChatMessage).filter(
+    msg = db.query(ChatMessage).filter(
         ChatMessage.id == message_id,
         ChatMessage.user_id == current_user.id
     ).first()
-
-    if not message:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
-
-    db.delete(message)
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+        
+    db.delete(msg)
     db.commit()
+    return None
+
+@router.put("/{message_id}/rate")
+async def rate_chat_message(
+    message_id: str,
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update the rating of a specific chat message (0-5 stars)."""
+    rating = payload.get("rating")
+    comment = payload.get("comment")
+    
+    if rating is not None and (not isinstance(rating, (int, float)) or rating < 0 or rating > 5):
+        raise HTTPException(status_code=400, detail="Valid rating (0-5) is required")
+        
+    msg = db.query(ChatMessage).filter(
+        ChatMessage.id == message_id,
+        ChatMessage.user_id == current_user.id
+    ).first()
+    
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+        
+    if rating is None and comment is None:
+        raise HTTPException(status_code=400, detail="Must provide rating or comment")
+        
+    if rating is not None:
+        msg.rating = int(rating)
+    if comment is not None:
+        msg.rating_comment = comment
+        
+    db.commit()
+    return {"rating": msg.rating, "rating_comment": msg.rating_comment}
 
 @router.get("/debug_cv")
 def debug_cv(conv_id: str, db: Session = Depends(get_db)):

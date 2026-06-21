@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Box, Title, Paper, ScrollArea, TextInput, ActionIcon, Group, Text, Stack, Loader, Flex, Divider, Center, Select, Badge, Menu, Modal, Button } from '@mantine/core';
+import { Box, Title, Paper, ScrollArea, TextInput, ActionIcon, Group, Text, Stack, Loader, Flex, Divider, Center, Select, Badge, Menu, Modal, Button, Rating, Popover, Textarea } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconSend, IconPlus, IconClockHour4, IconMessageCircle2, IconAdjustmentsHorizontal,
   IconRobot, IconWorld, IconFolder, IconBook, IconFile,
   IconSchool, IconBolt, IconList, IconFileText, IconX,
   IconWand, IconBrain, IconBabyCarriage, IconListNumbers, IconTable,
-  IconInfoCircle, IconRefresh, IconDotsVertical, IconPencil, IconPin, IconTrash, IconPinFilled, IconLayoutCards
+  IconInfoCircle, IconRefresh, IconDotsVertical, IconPencil, IconPin, IconTrash, IconPinFilled, IconLayoutCards, IconStar
 } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -23,6 +23,38 @@ const stepLabels = {
   step7: "7. AI Answer Generation",
   step9: "9. Save & Housekeeping"
 };
+
+const modeIcons = {
+    quick: <IconBolt size={14} />,
+    simple: <IconWand size={14} />,
+    normal: <IconBrain size={14} />,
+    elaborate: <IconSchool size={14} />,
+    eli5: <IconBabyCarriage size={14} />
+  };
+  
+const modeLabels = {
+    quick: 'Quick',
+    simple: 'Simple',
+    normal: 'Normal',
+    elaborate: 'Elaborate',
+    eli5: 'Explain like I am 5'
+  };
+
+const formatIcons = {
+    sentence: <IconFileText size={14} />,
+    pointform: <IconList size={14} />,
+    numbered_list: <IconListNumbers size={14} />,
+    table: <IconTable size={14} />,
+    mix: <IconLayoutCards size={14} />
+  };
+  
+const formatLabels = {
+    sentence: 'Sentence',
+    pointform: 'Pointform',
+    numbered_list: 'Numbered List',
+    table: 'Table',
+    mix: 'Mix'
+  };
 
 const parseAiMessage = (text) => {
   if (!text) return { reasoning: null, finalAnswer: null };
@@ -59,6 +91,186 @@ const parseAiMessage = (text) => {
   return { reasoning, finalAnswer };
 };
 
+const MetadataBlock = ({ msg, messageIndex, setMessages, handleRepeat }) => {
+  const { reasoning } = parseAiMessage(msg.text);
+  if (!msg.detailed_sources && !msg.timings && !msg.ai_model && !reasoning) return null;
+  
+  const filteredSources = msg.detailed_sources ? msg.detailed_sources.filter(s => s.is_web || s.score >= 50) : [];
+  const hasSources = filteredSources.length > 0;
+  const isWebSearch = hasSources && filteredSources.some(s => s.is_web);
+  
+  const [activeTab, setActiveTab] = useState(null);
+  const [rateOpened, setRateOpened] = useState(false);
+  const [comment, setComment] = useState(msg.rating_comment || '');
+
+  const handleRate = async (val, cmt = comment) => {
+    try {
+      if (!msg.id) return;
+      await fetchApi(`/chat/${msg.id}/rate`, {
+        method: 'PUT',
+        body: JSON.stringify({ rating: val, comment: cmt })
+      });
+      
+      // Update local state so it renders correctly
+      setMessages(prev => prev.map((m, i) => i === messageIndex ? { ...m, rating: val, rating_comment: cmt } : m));
+    } catch(e) {
+      console.error("Failed to rate", e);
+    }
+  };
+  
+  const handleCommentSubmit = () => {
+    handleRate(msg.rating || 0, comment);
+    setRateOpened(false);
+  };
+
+  return (
+    <Box mt="sm" pt="xs" style={{ fontSize: '12px' }}>
+      <Group gap="md" style={{ color: '#888' }}>
+        {reasoning && (
+          <Button variant="light" color="grape" size="compact-xs" leftSection={<IconBrain size={12} />} onClick={() => setActiveTab(prev => prev === 'brain' ? null : 'brain')}>
+            {activeTab === 'brain' ? 'Hide Reasoning' : 'Show Reasoning'}
+          </Button>
+        )}
+
+        {hasSources && (
+          <Group gap={4} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onClick={() => setActiveTab(prev => prev === 'sources' ? null : 'sources')} c={activeTab === 'sources' ? 'blue' : undefined}>
+            <IconFileText size={14} />
+            <Text size="xs" fw={500}>Sources</Text>
+          </Group>
+        )}
+
+        {msg.id && (
+          <Popover opened={rateOpened} onChange={setRateOpened} position="top" withArrow shadow="md">
+            <Popover.Target>
+              <Group gap={4} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onClick={() => setRateOpened((o) => !o)} c={rateOpened ? 'yellow' : undefined}>
+                <IconStar size={14} />
+                <Text size="xs" fw={500}>Rate</Text>
+              </Group>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Stack gap="xs">
+                <Text size="xs" fw={500}>Rate this answer</Text>
+                <Rating value={msg.rating || 0} onChange={(val) => handleRate(val, comment)} size="sm" />
+                <Textarea
+                  placeholder="Leave a comment (optional)..."
+                  size="xs"
+                  value={comment}
+                  onChange={(e) => setComment(e.currentTarget.value)}
+                  minRows={2}
+                />
+                <Button size="compact-xs" fullWidth onClick={handleCommentSubmit}>Submit</Button>
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
+        )}
+
+        <Group gap={4} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onClick={() => setActiveTab(prev => prev === 'info' ? null : 'info')} c={activeTab === 'info' ? 'teal' : undefined}>
+          <IconInfoCircle size={14} />
+          <Text size="xs" fw={500}>Info</Text>
+        </Group>
+
+        <Group gap={4} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onClick={() => handleRepeat(messageIndex)}>
+          <IconRefresh size={14} />
+          <Text size="xs" fw={500}>Retry</Text>
+        </Group>
+      </Group>
+
+      {activeTab && (
+        <Paper p="sm" mt="sm" withBorder bg="#f8f9fa" radius="md">
+          {activeTab === 'brain' && reasoning && (
+            <Box>
+              <Text size="xs" fw={600} mb="xs" c="grape"><IconBrain size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> AI Thought Process</Text>
+              <Text size="xs" c="dimmed" style={{ fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{reasoning}</Text>
+            </Box>
+          )}
+
+          {activeTab === 'info' && (
+            <Box>
+              <Text size="xs" fw={600} mb="xs" c="teal"><IconInfoCircle size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Request Details</Text>
+              
+              <Text size="xs" mb={4}><IconRobot size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Model: {msg.ai_model || 'Unknown'}</Text>
+              {msg.ai_mode && <Text size="xs" mb={4}><IconWand size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Mode: {modeLabels[msg.ai_mode] || msg.ai_mode}</Text>}
+              {msg.output_format && <Text size="xs" mb={4}><IconFileText size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Format: {formatLabels[msg.output_format] || msg.output_format}</Text>}
+              
+              {(msg.note_id || msg.subject_id || msg.group_id) && (
+                <Text size="xs" mb="xs">
+                  <IconFolder size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> 
+                  Context: {msg.note_id ? 'Specific Note' : msg.subject_id ? 'Subject Level' : msg.group_id ? 'Group Level' : 'Global Scope'}
+                </Text>
+              )}
+              
+              {msg.timings && msg.timings.step_times ? (
+                <Box mt="xs">
+                  <Text size="xs" fw={600} mb="xs"><IconListNumbers size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Process Timing (ms)</Text>
+                  {Object.entries(msg.timings.step_times).map(([step, time]) => (
+                    <Group key={step} justify="space-between" mb={2}>
+                      <Text size="xs" c="dimmed">{stepLabels[step] || step}</Text>
+                      <Text size="xs" fw={500}>{Number(time).toFixed(2)}ms</Text>
+                    </Group>
+                  ))}
+                  <Divider my="xs" />
+                  <Group justify="space-between">
+                    <Text size="xs" fw={600}>Total Time</Text>
+                    <Text size="xs" c="teal" fw={600}>{Number(msg.timings.total_ms).toFixed(2)}ms</Text>
+                  </Group>
+                </Box>
+              ) : msg.timings ? (
+                 <Box mt="xs">
+                   <Text size="xs" fw={600} mb="xs"><IconClockHour4 size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Timing</Text>
+                   <Group justify="space-between">
+                     <Text size="xs" fw={600}>Total Time</Text>
+                     <Text size="xs" c="teal" fw={600}>{Number(msg.timings.total_ms).toFixed(2)}ms</Text>
+                   </Group>
+                 </Box>
+              ) : <Text size="xs" c="dimmed">No timing data available.</Text>}
+            </Box>
+          )}
+
+          {activeTab === 'sources' && hasSources && (
+            <Box>
+              {isWebSearch && (
+                <Badge color="indigo" mb="sm" leftSection={<IconWorld size={10}/>}>Included Web Search Results</Badge>
+              )}
+              <Stack spacing="xs">
+                {filteredSources.map((src, idx) => (
+                  <Paper 
+                    key={idx} 
+                    p="xs" 
+                    withBorder 
+                    bg="white"
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f3f5'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                    onClick={() => {
+                      if (src.is_web) {
+                        window.open(src.url, '_blank');
+                      } else if (src.note_id) {
+                        window.open(`/note/${src.note_id}?highlight=${encodeURIComponent(src.text_preview)}`, '_blank');
+                      }
+                    }}
+                  >
+                    {src.is_web ? (
+                      <Box>
+                        <Text size="xs" fw={600} c="blue"><IconWorld size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} /> [{idx + 1}] Web Reference</Text>
+                        <Text size="xs" c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.url}</Text>
+                      </Box>
+                    ) : (
+                      <Box>
+                        <Text size="xs" fw={600} c="blue"><IconFileText size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} /> [{idx + 1}] Reference ({src.score}% match)</Text>
+                        <Text size="xs" c="dimmed">"{src.text_preview}"</Text>
+                      </Box>
+                    )}
+                  </Paper>
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </Paper>
+      )}
+    </Box>
+  );
+};
+
 export default function ChatInterface() {
   const { cvid } = useParams();
   const navigate = useNavigate();
@@ -89,19 +301,34 @@ export default function ChatInterface() {
   const [aiMode, setAiMode] = useState('elaborate');
   const [outputFormat, setOutputFormat] = useState('sentence');
   
+  const saveSettingsLocally = (updates) => {
+    const globalSettings = JSON.parse(localStorage.getItem('lastChatSettings') || '{}');
+    const newGlobal = { ...globalSettings, ...updates };
+    localStorage.setItem('lastChatSettings', JSON.stringify(newGlobal));
+
+    if (currentConversationIdRef.current) {
+      const convSettings = JSON.parse(localStorage.getItem('convSettings') || '{}');
+      convSettings[currentConversationIdRef.current] = { ...(convSettings[currentConversationIdRef.current] || {}), ...updates };
+      localStorage.setItem('convSettings', JSON.stringify(convSettings));
+    }
+  };
+
   const handleAiModeChange = (mode) => {
     setAiMode(mode);
     fetchApi('/auth/profile', { method: 'PUT', body: JSON.stringify({ last_chat_ai_mode: mode }) }).catch(console.error);
+    saveSettingsLocally({ aiMode: mode });
   };
   
   const handleOutputFormatChange = (format) => {
     setOutputFormat(format);
     fetchApi('/auth/profile', { method: 'PUT', body: JSON.stringify({ last_chat_output_format: format }) }).catch(console.error);
+    saveSettingsLocally({ outputFormat: format });
   };
 
   const handleContextTypeChange = (scope) => {
     setContextType(scope);
     fetchApi('/auth/profile', { method: 'PUT', body: JSON.stringify({ last_chat_context: scope }) }).catch(console.error);
+    saveSettingsLocally({ contextType: scope });
   };
   
   // Data for context dropdowns
@@ -185,12 +412,20 @@ export default function ChatInterface() {
         setMessages([]);
         setCurrentTaskId(null);
         setLoading(false);
+        const ls = JSON.parse(localStorage.getItem('lastChatSettings') || '{}');
         fetchApi('/auth/me').then(profileData => {
-           if (profileData) {
-             if (profileData.last_chat_context) setContextType(profileData.last_chat_context);
-             if (profileData.last_chat_ai_mode) setAiMode(profileData.last_chat_ai_mode);
-             if (profileData.last_chat_output_format) setOutputFormat(profileData.last_chat_output_format);
-           }
+           if (ls.contextType) setContextType(ls.contextType);
+           else if (profileData && profileData.last_chat_context) setContextType(profileData.last_chat_context);
+           
+           if (ls.aiMode) setAiMode(ls.aiMode);
+           else if (profileData && profileData.last_chat_ai_mode) setAiMode(profileData.last_chat_ai_mode);
+           
+           if (ls.outputFormat) setOutputFormat(ls.outputFormat);
+           else if (profileData && profileData.last_chat_output_format) setOutputFormat(profileData.last_chat_output_format);
+           
+           if (ls.selectedGroupId) setSelectedGroupId(ls.selectedGroupId);
+           if (ls.selectedSubjectId) setSelectedSubjectId(ls.selectedSubjectId);
+           if (ls.selectedNoteId) setSelectedNoteId(ls.selectedNoteId);
         }).catch(console.error);
       }
     }
@@ -210,10 +445,20 @@ export default function ChatInterface() {
         setSubjects((subjData || []).sort((a, b) => a.name.localeCompare(b.name)));
         setNotes((lectData || []).sort((a, b) => a.title.localeCompare(b.title)));
         
-        if (profileData && !cvid) {
-           if (profileData.last_chat_context) setContextType(profileData.last_chat_context);
-           if (profileData.last_chat_ai_mode) setAiMode(profileData.last_chat_ai_mode);
-           if (profileData.last_chat_output_format) setOutputFormat(profileData.last_chat_output_format);
+        const ls = JSON.parse(localStorage.getItem('lastChatSettings') || '{}');
+        if (!cvid) {
+           if (ls.contextType) setContextType(ls.contextType);
+           else if (profileData && profileData.last_chat_context) setContextType(profileData.last_chat_context);
+           
+           if (ls.aiMode) setAiMode(ls.aiMode);
+           else if (profileData && profileData.last_chat_ai_mode) setAiMode(profileData.last_chat_ai_mode);
+           
+           if (ls.outputFormat) setOutputFormat(ls.outputFormat);
+           else if (profileData && profileData.last_chat_output_format) setOutputFormat(profileData.last_chat_output_format);
+           
+           if (ls.selectedGroupId) setSelectedGroupId(ls.selectedGroupId);
+           if (ls.selectedSubjectId) setSelectedSubjectId(ls.selectedSubjectId);
+           if (ls.selectedNoteId) setSelectedNoteId(ls.selectedNoteId);
         }
       } catch (err) {
         console.error("Failed to load context data", err);
@@ -269,6 +514,8 @@ export default function ChatInterface() {
              const answer = statusData.result?.response || statusData.result?.answer || "Done, but no answer found.";
              setMessages(prev => [...prev, { 
                role: 'ai', 
+               id: statusData.result?.id,
+               rating: statusData.result?.rating,
                text: answer,
                detailed_sources: statusData.result?.detailed_sources,
                timings: statusData.result?.timings,
@@ -300,6 +547,8 @@ export default function ChatInterface() {
         formattedMsgs.push({ role: 'user', text: m.message });
         formattedMsgs.push({ 
           role: 'ai', 
+          id: m.id,
+          rating: m.rating,
           text: m.response,
           detailed_sources: m.detailed_sources,
           timings: m.timings,
@@ -327,6 +576,17 @@ export default function ChatInterface() {
           setSelectedGroupId(lastMsg.group_id);
         } else {
           setContextType('global');
+        }
+        
+        const convSettings = JSON.parse(localStorage.getItem('convSettings') || '{}');
+        if (convSettings[convId]) {
+          const s = convSettings[convId];
+          if (s.aiMode) setAiMode(s.aiMode);
+          if (s.outputFormat) setOutputFormat(s.outputFormat);
+          if (s.contextType) setContextType(s.contextType);
+          if (s.selectedGroupId) setSelectedGroupId(s.selectedGroupId);
+          if (s.selectedSubjectId) setSelectedSubjectId(s.selectedSubjectId);
+          if (s.selectedNoteId) setSelectedNoteId(s.selectedNoteId);
         }
       }
       setLoading(false);
@@ -390,6 +650,8 @@ export default function ChatInterface() {
         const answer = response.answer || response.response || "I couldn't generate an answer.";
         setMessages(prev => [...prev, { 
           role: 'ai', 
+          id: response.id,
+          rating: response.rating,
           text: answer,
           detailed_sources: response.detailed_sources,
           timings: response.timings,
@@ -442,37 +704,6 @@ export default function ChatInterface() {
     note: <IconFile size={14} />
   };
 
-  const modeIcons = {
-    quick: <IconBolt size={14} />,
-    simple: <IconWand size={14} />,
-    normal: <IconBrain size={14} />,
-    elaborate: <IconSchool size={14} />,
-    eli5: <IconBabyCarriage size={14} />
-  };
-  
-  const modeLabels = {
-    quick: 'Quick',
-    simple: 'Simple',
-    normal: 'Normal',
-    elaborate: 'Elaborate',
-    eli5: 'Explain like I am 5'
-  };
-
-  const formatIcons = {
-    sentence: <IconFileText size={14} />,
-    pointform: <IconList size={14} />,
-    numbered_list: <IconListNumbers size={14} />,
-    table: <IconTable size={14} />,
-    mix: <IconLayoutCards size={14} />
-  };
-  
-  const formatLabels = {
-    sentence: 'Sentence',
-    pointform: 'Pointform',
-    numbered_list: 'Numbered List',
-    table: 'Table',
-    mix: 'Mix'
-  };
 
   const getContextPillText = () => {
     if (contextType === 'global') return 'Global Scope';
@@ -553,138 +784,6 @@ export default function ChatInterface() {
     );
   };
 
-  const MetadataBlock = ({ msg, messageIndex }) => {
-    const { reasoning } = parseAiMessage(msg.text);
-    if (!msg.detailed_sources && !msg.timings && !msg.ai_model && !reasoning) return null;
-    
-    const hasSources = msg.detailed_sources && msg.detailed_sources.length > 0;
-    const isWebSearch = hasSources && msg.detailed_sources.some(s => s.is_web);
-    
-    const [activeTab, setActiveTab] = useState(null);
-  
-    return (
-      <Box mt="sm" pt="xs" style={{ fontSize: '12px' }}>
-        <Group gap="md" style={{ color: '#888' }}>
-          {hasSources && (
-            <Group gap={4} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onClick={() => setActiveTab(prev => prev === 'sources' ? null : 'sources')} c={activeTab === 'sources' ? 'blue' : undefined}>
-              <IconFileText size={14} />
-              <Text size="xs" fw={500}>Sources</Text>
-            </Group>
-          )}
-
-          {reasoning && (
-            <Group gap={4} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onClick={() => setActiveTab(prev => prev === 'brain' ? null : 'brain')} c={activeTab === 'brain' ? 'grape' : undefined}>
-              <IconBrain size={14} />
-              <Text size="xs" fw={500}>Thought Process</Text>
-            </Group>
-          )}
-
-          <Group gap={4} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onClick={() => setActiveTab(prev => prev === 'info' ? null : 'info')} c={activeTab === 'info' ? 'teal' : undefined}>
-            <IconInfoCircle size={14} />
-            <Text size="xs" fw={500}>Info</Text>
-          </Group>
-
-          <Group gap={4} style={{ cursor: 'pointer', transition: 'color 0.2s' }} onClick={() => handleRepeat(messageIndex)}>
-            <IconRefresh size={14} />
-            <Text size="xs" fw={500}>Retry</Text>
-          </Group>
-        </Group>
-  
-        {activeTab && (
-          <Paper p="sm" mt="sm" withBorder bg="#f8f9fa" radius="md">
-            {activeTab === 'brain' && reasoning && (
-              <Box>
-                <Text size="xs" fw={600} mb="xs" c="grape"><IconBrain size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> AI Thought Process</Text>
-                <Text size="xs" c="dimmed" style={{ fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{reasoning}</Text>
-              </Box>
-            )}
-
-            {activeTab === 'info' && (
-              <Box>
-                <Text size="xs" fw={600} mb="xs" c="teal"><IconInfoCircle size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Request Details</Text>
-                
-                <Text size="xs" mb={4}><IconRobot size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Model: {msg.ai_model || 'Unknown'}</Text>
-                {msg.ai_mode && <Text size="xs" mb={4}><IconWand size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Mode: {modeLabels[msg.ai_mode] || msg.ai_mode}</Text>}
-                {msg.output_format && <Text size="xs" mb={4}><IconFileText size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Format: {formatLabels[msg.output_format] || msg.output_format}</Text>}
-                
-                {(msg.note_id || msg.subject_id || msg.group_id) && (
-                  <Text size="xs" mb="xs">
-                    <IconFolder size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> 
-                    Context: {msg.note_id ? 'Specific Note' : msg.subject_id ? 'Subject Level' : msg.group_id ? 'Group Level' : 'Global Scope'}
-                  </Text>
-                )}
-                
-                {msg.timings && msg.timings.step_times ? (
-                  <Box mt="xs">
-                    <Text size="xs" fw={600} mb="xs"><IconListNumbers size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Process Timing (ms)</Text>
-                    {Object.entries(msg.timings.step_times).map(([step, time]) => (
-                      <Group key={step} justify="space-between" mb={2}>
-                        <Text size="xs" c="dimmed">{stepLabels[step] || step}</Text>
-                        <Text size="xs" fw={500}>{Number(time).toFixed(2)}ms</Text>
-                      </Group>
-                    ))}
-                    <Divider my="xs" />
-                    <Group justify="space-between">
-                      <Text size="xs" fw={600}>Total Time</Text>
-                      <Text size="xs" c="teal" fw={600}>{Number(msg.timings.total_ms).toFixed(2)}ms</Text>
-                    </Group>
-                  </Box>
-                ) : msg.timings ? (
-                   <Box mt="xs">
-                     <Text size="xs" fw={600} mb="xs"><IconClockHour4 size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Timing</Text>
-                     <Group justify="space-between">
-                       <Text size="xs" fw={600}>Total Time</Text>
-                       <Text size="xs" c="teal" fw={600}>{Number(msg.timings.total_ms).toFixed(2)}ms</Text>
-                     </Group>
-                   </Box>
-                ) : <Text size="xs" c="dimmed">No timing data available.</Text>}
-              </Box>
-            )}
-
-            {activeTab === 'sources' && hasSources && (
-              <Box>
-                {isWebSearch && (
-                  <Badge color="indigo" mb="sm" leftSection={<IconWorld size={10}/>}>Included Web Search Results</Badge>
-                )}
-                <Stack spacing="xs">
-                  {msg.detailed_sources.map((src, idx) => (
-                    <Paper 
-                      key={idx} 
-                      p="xs" 
-                      withBorder 
-                      bg="white"
-                      style={{ cursor: 'pointer' }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f3f5'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                      onClick={() => {
-                        if (src.is_web) {
-                          window.open(src.url, '_blank');
-                        } else if (src.note_id) {
-                          window.open(`/note/${src.note_id}?highlight=${encodeURIComponent(src.text_preview)}`, '_blank');
-                        }
-                      }}
-                    >
-                      {src.is_web ? (
-                        <Box>
-                          <Text size="xs" fw={600} c="blue"><IconWorld size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} /> [{idx + 1}] Web Reference</Text>
-                          <Text size="xs" c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.url}</Text>
-                        </Box>
-                      ) : (
-                        <Box>
-                          <Text size="xs" fw={600} c="blue"><IconFileText size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} /> [{idx + 1}] Reference ({src.score}% match)</Text>
-                          <Text size="xs" c="dimmed">"{src.text_preview}"</Text>
-                        </Box>
-                      )}
-                    </Paper>
-                  ))}
-                </Stack>
-              </Box>
-            )}
-          </Paper>
-        )}
-      </Box>
-    );
-  };
 
   return (
     <>
@@ -789,12 +888,7 @@ export default function ChatInterface() {
       {/* Main Chat Area */}
       <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#fff' }}>
         
-        {/* Header */}
-        <Box p="md" style={{ borderBottom: '1px solid #eaeaea', backgroundColor: '#fff', zIndex: 10, height: '60px', display: 'flex', alignItems: 'center' }}>
-          <Title order={4} fw={700} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>
-            Chat
-          </Title>
-        </Box>
+        {/* Header Removed */}
 
         {/* Chat Messages */}
         {loading && messages.length === 0 ? (
@@ -838,7 +932,7 @@ export default function ChatInterface() {
                       <Box style={{ fontSize: '15px', lineHeight: 1.6, color: '#171738' }}>
                         {renderMessageContent(msg.text, msg.detailed_sources)}
                       </Box>
-                      <MetadataBlock msg={msg} messageIndex={i} />
+                      <MetadataBlock msg={msg} messageIndex={i} setMessages={setMessages} handleRepeat={handleRepeat} />
                     </Box>
                   )}
                 </Group>
@@ -972,6 +1066,7 @@ export default function ChatInterface() {
                                   setSelectedGroupId(val);
                                   setSelectedSubjectId(null);
                                   setSelectedNoteId(null);
+                                  saveSettingsLocally({ selectedGroupId: val, selectedSubjectId: null, selectedNoteId: null });
                                 }}
                                 searchable
                                 maxDropdownHeight={200}
@@ -988,6 +1083,7 @@ export default function ChatInterface() {
                                 onChange={(val) => {
                                   setSelectedSubjectId(val);
                                   setSelectedNoteId(null);
+                                  saveSettingsLocally({ selectedSubjectId: val, selectedNoteId: null });
                                 }}
                                 searchable
                                 maxDropdownHeight={200}
@@ -1002,7 +1098,10 @@ export default function ChatInterface() {
                                 placeholder="Choose a note..."
                                 data={notes.filter(n => n.subject_id?.toString() === selectedSubjectId).map(n => ({ value: n.id.toString(), label: n.title }))}
                                 value={selectedNoteId}
-                                onChange={setSelectedNoteId}
+                                onChange={(val) => {
+                                  setSelectedNoteId(val);
+                                  saveSettingsLocally({ selectedNoteId: val });
+                                }}
                                 searchable
                                 maxDropdownHeight={200}
                                 disabled={!selectedSubjectId}
