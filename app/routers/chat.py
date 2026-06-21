@@ -372,8 +372,9 @@ async def web_search(query: str, timeout: float = 10.0) -> tuple:
             title_lower = title.lower()
             body_lower = body.lower()
             
-            # Extract important query terms (>2 chars, not stop words)
-            query_words = [w for w in query_lower.split() if len(w) > 2 and w not in {'what', 'this', 'that', 'with', 'from', 'into', 'have', 'been', 'does', 'is', 'a', 'an', 'the'}]
+            # Extract important query terms (>2 chars, not stop words) using regex to strip punctuation
+            raw_query_words = re.findall(r'\b\w+\b', query_lower)
+            query_words = [w for w in raw_query_words if len(w) > 2 and w not in {'what', 'this', 'that', 'with', 'from', 'into', 'have', 'been', 'does', 'is', 'a', 'an', 'the'}]
             
             if not query_words:
                 return 0.0
@@ -796,7 +797,9 @@ Sorry, I am here to help you study better and smarter with your notes. I am unab
                 reasoning_match = re.search(r'<reasoning>(.*?)</reasoning>', raw_response, flags=re.DOTALL | re.IGNORECASE)
                 if reasoning_match:
                     reasoning_text = reasoning_match.group(1).upper()
-                    if "NO" in reasoning_text and "YES" not in reasoning_text:
+                    has_no = bool(re.search(r'\bNO\b', reasoning_text))
+                    has_yes = bool(re.search(r'\bYES\b', reasoning_text))
+                    if has_no and not has_yes:
                         needs_web_search = True
                 
                 if not needs_web_search:

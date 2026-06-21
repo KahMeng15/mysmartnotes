@@ -339,7 +339,14 @@ export default function ChatInterface() {
 
   // Sidebar sizing
   const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [sidebarOpened, setSidebarOpened] = useState(true);
+  const [sidebarOpened, setSidebarOpened] = useState(() => {
+    const saved = localStorage.getItem('chatSidebarOpened');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('chatSidebarOpened', JSON.stringify(sidebarOpened));
+  }, [sidebarOpened]);
 
   const [renameModalOpened, setRenameModalOpened] = useState(false);
   const [conversationToRename, setConversationToRename] = useState(null);
