@@ -158,7 +158,7 @@ Question: '{question}'"""
         "pointform": "CRITICAL OUTPUT FORMAT: Please utilize a Markdown bulleted list to organize your points, but you may use normal introductory sentences before the list.",
         "numbered_list": "CRITICAL OUTPUT FORMAT: Please utilize a Markdown numbered list to organize your points, but you may use normal introductory sentences before the list.",
         "table": "CRITICAL OUTPUT FORMAT: Please utilize a Markdown table for structured data, but you MUST use normal sentences and bullet points outside the table to explain things naturally.",
-        "mix": "CRITICAL OUTPUT FORMAT: You MUST use a mix of normal sentences, bullet points, and tables where appropriate to explain the concepts thoroughly."
+        "mix": "CRITICAL OUTPUT FORMAT: You MUST use a mix of normal sentences, bullet points, and tables where appropriate to explain the concepts thoroughly. IMPORTANT: You MUST place at least two blank newlines before and after any Markdown table or list so they render correctly."
     }
 
     mode_inst = mode_instructions.get(mode, mode_instructions["elaborate"])

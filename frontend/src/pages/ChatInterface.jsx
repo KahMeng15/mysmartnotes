@@ -6,7 +6,8 @@ import {
   IconRobot, IconWorld, IconFolder, IconBook, IconFile,
   IconSchool, IconBolt, IconList, IconFileText, IconX,
   IconWand, IconBrain, IconBabyCarriage, IconListNumbers, IconTable,
-  IconInfoCircle, IconRefresh, IconDotsVertical, IconPencil, IconPin, IconTrash, IconPinFilled, IconLayoutCards, IconStar
+  IconInfoCircle, IconRefresh, IconDotsVertical, IconPencil, IconPin, IconTrash, IconPinFilled, IconLayoutCards, IconStar,
+  IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand
 } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -41,19 +42,19 @@ const modeLabels = {
   };
 
 const formatIcons = {
+    mix: <IconLayoutCards size={14} />,
     sentence: <IconFileText size={14} />,
     pointform: <IconList size={14} />,
     numbered_list: <IconListNumbers size={14} />,
-    table: <IconTable size={14} />,
-    mix: <IconLayoutCards size={14} />
+    table: <IconTable size={14} />
   };
   
 const formatLabels = {
+    mix: 'Mix',
     sentence: 'Sentence',
     pointform: 'Pointform',
     numbered_list: 'Numbered List',
-    table: 'Table',
-    mix: 'Mix'
+    table: 'Table'
   };
 
 const parseAiMessage = (text) => {
@@ -338,6 +339,7 @@ export default function ChatInterface() {
 
   // Sidebar sizing
   const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [sidebarOpened, setSidebarOpened] = useState(true);
 
   const [renameModalOpened, setRenameModalOpened] = useState(false);
   const [conversationToRename, setConversationToRename] = useState(null);
@@ -597,6 +599,10 @@ export default function ChatInterface() {
   };
 
   const startNewChat = () => {
+    setCurrentConversationId(null);
+    setMessages([]);
+    setCurrentTaskId(null);
+    setLoading(false);
     navigate('/chat');
   };
 
@@ -813,26 +819,34 @@ export default function ChatInterface() {
       {/* Sidebar: Conversations */}
       <Box 
         style={{ 
-          width: sidebarWidth, 
-          minWidth: '200px', 
-          maxWidth: '500px', 
-          resize: 'horizontal', 
-          overflow: 'auto', 
+          width: sidebarOpened ? sidebarWidth : '60px', 
+          minWidth: sidebarOpened ? '200px' : '60px', 
+          maxWidth: sidebarOpened ? '500px' : '60px', 
+          resize: sidebarOpened ? 'horizontal' : 'none', 
+          overflow: 'hidden', 
           display: 'flex', 
           flexDirection: 'column', 
           borderRight: '1px solid #eaeaea',
-          backgroundColor: '#fafafa'
+          backgroundColor: '#fafafa',
+          transition: 'width 0.2s, min-width 0.2s, max-width 0.2s'
         }}
       >
         <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', height: '60px', display: 'flex', alignItems: 'center' }}>
-          <Group justify="space-between" style={{ width: '100%' }}>
-            <Title order={4} fw={700} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>Conversations</Title>
-            <ActionIcon variant="default" size="sm" onClick={startNewChat}>
-              <IconPlus size={16} />
-            </ActionIcon>
+          <Group justify={sidebarOpened ? "space-between" : "center"} style={{ width: '100%' }}>
+            {sidebarOpened && <Title order={4} fw={700} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Conversations</Title>}
+            <Group gap="xs" wrap="nowrap">
+              {sidebarOpened && (
+                <ActionIcon variant="default" size="sm" onClick={startNewChat}>
+                  <IconPlus size={16} />
+                </ActionIcon>
+              )}
+              <ActionIcon variant="default" size="sm" onClick={() => setSidebarOpened(!sidebarOpened)}>
+                {sidebarOpened ? <IconLayoutSidebarLeftCollapse size={16} /> : <IconLayoutSidebarLeftExpand size={16} />}
+              </ActionIcon>
+            </Group>
           </Group>
         </Box>
-        <ScrollArea style={{ flex: 1 }} p="xs">
+        <ScrollArea style={{ flex: 1, display: sidebarOpened ? 'block' : 'none' }} p="xs">
           {conversations.length === 0 ? (
             <Center h={100}>
               <Text size="sm" c="dimmed">No past conversations</Text>
