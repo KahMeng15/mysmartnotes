@@ -299,8 +299,8 @@ export default function ChatInterface() {
   const [selectedNoteId, setSelectedNoteId] = useState(null);
   
   // AI Parameters
-  const [aiMode, setAiMode] = useState('elaborate');
-  const [outputFormat, setOutputFormat] = useState('sentence');
+  const [aiMode, setAiMode] = useState('normal');
+  const [outputFormat, setOutputFormat] = useState('mix');
   
   const saveSettingsLocally = (updates) => {
     const globalSettings = JSON.parse(localStorage.getItem('lastChatSettings') || '{}');
@@ -610,6 +610,8 @@ export default function ChatInterface() {
     const textToSend = typeof overrideText === 'string' ? overrideText : input.trim();
     if (!textToSend) return;
     
+    if (settingsOpened) closeSettings();
+
     if (loading && !isFromQueue) {
       setMessageQueue(prev => [...prev, textToSend]);
       if (typeof overrideText !== 'string') setInput('');
@@ -817,36 +819,34 @@ export default function ChatInterface() {
 
     <Flex h="100vh">
       {/* Sidebar: Conversations */}
-      <Box 
-        style={{ 
-          width: sidebarOpened ? sidebarWidth : '60px', 
-          minWidth: sidebarOpened ? '200px' : '60px', 
-          maxWidth: sidebarOpened ? '500px' : '60px', 
-          resize: sidebarOpened ? 'horizontal' : 'none', 
-          overflow: 'hidden', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          borderRight: '1px solid #eaeaea',
-          backgroundColor: '#fafafa',
-          transition: 'width 0.2s, min-width 0.2s, max-width 0.2s'
-        }}
-      >
-        <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', height: '60px', display: 'flex', alignItems: 'center' }}>
-          <Group justify={sidebarOpened ? "space-between" : "center"} style={{ width: '100%' }}>
-            {sidebarOpened && <Title order={4} fw={700} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Conversations</Title>}
-            <Group gap="xs" wrap="nowrap">
-              {sidebarOpened && (
+      {sidebarOpened && (
+        <Box 
+          style={{ 
+            width: sidebarWidth, 
+            minWidth: '200px', 
+            maxWidth: '500px', 
+            resize: 'horizontal', 
+            overflow: 'auto', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            borderRight: '1px solid #eaeaea',
+            backgroundColor: '#fafafa'
+          }}
+        >
+          <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', height: '60px', display: 'flex', alignItems: 'center' }}>
+            <Group justify="space-between" style={{ width: '100%' }}>
+              <Title order={4} fw={700} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Conversations</Title>
+              <Group gap="xs" wrap="nowrap">
                 <ActionIcon variant="default" size="sm" onClick={startNewChat}>
                   <IconPlus size={16} />
                 </ActionIcon>
-              )}
-              <ActionIcon variant="default" size="sm" onClick={() => setSidebarOpened(!sidebarOpened)}>
-                {sidebarOpened ? <IconLayoutSidebarLeftCollapse size={16} /> : <IconLayoutSidebarLeftExpand size={16} />}
-              </ActionIcon>
+                <ActionIcon variant="default" size="sm" onClick={() => setSidebarOpened(false)}>
+                  <IconLayoutSidebarLeftCollapse size={16} />
+                </ActionIcon>
+              </Group>
             </Group>
-          </Group>
-        </Box>
-        <ScrollArea style={{ flex: 1, display: sidebarOpened ? 'block' : 'none' }} p="xs">
+          </Box>
+          <ScrollArea style={{ flex: 1, display: 'block' }} p="xs">
           {conversations.length === 0 ? (
             <Center h={100}>
               <Text size="sm" c="dimmed">No past conversations</Text>
@@ -898,9 +898,22 @@ export default function ChatInterface() {
           )}
         </ScrollArea>
       </Box>
+      )}
 
       {/* Main Chat Area */}
-      <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#fff' }}>
+      <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#fff', position: 'relative' }}>
+        
+        {/* Floating Sidebar Toggle Button */}
+        {!sidebarOpened && (
+          <ActionIcon 
+            variant="default" 
+            size="md" 
+            onClick={() => setSidebarOpened(true)}
+            style={{ position: 'absolute', top: 16, left: 16, zIndex: 100 }}
+          >
+            <IconLayoutSidebarLeftExpand size={20} />
+          </ActionIcon>
+        )}
         
         {/* Header Removed */}
 
@@ -1189,7 +1202,7 @@ export default function ChatInterface() {
             {/* Chat Input */}
             <TextInput
               placeholder="Ask anything about your notes..."
-              size="lg"
+              size="md"
               radius="xl"
               value={input}
               onChange={(e) => {
@@ -1200,11 +1213,11 @@ export default function ChatInterface() {
               }}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
               rightSection={
-                <ActionIcon size="lg" color="indigo" variant="filled" radius="xl" onClick={() => handleSend()} disabled={!input.trim()} mr="sm">
-                  <IconSend size={18} />
+                <ActionIcon size="md" color="indigo" variant="filled" radius="xl" onClick={() => handleSend()} disabled={!input.trim()} mr="sm">
+                  <IconSend size={16} />
                 </ActionIcon>
               }
-              styles={{ input: { paddingRight: '60px', backgroundColor: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' } }}
+              styles={{ input: { fontSize: 'var(--mantine-font-size-sm)', paddingRight: '50px', backgroundColor: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' } }}
             />
             <Text size="xs" ta="center" c="dimmed" mt="xs">
               AI can make mistakes. Verify important information from your original notes.

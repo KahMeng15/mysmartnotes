@@ -48,8 +48,8 @@ class User(Base):
     
     # Chat Preferences
     last_chat_context = Column(String(50), default="global")
-    last_chat_ai_mode = Column(String(50), default="elaborate")
-    last_chat_output_format = Column(String(50), default="sentence")
+    last_chat_ai_mode = Column(String(50), default="normal")
+    last_chat_output_format = Column(String(50), default="mix")
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
