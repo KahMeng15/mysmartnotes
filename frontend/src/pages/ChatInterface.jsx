@@ -6,7 +6,7 @@ import {
   IconRobot, IconWorld, IconFolder, IconBook, IconFile,
   IconSchool, IconBolt, IconList, IconFileText, IconX,
   IconWand, IconBrain, IconBabyCarriage, IconListNumbers, IconTable,
-  IconInfoCircle, IconRefresh, IconDotsVertical, IconPencil, IconPin, IconTrash, IconPinFilled
+  IconInfoCircle, IconRefresh, IconDotsVertical, IconPencil, IconPin, IconTrash, IconPinFilled, IconLayoutCards
 } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -442,14 +442,16 @@ export default function ChatInterface() {
     sentence: <IconFileText size={14} />,
     pointform: <IconList size={14} />,
     numbered_list: <IconListNumbers size={14} />,
-    table: <IconTable size={14} />
+    table: <IconTable size={14} />,
+    mix: <IconLayoutCards size={14} />
   };
   
   const formatLabels = {
     sentence: 'Sentence',
     pointform: 'Pointform',
     numbered_list: 'Numbered List',
-    table: 'Table'
+    table: 'Table',
+    mix: 'Mix'
   };
 
   const getContextPillText = () => {
@@ -1009,7 +1011,8 @@ export default function ChatInterface() {
                             { value: 'sentence', label: 'Sentence' }, 
                             { value: 'pointform', label: 'Pointform' },
                             { value: 'numbered_list', label: 'Numbered List' },
-                            { value: 'table', label: 'Table' }
+                            { value: 'table', label: 'Table' },
+                            { value: 'mix', label: 'Mix' }
                           ].map(format => (
                             <Badge 
                               key={format.value}

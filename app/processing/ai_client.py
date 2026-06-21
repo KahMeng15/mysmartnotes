@@ -243,21 +243,21 @@ class AIClient:
                     candidate = parts[-1].strip()
                     if len(candidate) > 5: return candidate
 
-        # 3. Detect and skip reasoning blocks (Look from bottom up)
-        if text.lstrip().startswith("*") or "Context:" in text[:400] or "Question:" in text[:400] or "Wait," in text[:200]:
+        # 4. Detect and skip reasoning blocks (Look from bottom up)
+        if "Context:" in text[:400] or "Question:" in text[:400] or "Wait," in text[:200]:
             lines = text.split("\n")
-            meta_keywords = ["Context:", "Question:", "Constraint:", "Task:", "Wait,", "Actually,", "Let me", "Draft", "Final Check", "Source:", "Check constraints", "Let's check", "Final version:"]
+            meta_keywords = ["Context:", "Question:", "Constraint:", "Task:", "Wait,", "Actually,", "Let me", "Draft", "Final Check", "Check constraints", "Let's check", "Final version:"]
             
             for i in range(len(lines) - 1, -1, -1):
                 clean = lines[i].strip()
                 if not clean: continue
-                is_meta = clean.startswith("*") or clean.startswith("-") or any(k in clean for k in meta_keywords)
+                is_meta = any(k in clean for k in meta_keywords)
                 if not is_meta and len(clean) > 25 and clean[0].isupper() and not clean.endswith(":"):
                     start_idx = i
                     while start_idx > 0:
                         prev = lines[start_idx-1].strip()
                         if not prev: start_idx -= 1; continue
-                        if prev.startswith("*") or prev.startswith("-") or any(k in prev for k in meta_keywords): break
+                        if any(k in prev for k in meta_keywords): break
                         start_idx -= 1
                     return "\n".join(lines[start_idx:]).strip()
 
@@ -451,7 +451,9 @@ class AIClient:
         raise Exception(f"All AI tiers failed. Last error: {last_error}")
 
     async def answer_question(self, context: str, question: str, system_prompt: Optional[str] = None) -> str:
-        prompt = system_prompt if system_prompt else f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"
+        if system_prompt:
+            return await self.generate_text(prompt=question, max_tokens=8192, system_instruction=system_prompt)
+        prompt = f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"
         return await self.generate_text(prompt, max_tokens=8192)
     
     async def generate_quiz(self, content: str, num_questions: int = 5) -> List[dict]:

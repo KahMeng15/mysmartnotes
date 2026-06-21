@@ -132,45 +132,54 @@ def build_mode_prompt(context: str, question: str, mode: str, output_format: str
     """Return the full system prompt based on AI mode and output format."""
     if question.strip().lower() in {"hi", "hello", "how are you", "how are you?"}:
         return f"""You are a friendly assistant. Respond warmly.
-CRITICAL: You MUST output your response as a valid JSON object matching:
-{{
-  "reasoning": "Internal thoughts",
-  "final_answer": "Hello! How can I help you today?"
-}}
+CRITICAL: You MUST output your response using the following XML format:
+<reasoning>
+Internal thoughts
+</reasoning>
+<FINAL_ANSWER>
+Hello! How can I help you today?
+</FINAL_ANSWER>
 Question: '{question}'"""
 
     # Base mode instructions with STRICTER constraints
     mode_instructions = {
-        "quick": "You are a concise assistant. Extract the most important facts from the context. Be specific and factual. If context lacks details, say 'Sorry, I am unable to find any answers for your question based on the context.'",
-        "simple": "Explain using ONLY the provided context. Use plain, everyday language. Avoid jargon. If unclear in context, say 'Sorry, I am unable to find any answers for your question based on the context.'",
-        "normal": "Provide a balanced response using ONLY the provided context. Be clear and informative without being overly brief or excessively detailed.",
-        "elaborate": "Provide thorough, well-structured explanations grounded in the context. Be detailed but accurate. Never assume facts not in context.",
-        "eli5": "Explain like to a 5-year-old using ONLY context material. Use short sentences and relatable analogies from the context only.",
+        "quick": "Extract the most important facts concisely. Do not add fluff.",
+        "simple": "Explain using plain, everyday language. Avoid all jargon.",
+        "normal": "Provide a balanced, clear, and informative response.",
+        "elaborate": "Provide a thorough, detailed, and well-structured explanation.",
+        "eli5": "Explain concepts so simply that a 5-year-old could understand. Use relatable, everyday analogies.",
     }
 
-    # Output format instructions (Suggestive rather than strict)
+    # Output format instructions
     output_instructions = {
-        "sentence": "Respond using complete sentences. You may use headings, titles, or multiple sections as appropriate.",
-        "pointform": "Incorporate bullet points where helpful. You may use headings, titles, or multiple sections as appropriate.",
-        "numbered_list": "Incorporate numbered lists where helpful. You may use headings, titles, or multiple sections as appropriate.",
-        "table": "Include a markdown table if relevant. You may use headings, titles, or multiple sections as appropriate.",
+        "sentence": "CRITICAL OUTPUT FORMAT: You MUST respond using complete sentences in standard paragraph format.",
+        "pointform": "CRITICAL OUTPUT FORMAT: You MUST format your answer entirely as a Markdown bulleted list. Each point must start on a new line with a '-' character.",
+        "numbered_list": "CRITICAL OUTPUT FORMAT: You MUST format your answer entirely as a Markdown numbered list. Each point must start on a new line with a number followed by a period (e.g., '1. ').",
+        "table": "CRITICAL OUTPUT FORMAT: Please utilize a Markdown table for structured data, but you may use normal sentences and bullet points outside the table to explain things.",
+        "mix": "CRITICAL OUTPUT FORMAT: You MUST use a mix of normal sentences, bullet points, and tables where appropriate to explain the concepts thoroughly."
     }
 
     mode_inst = mode_instructions.get(mode, mode_instructions["elaborate"])
     output_inst = output_instructions.get(output_format, output_instructions["sentence"])
 
     guard = _BASE_GUARD
-    if is_web_search:
+    if mode == "eli5":
+        guard = (
+            "CRITICAL: Base your factual answer on the provided context blocks. "
+            "You may invent simple, everyday analogies to explain the concepts, but the core facts must come from the context. "
+            "If the factual answer is NOT found in the context, respond in <FINAL_ANSWER> with EXACTLY AND ONLY: \"Sorry, I am unable to find any answers for your question based on the context.\""
+        )
+    elif is_web_search:
         guard = (
             "CRITICAL: Answer using ONLY the web search snippets provided. "
             "Do NOT add external knowledge. "
-            "If the answer is NOT found in snippets, respond in final_answer with EXACTLY AND ONLY: \"Sorry, I am unable to find any answers for your question based on the context.\" "
+            "If the answer is NOT found in snippets, respond in <FINAL_ANSWER> with EXACTLY AND ONLY: \"Sorry, I am unable to find any answers for your question based on the context.\" "
             "Never hallucinate or guess."
         )
     else:
         guard = (
             "CRITICAL: Answer ONLY using the provided context blocks (e.g. [Source 1]: ...). "
-            "If the answer is NOT found in the context, respond in final_answer with EXACTLY AND ONLY: \"Sorry, I am unable to find any answers for your question based on the context.\" "
+            "If the answer is NOT found in the context, respond in <FINAL_ANSWER> with EXACTLY AND ONLY: \"Sorry, I am unable to find any answers for your question based on the context.\" "
             "Do NOT make up facts, hallucinate information, or guess. "
             "Never provide information outside the provided context."
         )
@@ -182,16 +191,17 @@ Question: '{question}'"""
 {output_inst}
 
 CRITICAL: 
-You MUST output your response as a valid JSON object. Do not include any other text, markdown blocks, or greetings before or after the JSON.
-Your JSON must exactly match the following structure:
-{{
-  "reasoning": "your step-by-step internal thoughts, constraint checks, and task analysis",
-  "final_answer": "your polished final answer that directly addresses the prompt. No intro phrases. No checklists."
-}}
+You MUST output your response using the exact XML structure below. Do not include any other text before or after.
+<reasoning>
+your step-by-step internal thoughts, constraint checks, and task analysis
+</reasoning>
+<FINAL_ANSWER>
+your polished final answer in the requested output format. No intro phrases.
+</FINAL_ANSWER>
 
-RULES FOR final_answer:
+RULES FOR <FINAL_ANSWER>:
 - NO introductory phrases like "Based on...", "Let me explain...", "Here's what..."
-- Answer directly and concisely
+- Follow the requested output format EXACTLY. If a table is requested, you must output a markdown table.
 - PARAPHRASE the context in your own words—do NOT copy-paste source text
 - Do NOT include author names or dates in the answer
 - ALWAYS cite the specific source you used by inserting [1], [2], etc. inside your text where appropriate.
@@ -217,7 +227,7 @@ RULES FOR final_answer:
 {question}
 </question>
 
-Respond with the JSON object now:"""
+Respond with the exact XML format now. Ensure your <FINAL_ANSWER> strictly follows the "{output_format}" format:"""
     
     return prompt
 
@@ -227,9 +237,9 @@ async def classify_query(client: AIClient, question: str) -> str:
     prompt = (
         "Classify this user query into strictly one of three categories:\n"
         "1. CONVERSATIONAL: Simple greetings, praise, thanks, goodbyes, or small talk (e.g. 'hello', 'thanks', 'how are you').\n"
-        "2. OFF_TOPIC: Requests unrelated to answering questions from notes, such as asking to write a poem, generate code, personal advice, or tell a joke.\n"
-        "3. INFORMATIONAL: Questions asking for facts, explanations, summaries, or knowledge.\n\n"
-        "Reply with EXACTLY ONE WORD: CONVERSATIONAL, OFF_TOPIC, or INFORMATIONAL."
+        "2. OFF_TOPIC: Requests completely unrelated to computer science, programming, or general academic study (e.g. asking for recipes, writing poems, pop culture, politics, 'who is donald trump').\n"
+        "3. INFORMATIONAL_DOMAIN: Questions asking for facts, explanations, summaries, or knowledge related to computer science, study notes, or general educational topics.\n\n"
+        "Reply with EXACTLY ONE WORD: CONVERSATIONAL, OFF_TOPIC, or INFORMATIONAL_DOMAIN."
     )
     try:
         res = await asyncio.wait_for(
@@ -239,9 +249,9 @@ async def classify_query(client: AIClient, question: str) -> str:
         res_upper = res.strip().upper()
         if "CONVERSATIONAL" in res_upper: return "CONVERSATIONAL"
         if "OFF_TOPIC" in res_upper: return "OFF_TOPIC"
-        return "INFORMATIONAL"
+        return "INFORMATIONAL_DOMAIN"
     except Exception:
-        return "INFORMATIONAL"  # Default to informational if classification fails
+        return "INFORMATIONAL_DOMAIN"  # Default to domain if classification fails
 
 
 async def is_conversation_continuation(
@@ -701,15 +711,23 @@ async def ask_question_logic(**kwargs) -> dict:
         if intent == "CONVERSATIONAL":
             context = "User is just making conversation."
             prompt = f"""You are a friendly study assistant. Respond warmly to the user.
-CRITICAL: You MUST output your response as a valid JSON object matching:
-{{
-  "reasoning": "Internal thoughts",
-  "final_answer": "Your friendly response here"
-}}
+CRITICAL: You MUST output your response using the exact XML structure below:
+<reasoning>
+Internal thoughts about the appropriate conversational response.
+</reasoning>
+<FINAL_ANSWER>
+Your friendly response here
+</FINAL_ANSWER>
 Question: {message}"""
         elif intent == "OFF_TOPIC":
             context = "User asking off-topic."
-            prompt = "You MUST output EXACTLY AND ONLY this JSON: {\"reasoning\": \"The user asked an off-topic question.\", \"final_answer\": \"Sorry I am not made to answer that, im here to help you study better and smarter...\"}"
+            prompt = """You MUST output EXACTLY AND ONLY this XML structure:
+<reasoning>
+The user asked a completely unrelated or off-topic question.
+</reasoning>
+<FINAL_ANSWER>
+Sorry, I am here to help you study better and smarter with your notes. I am unable to answer questions unrelated to your studies or computer science!
+</FINAL_ANSWER>"""
         else:
             t_step4_start = time.time()
             if target_note_ids:
@@ -761,7 +779,22 @@ Question: {message}"""
         if ai_client.ai_model_name:
             ai_model_info += f" ({ai_client.ai_model_name})"
 
-        response = await ai_client.answer_question(question=message, context=context, system_prompt=prompt)
+        raw_response = await ai_client.answer_question(question=message, context=context, system_prompt=prompt)
+        
+        # Parse the XML response to extract only the FINAL_ANSWER
+        import re
+        final_answer_match = re.search(r'<FINAL_ANSWER>\s*(.*?)\s*(?:</FINAL_ANSWER>|$)', raw_response, flags=re.DOTALL | re.IGNORECASE)
+        if final_answer_match:
+            response = final_answer_match.group(1).strip()
+        else:
+            # Fallback if the model didn't use the tags
+            response = raw_response.strip()
+            # If it included reasoning but no final answer end tag, try to split
+            if "<reasoning>" in response and "</reasoning>" in response:
+                response = response.split("</reasoning>")[-1].strip()
+                # Strip dangling <FINAL_ANSWER> tag just in case
+                response = re.sub(r'^<FINAL_ANSWER>\s*', '', response, flags=re.IGNORECASE)
+                
         model_ms = (time.time() - t_model_start) * 1000.0
         step_times["step7"] = round((time.time() - t_step7_start) * 1000.0, 2)
 

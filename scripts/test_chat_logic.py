@@ -1,81 +1,72 @@
 import asyncio
-import sys
 import os
+import sys
+import re
 
-# Add the base directory to sys.path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the project root to the python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.utils.db import SessionLocal
-from app.models.db import Lecture, User
-from app.routers.chat import ask_question_logic
+from app.models.db import User
+from app.processing.ai_client import AIClient
+from app.routers.chat import classify_query, build_mode_prompt
 
-async def main():
+async def run_tests():
     db = SessionLocal()
-    
-    lecture_id = "nt_01ff5107"
-    lecture = db.query(Lecture).filter(Lecture.id == lecture_id).first()
-    
-    if not lecture:
-        print(f"Error: Lecture {lecture_id} not found in DB!")
-        db.close()
-        return
+    try:
+        user = db.query(User).first()
+        if not user:
+            print("No user found in database.")
+            return
+            
+        client = AIClient(user=user, db=db)
+        print(f"Using AI Provider: {client.provider}")
         
-    user = db.query(User).filter(User.id == lecture.user_id).first()
-    if not user:
-        print(f"Error: User {lecture.user_id} not found in DB!")
-        db.close()
-        return
+        # Test 1: Classify Query (Domain-aware)
+        print("\n=== TEST 1: Classify Query ===")
+        queries = [
+            ("who is donald trump", "OFF_TOPIC"),
+            ("hello how are you", "CONVERSATIONAL"),
+            ("what are the advantages of python over java", "INFORMATIONAL_DOMAIN"),
+            ("explain object oriented programming", "INFORMATIONAL_DOMAIN")
+        ]
         
-    db.close()
-    
-    print(f"Testing for User {user.id} on Lecture {lecture_id} ('{lecture.title}')")
-    
-    success_count = 0
-    failures = []
-    
-    for i in range(10):
-        print(f"\n--- Test iteration {i+1} ---")
-        try:
-            result = await ask_question_logic(
-                user_id=user.id,
-                message="What is OOP",
-                lecture_id=lecture_id,
-                ai_mode="normal",
-                output_format="sentence",
-                auto_detect_conversation=False
-            )
-            
-            response_text = result["response"]
-            sources = result.get("detailed_sources", [])
-            
-            print(f"Response:\n{response_text}\n{'='*20}")
-            print(f"Sources: {len(sources)}")
-            
-            has_think_tag = "<think>" in response_text or "</think>" in response_text
-            is_web = any(s.get("is_web", False) for s in sources)
-            
-            if has_think_tag:
-                print("FAILURE: <think> tag leaked into output.")
-                failures.append(f"Iteration {i+1}: leaked <think> tag")
-            elif is_web:
-                print("FAILURE: Used web search instead of local knowledge base.")
-                failures.append(f"Iteration {i+1}: used web search")
+        for q, expected in queries:
+            result = await classify_query(client, q)
+            print(f"Query: '{q}'\nExpected: {expected} | Actual: {result}")
+            if result != expected:
+                print("  => FAILED ❌")
             else:
-                print("SUCCESS.")
-                success_count += 1
+                print("  => PASSED ✅")
                 
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            print(f"Error: {e}")
-            failures.append(f"Iteration {i+1}: Error {e}")
+        # Test 2: Build Mode Prompt Output (Table format)
+        print("\n=== TEST 2: Generate Table Format Output ===")
+        context = "[Source 1]: Object-oriented programming (OOP) is a programming paradigm based on the concept of 'objects', which can contain data and code: data in the form of fields (often known as attributes or properties), and code, in the form of procedures (often known as methods)."
+        question = "what is oop"
+        prompt = build_mode_prompt(context, question, mode="elaborate", output_format="table")
+        
+        print("Sending prompt to AI...")
+        raw_response = await client.answer_question(question=question, context=context, system_prompt=prompt)
+        
+        print("\n--- RAW XML RESPONSE ---")
+        print(raw_response)
+        
+        # Test 3: XML Parsing
+        print("\n=== TEST 3: XML Parsing ===")
+        final_answer_match = re.search(r'<FINAL_ANSWER>(.*?)</FINAL_ANSWER>', raw_response, flags=re.DOTALL | re.IGNORECASE)
+        if final_answer_match:
+            parsed = final_answer_match.group(1).strip()
+            print("Successfully extracted <FINAL_ANSWER>:")
+            print(parsed)
+            if "|" in parsed and "-" in parsed:
+                print("\nOutput looks like a Markdown table! => PASSED ✅")
+            else:
+                print("\nOutput does NOT look like a Markdown table! => FAILED ❌")
+        else:
+            print("Failed to find <FINAL_ANSWER> tags! => FAILED ❌")
             
-    print("\n==============================")
-    print(f"Test complete. Success: {success_count}/10")
-    if failures:
-        print("Failures:")
-        for f in failures:
-            print(f" - {f}")
+    finally:
+        db.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(run_tests())
