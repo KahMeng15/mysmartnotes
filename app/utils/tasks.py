@@ -277,8 +277,10 @@ class QuizTask:
                 question_types=kwargs.get("question_types"),
                 num_questions=kwargs.get("num_questions"),
                 quiz_group_id=kwargs.get("quiz_group_id"),
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                quiz_id=kwargs.get("quiz_id")
             )
+            return {"quiz_id": quiz.id}
             # Quiz model to dict (simplified for result)
             return {"quiz_id": quiz.id, "title": quiz.title}
         finally:

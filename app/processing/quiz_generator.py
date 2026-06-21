@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.db import User, Quiz, QuizQuestion, Subject, Note, SubjectGroup
 from app.processing.ai_client import AIClient
 from app.utils.db import generate_random_id
+from app.utils.storage import StorageManager
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,8 @@ async def generate_advanced_quiz(
     question_types: List[str],
     num_questions: int = 5,
     quiz_group_id: str = None,
-    progress_callback: Optional[callable] = None
+    progress_callback: Optional[callable] = None,
+    quiz_id: Optional[str] = None
 ) -> Quiz:
     """Generate a quiz with specific question types based on scope content."""
     
@@ -35,7 +37,7 @@ async def generate_advanced_quiz(
     if scope_type == "note":
         note = db.query(Note).filter(Note.id == scope_id, Note.user_id == user.id).first()
         if note:
-            content = note.extracted_text
+            content = StorageManager.get_note_text(note.id) or ""
             note_id = note.id
             subject_id = note.subject_id
             # Also get the group_id if possible
@@ -46,7 +48,7 @@ async def generate_advanced_quiz(
         subject = db.query(Subject).filter(Subject.id == scope_id, Subject.user_id == user.id).first()
         if subject:
             notes = db.query(Note).filter(Note.subject_id == subject.id).all()
-            content = "\\n\\n".join([l.extracted_text for l in notes if l.extracted_text])
+            content = "\n\n".join([StorageManager.get_note_text(l.id) or "" for l in notes])
             subject_id = subject.id
             group_id = subject.group_id
     elif scope_type == "group":
@@ -55,7 +57,7 @@ async def generate_advanced_quiz(
             subjects = db.query(Subject).filter(Subject.group_id == group.id).all()
             subject_ids = [s.id for s in subjects]
             notes = db.query(Note).filter(Note.subject_id.in_(subject_ids)).all()
-            content = "\\n\\n".join([l.extracted_text for l in notes if l.extracted_text])
+            content = "\n\n".join([StorageManager.get_note_text(l.id) or "" for l in notes])
             group_id = group.id
             
     if not content:
@@ -103,21 +105,47 @@ Respond with ONLY the JSON array.
         logger.error(f"Failed to parse quiz generation JSON: {response}")
         raise ValueError("Failed to generate valid quiz questions from AI.") from e
 
-    # Create the Quiz
-    quiz = Quiz(
-        id=generate_random_id(db, Quiz),
-        user_id=user.id,
-        title=title,
-        scope_type=scope_type,
-        group_id=group_id,
-        subject_id=subject_id,
-        note_id=note_id,
-        quiz_group_id=quiz_group_id,
-        model=ai_client.ai_model_name or ai_client.provider,
-        processing_time_ms=processing_time_ms
-    )
-    db.add(quiz)
-    db.flush() # Get the quiz ID
+    # Update the existing Quiz or create a new one if not provided
+    if quiz_id:
+        quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+        if quiz:
+            quiz.title = title
+            quiz.model = ai_client.ai_model_name or ai_client.provider
+            quiz.processing_time_ms = processing_time_ms
+        else:
+            quiz = Quiz(
+                id=quiz_id,
+                user_id=user.id,
+                title=title,
+                scope_type=scope_type,
+                group_id=group_id,
+                subject_id=subject_id,
+                note_id=note_id,
+                quiz_group_id=quiz_group_id,
+                model=ai_client.ai_model_name or ai_client.provider,
+                processing_time_ms=processing_time_ms
+            )
+            db.add(quiz)
+            db.flush()
+    else:
+        quiz = Quiz(
+            id=generate_random_id(db, Quiz),
+            user_id=user.id,
+            title=title,
+            scope_type=scope_type,
+            group_id=group_id,
+            subject_id=subject_id,
+            note_id=note_id,
+            quiz_group_id=quiz_group_id,
+            model=ai_client.ai_model_name or ai_client.provider,
+            processing_time_ms=processing_time_ms
+        )
+        db.add(quiz)
+        db.flush() # Get the quiz ID
+    
+    # Delete existing questions if any (e.g. retry)
+    if quiz_id:
+        db.query(QuizQuestion).filter(QuizQuestion.quiz_id == quiz.id).delete()
     
     # Create the Questions
     for idx, q_data in enumerate(questions_data):
@@ -149,15 +177,15 @@ async def generate_single_question(
     content = ""
     if quiz.note_id:
         note = db.query(Note).filter(Note.id == quiz.note_id).first()
-        if note: content = note.extracted_text
+        if note: content = StorageManager.get_note_text(note.id) or ""
     elif quiz.subject_id:
         notes = db.query(Note).filter(Note.subject_id == quiz.subject_id).all()
-        content = "\\n\\n".join([l.extracted_text for l in notes if l.extracted_text])
+        content = "\n\n".join([StorageManager.get_note_text(l.id) or "" for l in notes])
     elif quiz.group_id:
         subjects = db.query(Subject).filter(Subject.group_id == quiz.group_id).all()
         subject_ids = [s.id for s in subjects]
         notes = db.query(Note).filter(Note.subject_id.in_(subject_ids)).all()
-        content = "\\n\\n".join([l.extracted_text for l in notes if l.extracted_text])
+        content = "\n\n".join([StorageManager.get_note_text(l.id) or "" for l in notes])
         
     if not content:
         # Fallback to any content if quiz has no scope (shouldn't happen with AI quizzes)

@@ -2,7 +2,7 @@ import SummaryView from "./pages/SummaryView";
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from 'react-router-dom';
-import { AppShell, Burger, Group, Text, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton } from '@mantine/core';
+import { AppShell, Burger, Group, Text, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconDashboard, 
@@ -30,7 +30,36 @@ import NoteView from './pages/NoteView';
 import Settings from './pages/Settings';
 import GroupView from './pages/GroupView';
 import AdminPage from './pages/Admin';
+import QuizGroupView from './pages/QuizGroupView';
 import { fetchApi } from './lib/api';
+
+function GlobalToasts() {
+  const [toasts, setToasts] = useState([]);
+
+  useEffect(() => {
+    const handleError = (e) => {
+      const id = Date.now() + Math.random();
+      setToasts(prev => [...prev, { id, message: e.detail }]);
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, 5000);
+    };
+    window.addEventListener('apiError', handleError);
+    return () => window.removeEventListener('apiError', handleError);
+  }, []);
+
+  return (
+    <Portal>
+      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {toasts.map(t => (
+          <Notification key={t.id} title="System Error" color="red" onClose={() => setToasts(prev => prev.filter(x => x.id !== t.id))}>
+            {t.message}
+          </Notification>
+        ))}
+      </div>
+    </Portal>
+  );
+}
 
 function AppLayout({ children }) {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
@@ -100,8 +129,8 @@ function AppLayout({ children }) {
           <Tooltip label="Chat" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/chat" label={navOpen ? "Chat" : ""} leftSection={<IconMessageDots size="1.2rem" stroke={1.5} />} />
           </Tooltip>
-          <Tooltip label="Quiz Engine" disabled={navOpen} position="right">
-            <MantineNavLink component={NavLink} to="/quiz" label={navOpen ? "Quiz Engine" : ""} leftSection={<IconBolt size="1.2rem" stroke={1.5} />} />
+          <Tooltip label="Quiz" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/quiz" label={navOpen ? "Quiz" : ""} leftSection={<IconBolt size="1.2rem" stroke={1.5} />} />
           </Tooltip>
           <Tooltip label="Upload" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/upload" label={navOpen ? "Upload" : ""} leftSection={<IconUpload size="1.2rem" stroke={1.5} />} />
@@ -150,6 +179,7 @@ function AppLayout({ children }) {
       <AppShell.Main>
         {children}
       </AppShell.Main>
+      <GlobalToasts />
     </AppShell>
   );
 }
@@ -174,6 +204,7 @@ function App() {
           <Route path="/note/:id" element={<NoteView />} />
           <Route path="/note/:noteId/summary" element={<SummaryView />} />
           <Route path="/note/:noteId/summary/:summaryId" element={<SummaryView />} />
+          <Route path="/quiz-group/:id" element={<QuizGroupView />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin" element={<AdminPage />} />
         </Routes>

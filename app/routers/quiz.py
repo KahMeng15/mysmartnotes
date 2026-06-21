@@ -7,12 +7,14 @@ import json
 import os
 import uuid
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
 from app.models.db import User, Quiz, QuizQuestion, Subject, Note, QuizProgress, Summary, SubjectGroup, QuizGroup
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
+from app.utils.tasks import TaskManager
 from app.utils.quotas import enforce_quota_quizzes
 from app.schemas.quiz import (
     QuizCreate, QuizUpdate, QuizResponse, QuizQuestionCreate, QuizQuestionResponse,
@@ -35,7 +37,7 @@ router = APIRouter(
 # In-memory export progress tracking
 _export_progress = {}
 
-@router.get("/", response_model=List[QuizResponse])
+@router.get("", response_model=List[QuizResponse])
 def get_quizzes(
     q: Optional[str] = None,
     quiz_group_id: Optional[str] = None,
@@ -142,7 +144,7 @@ def move_quiz(
     db.commit()
     return {"success": True}
 
-@router.post("/", response_model=QuizResponse)
+@router.post("", response_model=QuizResponse)
 def create_quiz(
     quiz_in: QuizCreate,
     current_user: User = Depends(get_current_user),
@@ -224,11 +226,57 @@ async def generate_quiz_ai(
     enforce_quota_quizzes(current_user, db)
     
     task_id = f"quiz_{current_user.id}_{int(time.time())}"
+    
+    # 1. Determine title
+    title = request.title
+    if not title:
+        if request.scope_type == "note" and request.scope_id:
+            note = db.query(Note).filter(Note.id == request.scope_id).first()
+            title = f"Quiz on {note.title}" if note else "Generating AI Quiz..."
+        elif request.scope_type == "subject" and request.scope_id:
+            subject = db.query(Subject).filter(Subject.id == request.scope_id).first()
+            title = f"Quiz on {subject.name}" if subject else "Generating AI Quiz..."
+        elif request.scope_type == "group" and request.scope_id:
+            group = db.query(SubjectGroup).filter(SubjectGroup.id == request.scope_id).first()
+            title = f"Quiz on {group.name}" if group else "Generating AI Quiz..."
+        else:
+            title = "Generating AI Quiz..."
+
+    # 2. Synchronously create Quiz record with 0 questions
+    quiz_id = generate_random_id(db, Quiz)
+    quiz = Quiz(
+        id=quiz_id,
+        user_id=current_user.id,
+        title=title,
+        scope_type=request.scope_type,
+        quiz_group_id=request.quiz_group_id,
+        model="Generating..." # Status indicator
+    )
+    
+    if request.scope_type == "group":
+        quiz.group_id = request.scope_id
+    elif request.scope_type == "subject":
+        quiz.subject_id = request.scope_id
+        subject = db.query(Subject).filter(Subject.id == request.scope_id).first()
+        if subject: quiz.group_id = subject.group_id
+    elif request.scope_type == "note":
+        quiz.note_id = request.scope_id
+        note = db.query(Note).filter(Note.id == request.scope_id).first()
+        if note:
+            quiz.subject_id = note.subject_id
+            subject = db.query(Subject).filter(Subject.id == note.subject_id).first()
+            if subject: quiz.group_id = subject.group_id
+
+    db.add(quiz)
+    db.commit()
+    
+    # 3. Fire background task
     TaskManager.submit_task(
         task_id, 
         "quiz_generation", 
         current_user.id, 
-        title=request.title,
+        quiz_id=quiz_id, # Provide quiz_id to worker
+        title=request.title, # Passed if backend still wants to use it
         scope_type=request.scope_type,
         scope_id=request.scope_id,
         question_types=request.question_types,
@@ -236,7 +284,7 @@ async def generate_quiz_ai(
         quiz_group_id=request.quiz_group_id
     )
 
-    return {"task_id": task_id, "status": "pending"}
+    return {"task_id": task_id, "quiz_id": quiz_id, "status": "pending"}
 
 @router.post("/import", response_model=QuizResponse)
 async def import_quiz_endpoint(
