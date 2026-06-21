@@ -925,6 +925,12 @@ async def update_profile(user_update: UserUpdate, current_user: User = Depends(g
         current_user.action_sidebar_open = user_update.action_sidebar_open
     if getattr(user_update, "sort_preference", None) is not None:
         current_user.sort_preference = user_update.sort_preference
+    if getattr(user_update, "last_chat_context", None) is not None:
+        current_user.last_chat_context = user_update.last_chat_context
+    if getattr(user_update, "last_chat_ai_mode", None) is not None:
+        current_user.last_chat_ai_mode = user_update.last_chat_ai_mode
+    if getattr(user_update, "last_chat_output_format", None) is not None:
+        current_user.last_chat_output_format = user_update.last_chat_output_format
         
     db.commit()
     db.refresh(current_user)

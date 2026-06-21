@@ -88,6 +88,21 @@ export default function ChatInterface() {
   const [aiMode, setAiMode] = useState('elaborate');
   const [outputFormat, setOutputFormat] = useState('sentence');
   
+  const handleAiModeChange = (mode) => {
+    setAiMode(mode);
+    fetchApi('/auth/profile', { method: 'PUT', body: JSON.stringify({ last_chat_ai_mode: mode }) }).catch(console.error);
+  };
+  
+  const handleOutputFormatChange = (format) => {
+    setOutputFormat(format);
+    fetchApi('/auth/profile', { method: 'PUT', body: JSON.stringify({ last_chat_output_format: format }) }).catch(console.error);
+  };
+
+  const handleContextTypeChange = (scope) => {
+    setContextType(scope);
+    fetchApi('/auth/profile', { method: 'PUT', body: JSON.stringify({ last_chat_context: scope }) }).catch(console.error);
+  };
+  
   // Data for context dropdowns
   const [groups, setGroups] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -169,6 +184,13 @@ export default function ChatInterface() {
         setMessages([]);
         setCurrentTaskId(null);
         setLoading(false);
+        fetchApi('/auth/me').then(profileData => {
+           if (profileData) {
+             if (profileData.last_chat_context) setContextType(profileData.last_chat_context);
+             if (profileData.last_chat_ai_mode) setAiMode(profileData.last_chat_ai_mode);
+             if (profileData.last_chat_output_format) setOutputFormat(profileData.last_chat_output_format);
+           }
+        }).catch(console.error);
       }
     }
   }, [cvid]);
@@ -176,15 +198,22 @@ export default function ChatInterface() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [grpData, subjData, lectData] = await Promise.all([
+        const [grpData, subjData, lectData, profileData] = await Promise.all([
           fetchApi('/groups').catch(() => []),
           fetchApi('/subjects').catch(() => []),
-          fetchApi('/notes').catch(() => [])
+          fetchApi('/notes').catch(() => []),
+          fetchApi('/auth/me').catch(() => null)
         ]);
         
         setGroups((grpData || []).sort((a, b) => a.name.localeCompare(b.name)));
         setSubjects((subjData || []).sort((a, b) => a.name.localeCompare(b.name)));
         setNotes((lectData || []).sort((a, b) => a.title.localeCompare(b.title)));
+        
+        if (profileData && !cvid) {
+           if (profileData.last_chat_context) setContextType(profileData.last_chat_context);
+           if (profileData.last_chat_ai_mode) setAiMode(profileData.last_chat_ai_mode);
+           if (profileData.last_chat_output_format) setOutputFormat(profileData.last_chat_output_format);
+        }
       } catch (err) {
         console.error("Failed to load context data", err);
       }
@@ -282,6 +311,23 @@ export default function ChatInterface() {
         });
       }
       setMessages(formattedMsgs);
+      if (formattedMsgs.length > 0) {
+        const lastMsg = formattedMsgs[formattedMsgs.length - 1];
+        if (lastMsg.ai_mode) setAiMode(lastMsg.ai_mode);
+        if (lastMsg.output_format) setOutputFormat(lastMsg.output_format);
+        if (lastMsg.note_id) {
+          setContextType('note');
+          setSelectedNoteId(lastMsg.note_id);
+        } else if (lastMsg.subject_id) {
+          setContextType('subject');
+          setSelectedSubjectId(lastMsg.subject_id);
+        } else if (lastMsg.group_id) {
+          setContextType('group');
+          setSelectedGroupId(lastMsg.group_id);
+        } else {
+          setContextType('global');
+        }
+      }
       setLoading(false);
     } catch (err) {
       console.error("Failed to load conversation", err);
@@ -854,7 +900,7 @@ export default function ChatInterface() {
                             key={scope}
                             component="button"
                             onClick={() => {
-                              setContextType(scope);
+                              handleContextTypeChange(scope);
                               // Reset cascading selections when scope changes
                               setSelectedGroupId(null);
                               setSelectedSubjectId(null);
@@ -940,7 +986,7 @@ export default function ChatInterface() {
                             <Badge 
                               key={mode}
                               component="button"
-                              onClick={() => setAiMode(mode)}
+                              onClick={() => handleAiModeChange(mode)}
                               variant={aiMode === mode ? "filled" : "light"}
                               color="blue"
                               size="md"
@@ -968,7 +1014,7 @@ export default function ChatInterface() {
                             <Badge 
                               key={format.value}
                               component="button"
-                              onClick={() => setOutputFormat(format.value)}
+                              onClick={() => handleOutputFormatChange(format.value)}
                               variant={outputFormat === format.value ? "filled" : "light"}
                               color="teal"
                               size="md"

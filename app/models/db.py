@@ -46,6 +46,11 @@ class User(Base):
     action_sidebar_open = Column(Boolean, default=True)
     sort_preference = Column(String(50), default="name_asc")
     
+    # Chat Preferences
+    last_chat_context = Column(String(50), default="global")
+    last_chat_ai_mode = Column(String(50), default="elaborate")
+    last_chat_output_format = Column(String(50), default="sentence")
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

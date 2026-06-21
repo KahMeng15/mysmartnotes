@@ -48,6 +48,9 @@ class UserUpdate(BaseModel):
     nav_sidebar_open: Optional[bool] = None
     action_sidebar_open: Optional[bool] = None
     sort_preference: Optional[str] = None
+    last_chat_context: Optional[str] = None
+    last_chat_ai_mode: Optional[str] = None
+    last_chat_output_format: Optional[str] = None
 
 
 class User(UserBase):
@@ -65,6 +68,9 @@ class User(UserBase):
     nav_sidebar_open: bool = True
     action_sidebar_open: bool = True
     sort_preference: str = "name_asc"
+    last_chat_context: str = "global"
+    last_chat_ai_mode: str = "elaborate"
+    last_chat_output_format: str = "sentence"
     created_at: Optional[datetime] = None
     
     class Config:
