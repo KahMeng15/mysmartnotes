@@ -842,6 +842,14 @@ Sorry, I am here to help you study better and smarter with your notes. I am unab
                 # Strip dangling <FINAL_ANSWER> tag just in case
                 response = re.sub(r'^<FINAL_ANSWER>\s*', '', response, flags=re.IGNORECASE)
                 
+        # Fix markdown table formatting by ensuring blank lines before and after tables
+        # First, remove leading indentation from markdown table rows to prevent them from rendering as code blocks
+        response = re.sub(r'^[ \t]+(\|.*\|)', r'\1', response, flags=re.MULTILINE)
+        
+        # Then, only trigger spacing injection if there is exactly one newline between text and the table.
+        response = re.sub(r'([^|\s])([ \t]*\n[ \t]*)(\|.*\|)', r'\1\n\n\3', response)
+        response = re.sub(r'(\|.*\|)([ \t]*\n[ \t]*)([^|\s])', r'\1\n\n\3', response)
+                
         model_ms = (time.time() - t_model_start) * 1000.0
         step_times["step7"] = round((time.time() - t_step7_start) * 1000.0, 2)
         if "step8" in step_times:
@@ -853,19 +861,12 @@ Sorry, I am here to help you study better and smarter with your notes. I am unab
             conv_title = existing_msg.conversation_title
         else:
             try:
-                title_prompt = "You MUST output EXACTLY AND ONLY this JSON format: {\"reasoning\": \"brief reasoning here\", \"final_answer\": \"Short 3-5 word title\"}\nGenerate a title for the conversation starting with this message."
+                title_prompt = "You MUST output EXACTLY AND ONLY this JSON format: {\"reasoning\": \"brief reasoning here\", \"final_answer\": \"Short 3-5 word title\"}\nGenerate a descriptive topic title (e.g., 'Concept of Inheritance') for the conversation starting with this message. DO NOT simply repeat the user's question."
                 title_prompt += f"\nMessage: {message}"
                 conv_title_raw = await ai_client.answer_question(question=message, context="", system_prompt=title_prompt)
-                try:
-                    import re
-                    json_match = re.search(r'(\{.*\})', conv_title_raw, flags=re.DOTALL)
-                    if json_match:
-                        parsed = json.loads(json_match.group(1))
-                        conv_title = parsed.get("final_answer", parsed.get("title", ""))
-                    else:
-                        conv_title = ""
-                except Exception:
-                    conv_title = ""
+                conv_title = conv_title_raw.strip()
+                if conv_title.startswith('"') and conv_title.endswith('"'):
+                    conv_title = conv_title[1:-1]
                     
                 if not conv_title or len(conv_title) > 100 or "reasoning" in conv_title.lower() or "{" in conv_title:
                     conv_title = generate_conversation_title(message)

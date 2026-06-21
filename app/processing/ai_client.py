@@ -206,6 +206,8 @@ class AIClient:
                 parsed = json.loads(json_match.group(1))
                 if "final_answer" in parsed:
                     return str(parsed["final_answer"]).strip()
+                elif "title" in parsed:
+                    return str(parsed["title"]).strip()
             
             # Fallback: Look for the outermost curly braces anywhere in the text
             brace_match = re.search(r'(\{.*\})', text, flags=re.DOTALL)
@@ -213,12 +215,16 @@ class AIClient:
                 parsed = json.loads(brace_match.group(1))
                 if "final_answer" in parsed:
                     return str(parsed["final_answer"]).strip()
+                elif "title" in parsed:
+                    return str(parsed["title"]).strip()
                     
             # Legacy fallback for perfectly formatted clean text without braces
             clean_text = text.strip()
             parsed = json.loads(clean_text)
             if "final_answer" in parsed:
                 return str(parsed["final_answer"]).strip()
+            elif "title" in parsed:
+                return str(parsed["title"]).strip()
         except Exception:
             pass
         
