@@ -100,6 +100,9 @@ export default function ChatInterface() {
   const [conversationToRename, setConversationToRename] = useState(null);
   const [newTitle, setNewTitle] = useState('');
 
+  const [deleteModalOpened, setDeleteModalOpened] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState(null);
+
   const handleRename = async () => {
     if (!conversationToRename || !newTitle.trim()) return;
     try {
@@ -124,19 +127,25 @@ export default function ChatInterface() {
     }
   };
 
-  const handleDelete = async (conv, e) => {
+  const handleDeleteClick = (conv, e) => {
     e.stopPropagation();
-    if (confirm("Are you sure you want to delete this conversation?")) {
-      try {
-        await fetchApi(`/chat/conversations/${conv.conversation_id}`, { method: 'DELETE' });
-        if (currentConversationId === conv.conversation_id) {
-          navigate('/chat');
-        } else {
-          fetchConversations();
-        }
-      } catch (e) {
-        console.error(e);
+    setConversationToDelete(conv);
+    setDeleteModalOpened(true);
+  };
+
+  const executeDelete = async () => {
+    if (!conversationToDelete) return;
+    try {
+      await fetchApi(`/chat/conversations/${conversationToDelete.conversation_id}`, { method: 'DELETE' });
+      setDeleteModalOpened(false);
+      setConversationToDelete(null);
+      if (currentConversationId === conversationToDelete.conversation_id) {
+        navigate('/chat');
+      } else {
+        fetchConversations();
       }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -422,7 +431,21 @@ export default function ChatInterface() {
       finalAnswer = text || "*(No response provided)*";
     }
 
-    const processedAnswer = finalAnswer.replace(/\[(\d+)\]/g, '[$1](#source-$1)');
+    let processedAnswer = finalAnswer;
+    const citationBlockPattern = /(?:\[|【)(?:\s*source\s*)?\d+(?:\s*,\s*(?:\s*source\s*)?\d+)*\s*(?:\]|】)/gi;
+    processedAnswer = processedAnswer.replace(citationBlockPattern, (match) => {
+      const numbers = match.match(/\d+/g);
+      if (!numbers) return match;
+      return numbers.map(num => `[${num}](#source-${num})`).join(' ');
+    });
+    const bareSourcePattern = /\bSource\s+(\d+)\b/gi;
+    processedAnswer = processedAnswer.replace(bareSourcePattern, (match, num) => {
+      return `[${num}](#source-${num})`;
+    });
+    const supPattern = /<sup>\s*(\d+)\s*<\/sup>/gi;
+    processedAnswer = processedAnswer.replace(supPattern, (match, num) => {
+      return `<sup>[${num}](#source-${num})</sup>`;
+    });
 
     const LinkRenderer = (props) => {
       const { href, children } = props;
@@ -611,6 +634,14 @@ export default function ChatInterface() {
         </Group>
       </Modal>
 
+      <Modal opened={deleteModalOpened} onClose={() => setDeleteModalOpened(false)} title="Confirm Delete Conversation" centered>
+        <Text size="sm" mb="lg">Are you sure you want to delete this conversation?</Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setDeleteModalOpened(false)}>Cancel</Button>
+          <Button color="red" onClick={executeDelete}>Delete</Button>
+        </Group>
+      </Modal>
+
     <Flex h="100vh">
       {/* Sidebar: Conversations */}
       <Box 
@@ -674,7 +705,7 @@ export default function ChatInterface() {
                         <Menu.Item leftSection={<IconPin size={14} />} onClick={(e) => handlePin(conv, e)}>
                           {conv.is_pinned ? 'Unpin' : 'Pin'}
                         </Menu.Item>
-                        <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => handleDelete(conv, e)}>
+                        <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => handleDeleteClick(conv, e)}>
                           Delete
                         </Menu.Item>
                       </Menu.Dropdown>

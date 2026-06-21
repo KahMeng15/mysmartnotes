@@ -2211,10 +2211,32 @@ function openSourceReference(noteId, position) {
 
 // ── Citation Parsing ──
 function parseCitations(text) {
-    const citationPattern = /\[(\d+)\]/g;
-    return text.replace(citationPattern, (match, num) => {
+    let converted = text;
+
+    // 1. Bracketed lists of citations: [1], [1, 2, 3], [Source 1, Source 2], 【1, 2】
+    const citationBlockPattern = /(?:\[|【)(?:\s*source\s*)?\d+(?:\s*,\s*(?:\s*source\s*)?\d+)*\s*(?:\]|】)/gi;
+    
+    converted = converted.replace(citationBlockPattern, (match) => {
+        const numbers = match.match(/\d+/g);
+        if (!numbers) return match;
+        return numbers.map(num => 
+            `<span class="note-citation-link" data-citation-num="${num}" onclick="handleCitationClick(event, ${num})">[${num}]</span>`
+        ).join(' ');
+    });
+
+    // 2. Bare "Source X"
+    const bareSourcePattern = /\bSource\s+(\d+)\b/gi;
+    converted = converted.replace(bareSourcePattern, (match, num) => {
         return `<span class="note-citation-link" data-citation-num="${num}" onclick="handleCitationClick(event, ${num})">[${num}]</span>`;
     });
+
+    // 3. Superscript citations like <sup>1</sup>
+    const supPattern = /<sup>\s*(\d+)\s*<\/sup>/gi;
+    converted = converted.replace(supPattern, (match, num) => {
+        return `<sup><span class="note-citation-link" data-citation-num="${num}" onclick="handleCitationClick(event, ${num})">[${num}]</span></sup>`;
+    });
+
+    return converted;
 }
 
 function handleCitationClick(event, citationNum) {

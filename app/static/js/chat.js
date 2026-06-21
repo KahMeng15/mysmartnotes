@@ -1304,9 +1304,17 @@ async function toggleConvFav(e, convId) {
 
 async function deleteConv(e, convId) {
     e.stopPropagation();
-    showDeleteConfirmModal(() => {
-        performDeleteConv(convId);
-    });
+    console.log("deleteConv executed: Using window.showConfirmModal");
+    if (window.showConfirmModal) {
+        window.showConfirmModal("Are you sure you want to delete this conversation?", () => {
+            performDeleteConv(convId);
+        });
+    } else {
+        console.log("window.showConfirmModal is not defined! Falling back to confirm()");
+        if (confirm("Are you sure you want to delete this conversation?")) {
+            performDeleteConv(convId);
+        }
+    }
 }
 
 async function performDeleteConv(convId) {
@@ -1316,39 +1324,6 @@ async function performDeleteConv(convId) {
         await fetchConversations();
     } catch (err) { console.error(err); }
 }
-
-function showDeleteConfirmModal(onConfirm) {
-    let modal = document.getElementById('deleteConfirmModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'deleteConfirmModal';
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content" style="min-height: auto;">
-                <h3>Delete Conversation?</h3>
-                <p style="margin-bottom: var(--spacing-lg); color: var(--color-gray);">Are you sure you want to delete this entire conversation? This action cannot be undone.</p>
-                <div class="modal-buttons">
-                    <button type="button" class="btn-save" style="background: var(--color-error);" onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='var(--color-error)'" onclick="confirmDeleteConv()">Delete</button>
-                    <button type="button" class="btn-cancel" onclick="cancelDeleteConv()">Cancel</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    }
-    modal.classList.add('active');
-    window._deleteConfirmCallback = onConfirm;
-}
-
-window.confirmDeleteConv = function () {
-    const modal = document.getElementById('deleteConfirmModal');
-    if (modal) modal.classList.remove('active');
-    if (window._deleteConfirmCallback) window._deleteConfirmCallback();
-};
-
-window.cancelDeleteConv = function () {
-    const modal = document.getElementById('deleteConfirmModal');
-    if (modal) modal.classList.remove('active');
-};
 
 async function exportConv(e, convId) {
     e.stopPropagation();
@@ -1380,12 +1355,29 @@ function parseCitations(text) {
      * Parse text with [1], [2], etc. citations and convert them to clickable links.
      * Returns HTML with citations as clickable spans.
      */
-    // Pattern to match [1], [2], etc.
-    const citationPattern = /\[(\d+)\]/g;
     let converted = text;
 
-    converted = converted.replace(citationPattern, (match, num) => {
+    // 1. Bracketed lists of citations: [1], [1, 2, 3], [Source 1, Source 2], 【1, 2】
+    const citationBlockPattern = /(?:\[|【)(?:\s*source\s*)?\d+(?:\s*,\s*(?:\s*source\s*)?\d+)*\s*(?:\]|】)/gi;
+    
+    converted = converted.replace(citationBlockPattern, (match) => {
+        const numbers = match.match(/\d+/g);
+        if (!numbers) return match;
+        return numbers.map(num => 
+            `<span class="citation-link" data-citation-num="${num}" onclick="handleCitationClick(event, ${num})">[${num}]</span>`
+        ).join(' ');
+    });
+
+    // 2. Bare "Source X"
+    const bareSourcePattern = /\bSource\s+(\d+)\b/gi;
+    converted = converted.replace(bareSourcePattern, (match, num) => {
         return `<span class="citation-link" data-citation-num="${num}" onclick="handleCitationClick(event, ${num})">[${num}]</span>`;
+    });
+
+    // 3. Superscript citations like <sup>1</sup>
+    const supPattern = /<sup>\s*(\d+)\s*<\/sup>/gi;
+    converted = converted.replace(supPattern, (match, num) => {
+        return `<sup><span class="citation-link" data-citation-num="${num}" onclick="handleCitationClick(event, ${num})">[${num}]</span></sup>`;
     });
 
     return converted;
