@@ -204,7 +204,7 @@ export default function ChatInterface() {
   useEffect(() => {
     let interval;
     if (loading && currentTaskId) {
-      interval = setInterval(checkTaskStatus, 1500);
+      interval = setInterval(checkTaskStatus, 500);
     }
     return () => clearInterval(interval);
   }, [loading, currentTaskId]);

@@ -114,7 +114,7 @@ async def main():
         try:
             processed = await process_next_task()
             if not processed:
-                await asyncio.sleep(2)  # Wait before polling again
+                await asyncio.sleep(0.5)  # Wait before polling again
         except KeyboardInterrupt:
             logger.info("Worker shutting down...")
             break

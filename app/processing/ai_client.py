@@ -321,10 +321,13 @@ class AIClient:
                     messages.append({"role": "system", "content": system_instruction})
                 messages.append({"role": "user", "content": modified_prompt})
                 
+                # Cap max_tokens to 2000 for Groq to prevent exceeding the strict 6000 TPM free tier limits
+                safe_max_tokens = min(max_tokens, 2000)
+                
                 res = await tier.model.chat.completions.create(
                     model=tier.model_name,
                     messages=messages,
-                    max_tokens=max_tokens,
+                    max_tokens=safe_max_tokens,
                     temperature=0.7
                 )
                 return res.choices[0].message.content
@@ -409,10 +412,13 @@ class AIClient:
                             messages.append({"role": "system", "content": system_instruction})
                         messages.append({"role": "user", "content": modified_prompt})
                         
+                        # Cap max_tokens to 2000 for Groq to prevent exceeding the strict 6000 TPM free tier limits
+                        safe_max_tokens = min(max_tokens, 2000)
+                        
                         stream = await tier.model.chat.completions.create(
                             model=tier.model_name,
                             messages=messages,
-                            max_tokens=max_tokens,
+                            max_tokens=safe_max_tokens,
                             temperature=0.7,
                             stream=True
                         )
