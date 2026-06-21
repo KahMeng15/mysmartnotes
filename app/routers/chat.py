@@ -143,19 +143,19 @@ Question: '{question}'"""
 
     # Base mode instructions with STRICTER constraints
     mode_instructions = {
-        "quick": "Extract the most important facts concisely. Do not add fluff.",
-        "simple": "Explain using plain, everyday language. Avoid all jargon.",
-        "normal": "Provide a balanced, clear, and informative response.",
-        "elaborate": "Provide a thorough, detailed, and well-structured explanation.",
-        "eli5": "Explain concepts so simply that a 5-year-old could understand. Use relatable, everyday analogies.",
+        "quick": "CRITICAL TONE: Extract the most important facts concisely. Do not add fluff.",
+        "simple": "CRITICAL TONE: Explain using extremely simple, plain English. Avoid all technical jargon. Imagine explaining this to someone who has never touched a computer.",
+        "normal": "CRITICAL TONE: Provide a balanced, clear, and informative response.",
+        "elaborate": "CRITICAL TONE: Provide a thorough, detailed, and well-structured explanation.",
+        "eli5": "CRITICAL TONE: Explain this EXACTLY as if you are talking to a 5-year-old child! You MUST invent a fun, everyday analogy (like toys, animals, or food) to explain the concept. Use extremely simple words.",
     }
 
     # Output format instructions
     output_instructions = {
         "sentence": "CRITICAL OUTPUT FORMAT: You MUST respond using complete sentences in standard paragraph format.",
-        "pointform": "CRITICAL OUTPUT FORMAT: You MUST format your answer entirely as a Markdown bulleted list. Each point must start on a new line with a '-' character.",
-        "numbered_list": "CRITICAL OUTPUT FORMAT: You MUST format your answer entirely as a Markdown numbered list. Each point must start on a new line with a number followed by a period (e.g., '1. ').",
-        "table": "CRITICAL OUTPUT FORMAT: Please utilize a Markdown table for structured data, but you may use normal sentences and bullet points outside the table to explain things.",
+        "pointform": "CRITICAL OUTPUT FORMAT: Please utilize a Markdown bulleted list to organize your points, but you may use normal introductory sentences before the list.",
+        "numbered_list": "CRITICAL OUTPUT FORMAT: Please utilize a Markdown numbered list to organize your points, but you may use normal introductory sentences before the list.",
+        "table": "CRITICAL OUTPUT FORMAT: Please utilize a Markdown table for structured data, but you MUST use normal sentences and bullet points outside the table to explain things naturally.",
         "mix": "CRITICAL OUTPUT FORMAT: You MUST use a mix of normal sentences, bullet points, and tables where appropriate to explain the concepts thoroughly."
     }
 
@@ -192,12 +192,19 @@ Question: '{question}'"""
 
 CRITICAL: 
 You MUST output your response using the exact XML structure below. Do not include any other text before or after.
+
 <reasoning>
-your step-by-step internal thoughts, constraint checks, and task analysis
+[Your internal thoughts, constraint checks, and task analysis here]
 </reasoning>
 <FINAL_ANSWER>
-your polished final answer in the requested output format. No intro phrases.
+[Your polished final answer in the requested output format here]
 </FINAL_ANSWER>
+
+INSTRUCTIONS FOR <reasoning>:
+1. Analyze the user's question.
+2. Scan the provided context blocks. Does the context actually contain the answer? (State YES or NO)
+3. If NO: You MUST stop and output exactly "Sorry, I am unable to find any answers for your question based on the context." in the <FINAL_ANSWER> block.
+4. If YES: Plan your answer format and tone.
 
 RULES FOR <FINAL_ANSWER>:
 - NO introductory phrases like "Based on...", "Let me explain...", "Here's what..."
@@ -205,6 +212,8 @@ RULES FOR <FINAL_ANSWER>:
 - PARAPHRASE the context in your own words—do NOT copy-paste source text
 - Do NOT include author names or dates in the answer
 - ALWAYS cite the specific source you used by inserting [1], [2], etc. inside your text where appropriate.
+- You MUST wrap your citations in square brackets exactly like this: [1] or [1][2]. Do NOT use bare numbers.
+- Synthesize information from MULTIPLE sources when possible to provide a comprehensive answer, citing all of them.
 - Do NOT make up your own citations. ONLY use the [Source X] numbers provided in the context blocks.
 - If you found the answer, provide IT and NOTHING ELSE. Do NOT append apologies to a valid answer.
 - Never add information outside the provided context
@@ -227,7 +236,7 @@ RULES FOR <FINAL_ANSWER>:
 {question}
 </question>
 
-Respond with the exact XML format now. Ensure your <FINAL_ANSWER> strictly follows the "{output_format}" format:"""
+Respond with the exact XML format now. Ensure your <FINAL_ANSWER> strictly follows the "{output_format}" format, and remember to follow your tone instructions: {mode_inst}"""
     
     return prompt
 
@@ -369,13 +378,13 @@ async def web_search(query: str, timeout: float = 10.0) -> tuple:
             
             score = 0.0
             
-            # 1. Title relevance (40% weight) - very important
+            # 1. Title relevance (60% weight) - very important
             title_matches = sum(1 for word in query_words if word in title_lower)
             title_score = (title_matches / len(query_words)) * 100 if query_words else 0
-            score += title_score * 0.40
+            score += title_score * 0.60
             
-            # 2. Keyword density in body (35% weight)
-            body_words = re.findall(r'\\b\\w+\\b', body_lower)
+            # 2. Keyword density in body (20% weight)
+            body_words = re.findall(r'\b\w+\b', body_lower)
             if body_words:
                 keyword_count = sum(1 for word in body_words if word in query_words)
                 density = keyword_count / len(body_words)
@@ -418,8 +427,8 @@ async def web_search(query: str, timeout: float = 10.0) -> tuple:
                 # Calculate relevance score
                 relevance = calculate_relevance(query, title, body)
                 
-                # Filter out low relevance results (< 20% with new algorithm)
-                if relevance < 20.0:
+                # Filter out low relevance results (< 50% with new algorithm)
+                if relevance < 50.0:
                     print(f"[chat] Skipping low-relevance result: {title[:50]}... (score: {relevance:.1f}%)")
                     continue
                 
@@ -757,19 +766,11 @@ Sorry, I am here to help you study better and smarter with your notes. I am unab
             step_times["step4"] = round((time.time() - t_step4_start) * 1000.0, 2)
 
             t_step5_start = time.time()
-            # Only fallback to web search if we truly have no context or very little context AND no chunks found
-            if not context or (len(context) < 50 and len(detailed_sources) == 0):
-                web_snippet, web_sources, web_error = await web_search(message, timeout=10.0)
-                if web_snippet:
-                    context = ""
-                    for idx, s in enumerate(web_sources):
-                        context += f"[Source {idx+1}]: {s.get('text_preview', '')}\n\n"
-                        detailed_sources.append({"text_preview": s.get("text_preview", ""), "is_web": True, "url": s.get("url", "")})
-                    
-            step_times["step5"] = round((time.time() - t_step5_start) * 1000.0, 2)
+            step_times["step5"] = 0.0
 
             t_step6_start = time.time()
-            prompt = build_mode_prompt(context or "No info", message, ai_mode, output_format, conversation_context=conversation_context)
+            has_web = any(s.get("is_web") for s in detailed_sources)
+            prompt = build_mode_prompt(context or "No info", message, ai_mode, output_format, is_web_search=has_web, conversation_context=conversation_context)
             step_times["step6"] = round((time.time() - t_step6_start) * 1000.0, 2)
         
         t_model_start = time.time()
@@ -779,7 +780,48 @@ Sorry, I am here to help you study better and smarter with your notes. I am unab
         if ai_client.ai_model_name:
             ai_model_info += f" ({ai_client.ai_model_name})"
 
-        raw_response = await ai_client.answer_question(question=message, context=context, system_prompt=prompt)
+        if intent in ["CONVERSATIONAL", "OFF_TOPIC"]:
+            raw_response = await ai_client.answer_question(question=message, context=context, system_prompt=prompt)
+        else:
+            needs_web_search = False
+            if not context:
+                needs_web_search = True
+            else:
+                raw_response = await ai_client.answer_question(question=message, context=context, system_prompt=prompt)
+                
+                # Check if AI rejected the context in CoT or Final Answer
+                import re
+                reasoning_match = re.search(r'<reasoning>(.*?)</reasoning>', raw_response, flags=re.DOTALL | re.IGNORECASE)
+                if reasoning_match:
+                    reasoning_text = reasoning_match.group(1).upper()
+                    if "NO" in reasoning_text and "YES" not in reasoning_text:
+                        needs_web_search = True
+                
+                if not needs_web_search:
+                    final_answer_match = re.search(r'<FINAL_ANSWER>\s*(.*?)\s*(?:</FINAL_ANSWER>|$)', raw_response, flags=re.DOTALL | re.IGNORECASE)
+                    if final_answer_match:
+                        ans = final_answer_match.group(1).strip().lower()
+                        if "sorry" in ans or "unable to find" in ans or "no mention" in ans or "not found" in ans:
+                            needs_web_search = True
+
+            if needs_web_search:
+                t_web_start = time.time()
+                web_snippet, web_sources, web_error = await web_search(message, timeout=10.0)
+                step_times["step5"] = round((time.time() - t_web_start) * 1000.0, 2)
+                
+                if web_snippet:
+                    context = ""
+                    detailed_sources.clear()
+                    for idx, s in enumerate(web_sources):
+                        context += f"[Source {idx+1}]: {s.get('text_preview', '')}\n\n"
+                        detailed_sources.append({"text_preview": s.get("text_preview", ""), "is_web": True, "url": s.get("url", ""), "title": s.get("title", "Web Source")})
+                    
+                    has_web = True
+                    prompt = build_mode_prompt(context, message, ai_mode, output_format, is_web_search=has_web, conversation_context=conversation_context)
+                    raw_response = await ai_client.answer_question(question=message, context=context, system_prompt=prompt)
+                else:
+                    response_text = "Sorry, I am unable to find any answers for your question based on your notes or the web."
+                    raw_response = f"<FINAL_ANSWER>\n{response_text}\n</FINAL_ANSWER>"
         
         # Parse the XML response to extract only the FINAL_ANSWER
         import re
@@ -1116,3 +1158,16 @@ async def delete_chat_message(
 
     db.delete(message)
     db.commit()
+
+@router.get("/debug_cv")
+def debug_cv(conv_id: str, db: Session = Depends(get_db)):
+    msgs = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).order_by(ChatMessage.created_at).all()
+    res = []
+    for msg in msgs:
+        res.append({
+            "message": msg.message,
+            "mode": msg.ai_mode,
+            "format": msg.output_format,
+            "response": msg.response
+        })
+    return res

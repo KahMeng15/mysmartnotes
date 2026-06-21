@@ -66,6 +66,7 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [messageQueue, setMessageQueue] = useState([]);
   const scrollRef = useRef(null);
 
   const [conversations, setConversations] = useState([]);
@@ -339,10 +340,16 @@ export default function ChatInterface() {
     navigate('/chat');
   };
 
-  const handleSend = async (overrideText = null) => {
+  const handleSend = async (overrideText = null, isFromQueue = false) => {
     const textToSend = typeof overrideText === 'string' ? overrideText : input.trim();
-    if (!textToSend || loading) return;
+    if (!textToSend) return;
     
+    if (loading && !isFromQueue) {
+      setMessageQueue(prev => [...prev, textToSend]);
+      if (typeof overrideText !== 'string') setInput('');
+      return;
+    }
+
     if (typeof overrideText !== 'string') setInput('');
     setMessages(prev => [...prev, { role: 'user', text: textToSend }]);
     setLoading(true);
@@ -413,6 +420,19 @@ export default function ChatInterface() {
       handleSend(userText);
     }
   };
+
+  const handleSendRef = useRef();
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  });
+
+  useEffect(() => {
+    if (!loading && messageQueue.length > 0) {
+      const nextMsg = messageQueue[0];
+      setMessageQueue(prev => prev.slice(1));
+      handleSendRef.current(nextMsg, true);
+    }
+  }, [loading, messageQueue]);
 
   // Icons for mapping
   const contextIcons = {
@@ -810,12 +830,28 @@ export default function ChatInterface() {
                     </Paper>
                   ) : (
                     <Box style={{ width: '100%', padding: '0 8px' }}>
+                      {msg.detailed_sources?.some(s => s.is_web) && (
+                        <Badge color="grape" variant="light" mb="sm" size="sm" style={{ textTransform: 'none' }} leftSection={<IconWorld size={12}/>}>
+                          Used Web Search
+                        </Badge>
+                      )}
                       <Box style={{ fontSize: '15px', lineHeight: 1.6, color: '#171738' }}>
                         {renderMessageContent(msg.text, msg.detailed_sources)}
                       </Box>
                       <MetadataBlock msg={msg} messageIndex={i} />
                     </Box>
                   )}
+                </Group>
+              ))}
+              {messageQueue.map((msg, index) => (
+                <Group key={`queue-${index}`} align="flex-start" justify="flex-end" wrap="nowrap" mb="md">
+                  <Paper p="md" radius="lg" style={{ backgroundColor: '#eef2ff', color: '#333', maxWidth: '85%', alignSelf: 'flex-end', borderBottomRightRadius: 4, opacity: 0.7 }}>
+                    <Group gap="sm" mb={4}>
+                      <Text size="sm" fw={600} c="indigo">You (Queued)</Text>
+                      <Loader color="indigo" size="xs" type="dots" />
+                    </Group>
+                    <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{msg}</Text>
+                  </Paper>
                 </Group>
               ))}
               {loading && (
@@ -1051,7 +1087,7 @@ export default function ChatInterface() {
               }}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
               rightSection={
-                <ActionIcon size="lg" color="indigo" variant="filled" radius="xl" onClick={handleSend} disabled={loading || !input.trim()} mr="sm">
+                <ActionIcon size="lg" color="indigo" variant="filled" radius="xl" onClick={() => handleSend()} disabled={!input.trim()} mr="sm">
                   <IconSend size={18} />
                 </ActionIcon>
               }
