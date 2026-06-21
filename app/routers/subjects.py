@@ -105,6 +105,11 @@ async def delete_subject(
             detail="Subject not found"
         )
     
+    # Explicitly delete child notes and quizzes
+    from app.models.db import Note, Quiz
+    db.query(Note).filter(Note.subject_id == subject_id, Note.user_id == current_user.id).delete()
+    db.query(Quiz).filter(Quiz.subject_id == subject_id, Quiz.user_id == current_user.id).delete()
+    
     db.delete(db_subject)
     db.commit()
     

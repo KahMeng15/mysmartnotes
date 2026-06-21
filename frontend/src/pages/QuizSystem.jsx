@@ -668,10 +668,10 @@ export default function QuizSystem() {
       </Modal>
 
       {/* Delete Group Modal */}
-      <Modal opened={deleteGroupOpened} onClose={closeDeleteGroup} title="Delete Quiz Group" size="sm" zIndex={2000}>
-        <Text size="sm" mb="md">
-          Are you sure you want to delete this group? Quizzes inside this group will NOT be deleted, they will just become ungrouped.
-        </Text>
+      <Modal opened={deleteGroupOpened} onClose={closeDeleteGroup} title="Delete Quiz Group" size="sm" zIndex={2000} centered>
+          <Text size="sm" mb="md">
+            Are you sure you want to delete this group? This will permanently remove all associated quizzes.
+          </Text>
         <Group justify="flex-end">
           <Button variant="default" onClick={closeDeleteGroup}>Cancel</Button>
           <Button color="red" onClick={handleDeleteQuizGroup} loading={deletingGroup}>Delete</Button>

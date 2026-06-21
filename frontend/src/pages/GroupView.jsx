@@ -289,44 +289,49 @@ export default function GroupView() {
       </Group>
 
       {filteredSubjects.length > 0 ? (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
+        <Stack spacing="sm">
           {filteredSubjects.map((subject) => (
             <Card
               key={subject.id}
               shadow="sm"
-              padding="lg"
+              padding="md"
               radius="md"
               withBorder
               onClick={() => navigate(`/subject/${subject.id}`)}
-              style={{ cursor: 'pointer', borderLeft: `4px solid ${subject.color || '#228be6'}`, transition: 'transform 150ms ease', '&:hover': { transform: 'translateY(-2px)' } }}
+              style={{ cursor: 'pointer', borderLeft: `4px solid ${subject.color || '#228be6'}`, transition: 'transform 150ms ease', '&:hover': { transform: 'translateX(2px)' } }}
             >
-              <Text fw={600} size="lg" mb="xs" c="#171738">
-                {subject.name}
-              </Text>
-              <Text size="sm" c="dimmed" style={{ minHeight: '3rem' }}>
-                {subject.description || 'No description'}
-              </Text>
-              <Group mt="md" justify="space-between">
-                <Badge leftSection={<IconFiles size={12} />} color="blue" variant="light">
-                  View Notes
-                </Badge>
-                <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                  <Menu position="bottom-end" withinPortal>
-                    <Menu.Target>
-                      <ActionIcon component="div" variant="subtle" color="gray">
-                        <IconDotsVertical size={16} />
-                      </ActionIcon>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Item leftSection={<IconEdit size={14} />} onClick={() => { handleEditSubjectClick(subject); }}>Edit Subject</Menu.Item>
-                      <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => { handleDeleteSubjectClick(subject); }}>Delete Subject</Menu.Item>
-                    </Menu.Dropdown>
-                  </Menu>
-                </div>
+              <Group justify="space-between" wrap="nowrap">
+                <Box style={{ flex: 1 }}>
+                  <Text fw={600} size="lg" c="#171738">
+                    {subject.name}
+                  </Text>
+                  <Text size="sm" c="dimmed" mt={4}>
+                    {subject.description || 'No description'}
+                  </Text>
+                </Box>
+                
+                <Group gap="xs">
+                  <Button variant="light" size="sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/subject/${subject.id}`); }}>
+                    View Notes
+                  </Button>
+                  <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                    <Menu position="bottom-end" withinPortal>
+                      <Menu.Target>
+                        <ActionIcon component="div" variant="subtle" color="gray">
+                          <IconDotsVertical size={16} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconEdit size={14} />} onClick={() => { handleEditSubjectClick(subject); }}>Edit Subject</Menu.Item>
+                        <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => { handleDeleteSubjectClick(subject); }}>Delete Subject</Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </div>
+                </Group>
               </Group>
             </Card>
           ))}
-        </SimpleGrid>
+        </Stack>
       ) : (
         <Center h={200}>
           <Box ta="center">
@@ -352,7 +357,7 @@ export default function GroupView() {
       <Modal opened={deleteGroupModalOpened} onClose={closeDeleteGroupModal} title="Confirm Delete Group" centered>
         <form onSubmit={(e) => { e.preventDefault(); executeDeleteGroup(); }}>
           <Stack>
-            <Text size="sm">Are you sure you want to delete <b>{group.name}</b>? This will permanently remove all associated subjects and notes.</Text>
+            <Text size="sm">Are you sure you want to delete <b>{group.name}</b>? This will permanently remove all associated subjects, notes, and quizzes.</Text>
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={closeDeleteGroupModal}>Cancel</Button>
               <Button type="submit" color="red" loading={submitting} data-autofocus>Delete Group</Button>

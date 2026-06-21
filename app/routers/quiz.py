@@ -119,6 +119,10 @@ def delete_quiz_group(
     group = db.query(QuizGroup).filter(QuizGroup.id == group_id, QuizGroup.user_id == current_user.id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
+        
+    # Explicitly delete all child quizzes
+    db.query(Quiz).filter(Quiz.quiz_group_id == group_id, Quiz.user_id == current_user.id).delete()
+    
     db.delete(group)
     db.commit()
     return {"success": True}

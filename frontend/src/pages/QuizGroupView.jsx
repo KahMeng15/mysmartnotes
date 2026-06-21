@@ -186,40 +186,42 @@ export default function QuizGroupView() {
       </Group>
 
       {filteredQuizzes.length > 0 ? (
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
+        <Stack spacing="sm">
           {filteredQuizzes.map((quiz) => {
             const isGenerating = quiz.model === 'Generating...';
             const activeTask = activeTasks.find(t => t.kwargs && t.kwargs.quiz_id === quiz.id);
             
             return (
-              <Card key={quiz.id} shadow="sm" padding="lg" radius="md" withBorder>
-                <Group justify="space-between" mb="xs">
-                  <Text fw={700} size="lg" c="#171738">{quiz.title}</Text>
-                  <IconCards size={20} color="var(--mantine-color-pink-6)" />
-                </Group>
-                
-                {isGenerating ? (
-                  <Box mt="md" mb="sm">
-                    <Text size="sm" c="pink" fw={500} mb="xs">Generating AI Quiz...</Text>
-                    <Progress value={activeTask?.progress || 10} color="pink" striped animated />
-                    <Text size="xs" c="dimmed" mt="xs">{activeTask?.message || "Initializing..."}</Text>
-                  </Box>
-                ) : (
-                  <>
-                    <Text size="sm" c="dimmed" mb="lg">
-                      {quiz.questions?.length || 0} Questions • Created {new Date(quiz.created_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </Text>
-                    <Group grow>
-                      <Button variant="light" color="pink" onClick={() => startTakingQuiz(quiz)} disabled={!quiz.questions || quiz.questions.length === 0}>
-                        Take Quiz
-                      </Button>
+              <Card key={quiz.id} shadow="sm" padding="md" radius="md" withBorder>
+                <Group justify="space-between" wrap="nowrap">
+                  <Box style={{ flex: 1 }}>
+                    <Group gap="xs" mb={4}>
+                      <Text fw={600} size="lg" c="#171738">{quiz.title}</Text>
+                      {isGenerating && <Badge color="pink" variant="light" size="sm">Generating...</Badge>}
                     </Group>
-                  </>
-                )}
+                    
+                    {isGenerating ? (
+                      <Box mt="xs" w={{ base: '100%', sm: '300px' }}>
+                        <Progress value={activeTask?.progress || 10} color="pink" striped animated size="sm" mb={4} />
+                        <Text size="xs" c="dimmed">{activeTask?.message || "Initializing..."}</Text>
+                      </Box>
+                    ) : (
+                      <Text size="sm" c="dimmed" mt={4}>
+                        {quiz.questions?.length || 0} Questions • Created {new Date(quiz.created_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </Text>
+                    )}
+                  </Box>
+
+                  <Group gap="xs">
+                    <Button variant="light" color="pink" size="sm" onClick={() => startTakingQuiz(quiz)} disabled={isGenerating || !quiz.questions || quiz.questions.length === 0}>
+                      Take Quiz
+                    </Button>
+                  </Group>
+                </Group>
               </Card>
             );
           })}
-        </SimpleGrid>
+        </Stack>
       ) : (
         <Center h={200}>
           <Box ta="center">
