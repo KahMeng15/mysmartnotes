@@ -203,7 +203,7 @@ class SummaryPipeline:
             format_instruction = "Use a numbered list."
         elif output_format == "table":
             format_instruction = "Summarize the key information in a Markdown table."
-        else:
+        elif output_format != "none":
             format_instruction = "Use clear, professional sentences."
 
         mode_instruction = ""
@@ -213,36 +213,28 @@ class SummaryPipeline:
             mode_instruction = "Explain in simple terms as if for a beginner."
         elif mode == "eli5":
             mode_instruction = "Explain like I'm five. Use very simple analogies."
-        else: # elaborate
+        elif mode != "none": # elaborate
             mode_instruction = "Provide a detailed, comprehensive summary covering all key technical points."
 
+        instructions = []
+        if mode_instruction:
+            instructions.append(f"- Mode: {mode_instruction}")
+        if format_instruction:
+            instructions.append(f"- Format: {format_instruction}")
         if custom_prompt:
-            prompt = f"""Task: Summarize the following note segment according to the provided instructions.
+            instructions.append(f"- Custom Instruction: {custom_prompt}")
+            
+        instructions_text = "\n".join(instructions)
+
+        prompt = f"""Task: Summarize the following note segment.
 
 INSTRUCTIONS:
-{custom_prompt}
+{instructions_text}
 
 START WITH THE MARKER ===START===
 END WITH THE MARKER ===END===
 NO PREAMBLE: Output ONLY the summary between the markers.
 NO REASONING: Do not explain your process.
-
-INPUT SEGMENT:
-{chunk}
-
-SUMMARY:
-===START===
-"""
-        else:
-            prompt = f"""Task: Summarize the following note segment.
-
-INSTRUCTIONS:
-1. Mode: {mode_instruction}
-2. Format: {format_instruction}
-3. START WITH THE MARKER ===START===
-4. END WITH THE MARKER ===END===
-5. NO PREAMBLE: Output ONLY the summary between the markers.
-6. NO REASONING: Do not explain your process.
 
 INPUT SEGMENT:
 {chunk}

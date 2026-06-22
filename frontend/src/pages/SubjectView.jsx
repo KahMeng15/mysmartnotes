@@ -203,7 +203,7 @@ export default function SubjectView() {
         const up = userPrompts.find(p => `u_${p.id}` === selectedPromptId);
         const name = gp ? gp.name : up ? up.name : 'Custom Note';
         const icon = gp ? gp.icon : up ? up.icon : 'IconFileText';
-        const customPrompt = gp ? gp.prompt : up ? up.prompt : '';
+        const customPrompt = gp ? gp.content : up ? up.content : '';
         
         finalPromptName = name;
         finalPromptIcon = icon;
@@ -212,6 +212,8 @@ export default function SubjectView() {
           custom_prompt: customPrompt,
           prompt_name: name,
           prompt_icon: icon,
+          mode: 'none',
+          output_format: 'none',
         };
       } else {
         bodyData = {
