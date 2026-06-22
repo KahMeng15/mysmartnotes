@@ -941,14 +941,14 @@ async def update_profile(user_update: UserUpdate, current_user: User = Depends(g
 async def get_user_stats(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Get personalized statistics and recent logins for the current user"""
     u_id = current_user.id
-    notes_count = db.query(func.count(Resource.id)).filter(Note.user_id == u_id).scalar() or 0
+    notes_count = db.query(func.count(Resource.id)).filter(Resource.user_id == u_id).scalar() or 0
     subjects_count = db.query(func.count(Subject.id)).filter(Subject.user_id == u_id).scalar() or 0
     groups_count = db.query(func.count(SubjectGroup.id)).filter(SubjectGroup.user_id == u_id).scalar() or 0
     questions_count = db.query(func.count(ChatMessage.id)).filter(ChatMessage.user_id == u_id).scalar() or 0
     
     time_spent_mins = db.query(func.sum(StudySession.duration_minutes)).filter(StudySession.user_id == u_id).scalar() or 0
     
-    storage_bytes = db.query(func.sum(Resource.file_size)).filter(Note.user_id == u_id).scalar() or 0
+    storage_bytes = db.query(func.sum(Resource.file_size)).filter(Resource.user_id == u_id).scalar() or 0
     storage_mb = round(storage_bytes / (1024 * 1024), 2)
 
     tier_config = get_user_tier_config(current_user, db)

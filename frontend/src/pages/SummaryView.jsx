@@ -160,7 +160,7 @@ export default function SummaryView() {
         setSelectedSummary(summaryData);
         setSummaryContent(summaryData.content);
         
-        const noteData = await fetchApi(`/notes/${summaryData.note_id}`);
+        const noteData = await fetchApi(`/resources/${summaryData.resource_id}`);
         setNote(noteData);
         setLoading(false);
       } catch (err) {

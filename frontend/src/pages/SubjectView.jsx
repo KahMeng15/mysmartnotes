@@ -92,6 +92,8 @@ export default function SubjectView() {
   const [newPromptName, setNewPromptName] = useState('');
   const [newPromptContent, setNewPromptContent] = useState('');
   const [savingNewPrompt, setSavingNewPrompt] = useState(false);
+  const [newPromptInput, setNewPromptInput] = useState('');
+  const [generatingNewPrompt, setGeneratingNewPrompt] = useState(false);
 
   useEffect(() => {
     fetchApi('/admin/global-prompts').then(data => {
@@ -121,6 +123,25 @@ export default function SubjectView() {
       console.error("Failed to save new prompt", err);
     } finally {
       setSavingNewPrompt(false);
+    }
+  };
+
+  const generatePrompt = async () => {
+    if (!newPromptInput.trim()) return;
+    setGeneratingNewPrompt(true);
+    try {
+      const res = await fetchApi('/notes/generate-prompt', {
+        method: 'POST',
+        body: JSON.stringify({ user_input: newPromptInput })
+      });
+      if (res) {
+        if (res.prompt) setNewPromptContent(res.prompt);
+        if (res.name) setNewPromptName(res.name);
+      }
+    } catch (err) {
+      console.error("Failed to generate prompt", err);
+    } finally {
+      setGeneratingNewPrompt(false);
     }
   };
 
@@ -1180,52 +1201,57 @@ export default function SubjectView() {
               </>
             ) : (
               <Stack gap="sm">
-                <Group align="flex-end" gap="xs" style={{ flexWrap: 'nowrap' }}>
-                  <div style={{ flex: 1 }}>
-                    <Select
-                      label="Prompt Template"
-                      placeholder="Select a template..."
-                      data={[
-                        {
-                          group: 'Global Templates',
-                          items: globalPrompts.map(p => ({ value: `g_${p.id}`, label: p.name, icon: p.icon }))
-                        },
-                        {
-                          group: 'Your Templates',
-                          items: userPrompts.map(p => ({ value: `u_${p.id}`, label: p.name, icon: 'IconUserEdit' }))
-                        }
-                      ]}
-                      value={selectedPromptId}
-                      onChange={setSelectedPromptId}
-                      leftSection={(() => {
-                        if (!selectedPromptId) return <IconFileText size={16} />;
-                        if (selectedPromptId.startsWith('g_')) {
-                          const id = selectedPromptId.replace('g_', '');
-                          const gp = globalPrompts.find(p => p.id.toString() === id);
-                          const IconComp = getIconComponent(gp?.icon);
-                          return <IconComp size={16} />;
-                        } else if (selectedPromptId.startsWith('u_')) {
-                          const IconComp = getIconComponent('IconUserEdit');
-                          return <IconComp size={16} />;
-                        }
-                        return <IconFileText size={16} />;
-                      })()}
-                      renderOption={({ option }) => {
-                        const IconComp = getIconComponent(option.icon);
-                        return (
-                          <Group gap="sm">
-                            <IconComp size={16} />
-                            <Text size="sm">{option.label}</Text>
-                          </Group>
-                        );
-                      }}
-                      required
-                    />
-                  </div>
-                  <ActionIcon variant="light" color="blue" size="lg" onClick={() => setCreatePromptModalOpened(true)} title="Add Custom Template" style={{ height: '36px', width: '36px' }}>
-                    <IconPlus size={18} />
-                  </ActionIcon>
-                </Group>
+                <Select
+                  label="Prompt Template"
+                  placeholder="Select a template..."
+                  data={[
+                    {
+                      group: 'Global Templates',
+                      items: globalPrompts.map(p => ({ value: `g_${p.id}`, label: p.name, icon: p.icon }))
+                    },
+                    {
+                      group: 'Your Templates',
+                      items: [
+                        ...userPrompts.map(p => ({ value: `u_${p.id}`, label: p.name, icon: 'IconUserEdit' })),
+                        { value: 'create_new', label: 'Create New Template...', icon: 'IconPlus' }
+                      ]
+                    }
+                  ]}
+                  value={selectedPromptId}
+                  onChange={(val) => {
+                    if (val === 'create_new') {
+                      setNewPromptName('');
+                      setNewPromptContent('');
+                      setNewPromptInput('');
+                      setCreatePromptModalOpened(true);
+                    } else {
+                      setSelectedPromptId(val);
+                    }
+                  }}
+                  leftSection={(() => {
+                    if (!selectedPromptId) return <IconFileText size={16} />;
+                    if (selectedPromptId.startsWith('g_')) {
+                      const id = selectedPromptId.replace('g_', '');
+                      const gp = globalPrompts.find(p => p.id.toString() === id);
+                      const IconComp = getIconComponent(gp?.icon);
+                      return <IconComp size={16} />;
+                    } else if (selectedPromptId.startsWith('u_')) {
+                      const IconComp = getIconComponent('IconUserEdit');
+                      return <IconComp size={16} />;
+                    }
+                    return <IconFileText size={16} />;
+                  })()}
+                  renderOption={({ option }) => {
+                    const IconComp = getIconComponent(option.icon);
+                    return (
+                      <Group gap="sm">
+                        <IconComp size={16} />
+                        <Text size="sm">{option.label}</Text>
+                      </Group>
+                    );
+                  }}
+                  required
+                />
               </Stack>
             )}
 
@@ -1237,7 +1263,7 @@ export default function SubjectView() {
         </form>
       </Modal>
 
-      <Modal opened={createPromptModalOpened} onClose={() => setCreatePromptModalOpened(false)} title="Create Custom Template" centered>
+      <Modal opened={createPromptModalOpened} onClose={() => setCreatePromptModalOpened(false)} title="Create Custom Template" centered size="lg">
         <form onSubmit={(e) => { e.preventDefault(); saveNewPrompt(); }}>
           <Stack gap="md">
             <TextInput
@@ -1253,10 +1279,41 @@ export default function SubjectView() {
               placeholder="Instructions for the AI, e.g., Summarize key findings in bullet points..."
               value={newPromptContent}
               onChange={(e) => setNewPromptContent(e.currentTarget.value)}
-              minRows={4}
+              minRows={5}
               autosize
               required
             />
+            
+            <Divider label="AI Prompt Generator" labelPosition="center" my="sm" />
+            
+            <Text size="xs" c="dimmed">
+              Describe what you want, and the AI will generate a structured template for you.
+            </Text>
+            
+            <Group align="flex-end" gap="xs" style={{ flexWrap: 'nowrap' }}>
+              <div style={{ flex: 1 }}>
+                <Textarea
+                  label="AI Instruction"
+                  placeholder="e.g., focus on vocabulary, write a cheat sheet with formulas..."
+                  value={newPromptInput}
+                  onChange={(e) => setNewPromptInput(e.currentTarget.value)}
+                  minRows={2}
+                  autosize
+                />
+              </div>
+              <Button 
+                variant="light" 
+                color="indigo" 
+                onClick={generatePrompt} 
+                loading={generatingNewPrompt} 
+                disabled={!newPromptInput.trim()}
+                leftSection={<IconSparkles size={16} />}
+                style={{ height: '56px' }}
+              >
+                Generate
+              </Button>
+            </Group>
+
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={() => setCreatePromptModalOpened(false)}>Cancel</Button>
               <Button type="submit" loading={savingNewPrompt} disabled={!newPromptName.trim() || !newPromptContent.trim()}>

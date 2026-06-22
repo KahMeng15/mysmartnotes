@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Paper, Tabs, TextInput, Textarea, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader, ActionIcon, Table } from '@mantine/core';
-import { IconEdit, IconTrash } from '@tabler/icons-react';
+import { Box, Title, Paper, Tabs, TextInput, Textarea, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader, ActionIcon, Table, Modal } from '@mantine/core';
+import { IconEdit, IconTrash, IconPlus, IconSparkles } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 
 export default function Settings() {
@@ -18,6 +18,10 @@ export default function Settings() {
   const [editingPrompt, setEditingPrompt] = useState(null);
   const [promptName, setPromptName] = useState('');
   const [promptContent, setPromptContent] = useState('');
+  const [createPromptModalOpened, setCreatePromptModalOpened] = useState(false);
+  const [newPromptInput, setNewPromptInput] = useState('');
+  const [generatingNewPrompt, setGeneratingNewPrompt] = useState(false);
+  const [savingPrompt, setSavingPrompt] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -80,6 +84,8 @@ export default function Settings() {
   };
 
   const handleSavePrompt = async () => {
+    if (!promptName.trim() || !promptContent.trim()) return;
+    setSavingPrompt(true);
     try {
       if (editingPrompt) {
         const res = await fetchApi(`/prompts/${editingPrompt.id}`, {
@@ -97,8 +103,30 @@ export default function Settings() {
       setEditingPrompt(null);
       setPromptName('');
       setPromptContent('');
+      setCreatePromptModalOpened(false);
     } catch (err) {
       console.error(err);
+    } finally {
+      setSavingPrompt(false);
+    }
+  };
+
+  const generatePrompt = async () => {
+    if (!newPromptInput.trim()) return;
+    setGeneratingNewPrompt(true);
+    try {
+      const res = await fetchApi('/notes/generate-prompt', {
+        method: 'POST',
+        body: JSON.stringify({ user_input: newPromptInput })
+      });
+      if (res) {
+        if (res.prompt) setPromptContent(res.prompt);
+        if (res.name) setPromptName(res.name);
+      }
+    } catch (err) {
+      console.error("Failed to generate prompt", err);
+    } finally {
+      setGeneratingNewPrompt(false);
     }
   };
 
@@ -115,12 +143,15 @@ export default function Settings() {
     setEditingPrompt(prompt);
     setPromptName(prompt.name);
     setPromptContent(prompt.content);
+    setNewPromptInput('');
+    setCreatePromptModalOpened(true);
   };
 
   const handleCancelEditPrompt = () => {
     setEditingPrompt(null);
     setPromptName('');
     setPromptContent('');
+    setCreatePromptModalOpened(false);
   };
 
   if (loading) {
@@ -128,7 +159,7 @@ export default function Settings() {
   }
 
   return (
-    <Box maxWidth={800} mx="auto">
+    <Box maw={800} mx="auto">
       <Title order={2} mb="xl">Account Settings</Title>
 
       <Tabs value={activeTab} onChange={setActiveTab} orientation="vertical" variant="pills">
@@ -186,38 +217,23 @@ export default function Settings() {
 
         <Tabs.Panel value="prompts">
           <Paper withBorder p="xl" radius="md">
-            <Title order={4} mb="md">Custom Prompt Templates</Title>
-            <Text size="sm" c="dimmed" mb="xl">
-              Manage your custom prompt templates used for generating summaries.
-            </Text>
-
-            <Paper withBorder p="md" mb="xl" bg="var(--mantine-color-gray-0)">
-              <Title order={5} mb="sm">{editingPrompt ? 'Edit Template' : 'Create New Template'}</Title>
-              <Stack>
-                <TextInput
-                  label="Template Name"
-                  placeholder="e.g. Executive Summary"
-                  value={promptName}
-                  onChange={(e) => setPromptName(e.currentTarget.value)}
-                  required
-                />
-                <Textarea
-                  label="Prompt Content"
-                  placeholder="Enter the instructions for the AI..."
-                  value={promptContent}
-                  onChange={(e) => setPromptContent(e.currentTarget.value)}
-                  minRows={3}
-                  autosize
-                  required
-                />
-                <Group justify="flex-end">
-                  {editingPrompt && <Button variant="default" onClick={handleCancelEditPrompt}>Cancel</Button>}
-                  <Button onClick={handleSavePrompt} disabled={!promptName.trim() || !promptContent.trim()}>
-                    {editingPrompt ? 'Update Template' : 'Create Template'}
-                  </Button>
-                </Group>
-              </Stack>
-            </Paper>
+            <Group justify="space-between" align="center" mb="xl">
+              <div>
+                <Title order={4} mb="xs">Custom Prompt Templates</Title>
+                <Text size="sm" c="dimmed">
+                  Manage your custom prompt templates used for generating summaries.
+                </Text>
+              </div>
+              <Button leftSection={<IconPlus size={16} />} onClick={() => {
+                setEditingPrompt(null);
+                setPromptName('');
+                setPromptContent('');
+                setNewPromptInput('');
+                setCreatePromptModalOpened(true);
+              }}>
+                Create Template
+              </Button>
+            </Group>
 
             <Title order={5} mb="sm">Your Templates</Title>
             {userPrompts.length === 0 ? (
@@ -301,6 +317,66 @@ export default function Settings() {
           </Paper>
         </Tabs.Panel>
       </Tabs>
+      <Modal opened={createPromptModalOpened} onClose={() => setCreatePromptModalOpened(false)} title={editingPrompt ? "Edit Custom Template" : "Create Custom Template"} centered size="lg">
+        <form onSubmit={(e) => { e.preventDefault(); handleSavePrompt(); }}>
+          <Stack gap="md">
+            <TextInput
+              label="Template Name"
+              placeholder="e.g. Executive Summary"
+              value={promptName}
+              onChange={(e) => setPromptName(e.currentTarget.value)}
+              required
+              data-autofocus
+            />
+            <Textarea
+              label="Prompt Content"
+              placeholder="Enter the instructions for the AI..."
+              value={promptContent}
+              onChange={(e) => setPromptContent(e.currentTarget.value)}
+              minRows={5}
+              autosize
+              required
+            />
+            
+            <Divider label="AI Prompt Generator" labelPosition="center" my="sm" />
+            
+            <Text size="xs" c="dimmed">
+              Describe what you want, and the AI will generate a structured template for you.
+            </Text>
+            
+            <Group align="flex-end" gap="xs" style={{ flexWrap: 'nowrap' }}>
+              <div style={{ flex: 1 }}>
+                <Textarea
+                  label="AI Instruction"
+                  placeholder="e.g., focus on vocabulary, write a cheat sheet with formulas..."
+                  value={newPromptInput}
+                  onChange={(e) => setNewPromptInput(e.currentTarget.value)}
+                  minRows={2}
+                  autosize
+                />
+              </div>
+              <Button 
+                variant="light" 
+                color="indigo" 
+                onClick={generatePrompt} 
+                loading={generatingNewPrompt} 
+                disabled={!newPromptInput.trim()}
+                leftSection={<IconSparkles size={16} />}
+                style={{ height: '56px' }}
+              >
+                Generate
+              </Button>
+            </Group>
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => setCreatePromptModalOpened(false)}>Cancel</Button>
+              <Button type="submit" loading={savingPrompt} disabled={!promptName.trim() || !promptContent.trim()}>
+                {editingPrompt ? 'Update Template' : 'Create Template'}
+              </Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
     </Box>
   );
 }
