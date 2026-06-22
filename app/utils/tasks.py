@@ -379,7 +379,7 @@ class NoteTask:
                 "processing_time": processing_time,
                 "processing_time_ms": int(processing_time * 1000),
                 "model": doc.model,
-                "version": next_version,
+                "version": doc.version,
                 "is_user_edited": False,
                 "status": "completed"
             }

@@ -279,7 +279,6 @@ export default function NoteView() {
     const pollTask = async () => {
       try {
         const statusData = await fetchApi(`/search/task?resource_id=${id}`);
-        console.log("NoteView taskStatus:", statusData);
         setTaskStatus(statusData);
 
         if (statusData && statusData.status === 'completed') {

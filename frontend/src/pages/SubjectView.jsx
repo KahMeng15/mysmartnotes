@@ -395,11 +395,25 @@ export default function SubjectView() {
   const [failedExerciseIds, setFailedExerciseIds] = useState([]);
   const [reprocessingExerciseIds, setReprocessingExerciseIds] = useState([]);
   const [generatedNoteProgress, setGeneratedNoteProgress] = useState({});
-  const [failedGeneratedNoteIds, setFailedGeneratedNoteIds] = useState([]);
+  const [failedGeneratedNoteIds, setFailedGeneratedNoteIds] = useState(() => JSON.parse(localStorage.getItem('failedGeneratedNoteIds') || '[]'));
   const [reprocessingGeneratedNoteIds, setReprocessingGeneratedNoteIds] = useState([]);
   // Maps summary id -> task_id for in-flight generations
   const [pendingSummaryTasks, setPendingSummaryTasks] = useState({});
   const [resourceTasks, setResourceTasks] = useState({});
+  const [cancelledNoteIds, setCancelledNoteIds] = useState(() => JSON.parse(localStorage.getItem('cancelledNoteIds') || '[]'));
+  const [cancelledGeneratedNoteIds, setCancelledGeneratedNoteIds] = useState(() => JSON.parse(localStorage.getItem('cancelledGeneratedNoteIds') || '[]'));
+
+  useEffect(() => {
+    localStorage.setItem('failedGeneratedNoteIds', JSON.stringify(failedGeneratedNoteIds));
+  }, [failedGeneratedNoteIds]);
+
+  useEffect(() => {
+    localStorage.setItem('cancelledNoteIds', JSON.stringify(cancelledNoteIds));
+  }, [cancelledNoteIds]);
+
+  useEffect(() => {
+    localStorage.setItem('cancelledGeneratedNoteIds', JSON.stringify(cancelledGeneratedNoteIds));
+  }, [cancelledGeneratedNoteIds]);
   const [editingNote, setEditingNote] = useState(null);
   const [infoModalNote, setInfoModalNote] = useState(null);
   const [newTitle, setNewTitle] = useState('');
@@ -481,10 +495,8 @@ export default function SubjectView() {
             setGeneratedNoteProgress(prev => ({ ...prev, ...summaryProgress }));
           }
           if (initialReprocessingNoteIds.length > 0) {
-            console.log("Found initial reprocessing note IDs:", initialReprocessingNoteIds);
             setReprocessingNoteIds(prev => [...new Set([...prev, ...initialReprocessingNoteIds])]);
           }
-          console.log("activeTasksData on mount:", JSON.stringify(activeTasksData, null, 2));
           if (Object.keys(initialNoteProgress).length > 0) {
             setNoteProgress(prev => ({ ...prev, ...initialNoteProgress }));
           }
@@ -620,8 +632,6 @@ export default function SubjectView() {
               const taskData = await fetchApi(`/search/tasks/${taskId}`);
               if (!taskData) return;
               
-              console.log(`Polled summary task ${taskId}:`, taskData);
-
               if (taskData.progress !== undefined) {
                 setGeneratedNoteProgress(prev => ({ ...prev, [summaryId]: taskData.progress }));
               }
@@ -914,7 +924,10 @@ export default function SubjectView() {
                                     (note.extracted_content_structured != null && note.extracted_content_structured !== '[]' && note.extracted_content_structured !== '') || 
                                     (note.output_pdf_path != null && note.output_pdf_path !== '');
                 const isReprocessing = reprocessingNoteIds.includes(note.id);
-                const hasFailed = failedNoteIds.includes(note.id);
+                const isCancelled = cancelledNoteIds.includes(note.id);
+                // Also treat it as failed if it's not processed, has no active task, and is not reprocessing/cancelled
+                const hasFailed = failedNoteIds.includes(note.id) || (!isProcessed && !resourceTasks[note.id] && !isReprocessing && !isCancelled);
+                
                 return (
                   <Card
                     key={note.id}
@@ -930,9 +943,9 @@ export default function SubjectView() {
                           {note.title}
                         </Text>
                         <Group gap="xs" mt={4}>
-                          {(isReprocessing || !isProcessed) && (
-                            <Badge color={hasFailed ? "red" : "orange"} variant="light" size="sm">
-                              {isReprocessing ? 'Reprocessing...' : hasFailed ? 'Failed' : 'Processing...'}
+                          {(isReprocessing || !isProcessed || isCancelled) && (
+                            <Badge color={(hasFailed || isCancelled) ? "red" : "orange"} variant="light" size="sm">
+                              {isCancelled ? 'Cancelled' : hasFailed ? 'Failed' : isReprocessing ? 'Reprocessing...' : 'Processing...'}
                             </Badge>
                           )}
                           <Text size="xs" c="dimmed">
@@ -955,7 +968,7 @@ export default function SubjectView() {
                             <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRename(note)}>Rename</Menu.Item>
                             <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocess(note)}>Reprocess</Menu.Item>
                             <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalNote(note); }}>System Info</Menu.Item>
-                            {(isReprocessing || (!isProcessed && !hasFailed)) ? (
+                            {(isReprocessing || (!isProcessed && !hasFailed && !isCancelled)) ? (
                               <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
                                 const taskId = resourceTasks[note.id];
                                 if (!taskId) {
@@ -964,7 +977,7 @@ export default function SubjectView() {
                                 }
                                 try {
                                   await fetchApi(`/search/tasks/${taskId}/cancel`, { method: 'POST' });
-                                  setFailedNoteIds(prev => [...prev, note.id]);
+                                  setCancelledNoteIds(prev => [...prev, note.id]);
                                   setReprocessingNoteIds(prev => prev.filter(id => id !== note.id));
                                 } catch(e) {
                                   alert("Failed to cancel: " + e.message);
@@ -1120,8 +1133,9 @@ export default function SubjectView() {
                                      (gn.file_path != null && gn.file_path !== '') || 
                                      gn.status === 'completed';
                  const isReprocessing = reprocessingGeneratedNoteIds.includes(gn.id);
-                 const hasFailed = failedGeneratedNoteIds.includes(gn.id);
-                 const inProgressOrPending = !isProcessed && !hasFailed;
+                 const isCancelled = cancelledGeneratedNoteIds.includes(gn.id);
+                 const hasFailed = failedGeneratedNoteIds.includes(gn.id) || gn.status === 'failed' || (!isProcessed && !pendingSummaryTasks[gn.id] && !isReprocessing && !isCancelled);
+                 const inProgressOrPending = !isProcessed && !hasFailed && !isCancelled;
 
                  return (
                 <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
@@ -1131,9 +1145,9 @@ export default function SubjectView() {
                           {displayTitle}
                         </Text>
                         <Group gap="xs" mt={4}>
-                          {(isReprocessing || inProgressOrPending) && (
-                            <Badge color={hasFailed ? "red" : "orange"} variant="light" size="sm">
-                              {isReprocessing ? 'Regenerating...' : hasFailed ? 'Failed' : 'Generating...'}
+                          {(isReprocessing || inProgressOrPending || hasFailed || isCancelled) && (
+                            <Badge color={(hasFailed || isCancelled) ? "red" : "orange"} variant="light" size="sm">
+                              {isCancelled ? 'Cancelled' : hasFailed ? 'Failed' : isReprocessing ? 'Regenerating...' : 'Generating...'}
                             </Badge>
                           )}
                           <Text size="xs" c="dimmed">
@@ -1162,7 +1176,7 @@ export default function SubjectView() {
                               <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
                                 try {
                                   await fetchApi(`/search/tasks/${pendingSummaryTasks[gn.id]}/cancel`, { method: 'POST' });
-                                  setFailedGeneratedNoteIds(prev => [...prev, gn.id]);
+                                  setCancelledGeneratedNoteIds(prev => [...prev, gn.id]);
                                   setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[gn.id]; return n; });
                                 } catch (e) {
                                   console.error("Failed to cancel task", e);
