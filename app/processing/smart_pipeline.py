@@ -1063,25 +1063,32 @@ class SmartPipeline:
     async def _polish_chunk(self, client, chunk_idx: int, chunk: str, is_first_chunk: bool = False, debug_dir: Optional[Path] = None) -> str:
         """Polish a single chunk of markdown using the AI model with streaming."""
         if is_first_chunk:
-            heading_rule = "6. ONE H1: Only the main title is #. All other headings must be ## or ###."
-            title_instruction = """TITLE RULE: The first line of your output MUST be a single H1 heading (# ) with the 
-EXACT topic title from the slides (e.g., "# Topic 3: Inheritance"). 
-Remove university names, course codes, and noter names.
-"""
+            heading_rule = (
+                "4. ONE H1: Only the main title on the first line must be H1 (# ). All other headings in the input must be H2 (## ) or H3 (### ).\n"
+                "5. DEMOTE HEADINGS: Any subsequent H1 headings (# ) in the input MUST be demoted to H2 (## ) headings."
+            )
+            title_instruction = (
+                "TITLE RULE: The first line of your output MUST be a single H1 heading (# ) with the EXACT Topic/Chapter title and number from the slides (e.g., \"# Topic 2 Object-Oriented Modeling\" or \"# Topic 3: Inheritance\"). Ensure you preserve the Topic/Chapter word and its number. Remove only university names, course codes, and noter names."
+            )
         else:
-            heading_rule = "6. NO H1: Do NOT use H1 (# ) headings. Use only H2 (## ) or H3 (### ) for headings."
-            title_instruction = """HEADING RULE: If the input contains H1 (# ) headings, demote them to H2 (## ) headings. Do NOT prefix normal paragraphs or bullet points with ## or ###. Keep them as plain text.
-"""
+            heading_rule = (
+                "4. NO H1: Do NOT use any H1 (# ) headings in this chunk. Use only H2 (## ) or H3 (### ) for headings.\n"
+                "5. DEMOTE HEADINGS: Any H1 headings (# ) in the input MUST be demoted to H2 (## ) headings."
+            )
+            title_instruction = (
+                "HEADING RULE: If the input contains H1 (# ) headings, demote them to H2 (## ) headings. Do NOT prefix normal paragraphs or bullet points with ## or ###. Keep them as plain text."
+            )
 
         prompt = f"""Task: Clean and format the following note notes into clean Markdown.
 
 CRITICAL RULES:
 1. NO PREAMBLE/INTRO: Output ONLY the markdown between the markers.
 2. NO REASONING: Do not talk to yourself, do not plan, do not list rules, do not write 'Wait' or 'Let me think'.
-3. USE EXACT WORDS: Never rephrase or summarize.
+3. KEEP ALL CONTENT & EXACT WORDS: Do NOT delete, omit, or skip any learning objectives, slides, headings, bullet points, or paragraphs from the input. Use the exact words from the source text. Never rephrase or summarize.
 {heading_rule}
-5. CODE BLOCKS: Use ```java only for actual code. If it's normal text, remove the code block.
-6. YOUR ENTIRE RESPONSE MUST BE WRAPPED EXACTLY IN ===START=== AND ===END=== MARKERS.
+6. FIX LOGICAL LISTS: If a heading in the input is logically a list item (e.g. it follows a colon or an introductory list sentence like "you will be able to:"), format it as a list item (- ) instead of a heading.
+7. CODE BLOCKS: Use ```java only for actual code. If it's normal text, remove the code block.
+8. YOUR ENTIRE RESPONSE MUST BE WRAPPED EXACTLY IN ===START=== AND ===END=== MARKERS.
 
 {title_instruction}
 
