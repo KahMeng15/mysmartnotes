@@ -279,6 +279,7 @@ export default function NoteView() {
     const pollTask = async () => {
       try {
         const statusData = await fetchApi(`/search/task?resource_id=${id}`);
+        console.log("NoteView taskStatus:", statusData);
         setTaskStatus(statusData);
 
         if (statusData && statusData.status === 'completed') {
@@ -358,7 +359,8 @@ export default function NoteView() {
     return <Center h="50vh"><Text c="dimmed">Note not found.</Text></Center>;
   }
 
-  const isProcessed = isProcessedCheck(note) || (taskStatus?.status === 'completed');
+  const isCurrentlyProcessing = taskStatus && (taskStatus.status === 'pending' || taskStatus.status === 'processing' || taskStatus.status === 'running');
+  const isProcessed = (isProcessedCheck(note) || taskStatus?.status === 'completed') && !isCurrentlyProcessing;
   const isFailed = taskStatus?.status === 'failed';
   const processingProgress = taskStatus?.progress || 10;
 

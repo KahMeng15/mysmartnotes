@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress, ScrollArea, Divider, MultiSelect, SegmentedControl } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit } from '@tabler/icons-react';
+import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit, IconX } from '@tabler/icons-react';
 import * as TablerIcons from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi, getAuthToken } from '../lib/api';
@@ -454,18 +454,37 @@ export default function SubjectView() {
         if (activeTasksData && activeTasksData.tasks) {
           const summaryTasks = {};
           const summaryProgress = {};
+          const initialReprocessingNoteIds = [];
+          const initialNoteProgress = {};
+
           activeTasksData.tasks.forEach(t => {
-            if (t.task_type === 'note_generation' && t.input_data && t.input_data.note_id) {
-              const summaryId = t.input_data.note_id;
+            if (t.task_type === 'note_generation' && t.input_data && t.input_data.kwargs && t.input_data.kwargs.note_id) {
+              const summaryId = t.input_data.kwargs.note_id;
               summaryTasks[summaryId] = t.task_id;
               if (t.progress !== undefined) {
                 summaryProgress[summaryId] = t.progress;
+              }
+            } else if (t.task_type === 'resource_processing') {
+              const noteId = t.input_data?.kwargs?.resource_id || (t.task_id && t.task_id.startsWith('ocr_') ? t.task_id.split('_').slice(2).join('_') : null);
+              if (noteId) {
+                initialReprocessingNoteIds.push(noteId);
+                if (t.progress !== undefined) {
+                  initialNoteProgress[noteId] = t.progress;
+                }
               }
             }
           });
           if (Object.keys(summaryTasks).length > 0) {
             setPendingSummaryTasks(prev => ({ ...prev, ...summaryTasks }));
             setGeneratedNoteProgress(prev => ({ ...prev, ...summaryProgress }));
+          }
+          if (initialReprocessingNoteIds.length > 0) {
+            console.log("Found initial reprocessing note IDs:", initialReprocessingNoteIds);
+            setReprocessingNoteIds(prev => [...new Set([...prev, ...initialReprocessingNoteIds])]);
+          }
+          console.log("activeTasksData on mount:", JSON.stringify(activeTasksData, null, 2));
+          if (Object.keys(initialNoteProgress).length > 0) {
+            setNoteProgress(prev => ({ ...prev, ...initialNoteProgress }));
           }
         }
       } catch (err) {
@@ -486,7 +505,7 @@ export default function SubjectView() {
                           (n.extracted_text != null && n.extracted_text.trim() !== '') || 
                           (n.extracted_content_structured != null && n.extracted_content_structured !== '[]' && n.extracted_content_structured !== '') || 
                           (n.output_pdf_path != null && n.output_pdf_path !== '');
-      return !isProcessed && !failedNoteIds.includes(n.id);
+      return (!isProcessed || reprocessingNoteIds.includes(n.id)) && !failedNoteIds.includes(n.id);
     });
 
     if (unprocessedNotes.length === 0) return;
@@ -502,9 +521,11 @@ export default function SubjectView() {
                   setNoteProgress(prev => ({ ...prev, [n.id]: taskData.progress }));
                 }
                 if (taskData.status === 'completed') {
+                  setReprocessingNoteIds(prev => prev.filter(id => id !== n.id));
                   return await fetchApi(`/resources/${n.id}?t=${Date.now()}`);
                 }
                 if (taskData.status === 'failed') {
+                  setReprocessingNoteIds(prev => prev.filter(id => id !== n.id));
                   setFailedNoteIds(prev => [...prev, n.id]);
                   return await fetchApi(`/resources/${n.id}?t=${Date.now()}`);
                 }
@@ -535,7 +556,7 @@ export default function SubjectView() {
     const interval = setInterval(poll, 2000);
 
     return () => clearInterval(interval);
-  }, [notes, failedNoteIds]);
+  }, [notes, failedNoteIds, reprocessingNoteIds]);
 
   // Polling for exercise processing progress
   useEffect(() => {
@@ -593,6 +614,8 @@ export default function SubjectView() {
             try {
               const taskData = await fetchApi(`/search/tasks/${taskId}`);
               if (!taskData) return;
+              
+              console.log(`Polled summary task ${taskId}:`, taskData);
 
               if (taskData.progress !== undefined) {
                 setGeneratedNoteProgress(prev => ({ ...prev, [summaryId]: taskData.progress }));
@@ -934,7 +957,7 @@ export default function SubjectView() {
                     </Group>
                     {(isReprocessing || (!isProcessed && !hasFailed)) && (
                       <Progress 
-                        value={isReprocessing ? undefined : (noteProgress[note.id] || 10)}
+                        value={isReprocessing ? undefined : (noteProgress[note.id] ?? 10)}
                         animated={isReprocessing || (noteProgress[note.id] === undefined || noteProgress[note.id] < 100)} 
                         size="xs" 
                         color="orange" 
@@ -1069,7 +1092,14 @@ export default function SubjectView() {
                  const relatedNote = notes.find(n => n.id === gn.note_id);
                  const resourceName = relatedNote ? relatedNote.title : 'Unknown Resource';
                  const templateInfo = gn.prompt_name || [gn.mode, gn.output_format, gn.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
-                 const displayTitle = (gn.is_user_edited || (gn.title && gn.title.startsWith("Combined Note:"))) ? gn.title : `${templateInfo} - ${resourceName}`;
+                 const displayTitle = gn.title || `${templateInfo} - ${resourceName}`;
+
+                 const isProcessed = (gn.processing_time_ms != null && gn.processing_time_ms > 0) || 
+                                     (gn.file_path != null && gn.file_path !== '') || 
+                                     gn.status === 'completed';
+                 const isReprocessing = reprocessingGeneratedNoteIds.includes(gn.id);
+                 const hasFailed = failedGeneratedNoteIds.includes(gn.id);
+                 const inProgressOrPending = !isProcessed && !hasFailed;
 
                  return (
                 <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
@@ -1078,9 +1108,16 @@ export default function SubjectView() {
                         <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${gn.id}`)}>
                           {displayTitle}
                         </Text>
-                        <Text size="xs" c="dimmed">
-                           Generated on {formatNoteDate(gn.created_at)}
-                        </Text>
+                        <Group gap="xs" mt={4}>
+                          {(isReprocessing || inProgressOrPending) && (
+                            <Badge color={hasFailed ? "red" : "orange"} variant="light" size="sm">
+                              {isReprocessing ? 'Regenerating...' : hasFailed ? 'Failed' : 'Generating...'}
+                            </Badge>
+                          )}
+                          <Text size="xs" c="dimmed">
+                             Generated on {formatNoteDate(gn.created_at)}
+                          </Text>
+                        </Group>
                       </Box>
                       <Group gap="xs" wrap="nowrap">
                         <Button variant="light" size="sm" onClick={() => navigate(`/note/${gn.id}`)}>
@@ -1099,6 +1136,20 @@ export default function SubjectView() {
                             <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={() => setInfoModalSummary(gn)}>
                               System Info
                             </Menu.Item>
+                            {inProgressOrPending && pendingSummaryTasks[gn.id] && (
+                              <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
+                                try {
+                                  await fetchApi(`/search/tasks/${pendingSummaryTasks[gn.id]}/cancel`, { method: 'POST' });
+                                  setFailedGeneratedNoteIds(prev => [...prev, gn.id]);
+                                  setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[gn.id]; return n; });
+                                } catch (e) {
+                                  console.error("Failed to cancel task", e);
+                                  alert("Failed to cancel task: " + e.message);
+                                }
+                              }}>
+                                Cancel Generation
+                              </Menu.Item>
+                            )}
                             <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => { setDeletingSummary({ ...gn, displayTitle }); openDeleteSummaryModal(); }}>
                               Delete
                             </Menu.Item>
@@ -1107,10 +1158,10 @@ export default function SubjectView() {
                       </Group>
                    </Group>
                    {/* Progress bar for generated note processing */}
-                   {(reprocessingGeneratedNoteIds.includes(gn.id) || typeof generatedNoteProgress[gn.id] === 'number') && (
+                   {(isReprocessing || inProgressOrPending) && (
                      <Progress
-                       value={generatedNoteProgress[gn.id] || undefined}
-                       animated={true}
+                       value={isReprocessing ? undefined : (generatedNoteProgress[gn.id] ?? 10)}
+                       animated={isReprocessing || (generatedNoteProgress[gn.id] === undefined || generatedNoteProgress[gn.id] < 100)}
                        size="xs"
                        color="orange"
                        style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}
