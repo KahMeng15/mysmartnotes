@@ -259,7 +259,7 @@ export default function NoteView() {
   useEffect(() => {
     const loadNote = async () => {
       try {
-        const data = await fetchApi(`/notes/${id}?t=${Date.now()}`);
+        const data = await fetchApi(`/resources/${id}?t=${Date.now()}`);
         setNote(data);
         setContent(data.extracted_text || '');
       } catch (err) {
@@ -278,11 +278,11 @@ export default function NoteView() {
     let interval;
     const pollTask = async () => {
       try {
-        const statusData = await fetchApi(`/search/task?note_id=${id}`);
+        const statusData = await fetchApi(`/search/task?resource_id=${id}`);
         setTaskStatus(statusData);
 
         if (statusData && statusData.status === 'completed') {
-          const data = await fetchApi(`/notes/${id}?t=${Date.now()}`);
+          const data = await fetchApi(`/resources/${id}?t=${Date.now()}`);
           setNote(data);
           setContent(data.extracted_text || '');
           clearInterval(interval);
@@ -328,7 +328,7 @@ export default function NoteView() {
     }
 
     try {
-      await fetchApi(`/notes/${id}`, {
+      await fetchApi(`/resources/${id}/content`, {
         method: 'PUT',
         body: JSON.stringify({ extracted_text: finalContent })
       });
