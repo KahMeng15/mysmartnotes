@@ -322,32 +322,44 @@ class NoteTask:
             
             processing_time = time.time() - start_time
             
-            # Versioning
-            max_version = db.query(func.max(Note.version)).filter(
-                Note.resource_id == resource_id
-            ).scalar() or 0
-            next_version = max_version + 1
-
-            doc_id = kwargs.get("note_id") or generate_random_id(db, Note)
-            doc = Note(
-                id=doc_id,
-                version=next_version,
-                resource_id=resource_id,
-                title=title,
-                summary_type="summary",
-                file_path=f"note_{resource_id}_{next_version}.md",
-                mode=mode,
-                output_format=output_format,
-                processing_method=processing_method,
-                split_level=split_level,
-                custom_prompt=custom_prompt,
-                prompt_name=prompt_name,
-                prompt_icon=prompt_icon,
-                processing_time=processing_time,
-                processing_time_ms=int(processing_time * 1000),
-                model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()
-            )
-            db.add(doc)
+            doc_id = kwargs.get("note_id")
+            doc = None
+            if doc_id:
+                doc = db.query(Note).filter(Note.id == doc_id).first()
+            
+            if doc:
+                doc.title = title
+                doc.file_path = f"note_{resource_id}_{doc.version}.md"
+                doc.processing_time = processing_time
+                doc.processing_time_ms = int(processing_time * 1000)
+                doc.model = f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()
+            else:
+                if not doc_id:
+                    doc_id = generate_random_id(db, Note)
+                max_version = db.query(func.max(Note.version)).filter(
+                    Note.resource_id == resource_id
+                ).scalar() or 0
+                next_version = max_version + 1
+                
+                doc = Note(
+                    id=doc_id,
+                    version=next_version,
+                    resource_id=resource_id,
+                    title=title,
+                    summary_type="summary",
+                    file_path=f"note_{resource_id}_{next_version}.md",
+                    mode=mode,
+                    output_format=output_format,
+                    processing_method=processing_method,
+                    split_level=split_level,
+                    custom_prompt=custom_prompt,
+                    prompt_name=prompt_name,
+                    prompt_icon=prompt_icon,
+                    processing_time=processing_time,
+                    processing_time_ms=int(processing_time * 1000),
+                    model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()
+                )
+                db.add(doc)
             db.commit()
             
             StorageManager.save_note_text(doc_id, note_content)

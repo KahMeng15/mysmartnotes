@@ -436,11 +436,12 @@ export default function SubjectView() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [subjectsData, allNotes, exercisesData, summariesData] = await Promise.all([
+        const [subjectsData, allNotes, exercisesData, summariesData, activeTasksData] = await Promise.all([
           fetchApi('/subjects'),
           fetchApi('/resources'),
           fetchApi(`/exercises/subject/${id}`),
-          fetchApi(`/notes?subject_id=${id}`)
+          fetchApi(`/notes?subject_id=${id}`),
+          fetchApi('/search/tasks/active').catch(() => ({ tasks: [] }))
         ]);
         
         const currentSub = subjectsData.find(s => s.id == id);
@@ -449,6 +450,24 @@ export default function SubjectView() {
         setNotes(allNotes.filter(l => l.subject_id == id));
         setExercises(exercisesData || []);
         setGeneratedNotes(summariesData || []);
+
+        if (activeTasksData && activeTasksData.tasks) {
+          const summaryTasks = {};
+          const summaryProgress = {};
+          activeTasksData.tasks.forEach(t => {
+            if (t.task_type === 'note_generation' && t.input_data && t.input_data.note_id) {
+              const summaryId = t.input_data.note_id;
+              summaryTasks[summaryId] = t.task_id;
+              if (t.progress !== undefined) {
+                summaryProgress[summaryId] = t.progress;
+              }
+            }
+          });
+          if (Object.keys(summaryTasks).length > 0) {
+            setPendingSummaryTasks(prev => ({ ...prev, ...summaryTasks }));
+            setGeneratedNoteProgress(prev => ({ ...prev, ...summaryProgress }));
+          }
+        }
       } catch (err) {
         console.error("Failed to load subject data", err);
       } finally {

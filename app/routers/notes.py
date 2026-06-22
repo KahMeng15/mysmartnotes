@@ -157,7 +157,9 @@ async def generate_note_endpoint(
             Note.processing_method == request.processing_method,
             Note.mode == request.mode,
             Note.output_format == request.output_format,
-            Note.custom_prompt.is_(None)
+            Note.custom_prompt.is_(None),
+            Note.processing_time_ms > 0,
+            Note.file_path != ""
         ).order_by(Note.created_at.desc()).first()
 
         if existing_summary:
@@ -187,8 +189,43 @@ async def generate_note_endpoint(
 
     import time
     from app.utils.db import generate_random_id
+    from sqlalchemy import func
     doc_id = generate_random_id(db, Note)
     task_id = f"summary_{current_user.id}_{primary_resource_id}_{int(time.time())}"
+    
+    note_title = request.title
+    if not note_title:
+        if len(r_ids) > 1:
+            note_title = "Combined Note: " + ", ".join([r.title for r in resources[:3]])
+            if len(resources) > 3:
+                note_title += "..."
+        else:
+            note_title = resources[0].title
+
+    max_version = db.query(func.max(Note.version)).filter(
+        Note.resource_id == primary_resource_id
+    ).scalar() or 0
+    next_version = max_version + 1
+
+    doc = Note(
+        id=doc_id,
+        version=next_version,
+        resource_id=primary_resource_id,
+        title=note_title,
+        summary_type="summary",
+        file_path="",
+        mode=request.mode,
+        output_format=request.output_format,
+        processing_method=request.processing_method,
+        split_level=request.split_level,
+        custom_prompt=request.custom_prompt,
+        prompt_name=request.prompt_name,
+        prompt_icon=request.prompt_icon,
+        processing_time_ms=0,
+    )
+    db.add(doc)
+    db.commit()
+
     TaskManager.submit_task(
         task_id, 
         "note_generation", 
@@ -196,7 +233,7 @@ async def generate_note_endpoint(
         resource_id=primary_resource_id,
         resource_ids=r_ids,
         note_id=doc_id,
-        title=request.title,
+        title=note_title,
         mode=request.mode,
         output_format=request.output_format,
         processing_method=request.processing_method,
