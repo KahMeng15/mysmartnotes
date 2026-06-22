@@ -270,9 +270,28 @@ class NoteTask:
             prompt_icon = kwargs.get("prompt_icon", None)
             
             user = db.query(User).filter(User.id == user_id).first()
-            resource = db.query(Resource).filter(Resource.id == resource_id).first()
             
-            resource_content = StorageManager.get_resource_text(resource_id) or ""
+            resource_ids = kwargs.get("resource_ids")
+            if resource_ids:
+                content_parts = []
+                for rid in resource_ids:
+                    r = db.query(Resource).filter(Resource.id == rid).first()
+                    r_text = StorageManager.get_resource_text(rid) or ""
+                    if r_text:
+                        content_parts.append(f"--- Document: {r.title} ---\n{r_text}")
+                resource_content = "\n\n".join(content_parts)
+                
+                resources = db.query(Resource).filter(Resource.id.in_(resource_ids)).all()
+                res_dict = {r.id: r for r in resources}
+                resources_ordered = [res_dict[rid] for rid in resource_ids if rid in res_dict]
+                title = "Combined Note: " + ", ".join([r.title for r in resources_ordered[:3]])
+                if len(resources_ordered) > 3:
+                    title += "..."
+            else:
+                resource = db.query(Resource).filter(Resource.id == resource_id).first()
+                resource_content = StorageManager.get_resource_text(resource_id) or ""
+                title = resource.title
+
             ai_client = AIClient(user, db=db)
             
             start_time = time.time()
@@ -311,9 +330,9 @@ class NoteTask:
                 id=doc_id,
                 version=next_version,
                 resource_id=resource_id,
-                title=resource.title,
+                title=title,
                 summary_type="summary",
-                file_path=f"note_{resource.id}_{next_version}.md",
+                file_path=f"note_{resource_id}_{next_version}.md",
                 mode=mode,
                 output_format=output_format,
                 processing_method=processing_method,

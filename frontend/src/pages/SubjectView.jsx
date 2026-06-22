@@ -1,9 +1,42 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress, ScrollArea, Divider } from '@mantine/core';
+import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress, ScrollArea, Divider, MultiSelect, SegmentedControl } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList } from '@tabler/icons-react';
+import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit } from '@tabler/icons-react';
+import * as TablerIcons from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi, getAuthToken } from '../lib/api';
+
+const MODE_ICONS = {
+  quick: <IconBolt size={14} />,
+  simple: <IconWand size={14} />,
+  normal: <IconBrain size={14} />,
+  elaborate: <IconSchool size={14} />,
+  eli5: <IconBabyCarriage size={14} />,
+};
+
+const FORMAT_ICONS = {
+  sentence: <IconFileText size={14} />,
+  pointform: <IconList size={14} />,
+  numbered_list: <IconListNumbers size={14} />,
+  table: <IconTable size={14} />,
+};
+
+const METHOD_ICONS = {
+  whole: <IconFile size={14} />,
+  section: <IconLayersLinked size={14} />,
+  chunked: <IconCpu size={14} />,
+  hierarchical: <IconBinaryTree size={14} />,
+};
+
+const getIconComponent = (iconName) => {
+  if (!iconName) return TablerIcons.IconFileText;
+  if (TablerIcons[iconName]) return TablerIcons[iconName];
+  
+  const formattedName = 'Icon' + iconName.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join('');
+  if (TablerIcons[formattedName]) return TablerIcons[formattedName];
+  
+  return TablerIcons.IconFileText;
+};
 
 const getFriendlyFileType = (mimeType) => {
   if (!mimeType) return 'DOCUMENT';
@@ -42,6 +75,126 @@ export default function SubjectView() {
   const [generatedNotes, setGeneratedNotes] = useState([]);
   
   const [activeTab, setActiveTab] = useState(tab || 'resource');
+
+  const [selectedResources, setSelectedResources] = useState([]);
+  const [createNoteModalOpened, setCreateNoteModalOpened] = useState(false);
+  const [noteMode, setNoteMode] = useState('elaborate');
+  const [noteFormat, setNoteFormat] = useState('sentence');
+  const [noteMethod, setNoteMethod] = useState('whole');
+  const [noteCustomPrompt, setNoteCustomPrompt] = useState('');
+  const [generatingCombinedNote, setGeneratingCombinedNote] = useState(false);
+
+  const [parameterType, setParameterType] = useState('multi'); // 'multi' or 'single'
+  const [globalPrompts, setGlobalPrompts] = useState([]);
+  const [selectedPromptId, setSelectedPromptId] = useState(null);
+  const [userPrompts, setUserPrompts] = useState([]);
+  const [createPromptModalOpened, setCreatePromptModalOpened] = useState(false);
+  const [newPromptName, setNewPromptName] = useState('');
+  const [newPromptContent, setNewPromptContent] = useState('');
+  const [savingNewPrompt, setSavingNewPrompt] = useState(false);
+
+  useEffect(() => {
+    fetchApi('/admin/global-prompts').then(data => {
+      setGlobalPrompts(data || []);
+    }).catch(err => console.error("Failed to load global prompts", err));
+    fetchApi('/prompts').then(data => {
+      setUserPrompts(data || []);
+    }).catch(err => console.error("Failed to load user prompts", err));
+  }, []);
+
+  const saveNewPrompt = async () => {
+    if (!newPromptName.trim() || !newPromptContent.trim()) return;
+    setSavingNewPrompt(true);
+    try {
+      const res = await fetchApi('/prompts', {
+        method: 'POST',
+        body: JSON.stringify({ name: newPromptName, content: newPromptContent })
+      });
+      if (res && res.id) {
+        setUserPrompts(prev => [...prev, res]);
+        setSelectedPromptId(`u_${res.id}`);
+        setCreatePromptModalOpened(false);
+        setNewPromptName('');
+        setNewPromptContent('');
+      }
+    } catch (err) {
+      console.error("Failed to save new prompt", err);
+    } finally {
+      setSavingNewPrompt(false);
+    }
+  };
+
+  const handleCreateNotes = async () => {
+    if (selectedResources.length === 0) return;
+    setGeneratingCombinedNote(true);
+    try {
+      let bodyData = {
+        resource_ids: selectedResources,
+      };
+      
+      let finalPromptName = null;
+      let finalPromptIcon = null;
+
+      if (parameterType === 'single') {
+        const gp = globalPrompts.find(p => `g_${p.id}` === selectedPromptId);
+        const up = userPrompts.find(p => `u_${p.id}` === selectedPromptId);
+        const name = gp ? gp.name : up ? up.name : 'Custom Note';
+        const icon = gp ? gp.icon : up ? up.icon : 'IconFileText';
+        const customPrompt = gp ? gp.prompt : up ? up.prompt : '';
+        
+        finalPromptName = name;
+        finalPromptIcon = icon;
+        bodyData = {
+          ...bodyData,
+          custom_prompt: customPrompt,
+          prompt_name: name,
+          prompt_icon: icon,
+        };
+      } else {
+        bodyData = {
+          ...bodyData,
+          mode: noteMode,
+          output_format: noteFormat,
+          processing_method: noteMethod,
+          custom_prompt: noteCustomPrompt || undefined,
+        };
+      }
+
+      const res = await fetchApi('/notes/summary', {
+        method: 'POST',
+        body: JSON.stringify(bodyData)
+      });
+      
+      if (res && res.task_id) {
+        setPendingSummaryTasks(prev => ({ ...prev, [res.note_id]: res.task_id }));
+        setActiveTab('notes');
+        const placeholderNote = {
+          id: res.note_id,
+          version: 1,
+          resource_id: selectedResources[0],
+          note_id: selectedResources[0],
+          title: "Generating combined note...",
+          summary_type: "summary",
+          file_path: "",
+          created_at: new Date().toISOString(),
+          mode: parameterType === 'multi' ? noteMode : undefined,
+          output_format: parameterType === 'multi' ? noteFormat : undefined,
+          processing_method: parameterType === 'multi' ? noteMethod : undefined,
+          prompt_name: parameterType === 'single' ? finalPromptName : undefined,
+          prompt_icon: parameterType === 'single' ? finalPromptIcon : undefined,
+          status: "pending"
+        };
+        setGeneratedNotes(prev => [placeholderNote, ...prev]);
+      }
+      
+      setCreateNoteModalOpened(false);
+      setSelectedResources([]);
+    } catch (e) {
+      alert("Failed to create notes: " + e.message);
+    } finally {
+      setGeneratingCombinedNote(false);
+    }
+  };
 
   useEffect(() => {
     if (tab && tab !== activeTab) {
@@ -485,6 +638,18 @@ export default function SubjectView() {
     }
   };
 
+  const sortedProcessableNotes = useMemo(() => {
+    return notes
+      .filter(n => {
+        const isProcessed = (n.processing_time_ms != null && n.processing_time_ms > 0) || 
+                            (n.extracted_text != null && n.extracted_text.trim() !== '') || 
+                            (n.extracted_content_structured != null && n.extracted_content_structured !== '[]' && n.extracted_content_structured !== '') || 
+                            (n.output_pdf_path != null && n.output_pdf_path !== '');
+        return isProcessed && !reprocessingNoteIds.includes(n.id) && !failedNoteIds.includes(n.id);
+      })
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }, [notes, reprocessingNoteIds, failedNoteIds]);
+
   if (loading) {
     return (
       <Center h="50vh">
@@ -535,8 +700,11 @@ export default function SubjectView() {
           <ActionIcon variant="light" color="red" size="lg" title="Delete Subject" onClick={openDeleteSubjectModal}>
             <IconTrash size={18} />
           </ActionIcon>
+          <Button variant="light" leftSection={<IconSparkles size={16} />} onClick={() => setCreateNoteModalOpened(true)}>
+            Create
+          </Button>
           <Button leftSection={<IconUpload size={16} />} onClick={() => navigate(`/upload?subject_id=${subject.id}`)}>
-            Upload Notes
+            Upload
           </Button>
         </Group>
       </Group>
@@ -776,7 +944,7 @@ export default function SubjectView() {
                  const relatedNote = notes.find(n => n.id === gn.note_id);
                  const resourceName = relatedNote ? relatedNote.title : 'Unknown Resource';
                  const templateInfo = gn.prompt_name || [gn.mode, gn.output_format, gn.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
-                 const displayTitle = gn.is_user_edited ? gn.title : `${templateInfo} - ${resourceName}`;
+                 const displayTitle = (gn.is_user_edited || (gn.title && gn.title.startsWith("Combined Note:"))) ? gn.title : `${templateInfo} - ${resourceName}`;
 
                  return (
                 <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
@@ -894,6 +1062,209 @@ export default function SubjectView() {
           <Button variant="default" onClick={closeReprocessNoteModal}>Cancel</Button>
           <Button color="orange" onClick={executeReprocessNote} loading={submitting}>Start Reprocessing</Button>
         </Group>
+      </Modal>
+
+      <Modal opened={createNoteModalOpened} onClose={() => setCreateNoteModalOpened(false)} title="Create Note" centered size="lg">
+        <form onSubmit={(e) => { e.preventDefault(); handleCreateNotes(); }}>
+          <Stack gap="md">
+            <Text size="sm">Select resources and configure parameters to generate smart study notes using AI.</Text>
+            
+            <MultiSelect
+              label="Select Resources"
+              description="Choose one or more uploaded files to process into your study note."
+              placeholder="Pick files to include"
+              data={[
+                { value: 'all', label: 'All Resources (Select/Deselect All)' },
+                ...sortedProcessableNotes.map(n => ({ value: n.id, label: n.title }))
+              ]}
+              value={selectedResources}
+              onChange={(values) => {
+                if (values.includes('all')) {
+                  const processableIds = sortedProcessableNotes.map(n => n.id);
+                  if (selectedResources.length === processableIds.length) {
+                    setSelectedResources([]);
+                  } else {
+                    setSelectedResources(processableIds);
+                  }
+                } else {
+                  setSelectedResources(values);
+                }
+              }}
+              searchable
+              clearable
+              required
+            />
+
+            <SegmentedControl
+              value={parameterType}
+              onChange={setParameterType}
+              data={[
+                { label: 'Multi Parameters', value: 'multi' },
+                { label: 'Single Parameter', value: 'single' },
+              ]}
+              fullWidth
+              mb="xs"
+            />
+
+            {parameterType === 'multi' ? (
+              <>
+                <Select
+                  label="Mode"
+                  description="Controls the tone and elaboration level of the generated notes."
+                  value={noteMode}
+                  onChange={setNoteMode}
+                  leftSection={MODE_ICONS[noteMode]}
+                  renderOption={({ option }) => (
+                    <Group gap="sm">
+                      {MODE_ICONS[option.value]}
+                      <Text size="sm">{option.label}</Text>
+                    </Group>
+                  )}
+                  data={[
+                    { value: 'quick', label: 'Quick' },
+                    { value: 'simple', label: 'Simple' },
+                    { value: 'normal', label: 'Normal' },
+                    { value: 'elaborate', label: 'Elaborate' },
+                    { value: 'eli5', label: 'Explain like I am 5' },
+                  ]}
+                />
+                
+                <Select
+                  label="Output Format"
+                  description="Format style of the study notes."
+                  value={noteFormat}
+                  onChange={setNoteFormat}
+                  leftSection={FORMAT_ICONS[noteFormat]}
+                  renderOption={({ option }) => (
+                    <Group gap="sm">
+                      {FORMAT_ICONS[option.value]}
+                      <Text size="sm">{option.label}</Text>
+                    </Group>
+                  )}
+                  data={[
+                    { value: 'sentence', label: 'Sentence' },
+                    { value: 'pointform', label: 'Pointform' },
+                    { value: 'numbered_list', label: 'Numbered List' },
+                    { value: 'table', label: 'Table' },
+                  ]}
+                />
+                
+                <Select
+                  label="Processing Method"
+                  description="How the AI analyzes the concatenated document text."
+                  value={noteMethod}
+                  onChange={setNoteMethod}
+                  leftSection={METHOD_ICONS[noteMethod]}
+                  renderOption={({ option }) => (
+                    <Group gap="sm">
+                      {METHOD_ICONS[option.value]}
+                      <Text size="sm">{option.label}</Text>
+                    </Group>
+                  )}
+                  data={[
+                    { value: 'whole', label: 'Whole Document (Fast)' },
+                    { value: 'section', label: 'Section by Section' },
+                    { value: 'chunked', label: 'Chunked (Detailed)' },
+                    { value: 'hierarchical', label: 'Hierarchical (Structured)' },
+                  ]}
+                />
+
+                <Textarea
+                  label="Custom Instruction (Optional)"
+                  description="Add custom instructions to guide the note generation."
+                  placeholder="e.g. Focus on vocabulary, write in french, explain the math equations step-by-step..."
+                  value={noteCustomPrompt}
+                  onChange={(e) => setNoteCustomPrompt(e.currentTarget.value)}
+                  rows={3}
+                />
+              </>
+            ) : (
+              <Stack gap="sm">
+                <Group align="flex-end" gap="xs" style={{ flexWrap: 'nowrap' }}>
+                  <div style={{ flex: 1 }}>
+                    <Select
+                      label="Prompt Template"
+                      placeholder="Select a template..."
+                      data={[
+                        {
+                          group: 'Global Templates',
+                          items: globalPrompts.map(p => ({ value: `g_${p.id}`, label: p.name, icon: p.icon }))
+                        },
+                        {
+                          group: 'Your Templates',
+                          items: userPrompts.map(p => ({ value: `u_${p.id}`, label: p.name, icon: 'IconUserEdit' }))
+                        }
+                      ]}
+                      value={selectedPromptId}
+                      onChange={setSelectedPromptId}
+                      leftSection={(() => {
+                        if (!selectedPromptId) return <IconFileText size={16} />;
+                        if (selectedPromptId.startsWith('g_')) {
+                          const id = selectedPromptId.replace('g_', '');
+                          const gp = globalPrompts.find(p => p.id.toString() === id);
+                          const IconComp = getIconComponent(gp?.icon);
+                          return <IconComp size={16} />;
+                        } else if (selectedPromptId.startsWith('u_')) {
+                          const IconComp = getIconComponent('IconUserEdit');
+                          return <IconComp size={16} />;
+                        }
+                        return <IconFileText size={16} />;
+                      })()}
+                      renderOption={({ option }) => {
+                        const IconComp = getIconComponent(option.icon);
+                        return (
+                          <Group gap="sm">
+                            <IconComp size={16} />
+                            <Text size="sm">{option.label}</Text>
+                          </Group>
+                        );
+                      }}
+                      required
+                    />
+                  </div>
+                  <ActionIcon variant="light" color="blue" size="lg" onClick={() => setCreatePromptModalOpened(true)} title="Add Custom Template" style={{ height: '36px', width: '36px' }}>
+                    <IconPlus size={18} />
+                  </ActionIcon>
+                </Group>
+              </Stack>
+            )}
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => setCreateNoteModalOpened(false)}>Cancel</Button>
+              <Button type="submit" loading={generatingCombinedNote} disabled={selectedResources.length === 0 || (parameterType === 'single' && !selectedPromptId)} leftSection={<IconSparkles size={16} />}>Create</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      <Modal opened={createPromptModalOpened} onClose={() => setCreatePromptModalOpened(false)} title="Create Custom Template" centered>
+        <form onSubmit={(e) => { e.preventDefault(); saveNewPrompt(); }}>
+          <Stack gap="md">
+            <TextInput
+              label="Template Name"
+              placeholder="e.g., Executive Summary"
+              value={newPromptName}
+              onChange={(e) => setNewPromptName(e.currentTarget.value)}
+              required
+              data-autofocus
+            />
+            <Textarea
+              label="Prompt Content"
+              placeholder="Instructions for the AI, e.g., Summarize key findings in bullet points..."
+              value={newPromptContent}
+              onChange={(e) => setNewPromptContent(e.currentTarget.value)}
+              minRows={4}
+              autosize
+              required
+            />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => setCreatePromptModalOpened(false)}>Cancel</Button>
+              <Button type="submit" loading={savingNewPrompt} disabled={!newPromptName.trim() || !newPromptContent.trim()}>
+                Create Template
+              </Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       {/* Summary Modals */}

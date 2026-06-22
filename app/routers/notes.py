@@ -38,7 +38,8 @@ def format_timestamp(dt: Optional[datetime]) -> str:
 
 
 class NoteRequest(BaseModel):
-    resource_id: str
+    resource_id: Optional[str] = None
+    resource_ids: Optional[List[str]] = None
     mode: str = "elaborate"  # quick, simple, elaborate, eli5
     output_format: str = "sentence"  # sentence, pointform, numbered_list, table
     processing_method: str = "whole"  # whole, section
@@ -48,7 +49,6 @@ class NoteRequest(BaseModel):
     custom_prompt: Optional[str] = None  # Single parameter mode prompt
     prompt_name: Optional[str] = None
     prompt_icon: Optional[str] = None
-
 
 
 class NoteResponse(BaseModel):
@@ -90,6 +90,7 @@ class NoteItemResponse(BaseModel):
     id: str
     version: int
     resource_id: str
+    note_id: Optional[str] = None
     title: str
     summary_type: str
     file_path: str
@@ -122,22 +123,35 @@ async def generate_note_endpoint(
     # Enforce tier quotas
     enforce_quota_notes(current_user, db)
     
-    # Verify note belongs to user
-    note = db.query(Resource).filter(
-        Resource.id == request.resource_id,
-        Resource.user_id == current_user.id
-    ).first()
+    # Resolve resource_id and resource_ids
+    r_ids = request.resource_ids if request.resource_ids else []
+    if not r_ids and request.resource_id:
+        r_ids = [request.resource_id]
+        
+    if not r_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either resource_id or resource_ids must be provided"
+        )
+        
+    primary_resource_id = r_ids[0]
     
-    if not note:
+    # Verify all notes belong to user
+    resources = db.query(Resource).filter(
+        Resource.id.in_(r_ids),
+        Resource.user_id == current_user.id
+    ).all()
+    
+    if len(resources) != len(r_ids):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Resource not found"
+            detail="One or more resources not found"
         )
 
-    # Check for existing summary (unless forced)
-    if not request.force_regenerate and not request.custom_prompt:
+    # Check for existing summary (unless forced, and only for single resource to avoid combined note cache clashes)
+    if len(r_ids) == 1 and not request.force_regenerate and not request.custom_prompt:
         existing_summary = db.query(Note).filter(
-            Note.resource_id == request.resource_id,
+            Note.resource_id == primary_resource_id,
             Note.summary_type == "summary",
             Note.processing_method == request.processing_method,
             Note.mode == request.mode,
@@ -147,7 +161,7 @@ async def generate_note_endpoint(
 
         if existing_summary:
             return {
-                "resource_id": request.resource_id,
+                "resource_id": primary_resource_id,
                 "title": existing_summary.title,
                 "content": StorageManager.get_note_text(existing_summary.id) or "",
                 "is_cached": True,
@@ -173,14 +187,14 @@ async def generate_note_endpoint(
     import time
     from app.utils.db import generate_random_id
     doc_id = generate_random_id(db, Note)
-    task_id = f"summary_{current_user.id}_{request.resource_id}_{int(time.time())}"
+    task_id = f"summary_{current_user.id}_{primary_resource_id}_{int(time.time())}"
     TaskManager.submit_task(
         task_id, 
         "note_generation", 
         current_user.id, 
-        resource_id=note.id,
+        resource_id=primary_resource_id,
+        resource_ids=r_ids,
         note_id=doc_id,
-        title=note.title, 
         mode=request.mode,
         output_format=request.output_format,
         processing_method=request.processing_method,
@@ -348,6 +362,7 @@ async def update_generated_note(
         id=doc.id,
         version=doc.version,
         resource_id=doc.resource_id,
+        note_id=doc.resource_id,
         title=doc.title,
         summary_type=doc.summary_type,
         file_path=doc.file_path,
@@ -389,6 +404,7 @@ async def list_notes(
             id=d.id,
             version=d.version,
             resource_id=d.resource_id,
+            note_id=d.resource_id,
             title=d.title,
             summary_type=d.summary_type,
             file_path=d.file_path,
@@ -442,6 +458,7 @@ async def get_note(
         id=summary.id,
         version=summary.version,
         resource_id=summary.resource_id,
+        note_id=summary.resource_id,
         title=summary.title,
         summary_type=summary.summary_type,
         file_path=summary.file_path,

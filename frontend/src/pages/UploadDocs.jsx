@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Text, Select, Button, Stack, Group, Progress, SimpleGrid, Card } from '@mantine/core';
+import { Box, Title, Text, Select, Button, Stack, Group, Progress, SimpleGrid, Card, SegmentedControl } from '@mantine/core';
 import { IconUpload, IconFile, IconX } from '@tabler/icons-react';
 import { Dropzone, PDF_MIME_TYPE, IMAGE_MIME_TYPE, MS_POWERPOINT_MIME_TYPE } from '@mantine/dropzone';
 import { fetchApi } from '../lib/api';
@@ -10,12 +10,13 @@ export default function UploadDocs() {
   const [searchParams] = useSearchParams();
   const initialGroupId = searchParams.get('group_id');
   const initialSubjectId = searchParams.get('subject_id');
-  const isExercise = searchParams.get('type') === 'exercise';
+  const initialType = searchParams.get('type') === 'exercise' ? 'exercise' : 'resource';
 
   const [groups, setGroups] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(initialGroupId || null);
   const [selectedSubject, setSelectedSubject] = useState(initialSubjectId || null);
+  const [uploadType, setUploadType] = useState(initialType);
   const [files, setFiles] = useState([]);
   
   const [uploading, setUploading] = useState(false);
@@ -79,7 +80,7 @@ export default function UploadDocs() {
     setProgress(20);
 
     try {
-      if (isExercise) {
+      if (uploadType === 'exercise') {
         // Upload each file to `/exercises/upload` sequentially
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
@@ -133,12 +134,25 @@ export default function UploadDocs() {
 
   return (
     <Box h="100%" style={{ overflowX: 'hidden' }}>
-      <Title order={2} mb="md">{isExercise ? "Upload Exercises" : "Upload Documents"}</Title>
-      <Text c="dimmed" mb="xl">{isExercise ? "Upload PDFs, PPTXs, or Images of worksheets/exams to process into interactive exercises." : "Upload PDFs, PPTXs, or Images to generate smart notes."}</Text>
+      <Title order={2} mb="xs">Upload Files</Title>
+      <Text c="dimmed" mb="lg">Upload study resources to generate smart notes, or worksheets to create interactive exercises.</Text>
 
       <Box>
         <Stack gap="lg">
           {error && <Text color="red" size="sm">{error}</Text>}
+
+          <Box>
+            <Text fw={500} size="sm" mb={5}>Upload As</Text>
+            <SegmentedControl
+              value={uploadType}
+              onChange={setUploadType}
+              data={[
+                { label: 'Study Resource', value: 'resource' },
+                { label: 'Exercise / Worksheet', value: 'exercise' },
+              ]}
+              fullWidth
+            />
+          </Box>
           
           <Group grow align="flex-start">
             <Select
@@ -186,7 +200,7 @@ export default function UploadDocs() {
                     Drag files here or click to select files
                   </Text>
                   <Text size="sm" c="dimmed" inline mt={7}>
-                    {isExercise ? "Attach PDFs, PPTXs, or Image files of worksheets/exams to process" : "Attach PDFs, PPTXs, or Image files to process"}
+                    {uploadType === 'exercise' ? "Attach PDFs, PPTXs, or Image files of worksheets/exams to process" : "Attach PDFs, PPTXs, or Image files to process"}
                   </Text>
                 </div>
               </Group>
@@ -226,7 +240,7 @@ export default function UploadDocs() {
               disabled={!selectedSubject || files.length === 0}
               size="md"
             >
-              Upload and Process
+              Upload
             </Button>
           </Group>
         </Stack>
