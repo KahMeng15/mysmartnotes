@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu } from '@mantine/core';
-import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload } from '@tabler/icons-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
@@ -372,7 +372,7 @@ export default function NoteView() {
   };
 
   return (
-    <Box h="100vh" style={{ display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+    <Box h="100vh" style={{ display: 'flex', flexDirection: 'column' }}>
       <style>{`
         .sticky-markdown {
           font-family: 'Instrument Sans', sans-serif;
@@ -462,8 +462,6 @@ export default function NoteView() {
                   </>
                 )}
                 <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}`)}>{note.subject.name}</Text>
-                <Text size="sm" c="dimmed">/</Text>
-                <Text size="sm" fw={500} c="dimmed">Resource</Text>
               </Group>
             )}
             {!isProcessed && (
@@ -482,9 +480,9 @@ export default function NoteView() {
           viewportRef={viewportRef}
           onScrollPositionChange={handleScroll}
           style={{ flex: 1, backgroundColor: '#fff' }}
-          p={0}
+          p="xs"
         >
-          <Container size="md" py={0} px={0} w="100%">
+          <Container size="md" py="xs">
             {isFailed ? (
               <Box mt={100} ta="center">
                 <IconAlertCircle size={64} color="var(--mantine-color-red-6)" stroke={1.5} />
@@ -505,30 +503,26 @@ export default function NoteView() {
                   <Text size="sm" c="dimmed" mt="xs" ta="right">{processingProgress}%</Text>
                 </Box>
               </Box>
+            ) : isEditing && isRawMode ? (
+              <Textarea
+                ref={textareaRef}
+                minRows={30}
+                autosize
+                value={content}
+                onChange={(e) => setContent(e.currentTarget.value)}
+                variant="unstyled"
+                styles={{ input: { fontFamily: 'monospace', fontSize: '14px', lineHeight: 1.6 } }}
+              />
             ) : (
-              <Box px="md" pb="xl">
-                {isEditing && isRawMode ? (
-                  <Textarea
-                    ref={textareaRef}
-                    minRows={30}
-                    autosize
-                    value={content}
-                    onChange={(e) => setContent(e.currentTarget.value)}
-                    variant="unstyled"
-                    styles={{ input: { fontFamily: 'monospace', fontSize: '14px', lineHeight: 1.6 } }}
-                  />
+              <Box ref={markdownRef} className="sticky-markdown" style={{ color: '#171738', fontSize: '16px', lineHeight: 1.8 }}>
+                {isEditing && !isRawMode ? (
+                  <EditorContent editor={editor} />
+                ) : content ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {content}
+                  </ReactMarkdown>
                 ) : (
-                  <Box ref={markdownRef} className="sticky-markdown" style={{ color: '#171738', fontSize: '16px', lineHeight: 1.8 }}>
-                    {isEditing && !isRawMode ? (
-                      <EditorContent editor={editor} />
-                    ) : content ? (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {content}
-                      </ReactMarkdown>
-                    ) : (
-                      <Center h={200}><Text c="dimmed">No content extracted.</Text></Center>
-                    )}
-                  </Box>
+                  <Center h={200}><Text c="dimmed">No content extracted.</Text></Center>
                 )}
               </Box>
             )}
@@ -551,11 +545,11 @@ export default function NoteView() {
                         onClick={startEditing}
                       />
                     </Tooltip>
-                    <Tooltip label="View Summaries" disabled={sidebarOpen} position="left">
+                    <Tooltip label="Summary" disabled={sidebarOpen} position="left">
                       <MantineNavLink
-                        label={sidebarOpen ? "View Summaries" : ""}
+                        label={sidebarOpen ? "Summary" : ""}
                         leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
-                        onClick={() => navigate(`/subject/${note.subject.id}/notes`)}
+                        onClick={() => navigate(`/note/${id}/summary`)}
                       />
                     </Tooltip>
                     <Tooltip label="Quick Chat" disabled={sidebarOpen} position="left">
@@ -565,11 +559,11 @@ export default function NoteView() {
                         onClick={() => setChatOpened(true)}
                       />
                     </Tooltip>
-                    <Tooltip label="Generate Exercise" disabled={sidebarOpen} position="left">
+                    <Tooltip label="Generate Quiz" disabled={sidebarOpen} position="left">
                       <MantineNavLink
-                        label={sidebarOpen ? "Generate Exercise" : ""}
-                        leftSection={<IconBolt size="1.2rem" stroke={1.5} />}
-                        onClick={() => navigate(`/subject/${note.subject.id}/exercise`)}
+                        label={sidebarOpen ? "Generate Quiz" : ""}
+                        leftSection={<IconCards size="1.2rem" stroke={1.5} />}
+                        onClick={() => navigate(`/quiz?note_id=${id}`)}
                       />
                     </Tooltip>
                     <Menu position="left-start" withArrow>

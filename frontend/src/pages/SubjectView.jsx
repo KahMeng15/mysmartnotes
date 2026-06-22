@@ -33,14 +33,26 @@ const formatNoteDate = (dateString) => {
 };
 
 export default function SubjectView() {
-  const { id } = useParams();
+  const { id, tab } = useParams();
   const navigate = useNavigate();
   
   const [subject, setSubject] = useState(null);
   const [notes, setNotes] = useState([]);
   const [exercises, setExercises] = useState([]);
   const [generatedNotes, setGeneratedNotes] = useState([]);
-  const [activeTab, setActiveTab] = useState('resources');
+  
+  const [activeTab, setActiveTab] = useState(tab || 'resource');
+
+  useEffect(() => {
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [tab]);
+
+  const handleTabChange = (val) => {
+    setActiveTab(val);
+    navigate(`/subject/${id}/${val}`);
+  };
   const [selectedExercises, setSelectedExercises] = useState([]);
   const [merging, setMerging] = useState(false);
 
@@ -124,6 +136,14 @@ export default function SubjectView() {
   const [newTitle, setNewTitle] = useState('');
   const [deletingNote, setDeletingNote] = useState(null);
 
+  // Summary Action Modals
+  const [renameSummaryModalOpened, { open: openRenameSummaryModal, close: closeRenameSummaryModal }] = useDisclosure(false);
+  const [deleteSummaryModalOpened, { open: openDeleteSummaryModal, close: closeDeleteSummaryModal }] = useDisclosure(false);
+  const [editingSummary, setEditingSummary] = useState(null);
+  const [deletingSummary, setDeletingSummary] = useState(null);
+  const [infoModalSummary, setInfoModalSummary] = useState(null);
+  const [newSummaryTitle, setNewSummaryTitle] = useState('');
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -204,6 +224,38 @@ export default function SubjectView() {
   const openReprocess = (note) => {
     setReprocessingNote(note);
     openReprocessNoteModal();
+  };
+
+  const handleRenameSummary = async () => {
+    if (!newSummaryTitle.trim() || !editingSummary) return;
+    setSubmitting(true);
+    try {
+      await fetchApi(`/summaries/${editingSummary.id}/rename`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: newSummaryTitle.trim() })
+      });
+      // The API saves this as a user-edited title, and we need to update state
+      setGeneratedNotes(generatedNotes.map(gn => gn.id === editingSummary.id ? { ...gn, title: newSummaryTitle.trim(), is_user_edited: true } : gn));
+      closeRenameSummaryModal();
+    } catch (err) {
+      alert("Failed to rename generated note: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const executeDeleteSummary = async () => {
+    if (!deletingSummary) return;
+    setSubmitting(true);
+    try {
+      await fetchApi(`/summaries/${deletingSummary.id}`, { method: 'DELETE' });
+      setGeneratedNotes(generatedNotes.filter(gn => gn.id !== deletingSummary.id));
+      closeDeleteSummaryModal();
+    } catch (err) {
+      alert("Failed to delete generated note: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleRename = async () => {
@@ -346,14 +398,14 @@ export default function SubjectView() {
         />
       </Group>
 
-      <Tabs value={activeTab} onChange={setActiveTab} mb="md">
+      <Tabs value={activeTab} onChange={handleTabChange} mb="md">
         <Tabs.List>
-          <Tabs.Tab value="resources">Resources</Tabs.Tab>
-          <Tabs.Tab value="exercises">Exercises</Tabs.Tab>
-          <Tabs.Tab value="generated">Generated Notes</Tabs.Tab>
+          <Tabs.Tab value="resource">Resources</Tabs.Tab>
+          <Tabs.Tab value="exercise">Exercises</Tabs.Tab>
+          <Tabs.Tab value="notes">Generated Notes</Tabs.Tab>
         </Tabs.List>
 
-        <Tabs.Panel value="resources" pt="xl">
+        <Tabs.Panel value="resource" pt="xl">
           {filteredNotes.length > 0 ? (
             <Stack spacing="sm">
               {filteredNotes.map((note) => {
@@ -368,7 +420,7 @@ export default function SubjectView() {
                   >
                     <Group justify="space-between" wrap="nowrap">
                       <Box style={{ flex: 1 }}>
-                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${note.id}`)}>
+                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/resource/${note.id}`)}>
                           {note.title}
                         </Text>
                         <Group gap="xs" mt={4}>
@@ -384,8 +436,8 @@ export default function SubjectView() {
                       </Box>
 
                       <Group gap="xs">
-                        <Button variant="light" size="sm" onClick={() => navigate(`/note/${note.id}`)}>
-                          View Note
+                        <Button variant="light" size="sm" onClick={() => navigate(`/resource/${note.id}`)}>
+                          View Resource
                         </Button>
                         <Menu position="bottom-end" withinPortal>
                           <Menu.Target>
@@ -426,7 +478,7 @@ export default function SubjectView() {
           )}
         </Tabs.Panel>
         
-        <Tabs.Panel value="exercises" pt="xl">
+        <Tabs.Panel value="exercise" pt="xl">
           <Group mb="md" justify="space-between">
             <Text>Select multiple exercises to merge them into one.</Text>
             {selectedExercises.length > 1 && (
@@ -505,7 +557,7 @@ export default function SubjectView() {
             <Center h={200}>
               <Box ta="center">
                 <Text c="dimmed">No exercises found.</Text>
-                <Button mt="md" variant="light" onClick={() => navigate(`/upload?subject_id=${subject.id}`)}>
+                <Button mt="md" variant="light" onClick={() => navigate(`/upload?subject_id=${subject.id}&type=exercise`)}>
                   Upload an Exercise
                 </Button>
               </Box>
@@ -513,26 +565,53 @@ export default function SubjectView() {
           )}
         </Tabs.Panel>
         
-        <Tabs.Panel value="generated" pt="xl">
+        <Tabs.Panel value="notes" pt="xl">
           {generatedNotes.length > 0 ? (
             <Stack spacing="sm">
-              {generatedNotes.map((gn) => (
+              {generatedNotes.map((gn) => {
+                 const relatedNote = notes.find(n => n.id === gn.note_id);
+                 const resourceName = relatedNote ? relatedNote.title : 'Unknown Resource';
+                 const templateInfo = gn.prompt_name || [gn.mode, gn.output_format, gn.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+                 const displayTitle = gn.is_user_edited ? gn.title : `${templateInfo} - ${resourceName}`;
+
+                 return (
                 <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder>
                    <Group justify="space-between" wrap="nowrap">
                       <Box>
-                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${gn.note_id}/summary/${gn.id}`)}>
-                          {gn.title}
+                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${gn.id}`)}>
+                          {displayTitle}
                         </Text>
                         <Text size="xs" c="dimmed">
                            Generated on {formatNoteDate(gn.created_at)}
                         </Text>
                       </Box>
-                      <Button variant="light" size="sm" onClick={() => navigate(`/note/${gn.note_id}/summary/${gn.id}`)}>
-                        View Note
-                      </Button>
+                      <Group gap="xs">
+                        <Button variant="light" size="sm" onClick={() => navigate(`/note/${gn.id}`)}>
+                          View Note
+                        </Button>
+                        <Menu position="bottom-end">
+                          <Menu.Target>
+                            <ActionIcon variant="subtle" color="gray">
+                              <IconDotsVertical size={20} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => { setEditingSummary(gn); setNewSummaryTitle(displayTitle); openRenameSummaryModal(); }}>
+                              Rename
+                            </Menu.Item>
+                            <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={() => setInfoModalSummary(gn)}>
+                              System Info
+                            </Menu.Item>
+                            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => { setDeletingSummary({ ...gn, displayTitle }); openDeleteSummaryModal(); }}>
+                              Delete
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
                    </Group>
                 </Card>
-              ))}
+                 );
+              })}
             </Stack>
           ) : (
             <Center h={200}>
@@ -598,9 +677,49 @@ export default function SubjectView() {
           Are you sure you want to reprocess <b>{reprocessingNote?.title}</b>? This will extract all content from the file again, completely replacing the current extraction and embeddings. Existing summaries will be kept. This operation might take a while.
         </Text>
         <Group justify="flex-end">
-          <Button variant="default" onClick={closeReprocessNoteModal} disabled={submitting}>Cancel</Button>
-          <Button leftSection={<IconRefresh size={16} />} onClick={executeReprocessNote} loading={submitting}>Reprocess</Button>
+          <Button variant="default" onClick={closeReprocessNoteModal}>Cancel</Button>
+          <Button color="orange" onClick={executeReprocessNote} loading={submitting}>Start Reprocessing</Button>
         </Group>
+      </Modal>
+
+      {/* Summary Modals */}
+      <Modal opened={renameSummaryModalOpened} onClose={closeRenameSummaryModal} title="Rename Generated Note" centered>
+        <form onSubmit={(e) => { e.preventDefault(); handleRenameSummary(); }}>
+          <Stack>
+            <TextInput label="Note Title" value={newSummaryTitle} onChange={(e) => setNewSummaryTitle(e.currentTarget.value)} data-autofocus />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeRenameSummaryModal}>Cancel</Button>
+              <Button type="submit" loading={submitting}>Save</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      <Modal opened={deleteSummaryModalOpened} onClose={closeDeleteSummaryModal} title="Confirm Delete" centered>
+        <form onSubmit={(e) => { e.preventDefault(); executeDeleteSummary(); }}>
+          <Stack>
+            <Text size="sm">Are you sure you want to delete <b>{deletingSummary?.displayTitle || deletingSummary?.title}</b>? This action cannot be undone.</Text>
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeDeleteSummaryModal}>Cancel</Button>
+              <Button type="submit" color="red" loading={submitting} data-autofocus>Delete</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      <Modal opened={!!infoModalSummary} onClose={() => setInfoModalSummary(null)} title="System Info (Summary)" centered>
+        <Stack>
+          <Text size="sm"><b>ID:</b> {infoModalSummary?.id}</Text>
+          <Text size="sm"><b>Created:</b> {infoModalSummary?.created_at}</Text>
+          <Text size="sm"><b>Mode:</b> {infoModalSummary?.mode}</Text>
+          <Text size="sm"><b>Format:</b> {infoModalSummary?.output_format}</Text>
+          {infoModalSummary?.processing_time_ms && (
+            <Text size="sm"><b>Processing Time:</b> {(infoModalSummary.processing_time_ms / 1000).toFixed(2)}s</Text>
+          )}
+          {infoModalSummary?.model && (
+            <Text size="sm"><b>Model:</b> {infoModalSummary.model}</Text>
+          )}
+        </Stack>
       </Modal>
 
       <Modal opened={!!infoModalNote} onClose={() => setInfoModalNote(null)} title="System Information" centered size="lg">

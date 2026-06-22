@@ -10,6 +10,7 @@ export default function UploadDocs() {
   const [searchParams] = useSearchParams();
   const initialGroupId = searchParams.get('group_id');
   const initialSubjectId = searchParams.get('subject_id');
+  const isExercise = searchParams.get('type') === 'exercise';
 
   const [groups, setGroups] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -78,25 +79,45 @@ export default function UploadDocs() {
     setProgress(20);
 
     try {
-      const formData = new FormData();
-      formData.append('subject_id', selectedSubject);
-      files.forEach(file => {
-        formData.append('files', file);
-      });
+      if (isExercise) {
+        // Upload each file to `/exercises/upload` sequentially
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const formData = new FormData();
+          formData.append('subject_id', selectedSubject);
+          formData.append('file', file);
 
-      const res = await fetchApi('/notes/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      setProgress(100);
-      setTimeout(() => {
-        if (res && res.length === 1 && res[0].id) {
-          navigate(`/note/${res[0].id}`);
-        } else {
-          navigate(`/subject/${selectedSubject}`);
+          await fetchApi('/exercises/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          setProgress(Math.round(20 + (80 * (i + 1) / files.length)));
         }
-      }, 800);
+        setProgress(100);
+        setTimeout(() => {
+          navigate(`/subject/${selectedSubject}/exercise`);
+        }, 800);
+      } else {
+        const formData = new FormData();
+        formData.append('subject_id', selectedSubject);
+        files.forEach(file => {
+          formData.append('files', file);
+        });
+
+        const res = await fetchApi('/notes/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        setProgress(100);
+        setTimeout(() => {
+          if (res && res.length === 1 && res[0].id) {
+            navigate(`/resource/${res[0].id}`);
+          } else {
+            navigate(`/subject/${selectedSubject}`);
+          }
+        }, 800);
+      }
 
     } catch (err) {
       setError(err.message || 'Failed to upload document');
@@ -111,9 +132,9 @@ export default function UploadDocs() {
   };
 
   return (
-    <Box maw={800}>
-      <Title order={2} mb="md">Upload Documents</Title>
-      <Text c="dimmed" mb="xl">Upload PDFs, PPTXs, or Images to generate smart notes.</Text>
+    <Box h="100%" style={{ overflowX: 'hidden' }}>
+      <Title order={2} mb="md">{isExercise ? "Upload Exercises" : "Upload Documents"}</Title>
+      <Text c="dimmed" mb="xl">{isExercise ? "Upload PDFs, PPTXs, or Images of worksheets/exams to process into interactive exercises." : "Upload PDFs, PPTXs, or Images to generate smart notes."}</Text>
 
       <Box>
         <Stack gap="lg">
@@ -165,7 +186,7 @@ export default function UploadDocs() {
                     Drag files here or click to select files
                   </Text>
                   <Text size="sm" c="dimmed" inline mt={7}>
-                    Attach PDFs, PPTXs, or Image files to process
+                    {isExercise ? "Attach PDFs, PPTXs, or Image files of worksheets/exams to process" : "Attach PDFs, PPTXs, or Image files to process"}
                   </Text>
                 </div>
               </Group>

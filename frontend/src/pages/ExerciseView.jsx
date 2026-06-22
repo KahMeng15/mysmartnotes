@@ -120,7 +120,7 @@ export default function ExerciseView() {
                     leftSection={<IconBook size={12} />} 
                     variant="dot" 
                     style={{ cursor: 'pointer' }}
-                    onClick={() => navigate(`/note/${q.reference_note_id}`)}
+                    onClick={() => navigate(`/resource/${q.reference_note_id}`)}
                   >
                     View Source
                   </Badge>

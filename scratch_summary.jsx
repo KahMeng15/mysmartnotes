@@ -62,15 +62,18 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 export default function SummaryView() {
-  const { summaryId } = useParams();
+  const { noteId, summaryId } = useParams();
   const navigate = useNavigate();
 
   const [note, setNote] = useState(null);
   const [summaries, setSummaries] = useState([]);
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [summaryContent, setSummaryContent] = useState('');
+  const [currentTaskId, setCurrentTaskId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [generatingSummaryId, setGeneratingSummaryId] = useState(null);
   const [modalOpened, setModalOpened] = useState(false);
   const [deleteModalSummary, setDeleteModalSummary] = useState(null);
   const [renameModalSummary, setRenameModalSummary] = useState(null);
@@ -146,29 +149,161 @@ export default function SummaryView() {
   };
 
   useEffect(() => {
-    if (!summaryId) {
+    if (!noteId) {
       navigate('/dashboard');
       return;
     }
     
-    const init = async () => {
+    const loadNote = async () => {
       try {
-        setLoading(true);
-        const summaryData = await fetchApi(`/summaries/${summaryId}`);
-        setSelectedSummary(summaryData);
-        setSummaryContent(summaryData.content);
-        
-        const noteData = await fetchApi(`/notes/${summaryData.note_id}`);
-        setNote(noteData);
-        setLoading(false);
+        const data = await fetchApi(`/notes/${noteId}?t=${Date.now()}`);
+        setNote(data);
       } catch (err) {
-        console.error("Failed to load data", err);
-        setError("Failed to load summary");
-        setLoading(false);
+        console.error("Failed to load note", err);
       }
     };
-    init();
-  }, [summaryId]);
+    loadNote();
+    Promise.all([
+      fetchApi(`/summaries?note_id=${noteId}`),
+      fetchApi('/search/tasks/active').catch(() => null)
+    ]).then(([summariesData, activeData]) => {
+      let activeTask = null;
+      let genId = null;
+
+      if (activeData && activeData.tasks) {
+        activeTask = activeData.tasks.find(t => {
+          const data = t.input_data?.kwargs || t.input_data || {};
+          return t.task_type === 'summary_generation' && String(data.note_id) === String(noteId) && ['pending', 'processing', 'running'].includes(t.status);
+        });
+        
+        if (activeTask) {
+          const data = activeTask.input_data?.kwargs || activeTask.input_data || {};
+          genId = data.summary_id || 'generating';
+          setCurrentTaskId(activeTask.task_id);
+          setGenerating(true);
+          setGeneratingSummaryId(genId);
+          setTaskStatus(activeTask);
+        }
+      }
+
+      loadSummaries(false, false, summariesData, activeTask, genId);
+    }).catch(err => {
+      console.error("Failed to load initial data", err);
+      setLoading(false);
+    });
+  }, [noteId]);
+
+  useEffect(() => {
+    let interval;
+    if (generating && currentTaskId) {
+      interval = setInterval(checkTaskStatus, 1500);
+    }
+    return () => clearInterval(interval);
+  }, [generating, currentTaskId]);
+
+  const checkTaskStatus = async () => {
+    if (!currentTaskId) return;
+    try {
+      const statusData = await fetchApi(`/search/tasks/${currentTaskId}`);
+      if (statusData) {
+        setTaskStatus(statusData);
+        if (statusData.status === 'completed' || statusData.status === 'failed') {
+          setGenerating(false);
+          setGeneratingSummaryId(null);
+          setCurrentTaskId(null);
+          if (statusData.status === 'completed') {
+             loadSummaries(true, true);
+          } else {
+             loadSummaries(false, true);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch task status", e);
+    }
+  };
+
+  const loadSummaries = async (selectNewest = false, forceNotGenerating = false, preloadedData = null, activeTask = null, preloadedGenId = null) => {
+    try {
+      setLoading(true);
+      const data = preloadedData || await fetchApi(`/summaries?note_id=${noteId}`);
+      const filtered = data.filter(d => d.summary_type === 'summary').sort((a, b) => b.version - a.version);
+      
+      let finalSummaries = [...filtered];
+      const effectiveGenId = forceNotGenerating ? null : (preloadedGenId || generatingSummaryId);
+
+      // If we have an active task injected, create the mock version
+      if (activeTask && effectiveGenId) {
+        const tdata = activeTask.input_data?.kwargs || activeTask.input_data || {};
+        if (!finalSummaries.some(s => s.id === effectiveGenId)) {
+           const mockVersion = {
+             id: effectiveGenId,
+             version: finalSummaries.length > 0 ? finalSummaries[0].version + 1 : 1,
+             created_at: activeTask.created_at || new Date().toISOString(),
+             mode: tdata.mode || 'Generating...',
+             output_format: tdata.output_format || '',
+             processing_method: tdata.processing_method || '',
+             prompt_name: tdata.prompt_name,
+             prompt_icon: tdata.prompt_icon
+           };
+           finalSummaries = [mockVersion, ...finalSummaries];
+        }
+      }
+
+      setSummaries(prev => {
+        const isGenerating = forceNotGenerating ? false : (generating || activeTask);
+        if (isGenerating && !selectNewest && !activeTask) {
+           const existing = prev.find(s => s.id === effectiveGenId);
+           return [existing, ...filtered].filter(Boolean);
+        }
+        return finalSummaries;
+      });
+
+      if (finalSummaries.length > 0) {
+        if (selectNewest === true) {
+          loadSummaryContent(finalSummaries[0].id, forceNotGenerating);
+        } else if (summaryId && summaryId !== effectiveGenId) {
+          const target = finalSummaries.find(s => s.id === summaryId);
+          if (target) {
+            loadSummaryContent(target.id, forceNotGenerating);
+          } else {
+            loadSummaryContent(finalSummaries[0].id, forceNotGenerating);
+          }
+        } else if (summaryId !== effectiveGenId) {
+          loadSummaryContent(finalSummaries[0].id, forceNotGenerating);
+        } else {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error("Failed to load summaries", err);
+      setError("Failed to load summaries");
+      setLoading(false);
+    }
+  };
+
+  const loadSummaryContent = async (id, forceNotGenerating = false) => {
+    const isStillGenerating = forceNotGenerating ? false : (generating && id === generatingSummaryId);
+    if (isStillGenerating) {
+      setSelectedSummary(null);
+      navigate(`/note/${noteId}/summary/${id}`, { replace: true });
+      return;
+    }
+    try {
+      setLoading(true);
+      const data = await fetchApi(`/summaries/${id}`);
+      setSelectedSummary(data);
+      setSummaryContent(data.content);
+      navigate(`/note/${noteId}/summary/${id}`, { replace: true });
+    } catch (err) {
+      console.error("Failed to load summary content", err);
+      setError("Failed to load summary content");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRename = (summary, e) => {
     e.stopPropagation();
@@ -232,7 +367,7 @@ export default function SummaryView() {
       setSummaries(summaries.filter(s => s.id !== deleteModalSummary.id));
       if (selectedSummary?.id === deleteModalSummary.id) {
         setSelectedSummary(null);
-        navigate('/mynotes', { replace: true });
+        navigate(`/note/${noteId}/summary`, { replace: true });
       }
       setDeleteModalSummary(null);
     } catch (err) {
@@ -297,6 +432,88 @@ export default function SummaryView() {
       }
     } catch (err) {
       console.error("Failed to save new prompt", err);
+    }
+  };
+
+  const startGenerateSummary = async () => {
+    try {
+      setGenerating(true);
+      setModalOpened(false);
+      setTaskStatus({ progress: 0, status: 'pending' });
+      setSelectedSummary(null);
+      
+      const nextVersion = summaries.filter(s => !(generating && s.id === generatingSummaryId)).length > 0 
+        ? summaries.filter(s => !(generating && s.id === generatingSummaryId))[0].version + 1 
+        : 1;
+
+      let finalPrompt = null;
+      let finalPromptName = null;
+      let finalPromptIcon = null;
+      if (parameterType === 'single') {
+        if (!selectedPromptId) {
+          setError("Please select a prompt template first");
+          setGenerating(false);
+          return;
+        }
+        if (selectedPromptId.startsWith('g_')) {
+          const id = selectedPromptId.replace('g_', '');
+          const gp = globalPrompts.find(p => p.id.toString() === id);
+          if (gp) {
+            finalPrompt = gp.content;
+            finalPromptName = gp.name;
+            finalPromptIcon = gp.icon;
+          }
+        } else if (selectedPromptId.startsWith('u_')) {
+          const id = selectedPromptId.replace('u_', '');
+          const up = userPrompts.find(p => p.id.toString() === id);
+          if (up) {
+            finalPrompt = up.content;
+            finalPromptName = up.name;
+            finalPromptIcon = 'IconUserEdit';
+          }
+        }
+      }
+
+      const res = await fetchApi('/summaries/summary', {
+        method: 'POST',
+        body: JSON.stringify({
+          note_id: noteId,
+          mode: mode,
+          output_format: outputFormat,
+          processing_method: processingMethod,
+          custom_prompt: finalPrompt,
+          prompt_name: finalPromptName,
+          prompt_icon: finalPromptIcon
+        })
+      });
+      if (res && res.is_cached) {
+         setGenerating(false);
+         navigate(`/note/${noteId}/summary/${res.id}`, { replace: true });
+      } else if (res && res.task_id && res.summary_id) {
+         setGeneratingSummaryId(res.summary_id);
+         setCurrentTaskId(res.task_id);
+         
+         const mockVersion = {
+           id: res.summary_id,
+           version: nextVersion,
+           created_at: new Date().toISOString(),
+           mode: mode,
+           output_format: outputFormat,
+           processing_method: processingMethod,
+           prompt_name: finalPromptName,
+           prompt_icon: finalPromptIcon
+         };
+
+         setSummaries(prev => [mockVersion, ...prev.filter(s => s.id !== res.summary_id && s.id !== 'generating')]);
+         navigate(`/note/${noteId}/summary/${res.summary_id}`, { replace: true });
+      } else {
+         setGenerating(false);
+         setError("Failed to start summary generation");
+      }
+    } catch (err) {
+      console.error("Failed to generate summary", err);
+      setError("Failed to start summary generation");
+      setGenerating(false);
     }
   };
 
@@ -453,7 +670,7 @@ export default function SummaryView() {
     }
   };
 
-  if (!summaryId) return null;
+  if (!noteId) return null;
 
   const isFailed = taskStatus?.status === 'failed';
   const processingProgress = taskStatus?.progress || 10;
@@ -473,7 +690,7 @@ export default function SummaryView() {
   };
 
   return (
-    <Box h="100vh" style={{ display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+    <Box h="100vh" style={{ display: 'flex', flexDirection: 'column' }}>
       <style>{`
         .clickable-crumb {
           cursor: pointer;
@@ -662,13 +879,205 @@ export default function SummaryView() {
         )}
       </Modal>
 
+      <Modal opened={createPromptModalOpened} onClose={() => {
+        setCreatePromptModalOpened(false);
+        setModalOpened(true);
+      }} title="Create New Prompt Template" centered size="lg">
+        <Stack gap="md">
+          <TextInput
+            label="Template Name"
+            placeholder="e.g. My Detailed Analysis"
+            value={newPromptName}
+            onChange={(e) => setNewPromptName(e.currentTarget.value)}
+            required
+            data-autofocus
+          />
+          <Textarea
+            label="Custom Prompt"
+            placeholder="Enter your prompt here..."
+            value={newPromptContent}
+            onChange={(e) => setNewPromptContent(e.currentTarget.value)}
+            minRows={6}
+            autosize
+            maxRows={15}
+            required
+          />
+          <Paper withBorder p="sm" radius="md">
+            <Stack gap="xs">
+              <Text size="sm" fw={500}>Or generate a prompt with AI:</Text>
+              <Group gap="sm" align="flex-end">
+                <Textarea
+                  placeholder="E.g. generate a summary emphasizing key dates"
+                  value={newPromptInput}
+                  onChange={(e) => setNewPromptInput(e.currentTarget.value)}
+                  style={{ flex: 1 }}
+                  minRows={2}
+                  autosize
+                  maxRows={5}
+                />
+                <Button
+                  variant="light"
+                  onClick={handleGenerateNewPromptAI}
+                  loading={generatingNewPrompt}
+                  leftSection={<IconSparkles size={16} />}
+                >
+                  Generate
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
+          <Group justify="space-between" mt="md">
+            <Button variant="subtle" onClick={() => {
+              setCreatePromptModalOpened(false);
+              navigate('/settings');
+            }}>Manage Prompts in Settings</Button>
+            <Group>
+              <Button variant="default" onClick={() => {
+                setCreatePromptModalOpened(false);
+                setModalOpened(true);
+              }}>Cancel</Button>
+              <Button onClick={saveNewPrompt} disabled={!newPromptName.trim() || !newPromptContent.trim()}>Save Template</Button>
+            </Group>
+          </Group>
+        </Stack>
+      </Modal>
 
+      <Modal opened={modalOpened} onClose={() => setModalOpened(false)} title="Summary Parameters" centered>
+        <Stack>
+          <SegmentedControl
+            value={parameterType}
+            onChange={setParameterType}
+            data={[
+              { label: 'Multi Parameters', value: 'multi' },
+              { label: 'Single Parameter', value: 'single' },
+            ]}
+            fullWidth
+          />
+
+          {parameterType === 'multi' ? (
+            <>
+              <Select 
+                label="AI Mode" 
+                data={[
+                  { value: 'quick', label: 'Quick' },
+                  { value: 'simple', label: 'Simple' },
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'elaborate', label: 'Elaborate' },
+                  { value: 'eli5', label: 'Explain like I am 5' }
+                ]} 
+                value={mode} 
+                onChange={setMode} 
+                leftSection={MODE_ICONS[mode]}
+                renderOption={({ option }) => (
+                  <Group gap="sm">
+                    {MODE_ICONS[option.value]}
+                    <Text size="sm">{option.label}</Text>
+                  </Group>
+                )}
+              />
+              <Select 
+                label="Output Format" 
+                data={[
+                  { value: 'sentence', label: 'Sentence' },
+                  { value: 'pointform', label: 'Pointform' },
+                  { value: 'numbered_list', label: 'Numbered List' },
+                  { value: 'table', label: 'Table' }
+                ]} 
+                value={outputFormat} 
+                onChange={setOutputFormat} 
+                leftSection={FORMAT_ICONS[outputFormat]}
+                renderOption={({ option }) => (
+                  <Group gap="sm">
+                    {FORMAT_ICONS[option.value]}
+                    <Text size="sm">{option.label}</Text>
+                  </Group>
+                )}
+              />
+              <Select 
+                label="Processing Method" 
+                data={[
+                  { value: 'whole', label: 'Whole Document (Fast)' },
+                  { value: 'chunked', label: 'Chunked (Detailed)' },
+                  { value: 'hierarchical', label: 'Hierarchical (Structured)' }
+                ]} 
+                value={processingMethod} 
+                onChange={setProcessingMethod} 
+                leftSection={METHOD_ICONS[processingMethod]}
+                renderOption={({ option }) => (
+                  <Group gap="sm">
+                    {METHOD_ICONS[option.value]}
+                    <Text size="sm">{option.label}</Text>
+                  </Group>
+                )}
+              />
+            </>
+          ) : (
+            <Stack>
+              <Select
+                label="Prompt Template"
+                placeholder="Select a template..."
+                data={[
+                  {
+                    group: 'Global Templates',
+                    items: globalPrompts.map(p => ({ value: `g_${p.id}`, label: p.name, icon: p.icon }))
+                  },
+                  {
+                    group: 'Your Templates',
+                    items: userPrompts.map(p => ({ value: `u_${p.id}`, label: p.name, icon: 'IconUserEdit' }))
+                  },
+                  {
+                    group: 'Actions',
+                    items: [
+                      { value: 'create', label: 'Create a new template...', icon: 'IconPlus' }
+                    ]
+                  }
+                ]}
+                value={selectedPromptId}
+                onChange={(val) => {
+                  if (val === 'create') {
+                    setCreatePromptModalOpened(true);
+                    setModalOpened(false);
+                    setSelectedPromptId(null);
+                  } else {
+                    setSelectedPromptId(val);
+                  }
+                }}
+                leftSection={(() => {
+                  if (!selectedPromptId) return <IconFileText size={16} />;
+                  if (selectedPromptId.startsWith('g_')) {
+                    const id = selectedPromptId.replace('g_', '');
+                    const gp = globalPrompts.find(p => p.id.toString() === id);
+                    const IconComp = getIconComponent(gp?.icon);
+                    return <IconComp size={16} />;
+                  } else if (selectedPromptId.startsWith('u_')) {
+                    const IconComp = getIconComponent('IconUserEdit');
+                    return <IconComp size={16} />;
+                  }
+                  return <IconFileText size={16} />;
+                })()}
+                renderOption={({ option }) => {
+                  const IconComp = getIconComponent(option.icon);
+                  return (
+                    <Group gap="sm">
+                      <IconComp size={16} />
+                      <Text size="sm">{option.label}</Text>
+                    </Group>
+                  );
+                }}
+              />
+              
+            </Stack>
+          )}
+
+          <Button fullWidth mt="md" onClick={startGenerateSummary}>Start Generation</Button>
+        </Stack>
+      </Modal>
 
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
         <Group justify="space-between">
           <Group>
-            <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
+            <ActionIcon variant="subtle" color="gray" onClick={() => navigate(`/note/${noteId}`)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
             {note?.subject && (
@@ -680,6 +1089,10 @@ export default function SummaryView() {
                   </>
                 )}
                 <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}`)}>{note.subject.name}</Text>
+                <Text size="sm" c="dimmed">/</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/note/${noteId}`)}>{note.title || 'Note'}</Text>
+                <Text size="sm" c="dimmed">/</Text>
+                <Text size="sm" fw={500} c="dimmed">Summary</Text>
               </Group>
             )}
           </Group>
@@ -694,7 +1107,31 @@ export default function SummaryView() {
           p={0}
         >
           <Container size="md" p={0} pt={0} pb="xl">
-            {loading ? (
+            {generating && summaryId === generatingSummaryId ? (
+              <Box mt={100} ta="center">
+                {isFailed ? (
+                  <>
+                    <IconAlertCircle size={64} color="var(--mantine-color-red-6)" stroke={1.5} />
+                    <Title order={2} mt="xl" mb="sm" fw={800} c="red">Processing Failed</Title>
+                    <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                      {taskStatus?.error || 'An unexpected error occurred while generating the summary.'}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <IconRobot size={64} color="var(--mantine-color-blue-6)" stroke={1.5} style={{ opacity: 0.8 }} />
+                    <Title order={2} mt="xl" mb="sm" fw={800} c="#171738">Generating Summary...</Title>
+                    <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                      Our AI is analyzing the notes and generating your customized summary.
+                    </Text>
+                    <Box maw={400} mx="auto">
+                      <Progress value={processingProgress} animated striped color="blue" size="xl" radius="xl" />
+                      <Text size="sm" c="dimmed" mt="xs" ta="right">{processingProgress}%</Text>
+                    </Box>
+                  </>
+                )}
+              </Box>
+            ) : loading ? (
               <Center h="50vh"><Loader size="lg" /></Center>
             ) : error ? (
               <Center h="50vh">
@@ -703,11 +1140,13 @@ export default function SummaryView() {
                   <Text c="red">{error}</Text>
                 </Stack>
               </Center>
-            ) : !selectedSummary ? (
+            ) : summaries.length === 0 ? (
               <Center h="50vh">
                 <Stack align="center">
                   <IconFileText size={64} color="var(--mantine-color-gray-3)" />
-                  <Title order={3} c="dimmed">Summary Not Found</Title>
+                  <Title order={3} c="dimmed">No Summaries Yet</Title>
+                  <Text c="dimmed">Generate a summary to get started.</Text>
+                  <Button mt="md" onClick={() => setModalOpened(true)} loading={generating}>Generate First Summary</Button>
                 </Stack>
               </Center>
             ) : (
@@ -795,7 +1234,14 @@ export default function SummaryView() {
 
               {!isEditing ? (
                 <>
-
+                  <Tooltip label="Generate" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Generate" : ""}
+                      leftSection={<IconSparkles size="1.2rem" stroke={1.5} />}
+                      onClick={() => setModalOpened(true)}
+                      disabled={generating}
+                    />
+                  </Tooltip>
 
                   <Tooltip label="Edit" disabled={sidebarOpen} position="left">
                     <MantineNavLink
@@ -824,7 +1270,13 @@ export default function SummaryView() {
                       </Menu.Dropdown>
                     </Menu>
 
-
+                    <Tooltip label="Back to note" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Back to note" : ""}
+                        leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
+                        onClick={() => navigate(`/note/${noteId}`)}
+                      />
+                    </Tooltip>
                   </>
               ) : (
                 <>
@@ -911,7 +1363,90 @@ export default function SummaryView() {
                 </>
               )}
 
+              {!isEditing && (
+                <>
+                  {sidebarOpen && <Title order={5} fw={600} c="dimmed" mt="xl" mb="md">Versions</Title>}
+                  
+                  {sidebarOpen ? (
+                    <Stack gap="xs">
+                  {summaries.map(summary => {
+                    const isActive = (selectedSummary?.id === summary.id) || (generating && summary.id === generatingSummaryId && summaryId === generatingSummaryId);
+                    const details = summary.prompt_name || [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+                    const title = details || `Version ${summary.version}`;
 
+                    return (
+                    <Paper 
+                      key={summary.id} 
+                      p="sm" 
+                      withBorder 
+                      style={{ 
+                        cursor: 'pointer', 
+                        borderColor: isActive ? 'var(--mantine-color-blue-5)' : 'var(--mantine-color-gray-3)',
+                        backgroundColor: isActive ? 'var(--mantine-color-blue-0)' : '#fff'
+                      }}
+                      onClick={() => loadSummaryContent(summary.id)}
+                    >
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="sm" fw={isActive ? 700 : 500} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {summary.is_pinned && <TablerIcons.IconPinFilled size={14} style={{ marginRight: 4, color: 'var(--mantine-color-blue-6)', verticalAlign: 'middle' }} />}
+                          {summary.is_user_edited ? summary.title : title}
+                        </Text>
+                        {summary.id !== 'generating' && (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Menu shadow="md" width={150} position="bottom-end" withinPortal>
+                              <Menu.Target>
+                                <ActionIcon variant="subtle" color="gray" size="sm">
+                                  <TablerIcons.IconDotsVertical size={16} />
+                                </ActionIcon>
+                              </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Item leftSection={<TablerIcons.IconPencil size={14} />} onClick={(e) => handleRename(summary, e)}>
+                                Rename
+                              </Menu.Item>
+                              <Menu.Item leftSection={<TablerIcons.IconPin size={14} />} onClick={(e) => handlePin(summary, e)}>
+                                {summary.is_pinned ? 'Unpin' : 'Pin'}
+                              </Menu.Item>
+                              <Menu.Item leftSection={<TablerIcons.IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalSummary(summary); }}>
+                                System Info
+                              </Menu.Item>
+                              <Menu.Item color="red" leftSection={<TablerIcons.IconTrash size={14} />} onClick={(e) => handleDelete(summary, e)}>
+                                Delete
+                              </Menu.Item>
+                            </Menu.Dropdown>
+                            </Menu>
+                          </div>
+                        )}
+                      </Group>
+                      <Text size="xs" c="dimmed" mt={4}>
+                        {formatDate(summary.created_at)}
+                      </Text>
+                    </Paper>
+                    );
+                  })}
+                </Stack>
+              ) : (
+                <Stack gap="xs" align="center" mt="md">
+                  {summaries.map(summary => {
+                    const isActive = (selectedSummary?.id === summary.id) || (generating && summary.id === generatingSummaryId && summaryId === generatingSummaryId);
+                    const details = summary.prompt_name || [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+                    const tooltipLabel = `${details || `Version ${summary.version}`} (${formatDate(summary.created_at)})`;
+
+                    return (
+                    <Tooltip key={summary.id} label={tooltipLabel} position="left">
+                      <ActionIcon 
+                        variant={isActive ? "light" : "subtle"}
+                        color={isActive ? "blue" : "gray"}
+                        onClick={() => loadSummaryContent(summary.id)}
+                      >
+                        <Text size="xs" fw={700}>v{summary.version}</Text>
+                      </ActionIcon>
+                    </Tooltip>
+                    );
+                  })}
+                </Stack>
+              )}
+                </>
+              )}
             </Stack>
           </Box>
 

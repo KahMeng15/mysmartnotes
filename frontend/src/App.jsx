@@ -104,7 +104,7 @@ function AppLayout({ children }) {
         breakpoint: 'sm',
         collapsed: { mobile: !mobileOpened },
       }}
-      padding={(location.pathname.startsWith('/note/') || location.pathname.startsWith('/chat')) ? 0 : "md"}
+      padding={(location.pathname.startsWith('/note/') || location.pathname.startsWith('/resource/') || location.pathname.startsWith('/chat')) ? 0 : "md"}
       bg="#ffffff"
     >
       <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
@@ -206,9 +206,9 @@ function App() {
           <Route path="/exercises/:id" element={<ExerciseView />} />
           <Route path="/group/:id" element={<GroupView />} />
           <Route path="/subject/:id" element={<SubjectView />} />
-          <Route path="/note/:id" element={<NoteView />} />
-          <Route path="/note/:noteId/summary" element={<SummaryView />} />
-          <Route path="/note/:noteId/summary/:summaryId" element={<SummaryView />} />
+          <Route path="/subject/:id/:tab" element={<SubjectView />} />
+          <Route path="/resource/:id" element={<NoteView />} />
+          <Route path="/note/:summaryId" element={<SummaryView />} />
 
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin" element={<AdminPage />} />

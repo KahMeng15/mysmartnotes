@@ -37,7 +37,7 @@ const quickActions = [
   { label: 'Upload', icon: IconUpload, color: 'indigo', path: '/upload' },
   { label: 'My Notes', icon: IconBooks, color: 'teal', path: '/mynotes' },
   { label: 'Chat', icon: IconMessageDots, color: 'blue', path: '/chat' },
-  { label: 'Start Quiz', icon: IconBolt, color: 'pink', path: '/quiz' },
+  { label: 'Exercises', icon: IconBolt, color: 'pink', path: '/mynotes' },
   { label: 'Pomodoro', icon: IconTimerFallback, color: 'yellow', path: '/pomodoro' },
 ];
 
@@ -182,7 +182,7 @@ export default function Dashboard() {
       ) : recentNotes.length > 0 ? (
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
           {recentNotes.map(note => (
-            <Card key={note.id} withBorder radius="md" padding="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${note.id}`)}>
+            <Card key={note.id} withBorder radius="md" padding="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/resource/${note.id}`)}>
               <Text fw={600} mb="xs" c="#171738">{note.title}</Text>
               <Text size="sm" c="dimmed">Uploaded: {new Date(note.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
             </Card>
