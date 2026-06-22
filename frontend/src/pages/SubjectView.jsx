@@ -399,6 +399,7 @@ export default function SubjectView() {
   const [reprocessingGeneratedNoteIds, setReprocessingGeneratedNoteIds] = useState([]);
   // Maps summary id -> task_id for in-flight generations
   const [pendingSummaryTasks, setPendingSummaryTasks] = useState({});
+  const [resourceTasks, setResourceTasks] = useState({});
   const [editingNote, setEditingNote] = useState(null);
   const [infoModalNote, setInfoModalNote] = useState(null);
   const [newTitle, setNewTitle] = useState('');
@@ -471,6 +472,7 @@ export default function SubjectView() {
                 if (t.progress !== undefined) {
                   initialNoteProgress[noteId] = t.progress;
                 }
+                setResourceTasks(prev => ({ ...prev, [noteId]: t.task_id }));
               }
             }
           });
@@ -519,6 +521,9 @@ export default function SubjectView() {
               if (taskData) {
                 if (taskData.progress !== undefined) {
                   setNoteProgress(prev => ({ ...prev, [n.id]: taskData.progress }));
+                }
+                if (taskData.task_id) {
+                  setResourceTasks(prev => ({ ...prev, [n.id]: taskData.task_id }));
                 }
                 if (taskData.status === 'completed') {
                   setReprocessingNoteIds(prev => prev.filter(id => id !== n.id));
@@ -950,7 +955,24 @@ export default function SubjectView() {
                             <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRename(note)}>Rename</Menu.Item>
                             <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocess(note)}>Reprocess</Menu.Item>
                             <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalNote(note); }}>System Info</Menu.Item>
-                            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDelete(note)}>Delete</Menu.Item>
+                            {(isReprocessing || (!isProcessed && !hasFailed)) ? (
+                              <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
+                                const taskId = resourceTasks[note.id];
+                                if (!taskId) {
+                                  alert("Task ID not found, please wait a moment and try again.");
+                                  return;
+                                }
+                                try {
+                                  await fetchApi(`/search/tasks/${taskId}/cancel`, { method: 'POST' });
+                                  setFailedNoteIds(prev => [...prev, note.id]);
+                                  setReprocessingNoteIds(prev => prev.filter(id => id !== note.id));
+                                } catch(e) {
+                                  alert("Failed to cancel: " + e.message);
+                                }
+                              }}>Cancel Processing</Menu.Item>
+                            ) : (
+                              <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDelete(note)}>Delete</Menu.Item>
+                            )}
                           </Menu.Dropdown>
                         </Menu>
                       </Group>
@@ -1136,7 +1158,7 @@ export default function SubjectView() {
                             <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={() => setInfoModalSummary(gn)}>
                               System Info
                             </Menu.Item>
-                            {inProgressOrPending && pendingSummaryTasks[gn.id] && (
+                            {(inProgressOrPending || isReprocessing) && pendingSummaryTasks[gn.id] ? (
                               <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
                                 try {
                                   await fetchApi(`/search/tasks/${pendingSummaryTasks[gn.id]}/cancel`, { method: 'POST' });
@@ -1149,10 +1171,11 @@ export default function SubjectView() {
                               }}>
                                 Cancel Generation
                               </Menu.Item>
+                            ) : (
+                              <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => { setDeletingSummary({ ...gn, displayTitle }); openDeleteSummaryModal(); }}>
+                                Delete
+                              </Menu.Item>
                             )}
-                            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => { setDeletingSummary({ ...gn, displayTitle }); openDeleteSummaryModal(); }}>
-                              Delete
-                            </Menu.Item>
                           </Menu.Dropdown>
                         </Menu>
                       </Group>

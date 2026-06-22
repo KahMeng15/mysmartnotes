@@ -208,6 +208,41 @@ export default function SummaryView() {
     }
   };
 
+  useEffect(() => {
+    if (!selectedSummary) return;
+    const isProcessedCheck = (selectedSummary.processing_time_ms != null && selectedSummary.processing_time_ms > 0) || 
+                             (selectedSummary.file_path != null && selectedSummary.file_path !== '');
+    if (isProcessedCheck) return;
+
+    let interval;
+    const pollTask = async () => {
+      try {
+        const activeTasksData = await fetchApi('/search/tasks/active');
+        if (activeTasksData && activeTasksData.tasks) {
+          const task = activeTasksData.tasks.find(t => t.task_type === 'note_generation' && t.input_data?.kwargs?.note_id === summaryId);
+          if (task) {
+            setTaskStatus(task);
+            if (task.status === 'completed') {
+              const data = await fetchApi(`/notes/${summaryId}`);
+              setSelectedSummary(data);
+              setSummaryContent(data.content || '');
+              clearInterval(interval);
+            } else if (task.status === 'failed') {
+              clearInterval(interval);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to poll task status", e);
+      }
+    };
+
+    pollTask();
+    interval = setInterval(pollTask, 2000);
+
+    return () => clearInterval(interval);
+  }, [summaryId, selectedSummary?.processing_time_ms, selectedSummary?.file_path]);
+
   const handlePin = async (summary, e) => {
     e.stopPropagation();
     try {
@@ -457,6 +492,9 @@ export default function SummaryView() {
 
   if (!summaryId) return null;
 
+  const isCurrentlyProcessing = taskStatus && (taskStatus.status === 'pending' || taskStatus.status === 'processing' || taskStatus.status === 'running');
+  const isProcessed = ((selectedSummary?.processing_time_ms != null && selectedSummary.processing_time_ms > 0) || 
+                      (selectedSummary?.file_path != null && selectedSummary.file_path !== '') || taskStatus?.status === 'completed') && !isCurrentlyProcessing;
   const isFailed = taskStatus?.status === 'failed';
   const processingProgress = taskStatus?.progress || 10;
 
@@ -733,6 +771,26 @@ export default function SummaryView() {
                   <Title order={3} c="dimmed">Summary Not Found</Title>
                 </Stack>
               </Center>
+            ) : isFailed ? (
+              <Box mt={100} ta="center">
+                <IconAlertCircle size={64} color="var(--mantine-color-red-6)" stroke={1.5} />
+                <Title order={2} mt="xl" mb="sm" fw={800} c="red">Generation Failed</Title>
+                <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                  {taskStatus?.error || 'An unexpected error occurred while generating this note.'}
+                </Text>
+              </Box>
+            ) : !isProcessed ? (
+              <Box mt={100} ta="center">
+                <IconRobot size={64} color="var(--mantine-color-blue-6)" stroke={1.5} style={{ opacity: 0.8 }} />
+                <Title order={2} mt="xl" mb="sm" fw={800} c="#171738">Generating Note...</Title>
+                <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                  Our AI is currently analyzing the document and generating your smart notes. This usually takes a few seconds.
+                </Text>
+                <Box maw={400} mx="auto">
+                  <Progress value={processingProgress} animated striped color="orange" size="xl" radius="xl" />
+                  <Text size="sm" c="dimmed" mt="xs" ta="right">{processingProgress}%</Text>
+                </Box>
+              </Box>
             ) : (
               <Box px="md">
                 <Box mb="md" pt="md">
