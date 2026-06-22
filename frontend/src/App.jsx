@@ -1,7 +1,7 @@
 import SummaryView from "./pages/SummaryView";
 
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
 import { AppShell, Burger, Group, Text, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
@@ -186,12 +186,17 @@ function AppLayout({ children }) {
 
 
 
+function RootRedirect() {
+  const isAuthenticated = !!localStorage.getItem('token');
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+}
+
 function App() {
   return (
     <Router>
       <AppLayout>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/mynotes" element={<NotesManager />} />
