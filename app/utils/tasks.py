@@ -271,6 +271,7 @@ class NoteTask:
             
             user = db.query(User).filter(User.id == user_id).first()
             
+            title = kwargs.get("title")
             resource_ids = kwargs.get("resource_ids")
             if resource_ids:
                 content_parts = []
@@ -281,16 +282,18 @@ class NoteTask:
                         content_parts.append(f"--- Document: {r.title} ---\n{r_text}")
                 resource_content = "\n\n".join(content_parts)
                 
-                resources = db.query(Resource).filter(Resource.id.in_(resource_ids)).all()
-                res_dict = {r.id: r for r in resources}
-                resources_ordered = [res_dict[rid] for rid in resource_ids if rid in res_dict]
-                title = "Combined Note: " + ", ".join([r.title for r in resources_ordered[:3]])
-                if len(resources_ordered) > 3:
-                    title += "..."
+                if not title:
+                    resources = db.query(Resource).filter(Resource.id.in_(resource_ids)).all()
+                    res_dict = {r.id: r for r in resources}
+                    resources_ordered = [res_dict[rid] for rid in resource_ids if rid in res_dict]
+                    title = "Combined Note: " + ", ".join([r.title for r in resources_ordered[:3]])
+                    if len(resources_ordered) > 3:
+                        title += "..."
             else:
                 resource = db.query(Resource).filter(Resource.id == resource_id).first()
                 resource_content = StorageManager.get_resource_text(resource_id) or ""
-                title = resource.title
+                if not title:
+                    title = resource.title
 
             ai_client = AIClient(user, db=db)
             

@@ -54,6 +54,47 @@ const getFriendlyFileType = (mimeType) => {
   return part.toUpperCase();
 };
 
+const parseRanges = (str) => {
+  const nums = new Set();
+  const parts = str.split(',');
+  for (let p of parts) {
+    p = p.trim();
+    if (p.includes('-')) {
+      const [start, end] = p.split('-').map(Number);
+      if (!isNaN(start) && !isNaN(end)) {
+        for (let i = start; i <= end; i++) nums.add(i);
+      }
+    } else if (p.includes('–')) {
+      const [start, end] = p.split('–').map(Number);
+      if (!isNaN(start) && !isNaN(end)) {
+        for (let i = start; i <= end; i++) nums.add(i);
+      }
+    } else {
+      const n = Number(p);
+      if (!isNaN(n)) nums.add(n);
+    }
+  }
+  return Array.from(nums).sort((a, b) => a - b);
+};
+
+const getRangeString = (nums) => {
+  if (nums.length === 0) return '';
+  const ranges = [];
+  let start = nums[0];
+  let end = nums[0];
+  for (let i = 1; i < nums.length; i++) {
+    if (nums[i] === end + 1) {
+      end = nums[i];
+    } else {
+      ranges.push(start === end ? `${start}` : `${start}-${end}`);
+      start = nums[i];
+      end = nums[i];
+    }
+  }
+  ranges.push(start === end ? `${start}` : `${start}-${end}`);
+  return ranges.join(', ');
+};
+
 const formatNoteDate = (dateString) => {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -82,6 +123,7 @@ export default function SubjectView() {
   const [noteFormat, setNoteFormat] = useState('sentence');
   const [noteMethod, setNoteMethod] = useState('whole');
   const [noteCustomPrompt, setNoteCustomPrompt] = useState('');
+  const [newNoteTitle, setNewNoteTitle] = useState('');
   const [generatingCombinedNote, setGeneratingCombinedNote] = useState(false);
 
   const [parameterType, setParameterType] = useState('multi'); // 'multi' or 'single'
@@ -181,6 +223,48 @@ export default function SubjectView() {
         };
       }
 
+      let finalTitle = newNoteTitle.trim();
+      if (!finalTitle) {
+        let suffix = '';
+        if (selectedResources.length === 1) {
+          const resObj = notes.find(r => r.id === selectedResources[0]);
+          suffix = resObj ? resObj.title : 'Note';
+        } else {
+          const labelSet = new Set();
+          const allNums = new Set();
+          let matchCount = 0;
+          for (const id of selectedResources) {
+            const resObj = notes.find(r => r.id === id);
+            if (!resObj) continue;
+            const match = resObj.title.match(/(Topic|Chapter|Lec|Lecture|Sec|Section)\s*(\d+(?:[-–,\s\d]+)*)/i);
+            if (match) {
+              labelSet.add(match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase());
+              const parsed = parseRanges(match[2]);
+              for (const n of parsed) allNums.add(n);
+              matchCount++;
+            }
+          }
+          
+          if (labelSet.size === 1 && matchCount === selectedResources.length) {
+            const label = Array.from(labelSet)[0];
+            const sortedNums = Array.from(allNums).sort((a, b) => a - b);
+            suffix = `${label} ${getRangeString(sortedNums)}`;
+          } else {
+            const resourcesOrdered = selectedResources.map(rid => notes.find(r => r.id === rid)).filter(Boolean);
+            suffix = resourcesOrdered.slice(0, 3).map(r => r.title).join(', ');
+            if (resourcesOrdered.length > 3) suffix += '...';
+          }
+        }
+        
+        const parameterStr = parameterType === 'single'
+          ? finalPromptName
+          : [noteMode, noteFormat, noteMethod].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+        
+        finalTitle = `${parameterStr} - ${suffix}`;
+      }
+
+      bodyData.title = finalTitle;
+
       const res = await fetchApi('/notes/summary', {
         method: 'POST',
         body: JSON.stringify(bodyData)
@@ -194,7 +278,7 @@ export default function SubjectView() {
           version: 1,
           resource_id: selectedResources[0],
           note_id: selectedResources[0],
-          title: "Generating combined note...",
+          title: finalTitle,
           summary_type: "summary",
           file_path: "",
           created_at: new Date().toISOString(),
@@ -210,6 +294,7 @@ export default function SubjectView() {
       
       setCreateNoteModalOpened(false);
       setSelectedResources([]);
+      setNewNoteTitle('');
     } catch (e) {
       alert("Failed to create notes: " + e.message);
     } finally {
@@ -903,7 +988,7 @@ export default function SubjectView() {
                           }
                         }}
                       />
-                      <Box>
+                      <Box style={{ flex: 1 }}>
                         <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/exercises/${ex.id}`)}>
                           {ex.title}
                         </Text>
@@ -912,7 +997,7 @@ export default function SubjectView() {
                         </Text>
                       </Box>
                     </Group>
-                    <Group gap="xs">
+                    <Group gap="xs" wrap="nowrap">
                       <Button variant="light" size="sm" onClick={() => navigate(`/exercises/${ex.id}`)}>
                         View Exercise
                       </Button>
@@ -934,7 +1019,7 @@ export default function SubjectView() {
                     </Group>
                   </Group>
                   {/* Progress bar for exercise processing */}
-                  {(reprocessingExerciseIds.includes(ex.id) || exerciseProgress[ex.id]) && (
+                  {(reprocessingExerciseIds.includes(ex.id) || typeof exerciseProgress[ex.id] === 'number') && (
                     <Progress
                       value={exerciseProgress[ex.id] || undefined}
                       animated={true}
@@ -970,7 +1055,7 @@ export default function SubjectView() {
                  return (
                 <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
                    <Group justify="space-between" wrap="nowrap">
-                      <Box>
+                      <Box style={{ flex: 1 }}>
                         <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${gn.id}`)}>
                           {displayTitle}
                         </Text>
@@ -978,7 +1063,7 @@ export default function SubjectView() {
                            Generated on {formatNoteDate(gn.created_at)}
                         </Text>
                       </Box>
-                      <Group gap="xs">
+                      <Group gap="xs" wrap="nowrap">
                         <Button variant="light" size="sm" onClick={() => navigate(`/note/${gn.id}`)}>
                           View Note
                         </Button>
@@ -1003,7 +1088,7 @@ export default function SubjectView() {
                       </Group>
                    </Group>
                    {/* Progress bar for generated note processing */}
-                   {(reprocessingGeneratedNoteIds.includes(gn.id) || generatedNoteProgress[gn.id]) && (
+                   {(reprocessingGeneratedNoteIds.includes(gn.id) || typeof generatedNoteProgress[gn.id] === 'number') && (
                      <Progress
                        value={generatedNoteProgress[gn.id] || undefined}
                        animated={true}
@@ -1114,6 +1199,14 @@ export default function SubjectView() {
               searchable
               clearable
               required
+            />
+
+            <TextInput
+              label="Note Name (Optional)"
+              description="Give this note a custom name, or leave blank to auto-generate one."
+              placeholder="e.g., Biology Midterm Prep"
+              value={newNoteTitle}
+              onChange={(e) => setNewNoteTitle(e.currentTarget.value)}
             />
 
             <SegmentedControl

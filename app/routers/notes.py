@@ -46,7 +46,8 @@ class NoteRequest(BaseModel):
     split_level: str = "h1"  # h1, h2, h3
     force_regenerate: bool = False
     include_quickread: bool = False  # Generate quick mode summary alongside main summary
-    custom_prompt: Optional[str] = None  # Single parameter mode prompt
+    custom_prompt: Optional[str] = None
+    title: Optional[str] = None
     prompt_name: Optional[str] = None
     prompt_icon: Optional[str] = None
 
@@ -195,6 +196,7 @@ async def generate_note_endpoint(
         resource_id=primary_resource_id,
         resource_ids=r_ids,
         note_id=doc_id,
+        title=request.title,
         mode=request.mode,
         output_format=request.output_format,
         processing_method=request.processing_method,
