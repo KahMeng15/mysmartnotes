@@ -59,7 +59,6 @@ class User(Base):
     study_sessions = relationship("StudySession", back_populates="user", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
     subject_groups = relationship("SubjectGroup", back_populates="user")
-    quiz_groups = relationship("QuizGroup", back_populates="user")
 
 
 class SubjectGroup(Base):
@@ -76,22 +75,10 @@ class SubjectGroup(Base):
     user = relationship("User", back_populates="subject_groups")
     subjects = relationship("Subject", back_populates="group", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="group", cascade="all, delete-orphan")
-    quizzes = relationship("Quiz", back_populates="group", cascade="all, delete-orphan")
+    exercises = relationship("Exercise", back_populates="group", cascade="all, delete-orphan")
 
 
-class QuizGroup(Base):
-    """Group of quizzes"""
-    __tablename__ = "quiz_groups"
-    
-    id = Column(String(16), primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    name = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationships
-    user = relationship("User", back_populates="quiz_groups")
-    quizzes = relationship("Quiz", back_populates="quiz_group", cascade="all, delete-orphan")
+
 
 
 class Subject(Base):
@@ -112,7 +99,7 @@ class Subject(Base):
     group = relationship("SubjectGroup", back_populates="subjects")
     notes = relationship("Note", back_populates="subject", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="subject", cascade="all, delete-orphan")
-    quizzes = relationship("Quiz", back_populates="subject", cascade="all, delete-orphan")
+    exercises = relationship("Exercise", back_populates="subject", cascade="all, delete-orphan")
 
 
 class Note(Base):
@@ -141,7 +128,7 @@ class Note(Base):
     study_sessions = relationship("StudySession", back_populates="note", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="note", cascade="all, delete-orphan")
     snapshots = relationship("NoteSnapshot", back_populates="note", cascade="all, delete-orphan")
-    quizzes = relationship("Quiz", back_populates="note", cascade="all, delete-orphan")
+    exercises = relationship("Exercise", back_populates="note", cascade="all, delete-orphan")
 
 
 class ExportTemplate(Base):
@@ -168,7 +155,7 @@ class Summary(Base):
     id = Column(String(16), primary_key=True)
     version = Column(Integer, nullable=False, default=1)  # v1, v2, etc. per note
     note_id = Column(String(16), ForeignKey("notes.id"), nullable=False, index=True)
-    summary_type = Column(String(50))  # cheatsheet, quiz, summary
+    summary_type = Column(String(50))  # cheatsheet, exercise, summary
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
     mode = Column(String(50), nullable=True)  # elaborate, quick, simple, eli5
@@ -206,76 +193,76 @@ class NoteEmbedding(Base):
     note = relationship("Note", back_populates="embeddings")
 
 
-class Quiz(Base):
-    """Generated Quizzes"""
-    __tablename__ = "quizzes"
+class Exercise(Base):
+    """Uploaded and Generated Exercises"""
+    __tablename__ = "exercises"
     
-    id = Column(String(16), primary_key=True)
+    id = Column(String(16), primary_key=True)  # Will start with 'ex_'
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(255), nullable=False)
-    scope_type = Column(String(50))  # "group", "subject" or "note"
+    
+    # Can be linked to a group, subject, or a specific note (if generated from one)
     group_id = Column(String(16), ForeignKey("subject_groups.id"), nullable=True, index=True)
     subject_id = Column(String(16), ForeignKey("subjects.id"), nullable=True, index=True)
     note_id = Column(String(16), ForeignKey("notes.id"), nullable=True, index=True)
-    quiz_group_id = Column(String(16), ForeignKey("quiz_groups.id"), nullable=True, index=True)
-    model = Column(String(100), nullable=True)  # AI model used
-    processing_time_ms = Column(Integer, nullable=True)  # Processing time in milliseconds
+    
+    # Source file info if uploaded
+    file_path = Column(String(512), nullable=True)
+    file_name = Column(String(255), nullable=True)
+    
+    model = Column(String(100), nullable=True)  # AI model used if generated/parsed
+    processing_time_ms = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     user = relationship("User")
-    group = relationship("SubjectGroup", back_populates="quizzes")
-    subject = relationship("Subject", back_populates="quizzes")
-    note = relationship("Note", back_populates="quizzes")
-    quiz_group = relationship("QuizGroup", back_populates="quizzes")
-    questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
-    progress = relationship("QuizProgress", back_populates="quiz", cascade="all, delete-orphan")
+    group = relationship("SubjectGroup", back_populates="exercises")
+    subject = relationship("Subject", back_populates="exercises")
+    note = relationship("Note", back_populates="exercises")
+    questions = relationship("ExerciseQuestion", back_populates="exercise", cascade="all, delete-orphan")
+    progress = relationship("ExerciseProgress", back_populates="exercise", cascade="all, delete-orphan")
 
 
-class QuizQuestion(Base):
-    """Questions for a Quiz"""
-    __tablename__ = "quiz_questions"
+class ExerciseQuestion(Base):
+    """Questions for an Exercise"""
+    __tablename__ = "exercise_questions"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    quiz_id = Column(String(16), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    exercise_id = Column(String(16), ForeignKey("exercises.id", ondelete="CASCADE"), nullable=False, index=True)
     question_text = Column(Text, nullable=False)
     answer_text = Column(Text, nullable=False)
-    question_type = Column(String(50), default="subjective")  # objective, subjective, fill_in_the_blank
-    options = Column(JSON, nullable=True)  # Store options for objective questions
+    question_type = Column(String(50), default="subjective")  # objective, subjective, fill_in_the_blank, etc.
+    options = Column(JSON, nullable=True)  # Store options for multiple choice
     original_number = Column(String(20), nullable=True)  # e.g. "1.1", "Q5"
     order = Column(Integer, default=0)
     explanation = Column(Text, nullable=True)
-    explanation_mode = Column(String(50), nullable=True)
-    explanation_output = Column(String(50), nullable=True)
+    
+    # Reference to the highest matching resource (note)
+    reference_note_id = Column(String(16), ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
     
     # Relationships
-    quiz = relationship("Quiz", back_populates="questions")
-    progress = relationship("QuizProgress", back_populates="question", cascade="all, delete-orphan")
+    exercise = relationship("Exercise", back_populates="questions")
+    progress = relationship("ExerciseProgress", back_populates="question", cascade="all, delete-orphan")
+    reference_note = relationship("Note", foreign_keys=[reference_note_id])
 
 
-class QuizProgress(Base):
-    """Spaced Repetition track per user per question"""
-    __tablename__ = "quiz_progress"
+class ExerciseProgress(Base):
+    """Spaced Repetition / Progress track per user per question"""
+    __tablename__ = "exercise_progress"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    quiz_id = Column(String(16), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
-    question_id = Column(Integer, ForeignKey("quiz_questions.id", ondelete="CASCADE"), nullable=False, index=True)
+    exercise_id = Column(String(16), ForeignKey("exercises.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_id = Column(Integer, ForeignKey("exercise_questions.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     is_correct = Column(Boolean, default=False)
     times_tested = Column(Integer, default=0)
-    last_tested_at = Column(DateTime, nullable=True) # Legacy
-    next_review_at = Column(DateTime, nullable=True) # Legacy
     
-    # New SRS fields
     last_reviewed_at = Column(DateTime, default=datetime.utcnow)
-    interval_days = Column(Integer, default=0)
-    ease_factor = Column(Float, default=2.5)
-    consecutive_correct = Column(Integer, default=0)
     
     # Relationships
-    quiz = relationship("Quiz", back_populates="progress")
-    question = relationship("QuizQuestion", back_populates="progress")
+    exercise = relationship("Exercise", back_populates="progress")
+    question = relationship("ExerciseQuestion", back_populates="progress")
     user = relationship("User")
 
 
@@ -286,7 +273,7 @@ class StudySession(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     note_id = Column(String(16), ForeignKey("notes.id", ondelete="SET NULL"), nullable=True, index=True)
-    session_type = Column(String(50))  # quiz, chat, pomodoro_study, pomodoro_break, stopwatch
+    session_type = Column(String(50))  # exercise, chat, pomodoro_study, pomodoro_break, stopwatch
     duration_minutes = Column(Integer)
     questions_attempted = Column(Integer, default=0)
     questions_correct = Column(Integer, default=0)
@@ -392,7 +379,7 @@ class SystemSettings(Base):
     session_length = Column(Integer, default=24)
     session_unit = Column(String(20), default="hours") # hours, days
     session_reset_on_activity = Column(Boolean, default=True)
-    max_quiz_questions = Column(Integer, default=500)
+    max_exercise_questions = Column(Integer, default=500)
     unnecessary_logins_enabled = Column(Boolean, default=False)
     
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -557,7 +544,7 @@ class TierConfig(Base):
     max_conversations = Column(Integer, default=-1)
     max_messages = Column(Integer, default=-1)
     max_storage_gb = Column(Integer, default=-1)  # in GB, -1 = unlimited
-    max_quizzes = Column(Integer, default=-1)
+    max_exercises = Column(Integer, default=-1)
     max_summaries = Column(Integer, default=-1)
     # Reset periods: "week", "month", or None for cumulative limits
     conversations_reset_period = Column(String(20), nullable=True)  # week, month, or None

@@ -462,12 +462,6 @@ class AIClient:
         prompt = f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"
         return await self.generate_text(prompt, max_tokens=8192)
     
-    async def generate_quiz(self, content: str, num_questions: int = 5) -> List[dict]:
-        prompt = f"Generate {num_questions} quiz questions (JSON): {content}"
-        res = await self.generate_text(prompt)
-        try: import json; return json.loads(res)
-        except: return []
-
     async def generate_summary(
         self, 
         content: str, 

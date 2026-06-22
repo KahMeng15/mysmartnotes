@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 
 from app.models.db import (
-    User, TierConfig, Note, Subject, SubjectGroup, ChatMessage, Quiz, Summary
+    User, TierConfig, Note, Subject, SubjectGroup, ChatMessage, Exercise, Summary
 )
 
 DEFAULT_TIER_CONFIGS = {
@@ -17,7 +17,7 @@ DEFAULT_TIER_CONFIGS = {
         "max_conversations": -1,
         "max_messages": -1,
         "max_storage_gb": -1,
-        "max_quizzes": -1,
+        "max_exercises": -1,
         "max_summaries": -1,
         "conversations_reset_period": None,
         "messages_reset_period": None,
@@ -31,7 +31,7 @@ DEFAULT_TIER_CONFIGS = {
         "max_conversations": 100,
         "max_messages": 500,
         "max_storage_gb": 5,
-        "max_quizzes": 20,
+        "max_exercises": 20,
         "max_summaries": 50,
         "conversations_reset_period": None,
         "messages_reset_period": None,
@@ -45,7 +45,7 @@ DEFAULT_TIER_CONFIGS = {
         "max_conversations": -1,
         "max_messages": -1,
         "max_storage_gb": 100,
-        "max_quizzes": 200,
+        "max_exercises": 200,
         "max_summaries": 500,
         "conversations_reset_period": None,
         "messages_reset_period": None,
@@ -59,7 +59,7 @@ DEFAULT_TIER_CONFIGS = {
         "max_conversations": -1,
         "max_messages": -1,
         "max_storage_gb": -1,
-        "max_quizzes": -1,
+        "max_exercises": -1,
         "max_summaries": -1,
         "conversations_reset_period": None,
         "messages_reset_period": None,
@@ -178,10 +178,10 @@ def get_user_message_count(user: User, db: Session, reset_period: str = None) ->
     return count
 
 
-def get_user_quiz_count(user: User, db: Session) -> int:
-    """Get the number of quizzes a user has"""
-    count = db.query(func.count(Quiz.id)).filter(
-        Quiz.user_id == user.id
+def get_user_exercise_count(user: User, db: Session) -> int:
+    """Get the number of exercises a user has"""
+    count = db.query(func.count(Exercise.id)).filter(
+        Exercise.user_id == user.id
     ).scalar() or 0
     return count
 
@@ -261,13 +261,13 @@ def check_quota_messages(user: User, db: Session) -> bool:
     return current_count < tier_config.max_messages
 
 
-def check_quota_quizzes(user: User, db: Session) -> bool:
-    """Check if user can create another quiz"""
+def check_quota_exercises(user: User, db: Session) -> bool:
+    """Check if user can create another exercise"""
     tier_config = get_user_tier_config(user, db)
-    if tier_config.max_quizzes == -1:  # Unlimited
+    if tier_config.max_exercises == -1:  # Unlimited
         return True
-    current_count = get_user_quiz_count(user, db)
-    return current_count < tier_config.max_quizzes
+    current_count = get_user_exercise_count(user, db)
+    return current_count < tier_config.max_exercises
 
 
 def check_quota_summaries(user: User, db: Session) -> bool:
@@ -347,14 +347,14 @@ def enforce_quota_messages(user: User, db: Session):
         )
 
 
-def enforce_quota_quizzes(user: User, db: Session):
-    """Enforce quiz quota - raise exception if exceeded"""
-    if not check_quota_quizzes(user, db):
+def enforce_quota_exercises(user: User, db: Session):
+    """Enforce exercise quota - raise exception if exceeded"""
+    if not check_quota_exercises(user, db):
         tier_config = get_user_tier_config(user, db)
-        current = get_user_quiz_count(user, db)
+        current = get_user_exercise_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Quiz quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_quizzes} quizzes. You have {current}."
+            detail=f"Exercise quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_exercises} exercises. You have {current}."
         )
 
 
@@ -419,10 +419,10 @@ def get_user_quota_status(user: User, db: Session) -> dict:
                 "unlimited": tier_config.max_messages == -1,
                 "reset_period": tier_config.messages_reset_period
             },
-            "quizzes": {
-                "used": get_user_quiz_count(user, db),
-                "limit": tier_config.max_quizzes,
-                "unlimited": tier_config.max_quizzes == -1,
+            "exercises": {
+                "used": get_user_exercise_count(user, db),
+                "limit": tier_config.max_exercises,
+                "unlimited": tier_config.max_exercises == -1,
                 "reset_period": None
             },
             "summaries": {

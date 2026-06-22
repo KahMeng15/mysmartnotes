@@ -244,47 +244,7 @@ class TaskManager:
         finally:
             db.close()
 
-class QuizTask:
-    """Quiz generation task"""
-    @staticmethod
-    async def generate(**kwargs) -> dict:
-        from app.processing.quiz_generator import generate_advanced_quiz
-        from app.processing.ai_client import get_ai_client
-        from app.models.db import User
-        
-        db = SessionLocal()
-        try:
-            user_id = kwargs.get("user_id")
-            task_id = kwargs.get("task_id")
-            user = db.query(User).filter(User.id == user_id).first()
-            ai_client = get_ai_client(user=user, db=db)
-            
-            def progress_callback(p):
-                if task_id:
-                    msg = "Generating quiz..."
-                    if p > 30: msg = "Creating questions..."
-                    if p > 70: msg = "Formulating options..."
-                    if p > 90: msg = "Saving quiz..."
-                    TaskManager.update_task_progress(task_id, p, message=msg)
 
-            quiz = await generate_advanced_quiz(
-                db=db,
-                user=user,
-                ai_client=ai_client,
-                title=kwargs.get("title"),
-                scope_type=kwargs.get("scope_type"),
-                scope_id=kwargs.get("scope_id"),
-                question_types=kwargs.get("question_types"),
-                num_questions=kwargs.get("num_questions"),
-                quiz_group_id=kwargs.get("quiz_group_id"),
-                progress_callback=progress_callback,
-                quiz_id=kwargs.get("quiz_id")
-            )
-            return {"quiz_id": quiz.id}
-            # Quiz model to dict (simplified for result)
-            return {"quiz_id": quiz.id, "title": quiz.title}
-        finally:
-            db.close()
 
 class SummaryTask:
     """Summary generation task"""

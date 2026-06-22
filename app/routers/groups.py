@@ -94,10 +94,10 @@ async def delete_group(
             detail="Group not found"
         )
     
-    # Explicitly delete child subjects and quizzes
-    from app.models.db import Subject, Quiz
+    # Explicitly delete child subjects
+    from app.models.db import Subject
     db.query(Subject).filter(Subject.group_id == group_id, Subject.user_id == current_user.id).delete()
-    db.query(Quiz).filter(Quiz.group_id == group_id, Quiz.user_id == current_user.id).delete()
+
     
     db.delete(db_group)
     db.commit()

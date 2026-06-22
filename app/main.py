@@ -36,7 +36,7 @@ from app.config import get_settings
 from app.utils.db import init_db
 from app.utils.crypto import encrypt_secret
 from app.utils.observability import record_request
-from app.routers import auth, subjects, notes, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, quiz, support, ws, prompts
+from app.routers import auth, subjects, notes, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, support, ws, prompts, exercises
 
 # Configure logging
 from app.logging_config import setup_logging
@@ -451,9 +451,9 @@ app.include_router(snapshots.router)
 app.include_router(templates.router)
 app.include_router(prompts.router)
 app.include_router(admin.router)
-app.include_router(quiz.router)
 app.include_router(support.router)
 app.include_router(ws.router)
+app.include_router(exercises.router)
 
 # Serve generated files (images, PDFs, etc.)
 generated_dir = os.path.join(os.path.dirname(__file__), "generated")
@@ -551,17 +551,7 @@ async def serve_export_template(id: str):
 async def serve_pomodoro():
     return FileResponse(os.path.join(static_dir, "pomodoro.html"))
 
-@app.get("/quiz")
-async def serve_quiz_dashboard():
-    return FileResponse(os.path.join(static_dir, "quiz_dashboard.html"))
 
-@app.get("/quiz/{id}")
-async def serve_quiz_view(id: str):
-    return FileResponse(os.path.join(static_dir, "quiz_view.html"))
-
-@app.get("/quiz/{id}/{mode}")
-async def serve_quiz_mode_view(id: str, mode: str):
-    return FileResponse(os.path.join(static_dir, "quiz_view.html"))
 
 @app.get("/settings")
 async def serve_settings():

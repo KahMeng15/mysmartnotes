@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor } from '@mantine/core';
+import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -38,6 +38,11 @@ export default function SubjectView() {
   
   const [subject, setSubject] = useState(null);
   const [notes, setNotes] = useState([]);
+  const [exercises, setExercises] = useState([]);
+  const [generatedNotes, setGeneratedNotes] = useState([]);
+  const [activeTab, setActiveTab] = useState('resources');
+  const [selectedExercises, setSelectedExercises] = useState([]);
+  const [merging, setMerging] = useState(false);
 
   const handleDownload = async (noteId, fileName) => {
     try {
@@ -122,15 +127,19 @@ export default function SubjectView() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [subjectsData, allNotes] = await Promise.all([
+        const [subjectsData, allNotes, exercisesData, summariesData] = await Promise.all([
           fetchApi('/subjects'),
-          fetchApi('/notes')
+          fetchApi('/notes'),
+          fetchApi(`/exercises/subject/${id}`),
+          fetchApi(`/summaries?subject_id=${id}`)
         ]);
         
         const currentSub = subjectsData.find(s => s.id == id);
         setSubject(currentSub);
         
         setNotes(allNotes.filter(l => l.subject_id == id));
+        setExercises(exercisesData || []);
+        setGeneratedNotes(summariesData || []);
       } catch (err) {
         console.error("Failed to load subject data", err);
       } finally {
@@ -337,76 +346,201 @@ export default function SubjectView() {
         />
       </Group>
 
-      {filteredNotes.length > 0 ? (
-        <Stack spacing="sm">
-          {filteredNotes.map((note) => {
-            const isProcessed = note.processing_time_ms != null || note.extracted_text != null || note.extracted_content_structured != null || note.output_pdf_path != null;
-            return (
-              <Card
-                key={note.id}
-                shadow="sm"
-                padding="md"
-                radius="md"
-                withBorder
-              >
-                <Group justify="space-between" wrap="nowrap">
-                  <Box style={{ flex: 1 }}>
-                    <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${note.id}`)}>
-                      {note.title}
-                    </Text>
-                    <Group gap="xs" mt={4}>
-                      {!isProcessed && (
-                        <Badge color="orange" variant="light" size="sm">
-                          Processing...
-                        </Badge>
-                      )}
-                      <Text size="xs" c="dimmed">
-                        {getFriendlyFileType(note.file_type)} • {formatNoteDate(note.created_at)}
-                      </Text>
-                    </Group>
-                  </Box>
+      <Tabs value={activeTab} onChange={setActiveTab} mb="md">
+        <Tabs.List>
+          <Tabs.Tab value="resources">Resources</Tabs.Tab>
+          <Tabs.Tab value="exercises">Exercises</Tabs.Tab>
+          <Tabs.Tab value="generated">Generated Notes</Tabs.Tab>
+        </Tabs.List>
 
-                  <Group gap="xs">
-                    <Button variant="light" size="sm" onClick={() => navigate(`/note/${note.id}`)}>
-                      View Note
-                    </Button>
-                    <Menu position="bottom-end" withinPortal>
-                      <Menu.Target>
-                        <ActionIcon variant="subtle" color="gray">
-                          <IconDotsVertical size={16} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRename(note)}>Rename</Menu.Item>
-                        <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocess(note)}>Reprocess</Menu.Item>
-                        <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalNote(note); }}>System Info</Menu.Item>
-                        <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDelete(note)}>Delete</Menu.Item>
-                      </Menu.Dropdown>
-                    </Menu>
+        <Tabs.Panel value="resources" pt="xl">
+          {filteredNotes.length > 0 ? (
+            <Stack spacing="sm">
+              {filteredNotes.map((note) => {
+                const isProcessed = note.processing_time_ms != null || note.extracted_text != null || note.extracted_content_structured != null || note.output_pdf_path != null;
+                return (
+                  <Card
+                    key={note.id}
+                    shadow="sm"
+                    padding="md"
+                    radius="md"
+                    withBorder
+                  >
+                    <Group justify="space-between" wrap="nowrap">
+                      <Box style={{ flex: 1 }}>
+                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${note.id}`)}>
+                          {note.title}
+                        </Text>
+                        <Group gap="xs" mt={4}>
+                          {!isProcessed && (
+                            <Badge color="orange" variant="light" size="sm">
+                              Processing...
+                            </Badge>
+                          )}
+                          <Text size="xs" c="dimmed">
+                            {getFriendlyFileType(note.file_type)} • {formatNoteDate(note.created_at)}
+                          </Text>
+                        </Group>
+                      </Box>
+
+                      <Group gap="xs">
+                        <Button variant="light" size="sm" onClick={() => navigate(`/note/${note.id}`)}>
+                          View Note
+                        </Button>
+                        <Menu position="bottom-end" withinPortal>
+                          <Menu.Target>
+                            <ActionIcon variant="subtle" color="gray">
+                              <IconDotsVertical size={16} />
+                            </ActionIcon>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRename(note)}>Rename</Menu.Item>
+                            <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocess(note)}>Reprocess</Menu.Item>
+                            <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalNote(note); }}>System Info</Menu.Item>
+                            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDelete(note)}>Delete</Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+                      </Group>
+                    </Group>
+                  </Card>
+                );
+              })}
+            </Stack>
+          ) : search.trim() ? (
+            <Center h={200}>
+              <Box ta="center">
+                <IconSearch size={48} color="var(--mantine-color-gray-4)" />
+                <Text c="dimmed" mt="md">No notes found matching "{search}"</Text>
+              </Box>
+            </Center>
+          ) : (
+            <Center h={200}>
+              <Box ta="center">
+                <IconFile size={48} color="var(--mantine-color-gray-4)" />
+                <Text c="dimmed" mt="md">No notes uploaded to this subject yet.</Text>
+                <Button mt="md" variant="light" onClick={() => navigate(`/upload?subject_id=${subject.id}`)}>
+                  Upload your first file
+                </Button>
+              </Box>
+            </Center>
+          )}
+        </Tabs.Panel>
+        
+        <Tabs.Panel value="exercises" pt="xl">
+          <Group mb="md" justify="space-between">
+            <Text>Select multiple exercises to merge them into one.</Text>
+            {selectedExercises.length > 1 && (
+              <Button 
+                onClick={async () => {
+                  setMerging(true);
+                  try {
+                    const res = await fetchApi('/exercises/merge', {
+                      method: 'POST',
+                      body: JSON.stringify({ exercise_ids: selectedExercises, title: "Merged Exercises" })
+                    });
+                    setExercises([...exercises, res]);
+                    setSelectedExercises([]);
+                  } catch (e) {
+                    alert("Failed to merge exercises: " + e.message);
+                  } finally {
+                    setMerging(false);
+                  }
+                }}
+                loading={merging}
+              >
+                Merge Selected ({selectedExercises.length})
+              </Button>
+            )}
+          </Group>
+          {exercises.length > 0 ? (
+            <Stack spacing="sm">
+              {exercises.map((ex) => (
+                <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder>
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group>
+                      <Checkbox 
+                        checked={selectedExercises.includes(ex.id)}
+                        onChange={(e) => {
+                          if (e.currentTarget.checked) {
+                            setSelectedExercises([...selectedExercises, ex.id]);
+                          } else {
+                            setSelectedExercises(selectedExercises.filter(id => id !== ex.id));
+                          }
+                        }}
+                      />
+                      <Box>
+                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/exercises/${ex.id}`)}>
+                          {ex.title}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {formatNoteDate(ex.created_at)}
+                        </Text>
+                      </Box>
+                    </Group>
+                    <Group gap="xs">
+                      <Button variant="light" size="sm" onClick={() => navigate(`/exercises/${ex.id}`)}>
+                        View Exercise
+                      </Button>
+                      <Menu position="bottom-end" withinPortal>
+                        <Menu.Target>
+                          <ActionIcon variant="subtle" color="gray">
+                            <IconDotsVertical size={16} />
+                          </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={async () => {
+                            if (confirm("Delete this exercise?")) {
+                              await fetchApi(`/exercises/${ex.id}`, { method: 'DELETE' });
+                              setExercises(exercises.filter(e => e.id !== ex.id));
+                            }
+                          }}>Delete</Menu.Item>
+                        </Menu.Dropdown>
+                      </Menu>
+                    </Group>
                   </Group>
-                </Group>
-              </Card>
-            );
-          })}
-        </Stack>
-      ) : search.trim() ? (
-        <Center h={200}>
-          <Box ta="center">
-            <IconSearch size={48} color="var(--mantine-color-gray-4)" />
-            <Text c="dimmed" mt="md">No notes found matching "{search}"</Text>
-          </Box>
-        </Center>
-      ) : (
-        <Center h={200}>
-          <Box ta="center">
-            <IconFile size={48} color="var(--mantine-color-gray-4)" />
-            <Text c="dimmed" mt="md">No notes uploaded to this subject yet.</Text>
-            <Button mt="md" variant="light" onClick={() => navigate(`/upload?subject_id=${subject.id}`)}>
-              Upload your first file
-            </Button>
-          </Box>
-        </Center>
-      )}
+                </Card>
+              ))}
+            </Stack>
+          ) : (
+            <Center h={200}>
+              <Box ta="center">
+                <Text c="dimmed">No exercises found.</Text>
+                <Button mt="md" variant="light" onClick={() => navigate(`/upload?subject_id=${subject.id}`)}>
+                  Upload an Exercise
+                </Button>
+              </Box>
+            </Center>
+          )}
+        </Tabs.Panel>
+        
+        <Tabs.Panel value="generated" pt="xl">
+          {generatedNotes.length > 0 ? (
+            <Stack spacing="sm">
+              {generatedNotes.map((gn) => (
+                <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder>
+                   <Group justify="space-between" wrap="nowrap">
+                      <Box>
+                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${gn.note_id}/summary/${gn.id}`)}>
+                          {gn.title}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                           Generated on {formatNoteDate(gn.created_at)}
+                        </Text>
+                      </Box>
+                      <Button variant="light" size="sm" onClick={() => navigate(`/note/${gn.note_id}/summary/${gn.id}`)}>
+                        View Note
+                      </Button>
+                   </Group>
+                </Card>
+              ))}
+            </Stack>
+          ) : (
+            <Center h={200}>
+              <Text c="dimmed">No generated notes found.</Text>
+            </Center>
+          )}
+        </Tabs.Panel>
+      </Tabs>
 
       {/* Modals */}
       <Modal opened={editSubjectModalOpened} onClose={closeEditSubjectModal} title="Edit Subject" centered>

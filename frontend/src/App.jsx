@@ -24,13 +24,12 @@ import Dashboard from './pages/Dashboard';
 import NotesManager from './pages/NotesManager';
 import UploadDocs from './pages/UploadDocs';
 import ChatInterface from './pages/ChatInterface';
-import QuizSystem from './pages/QuizSystem';
+import ExerciseView from './pages/ExerciseView';
 import SubjectView from './pages/SubjectView';
 import NoteView from './pages/NoteView';
 import Settings from './pages/Settings';
 import GroupView from './pages/GroupView';
 import AdminPage from './pages/Admin';
-import QuizGroupView from './pages/QuizGroupView';
 import { fetchApi } from './lib/api';
 
 function GlobalToasts() {
@@ -129,8 +128,8 @@ function AppLayout({ children }) {
           <Tooltip label="Chat" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/chat" label={navOpen ? "Chat" : ""} leftSection={<IconMessageDots size="1.2rem" stroke={1.5} />} />
           </Tooltip>
-          <Tooltip label="Quiz" disabled={navOpen} position="right">
-            <MantineNavLink component={NavLink} to="/quiz" label={navOpen ? "Quiz" : ""} leftSection={<IconBolt size="1.2rem" stroke={1.5} />} />
+          <Tooltip label="Exercises" disabled={navOpen} position="right">
+            <MantineNavLink component={NavLink} to="/exercises" label={navOpen ? "Exercises" : ""} leftSection={<IconBolt size="1.2rem" stroke={1.5} />} />
           </Tooltip>
           <Tooltip label="Upload" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/upload" label={navOpen ? "Upload" : ""} leftSection={<IconUpload size="1.2rem" stroke={1.5} />} />
@@ -203,13 +202,14 @@ function App() {
           <Route path="/upload" element={<UploadDocs />} />
           <Route path="/chat" element={<ChatInterface />} />
           <Route path="/chat/:cvid" element={<ChatInterface />} />
-          <Route path="/quiz" element={<QuizSystem />} />
+          <Route path="/exercises" element={<Navigate to="/mynotes" replace />} />
+          <Route path="/exercises/:id" element={<ExerciseView />} />
           <Route path="/group/:id" element={<GroupView />} />
           <Route path="/subject/:id" element={<SubjectView />} />
           <Route path="/note/:id" element={<NoteView />} />
           <Route path="/note/:noteId/summary" element={<SummaryView />} />
           <Route path="/note/:noteId/summary/:summaryId" element={<SummaryView />} />
-          <Route path="/quiz/group/:id" element={<QuizGroupView />} />
+
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin" element={<AdminPage />} />
         </Routes>

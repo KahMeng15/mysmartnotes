@@ -39,7 +39,7 @@ def _prepare_system_settings_response(settings: SystemSettings) -> dict:
         "session_length": settings.session_length,
         "session_unit": settings.session_unit,
         "session_reset_on_activity": settings.session_reset_on_activity,
-        "max_quiz_questions": settings.max_quiz_questions,
+        "max_exercise_questions": settings.max_exercise_questions,
         "unnecessary_logins_enabled": settings.unnecessary_logins_enabled,
     }
 

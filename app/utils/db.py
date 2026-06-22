@@ -42,7 +42,7 @@ def generate_random_id(db: Session, model, length: int = 8) -> str:
     Returns:
         A unique prefixed hex ID derived from UUID4
     """
-    from app.models.db import SubjectGroup, Subject, Note, Summary, Quiz, QuizGroup, ChatMessage
+    from app.models.db import SubjectGroup, Subject, Note, Summary, ChatMessage, Exercise
     
     prefix = ""
     if model == SubjectGroup:
@@ -53,10 +53,8 @@ def generate_random_id(db: Session, model, length: int = 8) -> str:
         prefix = "nt_"
     elif model == Summary:
         prefix = "sy_"
-    elif model == Quiz:
-        prefix = "qz_"
-    elif model == QuizGroup:
-        prefix = "qg_"
+    elif model == Exercise:
+        prefix = "ex_"
     elif model == ChatMessage:
         prefix = "mg_"
         
@@ -132,8 +130,8 @@ def apply_content_dissociation_migrations():
         with engine.begin() as conn:
             # 1. Tables where user_id should be NULLABLE for dissociation (SET NULL)
             dissociate_tables = [
-                'subject_groups', 'quiz_groups', 'subjects', 'notes', 
-                'quizzes', 'chat_messages', 'note_snapshots', 'export_templates'
+                'subject_groups', 'subjects', 'notes', 
+                'chat_messages', 'note_snapshots', 'export_templates', 'exercises'
             ]
             
             for table in dissociate_tables:

@@ -16,7 +16,7 @@ class SystemSettingsSchema(BaseModel):
     session_length: int = 24
     session_unit: str = "hours"
     session_reset_on_activity: bool = True
-    max_quiz_questions: int = 500
+    max_exercise_questions: int = 500
     unnecessary_logins_enabled: bool = False
 
     class Config:
@@ -153,7 +153,7 @@ class TierConfigSchema(BaseModel):
     max_conversations: int = -1
     max_messages: int = -1
     max_storage_gb: int = -1
-    max_quizzes: int = -1
+    max_exercises: int = -1
     max_summaries: int = -1
     # Reset periods: "week", "month", or None for cumulative
     conversations_reset_period: Optional[str] = None

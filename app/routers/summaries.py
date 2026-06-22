@@ -34,17 +34,7 @@ def format_timestamp(dt: Optional[datetime]) -> str:
         return dt.isoformat()
 
 
-class QuizQuestion(BaseModel):
-    question: str
-    options: List[str]
-    correct_index: int
-    difficulty: str
 
-
-class QuizResponse(BaseModel):
-    note_id: str
-    questions: List[QuizQuestion]
-    total_questions: int
 
 
 class SummaryRequest(BaseModel):
@@ -118,52 +108,7 @@ class SummaryItemResponse(BaseModel):
     prompt_name: Optional[str] = None
     prompt_icon: Optional[str] = None
 
-@router.post("/quiz", response_model=QuizResponse)
-async def generate_quiz(
-    note_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Generate quiz questions from a note"""
-    
-    # Verify note belongs to user
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
-    ).first()
-    
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-    
-    note_content = StorageManager.get_note_text(note.id) or ""
-    if not note_content:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Note content not available yet. Please wait for processing."
-        )
-    
-    # Generate quiz using AI
-    ai_client = AIClient(current_user, db=db)
-    
-    try:
-        questions = ai_client.generate_quiz(
-            content=note_content,
-            num_questions=10
-        )
-        
-        return QuizResponse(
-            note_id=note_id,
-            questions=questions,
-            total_questions=len(questions)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error generating quiz: {str(e)}"
-        )
+
 
 
 @router.post("/summary", response_model=dict)
@@ -423,6 +368,7 @@ async def update_generated_summary(
 async def list_summaries(
     request: Request,
     note_id: str = None,
+    subject_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -431,6 +377,8 @@ async def list_summaries(
         Note.user_id == current_user.id
     )
     
+    if subject_id:
+        query = query.filter(Note.subject_id == subject_id)
     if note_id:
         query = query.filter(Summary.note_id == note_id)
     

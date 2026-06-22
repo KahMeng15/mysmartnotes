@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy import func
 from app.models.db import Task, RateLimitConfig
 from app.utils.db import SessionLocal, init_db
-from app.utils.tasks import TaskManager, OCRTask, EmbeddingsTask, QuizTask, SummaryTask, ChatTask
+from app.utils.tasks import TaskManager, OCRTask, EmbeddingsTask, SummaryTask, ChatTask
 
 from app.logging_config import setup_logging
 setup_logging()
@@ -21,7 +21,6 @@ TASK_REGISTRY = {
     "ocr": OCRTask.process_file,
     "embedding": EmbeddingsTask.generate_embeddings,
     "note_processing": process_note_task,
-    "quiz_generation": QuizTask.generate,
     "summary_generation": SummaryTask.generate,
     "chat_response": ChatTask.respond,
 }
