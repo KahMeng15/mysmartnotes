@@ -213,12 +213,12 @@ export default function SubjectView() {
 
     if (unprocessedNotes.length === 0) return;
 
-    const interval = setInterval(async () => {
+    const poll = async () => {
       try {
         const updatedNotes = await Promise.all(
           unprocessedNotes.map(async (n) => {
             try {
-              const taskData = await fetchApi(`/search/task?note_id=${n.id}`);
+              const taskData = await fetchApi(`/search/task?resource_id=${n.id}`);
               if (taskData) {
                 if (taskData.progress !== undefined) {
                   setNoteProgress(prev => ({ ...prev, [n.id]: taskData.progress }));
@@ -251,7 +251,10 @@ export default function SubjectView() {
       } catch (err) {
         console.error("Error polling task status", err);
       }
-    }, 2000);
+    };
+
+    poll();
+    const interval = setInterval(poll, 2000);
 
     return () => clearInterval(interval);
   }, [notes, failedNoteIds]);
@@ -261,12 +264,12 @@ export default function SubjectView() {
     const unprocessedExercises = exercises.filter(ex => !failedExerciseIds.includes(ex.id));
     if (unprocessedExercises.length === 0) return;
 
-    const interval = setInterval(async () => {
+    const poll = async () => {
       try {
         const updatedExercises = await Promise.all(
           unprocessedExercises.map(async (ex) => {
             try {
-              const taskData = await fetchApi(`/search/task?exercise_id=${ex.id}`);
+              const taskData = await fetchApi(`/search/tasks/extract_ex_${ex.id}`);
               if (taskData) {
                 if (taskData.progress !== undefined) {
                   setExerciseProgress(prev => ({ ...prev, [ex.id]: taskData.progress }));
@@ -291,7 +294,10 @@ export default function SubjectView() {
       } catch (err) {
         console.error("Error polling exercise task status", err);
       }
-    }, 2000);
+    };
+
+    poll();
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
   }, [exercises, failedExerciseIds]);
 
@@ -302,7 +308,7 @@ export default function SubjectView() {
     const pendingEntries = Object.entries(pendingSummaryTasks); // [[summaryId, taskId], ...]
     if (pendingEntries.length === 0) return;
 
-    const interval = setInterval(async () => {
+    const poll = async () => {
       try {
         await Promise.all(
           pendingEntries.map(async ([summaryId, taskId]) => {
@@ -334,7 +340,10 @@ export default function SubjectView() {
       } catch (err) {
         console.error('Error polling generated notes task status', err);
       }
-    }, 2000);
+    };
+
+    poll();
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
   }, [pendingSummaryTasks]);
 

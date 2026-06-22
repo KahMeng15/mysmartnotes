@@ -450,7 +450,7 @@ function setupStickyHeaderFading() {
 async function checkExtractionStatus() {
     if (noteData.extracted_text) return;
     try {
-        const response = await fetch(`/search/task?note_id=${noteId}`);
+        const response = await fetch(`/search/task?resource_id=${noteId}`);
         if (response.ok) {
             const task = await response.json();
             document.getElementById('extractionStatus').style.display = 'block';
@@ -492,7 +492,7 @@ function startPolling() { pollingInterval = setInterval(pollStatus, 2000); }
 
 async function pollStatus() {
     try {
-        const response = await fetch(`/search/task?note_id=${noteId}`);
+        const response = await fetch(`/search/task?resource_id=${noteId}`);
         if (response.ok) {
             const task = await response.json();
             if (task.status === 'completed') { clearInterval(pollingInterval); reloadNote(); }
