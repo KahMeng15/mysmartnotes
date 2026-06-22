@@ -240,6 +240,51 @@ class AIClient:
         if xml_match:
             candidate = xml_match.group(1).strip()
             if len(candidate) > 5: return candidate
+
+        # 2.5 Extract strictly bounded ===START=== and ===END=== markers if present
+        if "===START===" in text or "===END===" in text:
+            candidate = None
+            if "===START===" in text and "===END===" in text:
+                # Find the pair of ===START=== and ===END=== that contains the most content
+                best_candidate = None
+                start_idx = 0
+                while True:
+                    start_pos = text.find("===START===", start_idx)
+                    if start_pos == -1:
+                        break
+                    end_pos = text.find("===END===", start_pos + 11)
+                    if end_pos == -1:
+                        break
+                    cand = text[start_pos + 11 : end_pos].strip()
+                    if best_candidate is None or len(cand) > len(best_candidate):
+                        best_candidate = cand
+                    start_idx = start_pos + 11
+                if best_candidate is not None:
+                    candidate = best_candidate
+            
+            if candidate is None:
+                # Fallback if we only have one of them or the pair extraction failed
+                if "===START===" in text:
+                    # Look for the longest segment after any ===START===
+                    for part in reversed(text.split("===START===")):
+                        part_stripped = part.strip()
+                        if len(part_stripped) > 50:
+                            candidate = part_stripped
+                            break
+                    if candidate is None:
+                        # If all segments are small, just take the last one
+                        candidate = text.split("===START===")[-1].strip()
+                else:
+                    candidate = text.split("===END===", 1)[0].strip()
+
+            # Clean up potential leading/trailing markdown code blocks
+            if candidate.startswith("```markdown"):
+                candidate = candidate[11:].strip()
+            elif candidate.startswith("```"):
+                candidate = candidate[3:].strip()
+            if candidate.endswith("```"):
+                candidate = candidate[:-3].strip()
+            return candidate
             
         # 3. Fallback extraction markers (strongest signal)
         for marker in ["FINAL_ANSWER:", "FINAL ANSWER:", "===START===", "Final Answer:", "Answer:", "ANSWER:"]:

@@ -143,6 +143,16 @@ def _rebuild_note_content(
             StorageManager.save_note_json(note.id, "structured", structured_content)
             StorageManager.save_note_json(note.id, "images", images_data)
 
+        # Auto-detect title from first H1 heading
+        if raw_text:
+            for line in raw_text.split('\n'):
+                if line.strip().startswith('# '):
+                    detected_title = line.strip()[2:].strip()
+                    if detected_title:
+                        note.title = detected_title
+                        logger.info(f"Auto-detected title '{detected_title}' for note {note.id} during rebuild")
+                        break
+
         note.processing_time_ms = int((time.time() - start_time) * 1000)
         note.updated_at = datetime.utcnow()
         db.commit()

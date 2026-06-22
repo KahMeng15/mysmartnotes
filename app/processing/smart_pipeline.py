@@ -1006,9 +1006,16 @@ class SmartPipeline:
             lines = result.split("\n")
             cleaned = []
             seen_h1 = False
+            first_heading_seen = False
+            
             for line in lines:
+                # If this is the very first heading in the entire document, force it to be H1
+                if not first_heading_seen and re.match(r'^#{1,6}\s+', line):
+                    line = re.sub(r'^#{1,6}\s+', '# ', line)
+                    first_heading_seen = True
+                    seen_h1 = True
                 # Enforce only ONE H1
-                if re.match(r'^#\s+', line) and not re.match(r'^##', line):
+                elif re.match(r'^#\s+', line) and not re.match(r'^##', line):
                     if seen_h1:
                         # Demote to H2
                         line = "#" + line
@@ -1069,21 +1076,17 @@ Remove university names, course codes, and noter names.
         prompt = f"""Task: Clean and format the following note notes into clean Markdown.
 
 CRITICAL RULES:
-1. START WITH THE MARKER ===START===
-2. END WITH THE MARKER ===END===
-3. NO PREAMBLE/INTRO: Output ONLY the markdown between the markers.
-4. NO REASONING: Do not talk to yourself, do not plan, do not list rules.
-5. USE EXACT WORDS: Never rephrase or summarize.
+1. NO PREAMBLE/INTRO: Output ONLY the markdown between the markers.
+2. NO REASONING: Do not talk to yourself, do not plan, do not list rules, do not write 'Wait' or 'Let me think'.
+3. USE EXACT WORDS: Never rephrase or summarize.
 {heading_rule}
-7. CODE BLOCKS: Use ```java only for actual code.
+5. CODE BLOCKS: Use ```java only for actual code. If it's normal text, remove the code block.
+6. YOUR ENTIRE RESPONSE MUST BE WRAPPED EXACTLY IN ===START=== AND ===END=== MARKERS.
 
 {title_instruction}
 
 INPUT TO PROCESS:
 {chunk}
-
-POLISHED MARKDOWN:
-===START===
 """
         try:
             full_text = ""
@@ -1094,8 +1097,14 @@ POLISHED MARKDOWN:
                 with open(debug_file, "w", encoding="utf-8") as f:
                     f.write(f"--- CHUNK {chunk_idx} START ---\n\n")
 
+            system_instruction = (
+                "You are an expert technical editor. Your job is to clean, structure, and format raw markdown notes.\n"
+                "Output ONLY the clean, polished markdown content between ===START=== and ===END=== markers.\n"
+                "Do not include any preamble, introduction, explanation, or reasoning.\n"
+                "Strictly adhere to the heading rules and keep the exact words from the source text."
+            )
             # Use a slightly higher max_tokens to ensure we don't cut off the content
-            async for text_segment in client.stream_text(prompt, max_tokens=3000):
+            async for text_segment in client.stream_text(prompt, max_tokens=3000, system_instruction=system_instruction):
                 full_text += text_segment
                 if debug_file:
                     with open(debug_file, "a", encoding="utf-8") as f:
@@ -1108,7 +1117,7 @@ POLISHED MARKDOWN:
                 
                 # Split by markers
                 if "===START===" in content:
-                    content = content.split("===START===")[-1]
+                    content = content.split("===START===", 1)[-1]
                 if "===END===" in content:
                     content = content.split("===END===")[0]
                 
