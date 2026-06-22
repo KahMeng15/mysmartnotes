@@ -36,14 +36,14 @@ class DocxGenerator:
 
     def __init__(
         self,
-        note_id: int,
+        resource_id: str,
         note_title: str,
         base_output_dir: str = "generated",
     ):
-        self.note_id = note_id
+        self.resource_id = resource_id
         self.note_title = note_title
         self.base_output_dir = base_output_dir
-        self.output_dir = os.path.join(base_output_dir, str(note_id))
+        self.output_dir = os.path.join(base_output_dir, resource_id)
 
         # Create output directory
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)

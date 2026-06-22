@@ -63,7 +63,7 @@ export default function SubjectView() {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const response = await fetch(`/api/notes/${noteId}/download-file`, {
+      const response = await fetch(`/api/resources/${noteId}/download-file`, {
         headers
       });
       if (!response.ok) throw new Error('Download failed');
@@ -165,7 +165,7 @@ export default function SubjectView() {
     setProcessingLogs(null);
     openProcessingLogsModal();
     try {
-      const data = await fetchApi(`/notes/${noteId}/processing-logs?limit=200`);
+      const data = await fetchApi(`/resources/${noteId}/processing-logs?limit=200`);
       setProcessingLogs(data);
     } catch (err) {
       setProcessingLogs({ error: err.message });
@@ -179,9 +179,9 @@ export default function SubjectView() {
       try {
         const [subjectsData, allNotes, exercisesData, summariesData] = await Promise.all([
           fetchApi('/subjects'),
-          fetchApi('/notes'),
+          fetchApi('/resources'),
           fetchApi(`/exercises/subject/${id}`),
-          fetchApi(`/summaries?subject_id=${id}`)
+          fetchApi(`/notes?subject_id=${id}`)
         ]);
         
         const currentSub = subjectsData.find(s => s.id == id);
@@ -224,11 +224,11 @@ export default function SubjectView() {
                   setNoteProgress(prev => ({ ...prev, [n.id]: taskData.progress }));
                 }
                 if (taskData.status === 'completed') {
-                  return await fetchApi(`/notes/${n.id}?t=${Date.now()}`);
+                  return await fetchApi(`/resources/${n.id}?t=${Date.now()}`);
                 }
                 if (taskData.status === 'failed') {
                   setFailedNoteIds(prev => [...prev, n.id]);
-                  return await fetchApi(`/notes/${n.id}?t=${Date.now()}`);
+                  return await fetchApi(`/resources/${n.id}?t=${Date.now()}`);
                 }
               }
               return null;
@@ -316,7 +316,7 @@ export default function SubjectView() {
 
               if (taskData.status === 'completed') {
                 // Task done — refresh the summary from server
-                const refreshed = await fetchApi(`/summaries/${summaryId}?t=${Date.now()}`);
+                const refreshed = await fetchApi(`/notes/${summaryId}?t=${Date.now()}`);
                 setGeneratedNotes(prev => prev.map(item => item.id === summaryId ? refreshed : item));
                 // Remove from pending
                 setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[summaryId]; return n; });
@@ -399,7 +399,7 @@ export default function SubjectView() {
     if (!newSummaryTitle.trim() || !editingSummary) return;
     setSubmitting(true);
     try {
-      await fetchApi(`/summaries/${editingSummary.id}/rename`, {
+      await fetchApi(`/notes/${editingSummary.id}/rename`, {
         method: 'PATCH',
         body: JSON.stringify({ title: newSummaryTitle.trim() })
       });
@@ -417,7 +417,7 @@ export default function SubjectView() {
     if (!deletingSummary) return;
     setSubmitting(true);
     try {
-      await fetchApi(`/summaries/${deletingSummary.id}`, { method: 'DELETE' });
+      await fetchApi(`/notes/${deletingSummary.id}`, { method: 'DELETE' });
       setGeneratedNotes(generatedNotes.filter(gn => gn.id !== deletingSummary.id));
       closeDeleteSummaryModal();
     } catch (err) {
@@ -431,7 +431,7 @@ export default function SubjectView() {
     if (!newTitle.trim() || !editingNote) return;
     setSubmitting(true);
     try {
-      await fetchApi(`/notes/${editingNote.id}`, {
+      await fetchApi(`/resources/${editingNote.id}`, {
         method: 'PUT',
         body: JSON.stringify({ title: newTitle.trim() })
       });
@@ -448,7 +448,7 @@ export default function SubjectView() {
     if (!deletingNote) return;
     setSubmitting(true);
     try {
-      await fetchApi(`/notes/${deletingNote.id}`, { method: 'DELETE' });
+      await fetchApi(`/resources/${deletingNote.id}`, { method: 'DELETE' });
       setNotes(notes.filter(l => l.id !== deletingNote.id));
       closeDeleteNoteModal();
     } catch (err) {
@@ -464,7 +464,7 @@ export default function SubjectView() {
     closeReprocessNoteModal();
     setReprocessingNoteIds(prev => [...prev, noteIdToReprocess]);
     try {
-      const res = await fetchApi(`/notes/${noteIdToReprocess}/reprocess`, {
+      const res = await fetchApi(`/resources/${noteIdToReprocess}/reprocess`, {
         method: 'POST'
       });
       // The API returns the updated note

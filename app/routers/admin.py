@@ -7,7 +7,7 @@ from app.utils.quotas import ensure_default_tier_configs
 import datetime
 import secrets
 
-from app.models.db import User, SystemSettings, IPFilter, RateLimitConfig, UserLog, Note, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation, TierConfig, GlobalPrompt
+from app.models.db import User, SystemSettings, IPFilter, RateLimitConfig, UserLog, Resource, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation, TierConfig, GlobalPrompt
 from app.schemas.admin import (
     SystemSettingsSchema, EmailConfigSchema, IPFilterSchema, IPFilterCreate, RateLimitConfigSchema, UserLogSchema, UserAdminResponse, UserActionRequest,
     UserInvitationCreate, UserInvitationResponse, TierConfigSchema, GlobalPromptSchema, GlobalPromptCreate, GlobalPromptUpdate
@@ -321,13 +321,13 @@ def get_all_users(db: Session = Depends(get_db), admin: User = Depends(get_curre
     
     # Compute stats for each user
     for u in users:
-        notes_count = db.query(func.count(Note.id)).filter(Note.user_id == u.id).scalar() or 0
+        notes_count = db.query(func.count(Resource.id)).filter(Note.user_id == u.id).scalar() or 0
         subjects_count = db.query(func.count(Subject.id)).filter(Subject.user_id == u.id).scalar() or 0
         groups_count = db.query(func.count(SubjectGroup.id)).filter(SubjectGroup.user_id == u.id).scalar() or 0
         conv_count = db.query(func.count(ChatMessage.id)).filter(ChatMessage.user_id == u.id).scalar() or 0
         
         # Calculate storage used
-        storage_bytes = db.query(func.sum(Note.file_size)).filter(Note.user_id == u.id).scalar() or 0
+        storage_bytes = db.query(func.sum(Resource.file_size)).filter(Note.user_id == u.id).scalar() or 0
         storage_mb = round(storage_bytes / (1024 * 1024), 2)
         
         total_logins = db.query(func.count(UserLog.id)).filter(UserLog.user_id == u.id, UserLog.action == 'login').scalar() or 0

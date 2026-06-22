@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any, List
 
-from app.models.db import User, Exercise, ExerciseQuestion, Task, Note
+from app.models.db import User, Exercise, ExerciseQuestion, Task, Resource
 from app.utils.db import SessionLocal
 from app.utils.tasks import TaskManager
 from app.processing.ocr import OCRProcessor
@@ -29,7 +29,7 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None):
         def progress_callback(percent, message=None):
             if task_id:
                 TaskManager.update_task_progress(task_id, percent, message=message)
-
+ 
         start_time = time.time()
         file_path = exercise.file_path
         file_ext = os.path.splitext(file_path)[1].lower() if file_path else ""
@@ -90,12 +90,12 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None):
             logger.error(f"Failed to parse LLM JSON response: {response}")
             raise ValueError("Failed to parse extracted questions into JSON format.")
             
-        # 3. Process questions and find reference notes
+        # 3. Process questions and find reference resources
         progress_callback(80, "Mapping references and generating missing answers...")
         
-        # Get all note IDs for this subject
-        subject_notes = db.query(Note.id).filter(Note.subject_id == exercise.subject_id).all()
-        subject_note_ids = [n.id for n in subject_notes]
+        # Get all resource IDs for this subject
+        subject_resources = db.query(Resource.id).filter(Resource.subject_id == exercise.subject_id).all()
+        subject_resource_ids = [r.id for r in subject_resources]
         
         order = 0
         for q_data in questions_data:
@@ -110,13 +110,13 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None):
                 )
                 answer = ans_resp.strip()
                 
-            # Find reference note
-            ref_note_id = None
-            if subject_note_ids:
+            # Find reference resource
+            ref_resource_id = None
+            if subject_resource_ids:
                 try:
-                    chunks = retrieve_relevant_chunks(q_data.get("question_text", ""), subject_note_ids, db, top_k=1)
+                    chunks = retrieve_relevant_chunks(q_data.get("question_text", ""), subject_resource_ids, db, top_k=1)
                     if chunks:
-                        ref_note_id = chunks[0]["note_id"]
+                        ref_resource_id = chunks[0]["resource_id"]
                 except Exception as e:
                     logger.warning(f"Error retrieving relevant chunks: {e}")
                     
@@ -128,7 +128,7 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None):
                 options=q_data.get("options"),
                 original_number=str(q_data.get("original_number", "")),
                 order=order,
-                reference_note_id=ref_note_id
+                reference_resource_id=ref_resource_id
             )
             db.add(db_q)
             order += 1

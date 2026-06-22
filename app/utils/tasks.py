@@ -246,12 +246,12 @@ class TaskManager:
 
 
 
-class SummaryTask:
-    """Summary generation task"""
+class NoteTask:
+    """Note generation task"""
     @staticmethod
     async def generate(**kwargs) -> dict:
         from app.processing.ai_client import AIClient
-        from app.models.db import User, Note, Summary
+        from app.models.db import User, Resource, Note
         from app.utils.storage import StorageManager
         from app.utils.db import generate_random_id
         from sqlalchemy import func
@@ -260,7 +260,7 @@ class SummaryTask:
         db = SessionLocal()
         try:
             user_id = kwargs.get("user_id")
-            note_id = kwargs.get("note_id")
+            resource_id = kwargs.get("resource_id")
             mode = kwargs.get("mode", "elaborate")
             output_format = kwargs.get("output_format", "sentence")
             processing_method = kwargs.get("processing_method", "whole")
@@ -270,9 +270,9 @@ class SummaryTask:
             prompt_icon = kwargs.get("prompt_icon", None)
             
             user = db.query(User).filter(User.id == user_id).first()
-            note = db.query(Note).filter(Note.id == note_id).first()
+            resource = db.query(Resource).filter(Resource.id == resource_id).first()
             
-            note_content = StorageManager.get_note_text(note_id) or ""
+            resource_content = StorageManager.get_resource_text(resource_id) or ""
             ai_client = AIClient(user, db=db)
             
             start_time = time.time()
@@ -282,14 +282,14 @@ class SummaryTask:
                 if task_id:
                     msg = message
                     if not msg:
-                        msg = "Generating summary..."
-                        if percent > 20: msg = "Analyzing note content..."
+                        msg = "Generating note..."
+                        if percent > 20: msg = "Analyzing resource content..."
                         if percent > 50: msg = "Drafting sections..."
-                        if percent > 80: msg = "Finalizing summary..."
+                        if percent > 80: msg = "Finalizing note..."
                     TaskManager.update_task_progress(task_id, percent, message=msg, intermediate_result=intermediate_result)
 
-            summary_content = await ai_client.generate_summary(
-                content=note_content,
+            note_content = await ai_client.generate_summary(
+                content=resource_content,
                 mode=mode,
                 output_format=output_format,
                 processing_method=processing_method,
@@ -301,19 +301,19 @@ class SummaryTask:
             processing_time = time.time() - start_time
             
             # Versioning
-            max_version = db.query(func.max(Summary.version)).filter(
-                Summary.note_id == note_id
+            max_version = db.query(func.max(Note.version)).filter(
+                Note.resource_id == resource_id
             ).scalar() or 0
             next_version = max_version + 1
 
-            doc_id = kwargs.get("summary_id") or generate_random_id(db, Summary)
-            doc = Summary(
+            doc_id = kwargs.get("note_id") or generate_random_id(db, Note)
+            doc = Note(
                 id=doc_id,
                 version=next_version,
-                note_id=note_id,
-                title=note.title,
+                resource_id=resource_id,
+                title=resource.title,
                 summary_type="summary",
-                file_path=f"summary_{note.id}_{next_version}.md",
+                file_path=f"note_{resource.id}_{next_version}.md",
                 mode=mode,
                 output_format=output_format,
                 processing_method=processing_method,
@@ -328,16 +328,16 @@ class SummaryTask:
             db.add(doc)
             db.commit()
             
-            StorageManager.save_summary_text(doc_id, summary_content)
+            StorageManager.save_note_text(doc_id, note_content)
             
             if task_id:
                 TaskManager.update_task_progress(task_id, 100)
             
             return {
                 "id": doc_id,
-                "note_id": note_id,
+                "resource_id": resource_id,
                 "title": doc.title,
-                "content": summary_content,
+                "content": note_content,
                 "mode": mode,
                 "output_format": output_format,
                 "processing_method": processing_method,

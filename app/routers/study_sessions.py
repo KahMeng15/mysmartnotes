@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
-from app.models.db import User, StudySession, Note
+from app.models.db import User, StudySession, Resource
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/study-sessions", tags=["study-sessions"])
 
 
 class StudySessionCreate(BaseModel):
-    note_id: Optional[str] = None
+    resource_id: Optional[str] = None
     session_type: str  # "exercise", "reading", "pomodoro_study", "pomodoro_break", "stopwatch"
     duration_minutes: int
     questions_attempted: int = 0
@@ -26,7 +26,7 @@ class StudySessionCreate(BaseModel):
 
 class StudySessionResponse(BaseModel):
     id: int
-    note_id: Optional[str] = None
+    resource_id: Optional[str] = None
     session_type: str
     duration_minutes: int
     questions_attempted: int
@@ -142,7 +142,7 @@ async def get_study_calendar(
 
 @router.get("", response_model=List[StudySessionResponse])
 async def get_study_sessions(
-    note_id: str = None,
+    resource_id: str = None,
     session_type: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -151,8 +151,8 @@ async def get_study_sessions(
     
     query = db.query(StudySession).filter(StudySession.user_id == current_user.id)
     
-    if note_id:
-        query = query.filter(StudySession.note_id == note_id)
+    if resource_id:
+        query = query.filter(StudySession.resource_id == resource_id)
     
     if session_type:
         query = query.filter(StudySession.session_type == session_type)
@@ -169,17 +169,17 @@ async def create_study_session(
 ):
     """Create a new study session record"""
     
-    # Verify note belongs to user if provided
-    if session.note_id:
-        note = db.query(Note).filter(
-            Note.id == session.note_id,
-            Note.user_id == current_user.id
+    # Verify resource belongs to user if provided
+    if session.resource_id:
+        resource = db.query(Resource).filter(
+            Resource.id == session.resource_id,
+            Resource.user_id == current_user.id
         ).first()
         
-        if not note:
+        if not resource:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Note not found"
+                detail="Resource not found"
             )
     
     # Calculate score if questions attempted
@@ -189,7 +189,7 @@ async def create_study_session(
     
     db_session = StudySession(
         user_id=current_user.id,
-        note_id=session.note_id,
+        resource_id=session.resource_id,
         session_type=session.session_type,
         duration_minutes=session.duration_minutes,
         questions_attempted=session.questions_attempted,

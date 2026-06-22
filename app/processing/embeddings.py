@@ -203,33 +203,33 @@ def combine_snippets(snippets: List[dict], max_chars: int = 2000) -> str:
     return combined
 
 
-def compute_and_store_embeddings(note_id: int, text: str, db) -> int:
+def compute_and_store_embeddings(resource_id: str, text: str, db) -> int:
     """
-    Compute embeddings for a note and store them in the database.
+    Compute embeddings for a resource and store them in the database.
     
     Args:
-        note_id: ID of the note
+        resource_id: ID of the resource
         text: Full extracted text
         db: SQLAlchemy Session
         
     Returns:
         Number of embeddings stored
     """
-    from app.models.db import NoteEmbedding
+    from app.models.db import ResourceEmbedding
     
     if not text or not text.strip():
-        logger.warning(f"Note {note_id} has empty text, skipping embedding")
+        logger.warning(f"Resource {resource_id} has empty text, skipping embedding")
         return 0
     
     model = get_embeddings_model()
     if model is None:
-        logger.error(f"Failed to get embeddings model for note {note_id}")
+        logger.error(f"Failed to get embeddings model for resource {resource_id}")
         return 0
     
     try:
-        # Delete existing embeddings for this note
-        db.query(NoteEmbedding).filter(
-            NoteEmbedding.note_id == note_id
+        # Delete existing embeddings for this resource
+        db.query(ResourceEmbedding).filter(
+            ResourceEmbedding.resource_id == resource_id
         ).delete()
         db.commit()
         
@@ -260,7 +260,7 @@ def compute_and_store_embeddings(note_id: int, text: str, db) -> int:
             chunks.append(" ".join(current_chunk))
         
         if not chunks:
-            logger.warning(f"No chunks created for note {note_id}")
+            logger.warning(f"No chunks created for resource {resource_id}")
             return 0
         
         # Compute embeddings for all chunks
@@ -269,8 +269,8 @@ def compute_and_store_embeddings(note_id: int, text: str, db) -> int:
         # Store embeddings in database
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             pos = positions[i] if i < len(positions) else 0
-            emb_record = NoteEmbedding(
-                note_id=note_id,
+            emb_record = ResourceEmbedding(
+                resource_id=resource_id,
                 chunk_text=chunk,
                 chunk_index=i,
                 embedding=embedding.tolist(),  # Convert numpy array to list
@@ -279,34 +279,34 @@ def compute_and_store_embeddings(note_id: int, text: str, db) -> int:
             db.add(emb_record)
         
         db.commit()
-        logger.info(f"Stored {len(chunks)} embeddings for note {note_id}")
+        logger.info(f"Stored {len(chunks)} embeddings for resource {resource_id}")
         return len(chunks)
         
     except Exception as e:
-        logger.error(f"Error computing embeddings for note {note_id}: {e}")
+        logger.error(f"Error computing embeddings for resource {resource_id}: {e}")
         db.rollback()
         return 0
 
 
-def update_note_embeddings(note_id: int, text: str, db) -> int:
+def update_resource_embeddings(resource_id: str, text: str, db) -> int:
     """
-    Update embeddings when note content changes.
+    Update embeddings when resource content changes.
     Deletes old embeddings and computes new ones.
     
     Args:
-        note_id: ID of the note
+        resource_id: ID of the resource
         text: Updated extracted text
         db: SQLAlchemy Session
         
     Returns:
         Number of new embeddings stored
     """
-    return compute_and_store_embeddings(note_id, text, db)
+    return compute_and_store_embeddings(resource_id, text, db)
 
 
 def retrieve_relevant_chunks(
     query: str,
-    note_ids: List[int],
+    resource_ids: List[str],
     db,
     top_k: int = 3
 ) -> List[dict]:
@@ -315,16 +315,16 @@ def retrieve_relevant_chunks(
     
     Args:
         query: Search query
-        note_ids: List of note IDs to search within
+        resource_ids: List of resource IDs to search within
         db: SQLAlchemy Session
         top_k: Number of top results to return
         
     Returns:
-        List of dicts with 'text', 'position', 'score', 'note_id'
+        List of dicts with 'text', 'position', 'score', 'resource_id'
     """
-    from app.models.db import NoteEmbedding
+    from app.models.db import ResourceEmbedding
     
-    if not note_ids or not query:
+    if not resource_ids or not query:
         return []
     
     model = get_embeddings_model()
@@ -333,13 +333,13 @@ def retrieve_relevant_chunks(
         return []
     
     try:
-        # Get all embeddings for the given notes
-        embeddings_records = db.query(NoteEmbedding).filter(
-            NoteEmbedding.note_id.in_(note_ids)
+        # Get all embeddings for the given resources
+        embeddings_records = db.query(ResourceEmbedding).filter(
+            ResourceEmbedding.resource_id.in_(resource_ids)
         ).all()
         
         if not embeddings_records:
-            logger.warning(f"No embeddings found for notes {note_ids}")
+            logger.warning(f"No embeddings found for resources {resource_ids}")
             return []
         
         # Compute query embedding
@@ -356,7 +356,7 @@ def retrieve_relevant_chunks(
                 'text': record.chunk_text,
                 'position': record.position,
                 'score': round(sim * 100, 1),
-                'note_id': record.note_id,
+                'resource_id': record.resource_id,
                 'chunk_index': record.chunk_index
             })
         

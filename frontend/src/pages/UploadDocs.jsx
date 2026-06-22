@@ -104,7 +104,7 @@ export default function UploadDocs() {
           formData.append('files', file);
         });
 
-        const res = await fetchApi('/notes/upload', {
+        const res = await fetchApi('/resources/upload', {
           method: 'POST',
           body: formData,
         });

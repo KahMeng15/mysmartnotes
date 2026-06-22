@@ -105,9 +105,11 @@ async def delete_subject(
             detail="Subject not found"
         )
     
-    # Explicitly delete child notes and exercises
-    from app.models.db import Note, Exercise
-    db.query(Note).filter(Note.subject_id == subject_id, Note.user_id == current_user.id).delete()
+    # Explicitly delete child resources and exercises
+    from app.models.db import Resource, Exercise
+    resources = db.query(Resource).filter(Resource.subject_id == subject_id, Resource.user_id == current_user.id).all()
+    for resource in resources:
+        db.delete(resource)
     db.query(Exercise).filter(Exercise.subject_id == subject_id, Exercise.user_id == current_user.id).delete()
     
     db.delete(db_subject)

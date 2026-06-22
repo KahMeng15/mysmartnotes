@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime, timedelta
 
-from app.models.db import User, Note, StudySession, Subject, ChatMessage
+from app.models.db import User, Resource, StudySession, Subject, ChatMessage
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.schemas.analytics import DashboardSummary
@@ -61,11 +61,11 @@ async def get_learning_progress(
     db: Session = Depends(get_db)
 ):
     """Get learning progress statistics"""
-    notes = db.query(Note).filter(
-        Note.user_id == current_user.id
+    resources = db.query(Resource).filter(
+        Resource.user_id == current_user.id
     ).all()
     
-    if not notes:
+    if not resources:
         return ProgressResponse(
             total_notes=0,
             overall_completion=0.0,
@@ -75,23 +75,23 @@ async def get_learning_progress(
     by_note = []
     total_completion = 0
     
-    for note in notes:
+    for resource in resources:
         # Placeholder completion logic since standalone flashcards are removed
-        has_summary = note.summaries is not None and len(note.summaries) > 0
+        has_summary = len(resource.notes) > 0
         completion_pct = 100.0 if has_summary else 0.0
         
         by_note.append(ProgressStat(
-            note_id=note.id,
-            note_title=note.title,
+            note_id=resource.id,
+            note_title=resource.title,
             completion_percentage=completion_pct
         ))
         
         total_completion += completion_pct
     
-    overall_completion = (total_completion / len(notes)) if notes else 0
+    overall_completion = (total_completion / len(resources)) if resources else 0
     
     return ProgressResponse(
-        total_notes=len(notes),
+        total_notes=len(resources),
         overall_completion=overall_completion,
         by_note=by_note
     )
@@ -117,32 +117,36 @@ async def get_time_spent_analytics(
             by_note=[]
         )
     
-    # Group by note
+    # Group by resource
     by_note_dict = {}
     total_minutes = 0
     
     for session in sessions:
+        if not session.resource_id:
+            continue
         duration_minutes = session.duration_minutes or 0
         total_minutes += duration_minutes
         
-        if session.note_id not in by_note_dict:
-            by_note_dict[session.note_id] = {
-                "note_title": db.query(Note).get(session.note_id).title,
+        if session.resource_id not in by_note_dict:
+            res = db.query(Resource).filter(Resource.id == session.resource_id).first()
+            title = res.title if res else "Unknown Resource"
+            by_note_dict[session.resource_id] = {
+                "note_title": title,
                 "total_minutes": 0,
                 "sessions_count": 0
             }
         
-        by_note_dict[session.note_id]["total_minutes"] += duration_minutes
-        by_note_dict[session.note_id]["sessions_count"] += 1
+        by_note_dict[session.resource_id]["total_minutes"] += duration_minutes
+        by_note_dict[session.resource_id]["sessions_count"] += 1
     
     by_note = [
         TimeSpentStat(
-            note_id=note_id,
+            note_id=res_id,
             note_title=data["note_title"],
             total_minutes=data["total_minutes"],
             sessions_count=data["sessions_count"]
         )
-        for note_id, data in by_note_dict.items()
+        for res_id, data in by_note_dict.items()
     ]
     
     average_minutes = (total_minutes / len(sessions)) if sessions else 0
@@ -162,12 +166,12 @@ async def get_completion_rates(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get completion rates for notes"""
-    notes = db.query(Note).filter(
-        Note.user_id == current_user.id
+    """Get completion rates for resources"""
+    resources = db.query(Resource).filter(
+        Resource.user_id == current_user.id
     ).all()
     
-    if not notes:
+    if not resources:
         return CompletionResponse(
             completed_count=0,
             in_progress_count=0,
@@ -180,9 +184,9 @@ async def get_completion_rates(
     not_started_count = 0
     completion_rates = []
     
-    for note in notes:
+    for resource in resources:
         # Placeholder completion logic since standalone flashcards are removed
-        has_summary = note.summaries is not None and len(note.summaries) > 0
+        has_summary = len(resource.notes) > 0
         completion_pct = 100.0 if has_summary else 0.0
         
         if completion_pct == 0:
@@ -196,7 +200,7 @@ async def get_completion_rates(
             in_progress_count += 1
         
         completion_rates.append(CompletionStat(
-            note_title=note.title,
+            note_title=resource.title,
             completion_percentage=completion_pct,
             status=status
         ))
@@ -221,7 +225,7 @@ async def get_dashboard_summary(
     
     # 1. Totals
     total_subjects = db.query(func.count(Subject.id)).filter(Subject.user_id == current_user.id).scalar() or 0
-    total_notes = db.query(func.count(Note.id)).filter(Note.user_id == current_user.id).scalar() or 0
+    total_notes = db.query(func.count(Resource.id)).filter(Resource.user_id == current_user.id).scalar() or 0
     
     # 2. Last 7 Days Range
     seven_days_ago = datetime.utcnow() - timedelta(days=7)

@@ -10,7 +10,7 @@ import asyncio
 import uuid
 import logging
 
-from app.models.db import User, Note, ChatMessage, Subject, SubjectGroup
+from app.models.db import User, Resource, ChatMessage, Subject, SubjectGroup
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id, generate_conversation_id
 from app.utils.quotas import enforce_quota_messages, check_quota_conversations, get_user_conversation_count, get_user_tier_config
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    note_id: Optional[str] = None
+    resource_id: Optional[str] = None
     subject_id: Optional[str] = None
     group_id: Optional[str] = None
     message: str
@@ -44,7 +44,7 @@ class ChatMessageResponse(BaseModel):
     sources: list = []
     detailed_sources: list = []
     created_at: str
-    note_id: Optional[str] = None
+    resource_id: Optional[str] = None
     subject_id: Optional[str] = None
     group_id: Optional[str] = None
     ai_mode: Optional[str] = None
@@ -69,7 +69,7 @@ class ConversationSummary(BaseModel):
     title: str
     message_count: int
     last_message_at: str
-    note_id: Optional[str] = None
+    resource_id: Optional[str] = None
     subject_id: Optional[str] = None
     group_id: Optional[str] = None
     scope_type: Optional[str] = None
@@ -249,7 +249,7 @@ async def classify_query(client: AIClient, question: str) -> str:
         "Classify this user query into strictly one of three categories:\n"
         "1. CONVERSATIONAL: Simple greetings, praise, thanks, goodbyes, or small talk (e.g. 'hello', 'thanks', 'how are you').\n"
         "2. OFF_TOPIC: Requests completely unrelated to computer science, programming, or general academic study (e.g. asking for recipes, writing poems, pop culture, politics, 'who is donald trump').\n"
-        "3. INFORMATIONAL_DOMAIN: Questions asking for facts, explanations, summaries, or knowledge related to computer science, study notes, or general educational topics.\n\n"
+        "3. INFORMATIONAL_DOMAIN: Questions asking for facts, explanations, summaries, or knowledge related to computer science, study resources, or general educational topics.\n\n"
         "Reply with EXACTLY ONE WORD: CONVERSATIONAL, OFF_TOPIC, or INFORMATIONAL_DOMAIN."
     )
     try:
@@ -596,7 +596,7 @@ async def ask_question(
         "chat_response",
         current_user.id,
         message=request.message,
-        note_id=request.note_id,
+        resource_id=request.resource_id,
         subject_id=request.subject_id,
         group_id=request.group_id,
         ai_mode=request.ai_mode,
@@ -615,7 +615,7 @@ async def ask_question_logic(**kwargs) -> dict:
     try:
         user_id = kwargs.get("user_id")
         message = kwargs.get("message")
-        note_id = kwargs.get("note_id")
+        resource_id = kwargs.get("resource_id")
         subject_id = kwargs.get("subject_id")
         group_id = kwargs.get("group_id")
         ai_mode = kwargs.get("ai_mode", "elaborate")
@@ -630,35 +630,35 @@ async def ask_question_logic(**kwargs) -> dict:
 
         t_start = time.time()
         step_times = {f"step{i}": 0.0 for i in range(1, 10)}
-        target_note_ids = []
+        target_resource_ids = []
         sources = []
 
         # Identical logic to previous endpoint follows...
-        if note_id:
-            note = db.query(Note).filter(Note.id == note_id, Note.user_id == user_id).first()
-            if note:
-                target_note_ids = [note_id]
-                sources = [note.title]
+        if resource_id:
+            resource = db.query(Resource).filter(Resource.id == resource_id, Resource.user_id == user_id).first()
+            if resource:
+                target_resource_ids = [resource_id]
+                sources = [resource.title]
 
         elif subject_id:
             subject = db.query(Subject).filter(Subject.id == subject_id, Subject.user_id == user_id).first()
             if subject:
-                notes = db.query(Note).filter(Note.subject_id == subject.id).all()
-                target_note_ids = [l.id for l in notes]
-                sources = [l.title for l in notes]
+                resources = db.query(Resource).filter(Resource.subject_id == subject.id).all()
+                target_resource_ids = [l.id for l in resources]
+                sources = [l.title for l in resources]
 
         elif group_id:
             group = db.query(SubjectGroup).filter(SubjectGroup.id == group_id, SubjectGroup.user_id == user_id).first()
             if group:
                 subjects = db.query(Subject).filter(Subject.group_id == group.id).all()
                 for s in subjects:
-                    notes = db.query(Note).filter(Note.subject_id == s.id).all()
-                    target_note_ids.extend([l.id for l in notes])
-                    sources.extend([l.title for l in notes])
+                    resources = db.query(Resource).filter(Resource.subject_id == s.id).all()
+                    target_resource_ids.extend([l.id for l in resources])
+                    sources.extend([l.title for l in resources])
         else:
-            notes = db.query(Note).filter(Note.user_id == user_id).all()
-            target_note_ids = [l.id for l in notes]
-            sources = [l.title for l in notes]
+            resources = db.query(Resource).filter(Resource.user_id == user_id).all()
+            target_resource_ids = [l.id for l in resources]
+            sources = [l.title for l in resources]
 
         step_times["step1"] = round((time.time() - t_start) * 1000.0, 2)
         retrieval_ms = (time.time() - t_start) * 1000.0
@@ -704,7 +704,7 @@ async def ask_question_logic(**kwargs) -> dict:
         
         chat_msg_id = generate_random_id(db, ChatMessage)
         chat_msg = ChatMessage(
-            id=chat_msg_id, user_id=user_id, note_id=note_id, subject_id=subject_id, group_id=group_id,
+            id=chat_msg_id, user_id=user_id, resource_id=resource_id, subject_id=subject_id, group_id=group_id,
             message=message, response="", sources="[]", conversation_id=conv_id, conversation_title=""
         )
         db.add(chat_msg)
@@ -738,14 +738,14 @@ Question: {message}"""
 The user asked a completely unrelated or off-topic question.
 </reasoning>
 <FINAL_ANSWER>
-Sorry, I am here to help you study better and smarter with your notes. I am unable to answer questions unrelated to your studies or computer science!
+Sorry, I am here to help you study better and smarter with your resources. I am unable to answer questions unrelated to your studies or computer science!
 </FINAL_ANSWER>"""
         else:
             t_step4_start = time.time()
-            if target_note_ids:
+            if target_resource_ids:
                 try:
                     from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
-                    raw_chunks = retrieve_relevant_chunks(query=message, note_ids=target_note_ids, db=db, top_k=5)
+                    raw_chunks = retrieve_relevant_chunks(query=message, note_ids=target_resource_ids, db=db, top_k=5)
                     # Filter for confident chunks (score >= 15.0)
                     chunks = [c for c in raw_chunks if c["score"] >= 15.0]
                     
@@ -759,7 +759,7 @@ Sorry, I am here to help you study better and smarter with your notes. I am unab
                                 "text_preview": chunk["text"][:150],
                                 "position": chunk["position"],
                                 "score": chunk["score"],
-                                "note_id": chunk["note_id"]
+                                "resource_id": chunk["resource_id"]
                             })
                         # snippet_sources isn't used directly here for DB, wait, it might be.
                 except Exception as e:
@@ -825,7 +825,7 @@ Sorry, I am here to help you study better and smarter with your notes. I am unab
                     prompt = build_mode_prompt(context, message, ai_mode, output_format, is_web_search=has_web, conversation_context=conversation_context)
                     raw_response = await ai_client.answer_question(question=message, context=context, system_prompt=prompt)
                 else:
-                    response_text = "Sorry, I am unable to find any answers for your question based on your notes or the web."
+                    response_text = "Sorry, I am unable to find any answers for your question based on your resources or the web."
                     raw_response = f"<FINAL_ANSWER>\n{response_text}\n</FINAL_ANSWER>"
         
         # Parse the XML response to extract only the FINAL_ANSWER
@@ -911,7 +911,7 @@ async def get_conversations(
             func.max(ChatMessage.conversation_title).label("title"),
             func.count(ChatMessage.id).label("message_count"),
             func.max(ChatMessage.created_at).label("last_message_at"),
-            func.max(ChatMessage.note_id).label("note_id"),
+            func.max(ChatMessage.resource_id).label("resource_id"),
             func.max(ChatMessage.subject_id).label("subject_id"),
             func.max(ChatMessage.group_id).label("group_id"),
             func.max(cast(ChatMessage.is_pinned, Integer)).label("is_pinned"),
@@ -931,13 +931,13 @@ async def get_conversations(
 
     result = []
     for row in rows:
-        scope_type = "note" if row.note_id else ("subject" if row.subject_id else ("group" if row.group_id else None))
+        scope_type = "resource" if row.resource_id else ("subject" if row.subject_id else ("group" if row.group_id else None))
         result.append(ConversationSummary(
             conversation_id=row.conversation_id,
             title=row.title or "Untitled Conversation",
             message_count=row.message_count,
             last_message_at=row.last_message_at.isoformat(),
-            note_id=row.note_id,
+            resource_id=row.resource_id,
             subject_id=row.subject_id,
             group_id=row.group_id,
             scope_type=scope_type,
@@ -976,7 +976,7 @@ async def get_conversation_messages(
             sources=json.loads(m.sources) if m.sources else [],
             detailed_sources=json.loads(m.detailed_sources_json) if m.detailed_sources_json else [],
             created_at=m.created_at.isoformat(),
-            note_id=m.note_id,
+            resource_id=m.resource_id,
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,
@@ -1010,7 +1010,7 @@ async def get_all_chat_history(
             sources=json.loads(m.sources) if m.sources else [],
             detailed_sources=json.loads(m.detailed_sources_json) if m.detailed_sources_json else [],
             created_at=m.created_at.isoformat(),
-            note_id=m.note_id,
+            resource_id=m.resource_id,
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,
@@ -1026,24 +1026,24 @@ async def get_all_chat_history(
         for m in messages
     ]
 
-@router.get("/history/{note_id}", response_model=List[ChatMessageResponse])
+@router.get("/history/{resource_id}", response_model=List[ChatMessageResponse])
 async def get_note_chat_history(
-    note_id: str,
+    resource_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get chat history for a specific note."""
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    """Get chat history for a specific resource."""
+    resource = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
 
-    if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+    if not resource:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
 
     messages = db.query(ChatMessage).filter(
         ChatMessage.user_id == current_user.id,
-        ChatMessage.note_id == note_id
+        ChatMessage.resource_id == resource_id
     ).order_by(ChatMessage.created_at.desc()).all()
 
     return [
@@ -1054,7 +1054,7 @@ async def get_note_chat_history(
             sources=json.loads(m.sources) if m.sources else [],
             detailed_sources=json.loads(m.detailed_sources_json) if m.detailed_sources_json else [],
             created_at=m.created_at.isoformat(),
-            note_id=m.note_id,
+            resource_id=m.resource_id,
             subject_id=m.subject_id,
             group_id=m.group_id,
             ai_mode=m.ai_mode,

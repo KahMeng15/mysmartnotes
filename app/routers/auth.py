@@ -26,7 +26,7 @@ from app.utils.quotas import get_user_quota_status, get_user_tier_config
 from app.utils.email import send_password_reset_email, send_verification_email
 from app.config import get_settings
 from sqlalchemy import func
-from app.models.db import Note, Subject, SubjectGroup, ChatMessage, StudySession, UserLog
+from app.models.db import Resource, Subject, SubjectGroup, ChatMessage, StudySession, UserLog
 from app.utils.invitation_utils import is_link_only_email
 from app.utils.crypto import encrypt_secret
 
@@ -941,14 +941,14 @@ async def update_profile(user_update: UserUpdate, current_user: User = Depends(g
 async def get_user_stats(current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)):
     """Get personalized statistics and recent logins for the current user"""
     u_id = current_user.id
-    notes_count = db.query(func.count(Note.id)).filter(Note.user_id == u_id).scalar() or 0
+    notes_count = db.query(func.count(Resource.id)).filter(Note.user_id == u_id).scalar() or 0
     subjects_count = db.query(func.count(Subject.id)).filter(Subject.user_id == u_id).scalar() or 0
     groups_count = db.query(func.count(SubjectGroup.id)).filter(SubjectGroup.user_id == u_id).scalar() or 0
     questions_count = db.query(func.count(ChatMessage.id)).filter(ChatMessage.user_id == u_id).scalar() or 0
     
     time_spent_mins = db.query(func.sum(StudySession.duration_minutes)).filter(StudySession.user_id == u_id).scalar() or 0
     
-    storage_bytes = db.query(func.sum(Note.file_size)).filter(Note.user_id == u_id).scalar() or 0
+    storage_bytes = db.query(func.sum(Resource.file_size)).filter(Note.user_id == u_id).scalar() or 0
     storage_mb = round(storage_bytes / (1024 * 1024), 2)
 
     tier_config = get_user_tier_config(current_user, db)
@@ -1133,7 +1133,7 @@ async def download_data(current_user: User = Depends(get_current_user_from_token
     uid = current_user.id
     
     # This is a simple aggregated export
-    notes = db.query(Note).filter(Note.user_id == uid).all()
+    notes = db.query(Resource).filter(Resource.user_id == uid).all()
     subjects = db.query(Subject).filter(Subject.user_id == uid).all()
     groups = db.query(SubjectGroup).filter(SubjectGroup.user_id == uid).all()
     chats = db.query(ChatMessage).filter(ChatMessage.user_id == uid).all()

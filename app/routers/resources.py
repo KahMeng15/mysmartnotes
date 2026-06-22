@@ -10,13 +10,13 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Callable
 import uuid
 
-from app.models.db import User, Note, Subject, Summary, Task
-from app.schemas.schemas import NoteResponse
+from app.models.db import User, Resource, Subject, Note, Task
+from app.schemas.schemas import ResourceResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id, SessionLocal
 from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
-from app.utils.quotas import enforce_quota_notes, enforce_quota_storage
+from app.utils.quotas import enforce_quota_resources, enforce_quota_storage
 from app.utils.crypto import decrypt_secret
 from app.processing.ocr import OCRProcessor
 from app.processing.image_extractor import ImageExtractor
@@ -26,12 +26,12 @@ from app.processing.note_processor import (
     get_pipeline_for_user,
     extract_markdown_for_user,
     markdown_to_segments,
-    process_note_task
+    process_resource_task
 )
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/notes", tags=["notes"])
+router = APIRouter(prefix="/resources", tags=["resources"])
 
 # Upload directory - use local temp directory
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "uploads")
@@ -40,13 +40,13 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
 
-def _rebuild_note_content(
-    note: "Note",
+def _rebuild_resource_content(
+    note: "Resource",
     current_user: "User",
     db: Session,
     use_v2: bool = True,
     reset_first: bool = False,
-) -> "Note":
+) -> "Resource":
     """
     Rebuild a note's extracted content from the original uploaded file.
     For PDF/PPTX, this reruns the SmartPipeline from scratch. For images,
@@ -56,11 +56,11 @@ def _rebuild_note_content(
     if not os.path.exists(note.file_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note file not found"
+            detail="Resource file not found"
         )
 
     # Clear cache first to ensure other requests (like SubjectView) immediately see the reset state
-    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+    clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
 
     # Delete output PDF file if it exists
     if note.output_pdf_path and os.path.exists(note.output_pdf_path):
@@ -73,7 +73,7 @@ def _rebuild_note_content(
     note.processing_time_ms = None
 
     if reset_first:
-        StorageManager.delete_note_files(note.id)
+        StorageManager.delete_resource_files(note.id)
 
     note.updated_at = datetime.utcnow()
     db.commit()
@@ -86,7 +86,7 @@ def _rebuild_note_content(
         db_task = Task(
             task_id=task_id,
             user_id=current_user.id,
-            task_type="note_processing",
+            task_type="resource_processing",
             status="processing",
             progress=10,
             created_at=datetime.utcnow(),
@@ -108,30 +108,30 @@ def _rebuild_note_content(
         if file_ext in ('.pdf', '.pptx'):
             logger.info(f"Rebuilding note {note.id} with SmartPipeline from scratch")
             raw_text, timings = extract_markdown_for_user(current_user, note.file_path)
-            StorageManager.save_note_json(note.id, "timings", timings)
+            StorageManager.save_resource_json(note.id, "timings", timings)
             structured_content = markdown_to_segments(raw_text)
 
             images_data = []
             if file_ext == '.pdf':
                 try:
-                    extractor = ImageExtractor(note_id=note.id)
+                    extractor = ImageExtractor(resource_id=note.id)
                     images_extracted = extractor.extract_images_from_pdf(note.file_path)
                     images_data = [img.to_dict() for img in images_extracted]
-                    logger.info(f"Extracted {len(images_data)} images during note rebuild")
+                    logger.info(f"Extracted {len(images_data)} images during resource rebuild")
                 except Exception as e:
-                    logger.warning(f"Image extraction failed during note rebuild: {e}")
+                    logger.warning(f"Image extraction failed during resource rebuild: {e}")
             
             # Save to file storage
-            StorageManager.save_note_text(note.id, raw_text)
-            StorageManager.save_note_json(note.id, "structured", structured_content)
-            StorageManager.save_note_json(note.id, "images", images_data)
+            StorageManager.save_resource_text(note.id, raw_text)
+            StorageManager.save_resource_json(note.id, "structured", structured_content)
+            StorageManager.save_resource_json(note.id, "images", images_data)
 
         else:
             logger.info(f"Rebuilding note {note.id} with OCR fallback")
             ocr_result = OCRProcessor.extract_text(
                 note.file_path,
                 note.file_type,
-                note_id=note.id,
+                resource_id=note.id,
                 use_v2=use_v2
             )
             raw_text = ocr_result.get("raw_text", "")
@@ -139,9 +139,9 @@ def _rebuild_note_content(
             images_data = ocr_result.get("images", [])
             
             # Save to file storage
-            StorageManager.save_note_text(note.id, raw_text)
-            StorageManager.save_note_json(note.id, "structured", structured_content)
-            StorageManager.save_note_json(note.id, "images", images_data)
+            StorageManager.save_resource_text(note.id, raw_text)
+            StorageManager.save_resource_json(note.id, "structured", structured_content)
+            StorageManager.save_resource_json(note.id, "images", images_data)
 
         # Auto-detect title from first H1 heading
         if raw_text:
@@ -160,14 +160,14 @@ def _rebuild_note_content(
 
         if raw_text and raw_text.strip():
             try:
-                from app.processing.embeddings import update_note_embeddings
-                update_note_embeddings(note.id, raw_text, db)
+                from app.processing.embeddings import update_resource_embeddings
+                update_resource_embeddings(note.id, raw_text, db)
                 logger.info(f"Updated embeddings after rebuilding note {note.id}")
             except Exception as e:
-                logger.error(f"Error updating embeddings after note rebuild: {e}", exc_info=True)
+                logger.error(f"Error updating embeddings after resource rebuild: {e}", exc_info=True)
 
         logger.info(
-            f"Note rebuild complete: {note.id}, "
+            f"Resource rebuild complete: {note.id}, "
             f"{len(raw_text)} chars, {len(structured_content)} segments, {len(images_data)} images"
         )
         
@@ -179,7 +179,7 @@ def _rebuild_note_content(
         
         return note
     except Exception as e:
-        logger.error(f"Error during note rebuild for {note.id}: {e}", exc_info=True)
+        logger.error(f"Error during resource rebuild for {note.id}: {e}", exc_info=True)
         # Mark Task failed
         db_task.status = "failed"
         db_task.error_message = str(e)
@@ -189,26 +189,26 @@ def _rebuild_note_content(
         raise
 
 
-@router.get("", response_model=List[NoteResponse])
+@router.get("", response_model=List[ResourceResponse])
 @cache_response(ttl=3600)
-async def get_notes(
+async def get_resources(
     request: Request,
     subject_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get all notes for the current user, optionally filtered by subject"""
-    query = db.query(Note).filter(Note.user_id == current_user.id)
+    query = db.query(Resource).filter(Resource.user_id == current_user.id)
     
     if subject_id:
-        query = query.filter(Note.subject_id == subject_id)
+        query = query.filter(Resource.subject_id == subject_id)
     
-    notes = query.order_by(Note.created_at.desc()).all()
+    notes = query.order_by(Resource.created_at.desc()).all()
     
     response_notes = []
     for note in notes:
-        note_data = NoteResponse.from_orm(note)
-        timings = StorageManager.get_note_json(note.id, "timings")
+        note_data = ResourceResponse.from_orm(note)
+        timings = StorageManager.get_resource_json(note.id, "timings")
         if timings:
             note_data.timings = timings
         response_notes.append(note_data)
@@ -216,8 +216,8 @@ async def get_notes(
     return response_notes
 
 
-@router.post("/upload", response_model=List[NoteResponse], status_code=status.HTTP_201_CREATED)
-async def upload_note(
+@router.post("/upload", response_model=List[ResourceResponse], status_code=status.HTTP_201_CREATED)
+async def upload_resource(
     background_tasks: BackgroundTasks,
     subject_id: str = Form(...),
     files: List[UploadFile] = File(...),
@@ -275,7 +275,7 @@ async def upload_note(
         
         # Enforce tier quotas
         try:
-            enforce_quota_notes(current_user, db)
+            enforce_quota_resources(current_user, db)
             enforce_quota_storage(current_user, len(contents), db)
         except HTTPException as e:
             logger.error(f"Quota exceeded: {e.detail}")
@@ -295,9 +295,9 @@ async def upload_note(
         with open(file_path, "wb") as f:
             f.write(contents)
         
-        # Create note record
-        db_note = Note(
-            id=generate_random_id(db, Note),
+        # Create resource record
+        db_note = Resource(
+            id=generate_random_id(db, Resource),
             title=file_title,
             subject_id=subject_id,
             user_id=current_user.id,
@@ -317,16 +317,16 @@ async def upload_note(
         task_id = f"ocr_{current_user.id}_{db_note.id}"
         TaskManager.submit_task(
             task_id, 
-            "note_processing", 
+            "resource_processing", 
             current_user.id, 
-            note_id=db_note.id, 
+            resource_id=db_note.id, 
             file_name=file.filename,
             auto_detect_title=auto_detect_title
         )
         processed_notes.append(db_note)
 
     # Clear cache
-    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+    clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
     
     if not processed_notes:
         raise HTTPException(
@@ -338,11 +338,11 @@ async def upload_note(
 
 
 
-@router.get("/{note_id}", response_model=NoteResponse)
+@router.get("/{resource_id}", response_model=ResourceResponse)
 @cache_response(ttl=3600)
-async def get_note(
+async def get_resource(
     request: Request,
-    note_id: str,
+    resource_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -350,58 +350,58 @@ async def get_note(
     import logging
     logger = logging.getLogger(__name__)
     
-    note = db.query(Note).options(
-        joinedload(Note.subject).joinedload(Subject.group)
+    note = db.query(Resource).options(
+        joinedload(Resource.subject).joinedload(Subject.group)
     ).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
     
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
 
     # Manually populate text fields from storage for the response
-    note_data = NoteResponse.from_orm(note)
-    note_data.extracted_text = StorageManager.get_note_text(note_id)
+    note_data = ResourceResponse.from_orm(note)
+    note_data.extracted_text = StorageManager.get_resource_text(resource_id)
 
     # Get structured content and images
-    structured = StorageManager.get_note_json(note_id, "structured")
+    structured = StorageManager.get_resource_json(resource_id, "structured")
     if structured:
         note_data.extracted_content_structured = json.dumps(structured)
 
-    images = StorageManager.get_note_json(note_id, "images")
+    images = StorageManager.get_resource_json(resource_id, "images")
     if images:
         note_data.extracted_images_metadata = json.dumps(images)
 
-    timings = StorageManager.get_note_json(note_id, "timings")
+    timings = StorageManager.get_resource_json(resource_id, "timings")
     if timings:
         note_data.timings = timings
 
-    logger.info(f"GET note {note_id}: extracted_text length = {len(note_data.extracted_text) if note_data.extracted_text else 'NULL'}")
+    logger.info(f"GET note {resource_id}: extracted_text length = {len(note_data.extracted_text) if note_data.extracted_text else 'NULL'}")
     return note_data
 
 
-@router.put("/{note_id}", response_model=NoteResponse)
-async def update_note(
-    note_id: str,
+@router.put("/{resource_id}", response_model=ResourceResponse)
+async def update_resource(
+    resource_id: str,
     title: str = Form(None),
     subject_id: str = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update note metadata"""
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    """Update resource metadata"""
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
     
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
     
     if title:
@@ -425,43 +425,43 @@ async def update_note(
     db.refresh(note)
 
     # Clear cache
-    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+    clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
 
     return note
 
 
 
-@router.post("/{note_id}/reprocess-ocr", response_model=NoteResponse)
+@router.post("/{resource_id}/reprocess-ocr", response_model=ResourceResponse)
 def reprocess_ocr(
-    note_id: str,
+    resource_id: str,
     use_v2: bool = True,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Reprocess OCR for existing note to extract structured content with enhanced v2 processor"""
     
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
     
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
     
     try:
-        logger.info(f"Reprocessing OCR for note {note_id} (use_v2={use_v2})")
-        note = _rebuild_note_content(note, current_user, db, use_v2=use_v2, reset_first=False)
-        logger.info(f"Successfully reprocessed OCR for note {note_id}")
+        logger.info(f"Reprocessing OCR for note {resource_id} (use_v2={use_v2})")
+        note = _rebuild_resource_content(note, current_user, db, use_v2=use_v2, reset_first=False)
+        logger.info(f"Successfully reprocessed OCR for note {resource_id}")
         
-        note_data = NoteResponse.from_orm(note)
-        timings = StorageManager.get_note_json(note.id, "timings")
+        note_data = ResourceResponse.from_orm(note)
+        timings = StorageManager.get_resource_json(note.id, "timings")
         if timings:
             note_data.timings = timings
             
-        clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+        clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
         return note_data
         
     except Exception as e:
@@ -475,36 +475,36 @@ def reprocess_ocr(
         )
 
 
-@router.post("/{note_id}/reprocess", response_model=NoteResponse)
-def reprocess_note_from_scratch(
-    note_id: str,
+@router.post("/{resource_id}/reprocess", response_model=ResourceResponse)
+def reprocess_resource_from_scratch(
+    resource_id: str,
     use_v2: bool = True,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Fully rebuild a note from the original uploaded file, replacing all derived content."""
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
 
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
 
     try:
-        logger.info(f"Starting full note rebuild for {note_id}")
-        note = _rebuild_note_content(note, current_user, db, use_v2=use_v2, reset_first=True)
-        logger.info(f"Successfully rebuilt note {note_id} from scratch")
+        logger.info(f"Starting full resource rebuild for {resource_id}")
+        note = _rebuild_resource_content(note, current_user, db, use_v2=use_v2, reset_first=True)
+        logger.info(f"Successfully rebuilt note {resource_id} from scratch")
         
-        note_data = NoteResponse.from_orm(note)
-        timings = StorageManager.get_note_json(note.id, "timings")
+        note_data = ResourceResponse.from_orm(note)
+        timings = StorageManager.get_resource_json(note.id, "timings")
         if timings:
             note_data.timings = timings
             
-        clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+        clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
         return note_data
     except Exception as e:
         logger.error(f"Error rebuilding note from scratch: {e}", exc_info=True)
@@ -514,22 +514,22 @@ def reprocess_note_from_scratch(
         )
 
 
-@router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_note(
-    note_id: str,
+@router.delete("/{resource_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_resource(
+    resource_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete a note"""
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
     
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
     
     # 1. Delete the actual uploaded file if it exists
@@ -542,7 +542,7 @@ async def delete_note(
 
     # 2. Delete storage files (extracted text, structured JSON, images)
     try:
-        StorageManager.delete_note_files(note.id)
+        StorageManager.delete_resource_files(note.id)
     except Exception as e:
         logger.warning(f"Error deleting storage files: {e}")
 
@@ -552,7 +552,7 @@ async def delete_note(
         db.commit()
         
         # Clear cache
-        clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+        clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
     except Exception as e:
         db.rollback()
         logger.error(f"Error deleting note from database: {e}", exc_info=True)
@@ -564,9 +564,9 @@ async def delete_note(
     return None
 
 
-@router.post("/{note_id}/generate-pdf", response_model=dict)
+@router.post("/{resource_id}/generate-pdf", response_model=dict)
 async def generate_pdf(
-    note_id: str,
+    resource_id: str,
     body: dict = {},
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -574,15 +574,15 @@ async def generate_pdf(
     """Generate OUTPUT.pdf from note content"""
     
     # Get note
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
     
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
     
     # Extract options from body
@@ -623,13 +623,13 @@ async def generate_pdf(
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Note has no content to export. Please wait for processing to complete."
+                detail="Resource has no content to export. Please wait for processing to complete."
             )
         
         # Actually generate the PDF
         from app.processing.document_generator import DocumentGenerator
         generator = DocumentGenerator(
-            note_id=note.id,
+            resource_id=note.id,
             note_title=note.title,
             base_output_dir=GENERATED_DIR,
         )
@@ -646,12 +646,12 @@ async def generate_pdf(
         note.updated_at = datetime.utcnow()
         db.commit()
         
-        logger.info(f"Generated PDF for note {note_id}: {output_path}")
+        logger.info(f"Generated PDF for note {resource_id}: {output_path}")
         
         return {
             "success": True,
             "message": "PDF generated successfully",
-            "download_url": f"/notes/{note_id}/download-pdf",
+            "download_url": f"/resources/{resource_id}/download-pdf",
             "segments_count": len(segments),
             "images_count": len(images)
         }
@@ -672,24 +672,24 @@ async def generate_pdf(
         )
 
 
-@router.get("/{note_id}/download-pdf")
+@router.get("/{resource_id}/download-pdf")
 async def download_pdf(
-    note_id: str,
+    resource_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Download generated OUTPUT.pdf"""
     
     # Get note
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
     
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
     
     if not note.output_pdf_path or not os.path.exists(note.output_pdf_path):
@@ -716,16 +716,16 @@ async def download_pdf(
         )
 
 
-@router.post("/{note_id}/export", response_model=dict)
-async def export_note(
-    note_id: str,
+@router.post("/{resource_id}/export", response_model=dict)
+async def export_resource(
+    resource_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Export note as PDF or DOCX"""
     import uuid
-    logger.info(f"[Export] Received request for note {note_id} with body: {body}")
+    logger.info(f"[Export] Received request for note {resource_id} with body: {body}")
     task_id = str(uuid.uuid4())[:8]
     _export_progress[task_id] = {"step": "Starting", "percent": 0, "status": "running"}
     
@@ -767,15 +767,15 @@ async def export_note(
     if include_cover is None: include_cover = True
 
     # Get note
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
 
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
 
     # Build segments from structured content or markdown
@@ -848,7 +848,7 @@ async def export_note(
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Note has no content to export. Please wait for processing to complete."
+                detail="Resource has no content to export. Please wait for processing to complete."
             )
         
         # Generate the document
@@ -857,7 +857,7 @@ async def export_note(
         if export_format == "pdf":
             from app.processing.document_generator import DocumentGenerator
             generator = DocumentGenerator(
-                note_id=note.id,
+                resource_id=note.id,
                 note_title=note.title,
                 base_output_dir=GENERATED_DIR,
             )
@@ -874,7 +874,7 @@ async def export_note(
         else:
             from app.processing.docx_generator import DocxGenerator
             generator = DocxGenerator(
-                note_id=note.id,
+                resource_id=note.id,
                 note_title=note.title,
                 base_output_dir=GENERATED_DIR,
             )
@@ -888,10 +888,10 @@ async def export_note(
             )
             download_filename = f"{safe_title}.docx"
         
-        # Store in Summary
-        from app.models.db import Summary
-        gen_doc = Summary(
-            note_id=note.id,
+        # Store in Note
+        from app.models.db import Note
+        gen_doc = Note(
+            resource_id=note.id,
             title=f"{note.title} ({export_format.upper()})",
             file_path=output_path,
             summary_type=export_format,
@@ -900,12 +900,12 @@ async def export_note(
         note.updated_at = datetime.utcnow()
         db.commit()
         
-        logger.info(f"Exported {export_format.upper()} for note {note_id}: {output_path}")
+        logger.info(f"Exported {export_format.upper()} for note {resource_id}: {output_path}")
         
         return {
             "success": True,
             "message": f"{export_format.upper()} generated successfully",
-            "download_url": f"/notes/{note_id}/download-export?format={export_format}",
+            "download_url": f"/resources/{resource_id}/download-export?format={export_format}",
             "task_id": task_id,
             "segments_count": len(segments),
             "images_count": len(images)
@@ -931,9 +931,9 @@ async def export_note(
 _export_progress = {}
 
 
-@router.get("/{note_id}/export-status/{task_id}")
+@router.get("/{resource_id}/export-status/{task_id}")
 async def get_export_status(
-    note_id: str,
+    resource_id: str,
     task_id: str,
     current_user: User = Depends(get_current_user),
 ):
@@ -944,9 +944,9 @@ async def get_export_status(
     return progress
 
 
-@router.get("/{note_id}/download-export")
+@router.get("/{resource_id}/download-export")
 async def download_export(
-    note_id: str,
+    resource_id: str,
     format: str = "pdf",
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -960,23 +960,23 @@ async def download_export(
             detail="Format must be 'pdf' or 'docx'"
         )
     
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
     
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
     
     # Look for the generated file
-    from app.models.db import Summary
-    gen_doc = db.query(Summary).filter(
-        Summary.note_id == note_id,
-        Summary.summary_type == export_format,
-    ).order_by(Summary.created_at.desc()).first()
+    from app.models.db import Note
+    gen_doc = db.query(Note).filter(
+        Note.resource_id == resource_id,
+        Note.summary_type == export_format,
+    ).order_by(Note.created_at.desc()).first()
     
     if not gen_doc or not os.path.exists(gen_doc.file_path):
         raise HTTPException(
@@ -997,23 +997,23 @@ async def download_export(
         media_type=mime_types[export_format],
     )
 
-@router.put("/{note_id}/content", response_model=NoteResponse)
-async def update_note_content(
-    note_id: str,
+@router.put("/{resource_id}/content", response_model=ResourceResponse)
+async def update_resource_content(
+    resource_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Save edited markdown content back to the note"""
-    note = db.query(Note).options(joinedload(Note.subject)).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).options(joinedload(Resource.subject)).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
     
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
     
     new_text = body.get("extracted_text")
@@ -1023,52 +1023,52 @@ async def update_note_content(
             detail="extracted_text is required"
         )
     
-    StorageManager.save_note_text(note.id, new_text)
-    StorageManager.save_note_json(note.id, "structured", _markdown_to_segments(new_text))
+    StorageManager.save_resource_text(note.id, new_text)
+    StorageManager.save_resource_json(note.id, "structured", _markdown_to_segments(new_text))
     note.updated_at = datetime.utcnow()
     
     # Invalidate existing summary when content changes
-    db.query(Summary).filter(
-        Summary.note_id == note_id,
-        Summary.summary_type == "summary"
+    db.query(Note).filter(
+        Note.resource_id == resource_id,
+        Note.summary_type == "summary"
     ).delete()
     
     db.commit()
     db.refresh(note)
     
     # Clear cache
-    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+    clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
     
     # Update embeddings to stay in sync
     if new_text and new_text.strip():
         try:
-            from app.processing.embeddings import update_note_embeddings
-            update_note_embeddings(note.id, new_text, db)
-            logger.info(f"Updated embeddings for note {note_id}")
+            from app.processing.embeddings import update_resource_embeddings
+            update_resource_embeddings(note.id, new_text, db)
+            logger.info(f"Updated embeddings for note {resource_id}")
         except Exception as e:
             logger.error(f"Error updating embeddings: {e}", exc_info=True)
             # Don't fail the content update
     
-    logger.info(f"Updated content for note {note_id}: {len(new_text)} chars")
+    logger.info(f"Updated content for note {resource_id}: {len(new_text)} chars")
     return note
 
 
-@router.get("/{note_id}/download-file")
+@router.get("/{resource_id}/download-file")
 async def download_original_file(
-    note_id: str,
+    resource_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Download the original uploaded file"""
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
     
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
     
     if not note.file_path or not os.path.exists(note.file_path):
@@ -1079,31 +1079,31 @@ async def download_original_file(
     
     return FileResponse(
         path=note.file_path,
-        filename=note.file_name or f"note_{note_id}",
+        filename=note.file_name or f"note_{resource_id}",
         media_type=note.file_type or "application/octet-stream"
     )
 
 
-@router.get("/{note_id}/processing-logs")
-async def get_note_processing_logs(
-    note_id: str,
+@router.get("/{resource_id}/processing-logs")
+async def get_resource_processing_logs(
+    resource_id: str,
     limit: int = 200,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Return recent log lines related to a specific note's processing.
-    Scans api.log and errors.log for lines mentioning the note_id.
+    Scans api.log and errors.log for lines mentioning the resource_id.
     """
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    note = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
 
     if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Resource not found"
         )
 
     import re
@@ -1128,7 +1128,7 @@ async def get_note_processing_logs(
                 lines = f.readlines()
 
             for line in lines:
-                if note_id not in line:
+                if resource_id not in line:
                     continue
                 # Skip noisy uvicorn HTTP access lines for this note
                 if "uvicorn.access" in line:
@@ -1162,7 +1162,7 @@ async def get_note_processing_logs(
     entries = entries[-limit:]
 
     return {
-        "note_id": note_id,
+        "resource_id": resource_id,
         "count": len(entries),
         "entries": entries,
     }

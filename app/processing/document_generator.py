@@ -181,15 +181,15 @@ class DocumentGenerator:
 
     def __init__(
         self,
-        note_id: int,
+        resource_id: str,
         note_title: str,
         base_output_dir: str = "generated",
         page_size=letter,
     ):
-        self.note_id = note_id
+        self.resource_id = resource_id
         self.note_title = note_title
         self.base_output_dir = base_output_dir
-        self.output_dir = os.path.join(base_output_dir, str(note_id))
+        self.output_dir = os.path.join(base_output_dir, resource_id)
         self.page_size = page_size
         self._template_config = None
         # Resolved footer settings (set during generate_pdf, used in _on_page callback)

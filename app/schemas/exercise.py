@@ -24,7 +24,7 @@ class ExerciseQuestionUpdate(BaseModel):
 class ExerciseQuestionResponse(ExerciseQuestionBase):
     id: int
     exercise_id: str
-    reference_note_id: Optional[str] = None
+    reference_resource_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -33,7 +33,7 @@ class ExerciseBase(BaseModel):
     title: str
     group_id: Optional[str] = None
     subject_id: Optional[str] = None
-    note_id: Optional[str] = None
+    resource_id: Optional[str] = None
     file_path: Optional[str] = None
     file_name: Optional[str] = None
     model: Optional[str] = None
@@ -46,7 +46,7 @@ class ExerciseUpdate(BaseModel):
     title: Optional[str] = None
     group_id: Optional[str] = None
     subject_id: Optional[str] = None
-    note_id: Optional[str] = None
+    resource_id: Optional[str] = None
 
 class ExerciseResponse(ExerciseBase):
     id: str

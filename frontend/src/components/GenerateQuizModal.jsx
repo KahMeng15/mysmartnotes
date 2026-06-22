@@ -53,7 +53,7 @@ export default function GenerateQuizModal({ opened, onClose, onSuccess, initialQ
           const [subjectsData, groupsData, notesData, quizGroupsData] = await Promise.all([
             fetchApi('/subjects').catch(() => []),
             fetchApi('/groups').catch(() => []),
-            fetchApi('/notes').catch(() => []),
+            fetchApi('/resources').catch(() => []),
             fetchApi('/quizzes/groups').catch(() => [])
           ]);
           setSubjects(subjectsData || []);

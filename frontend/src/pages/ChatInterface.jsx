@@ -446,7 +446,7 @@ export default function ChatInterface() {
         const [grpData, subjData, lectData, profileData] = await Promise.all([
           fetchApi('/groups').catch(() => []),
           fetchApi('/subjects').catch(() => []),
-          fetchApi('/notes').catch(() => []),
+          fetchApi('/resources').catch(() => []),
           fetchApi('/auth/me').catch(() => null)
         ]);
         

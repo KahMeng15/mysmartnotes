@@ -156,7 +156,7 @@ export default function SummaryView() {
     const init = async () => {
       try {
         setLoading(true);
-        const summaryData = await fetchApi(`/summaries/${summaryId}`);
+        const summaryData = await fetchApi(`/notes/${summaryId}`);
         setSelectedSummary(summaryData);
         setSummaryContent(summaryData.content);
         
@@ -194,7 +194,7 @@ export default function SummaryView() {
     }
     
     try {
-      await fetchApi(`/summaries/${renameModalSummary.id}/rename`, {
+      await fetchApi(`/notes/${renameModalSummary.id}/rename`, {
         method: 'PATCH',
         body: JSON.stringify({ title: renameInput })
       });
@@ -211,7 +211,7 @@ export default function SummaryView() {
   const handlePin = async (summary, e) => {
     e.stopPropagation();
     try {
-      await fetchApi(`/summaries/${summary.id}/pin`, { method: 'PATCH' });
+      await fetchApi(`/notes/${summary.id}/pin`, { method: 'PATCH' });
       const updated = summaries.map(s => s.id === summary.id ? { ...s, is_pinned: !s.is_pinned } : s);
       setSummaries(updated.sort((a, b) => {
         if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
@@ -230,7 +230,7 @@ export default function SummaryView() {
   const confirmDelete = async () => {
     if (!deleteModalSummary) return;
     try {
-      await fetchApi(`/summaries/${deleteModalSummary.id}`, { method: 'DELETE' });
+      await fetchApi(`/notes/${deleteModalSummary.id}`, { method: 'DELETE' });
       setSummaries(summaries.filter(s => s.id !== deleteModalSummary.id));
       if (selectedSummary?.id === deleteModalSummary.id) {
         setSelectedSummary(null);
@@ -246,7 +246,7 @@ export default function SummaryView() {
     if (!promptInput.trim()) return;
     try {
       setGeneratingPrompt(true);
-      const res = await fetchApi('/summaries/generate-prompt', {
+      const res = await fetchApi('/notes/generate-prompt', {
         method: 'POST',
         body: JSON.stringify({ user_input: promptInput })
       });
@@ -264,7 +264,7 @@ export default function SummaryView() {
     if (!newPromptInput.trim()) return;
     try {
       setGeneratingNewPrompt(true);
-      const res = await fetchApi('/summaries/generate-prompt', {
+      const res = await fetchApi('/notes/generate-prompt', {
         method: 'POST',
         body: JSON.stringify({ user_input: newPromptInput })
       });
@@ -395,7 +395,7 @@ export default function SummaryView() {
     }
 
     try {
-      await fetchApi(`/summaries/${selectedSummary.id}`, {
+      await fetchApi(`/notes/${selectedSummary.id}`, {
         method: 'PUT',
         body: JSON.stringify({ content: finalContent })
       });

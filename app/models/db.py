@@ -97,14 +97,14 @@ class Subject(Base):
     # Relationships
     owner = relationship("User", back_populates="subjects")
     group = relationship("SubjectGroup", back_populates="subjects")
-    notes = relationship("Note", back_populates="subject", cascade="all, delete-orphan")
+    resources = relationship("Resource", back_populates="subject", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="subject", cascade="all, delete-orphan")
     exercises = relationship("Exercise", back_populates="subject", cascade="all, delete-orphan")
 
 
-class Note(Base):
-    """Note/Document"""
-    __tablename__ = "notes"
+class Resource(Base):
+    """Resource/Document"""
+    __tablename__ = "resources"
     
     id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -122,13 +122,14 @@ class Note(Base):
     
     # Relationships
     user = relationship("User")
-    subject = relationship("Subject", back_populates="notes")
-    summaries = relationship("Summary", back_populates="note", cascade="all, delete-orphan")
-    embeddings = relationship("NoteEmbedding", back_populates="note", cascade="all, delete-orphan")
-    study_sessions = relationship("StudySession", back_populates="note", cascade="all, delete-orphan")
-    chat_messages = relationship("ChatMessage", back_populates="note", cascade="all, delete-orphan")
-    snapshots = relationship("NoteSnapshot", back_populates="note", cascade="all, delete-orphan")
-    exercises = relationship("Exercise", back_populates="note", cascade="all, delete-orphan")
+    subject = relationship("Subject", back_populates="resources")
+    notes = relationship("Note", back_populates="resource", cascade="all, delete-orphan")
+    embeddings = relationship("ResourceEmbedding", back_populates="resource", cascade="all, delete-orphan")
+    study_sessions = relationship("StudySession", back_populates="resource", cascade="all, delete-orphan")
+    chat_messages = relationship("ChatMessage", back_populates="resource", cascade="all, delete-orphan")
+    snapshots = relationship("ResourceSnapshot", back_populates="resource", cascade="all, delete-orphan")
+    exercises = relationship("Exercise", back_populates="resource", cascade="all, delete-orphan")
+    quizzes = relationship("Quiz", back_populates="resource", cascade="all, delete-orphan")
 
 
 class ExportTemplate(Base):
@@ -148,13 +149,13 @@ class ExportTemplate(Base):
     user = relationship("User")
 
 
-class Summary(Base):
-    """Generated summaries, cheat sheets, etc."""
-    __tablename__ = "summaries"
+class Note(Base):
+    """Generated study notes, cheat sheets, etc."""
+    __tablename__ = "notes"
     
     id = Column(String(16), primary_key=True)
-    version = Column(Integer, nullable=False, default=1)  # v1, v2, etc. per note
-    note_id = Column(String(16), ForeignKey("notes.id"), nullable=False, index=True)
+    version = Column(Integer, nullable=False, default=1)  # v1, v2, etc. per resource
+    resource_id = Column(String(16), ForeignKey("resources.id"), nullable=False, index=True)
     summary_type = Column(String(50))  # cheatsheet, exercise, summary
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
@@ -173,24 +174,24 @@ class Summary(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    note = relationship("Note", back_populates="summaries")
+    resource = relationship("Resource", back_populates="notes")
 
 
-class NoteEmbedding(Base):
-    """Pre-computed embeddings for note chunks (vector DB)"""
-    __tablename__ = "note_embeddings"
+class ResourceEmbedding(Base):
+    """Pre-computed embeddings for resource chunks (vector DB)"""
+    __tablename__ = "resource_embeddings"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    note_id = Column(String(16), ForeignKey("notes.id"), nullable=False, index=True)
+    resource_id = Column(String(16), ForeignKey("resources.id"), nullable=False, index=True)
     chunk_text = Column(Text, nullable=False)  # Original text of this chunk
-    chunk_index = Column(Integer, nullable=False)  # Order of this chunk in note
+    chunk_index = Column(Integer, nullable=False)  # Order of this chunk in resource
     embedding = Column(JSON, nullable=False)  # Embedding vector as list of floats
     position = Column(Integer)  # Character position in original text
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    note = relationship("Note", back_populates="embeddings")
+    resource = relationship("Resource", back_populates="embeddings")
 
 
 class Exercise(Base):
@@ -201,10 +202,10 @@ class Exercise(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(255), nullable=False)
     
-    # Can be linked to a group, subject, or a specific note (if generated from one)
+    # Can be linked to a group, subject, or a specific resource (if generated from one)
     group_id = Column(String(16), ForeignKey("subject_groups.id"), nullable=True, index=True)
     subject_id = Column(String(16), ForeignKey("subjects.id"), nullable=True, index=True)
-    note_id = Column(String(16), ForeignKey("notes.id"), nullable=True, index=True)
+    resource_id = Column(String(16), ForeignKey("resources.id"), nullable=True, index=True)
     
     # Source file info if uploaded
     file_path = Column(String(512), nullable=True)
@@ -219,7 +220,7 @@ class Exercise(Base):
     user = relationship("User")
     group = relationship("SubjectGroup", back_populates="exercises")
     subject = relationship("Subject", back_populates="exercises")
-    note = relationship("Note", back_populates="exercises")
+    resource = relationship("Resource", back_populates="exercises")
     questions = relationship("ExerciseQuestion", back_populates="exercise", cascade="all, delete-orphan")
     progress = relationship("ExerciseProgress", back_populates="exercise", cascade="all, delete-orphan")
 
@@ -238,13 +239,13 @@ class ExerciseQuestion(Base):
     order = Column(Integer, default=0)
     explanation = Column(Text, nullable=True)
     
-    # Reference to the highest matching resource (note)
-    reference_note_id = Column(String(16), ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
+    # Reference to the highest matching resource
+    reference_resource_id = Column(String(16), ForeignKey("resources.id", ondelete="SET NULL"), nullable=True)
     
     # Relationships
     exercise = relationship("Exercise", back_populates="questions")
     progress = relationship("ExerciseProgress", back_populates="question", cascade="all, delete-orphan")
-    reference_note = relationship("Note", foreign_keys=[reference_note_id])
+    reference_resource = relationship("Resource", foreign_keys=[reference_resource_id])
 
 
 class ExerciseProgress(Base):
@@ -272,7 +273,7 @@ class StudySession(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    note_id = Column(String(16), ForeignKey("notes.id", ondelete="SET NULL"), nullable=True, index=True)
+    resource_id = Column(String(16), ForeignKey("resources.id", ondelete="SET NULL"), nullable=True, index=True)
     session_type = Column(String(50))  # exercise, chat, pomodoro_study, pomodoro_break, stopwatch
     duration_minutes = Column(Integer)
     questions_attempted = Column(Integer, default=0)
@@ -285,7 +286,7 @@ class StudySession(Base):
     
     # Relationships
     user = relationship("User", back_populates="study_sessions")
-    note = relationship("Note", back_populates="study_sessions")
+    resource = relationship("Resource", back_populates="study_sessions")
 
 
 class Task(Base):
@@ -314,7 +315,7 @@ class ChatMessage(Base):
     
     id = Column(String(16), primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    note_id = Column(String(16), ForeignKey("notes.id", ondelete="SET NULL"), nullable=True, index=True)
+    resource_id = Column(String(16), ForeignKey("resources.id", ondelete="SET NULL"), nullable=True, index=True)
     subject_id = Column(String(16), ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True)
     group_id = Column(String(16), ForeignKey("subject_groups.id", ondelete="SET NULL"), nullable=True, index=True)
     message = Column(Text, nullable=False)
@@ -339,17 +340,17 @@ class ChatMessage(Base):
     
     # Relationships
     user = relationship("User")
-    note = relationship("Note", back_populates="chat_messages")
+    resource = relationship("Resource", back_populates="chat_messages")
     subject = relationship("Subject", back_populates="chat_messages")
     group = relationship("SubjectGroup", back_populates="chat_messages")
 
 
-class NoteSnapshot(Base):
-    """Named snapshots of note notes for version history"""
-    __tablename__ = "note_snapshots"
+class ResourceSnapshot(Base):
+    """Named snapshots of resource contents for version history"""
+    __tablename__ = "resource_snapshots"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    note_id = Column(String(16), ForeignKey("notes.id", ondelete="CASCADE"), nullable=False, index=True)
+    resource_id = Column(String(16), ForeignKey("resources.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
@@ -357,7 +358,7 @@ class NoteSnapshot(Base):
     
     # Relationships
     user = relationship("User")
-    note = relationship("Note", back_populates="snapshots")
+    resource = relationship("Resource", back_populates="snapshots")
 
 
 class SystemSettings(Base):
@@ -538,51 +539,79 @@ class TierConfig(Base):
 
     id = Column(String(50), primary_key=True)  # unlimited, free, pro
     display_name = Column(String(100), nullable=False)  # "Unlimited", "Free", "Pro"
-    max_notes = Column(Integer, default=-1)  # -1 = unlimited
+    max_resources = Column(Integer, default=-1)  # -1 = unlimited
     max_subjects = Column(Integer, default=-1)
     max_groups = Column(Integer, default=-1)
     max_conversations = Column(Integer, default=-1)
     max_messages = Column(Integer, default=-1)
     max_storage_gb = Column(Integer, default=-1)  # in GB, -1 = unlimited
     max_exercises = Column(Integer, default=-1)
-    max_summaries = Column(Integer, default=-1)
+    max_notes = Column(Integer, default=-1)
     # Reset periods: "week", "month", or None for cumulative limits
     conversations_reset_period = Column(String(20), nullable=True)  # week, month, or None
     messages_reset_period = Column(String(20), nullable=True)
-    summaries_reset_period = Column(String(20), nullable=True)
+    notes_reset_period = Column(String(20), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+# --- Quiz Models ---
+class Quiz(Base):
+    """Quiz generated from a resource"""
+    __tablename__ = "quizzes"
+
+    id = Column(String(16), primary_key=True)
+    title = Column(String(255), nullable=False)
+    resource_id = Column(String(16), ForeignKey("resources.id"), nullable=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    resource = relationship("Resource", back_populates="quizzes")
+    questions = relationship("QuizQuestion", back_populates="quiz", cascade="all, delete-orphan")
+
+class QuizQuestion(Base):
+    """Questions belonging to a quiz"""
+    __tablename__ = "quiz_questions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    quiz_id = Column(String(16), ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_text = Column(Text, nullable=False)
+    answer_text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    quiz = relationship("Quiz", back_populates="questions")
+
 # --- Event Listeners for File Cleanup ---
 
-@event.listens_for(Note, 'after_delete')
+@event.listens_for(Resource, 'after_delete')
 def receive_after_delete(mapper, connection, target):
-    """Delete original file and generated PDF when a note is deleted"""
+    """Delete original file and generated PDF when a resource is deleted"""
     # Delete original file
     if target.file_path and os.path.exists(target.file_path):
         try:
             os.remove(target.file_path)
-            logger.info(f"Deleted original file for note {target.id}: {target.file_path}")
+            logger.info(f"Deleted original file for resource {target.id}: {target.file_path}")
         except Exception as e:
-            logger.warning(f"Error deleting original file for note {target.id}: {e}")
+            logger.warning(f"Error deleting original file for resource {target.id}: {e}")
             
     # Delete generated output PDF
     if target.output_pdf_path and os.path.exists(target.output_pdf_path):
         try:
             os.remove(target.output_pdf_path)
-            logger.info(f"Deleted output PDF for note {target.id}: {target.output_pdf_path}")
+            logger.info(f"Deleted output PDF for resource {target.id}: {target.output_pdf_path}")
         except Exception as e:
-            logger.warning(f"Error deleting output PDF for note {target.id}: {e}")
+            logger.warning(f"Error deleting output PDF for resource {target.id}: {e}")
 
 
-@event.listens_for(Summary, 'after_delete')
-def receive_summary_after_delete(mapper, connection, target):
-    """Delete the physical file associated with a summary (PDF, DOCX, etc.)"""
+@event.listens_for(Note, 'after_delete')
+def receive_note_after_delete(mapper, connection, target):
+    """Delete the physical file associated with a note (PDF, DOCX, etc.)"""
     if target.file_path and os.path.exists(target.file_path):
         try:
             os.remove(target.file_path)
-            logger.info(f"Deleted file for summary {target.id}: {target.file_path}")
+            logger.info(f"Deleted file for note {target.id}: {target.file_path}")
         except Exception as e:
-            logger.warning(f"Error deleting file for summary {target.id}: {e}")
+            logger.warning(f"Error deleting file for note {target.id}: {e}")
 

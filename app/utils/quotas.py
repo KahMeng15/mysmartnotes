@@ -5,65 +5,65 @@ from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 
 from app.models.db import (
-    User, TierConfig, Note, Subject, SubjectGroup, ChatMessage, Exercise, Summary
+    User, TierConfig, Resource, Subject, SubjectGroup, ChatMessage, Exercise, Note
 )
 
 DEFAULT_TIER_CONFIGS = {
     "unlimited": {
         "display_name": "Unlimited",
-        "max_notes": -1,
+        "max_resources": -1,
         "max_subjects": -1,
         "max_groups": -1,
         "max_conversations": -1,
         "max_messages": -1,
         "max_storage_gb": -1,
         "max_exercises": -1,
-        "max_summaries": -1,
+        "max_notes": -1,
         "conversations_reset_period": None,
         "messages_reset_period": None,
-        "summaries_reset_period": None
+        "notes_reset_period": None
     },
     "free": {
         "display_name": "Free",
-        "max_notes": 50,
+        "max_resources": 50,
         "max_subjects": 10,
         "max_groups": 5,
         "max_conversations": 100,
         "max_messages": 500,
         "max_storage_gb": 5,
         "max_exercises": 20,
-        "max_summaries": 50,
+        "max_notes": 50,
         "conversations_reset_period": None,
         "messages_reset_period": None,
-        "summaries_reset_period": None
+        "notes_reset_period": None
     },
     "pro": {
         "display_name": "Pro",
-        "max_notes": 500,
+        "max_resources": 500,
         "max_subjects": 100,
         "max_groups": 50,
         "max_conversations": -1,
         "max_messages": -1,
         "max_storage_gb": 100,
         "max_exercises": 200,
-        "max_summaries": 500,
+        "max_notes": 500,
         "conversations_reset_period": None,
         "messages_reset_period": None,
-        "summaries_reset_period": None
+        "notes_reset_period": None
     },
     "early_tester": {
         "display_name": "Early Tester",
-        "max_notes": -1,
+        "max_resources": -1,
         "max_subjects": -1,
         "max_groups": -1,
         "max_conversations": -1,
         "max_messages": -1,
         "max_storage_gb": -1,
         "max_exercises": -1,
-        "max_summaries": -1,
+        "max_notes": -1,
         "conversations_reset_period": None,
         "messages_reset_period": None,
-        "summaries_reset_period": None
+        "notes_reset_period": None
     }
 }
 
@@ -72,7 +72,7 @@ def ensure_default_tier_configs(db: Session):
     existing_ids = {tier.id for tier in db.query(TierConfig).all()}
     missing_tiers = [tier_id for tier_id in DEFAULT_TIER_CONFIGS if tier_id not in existing_ids]
     if not missing_tiers:
-        return
+         return
 
     for tier_id in missing_tiers:
         data = DEFAULT_TIER_CONFIGS[tier_id]
@@ -126,10 +126,10 @@ def get_user_tier_config(user: User, db: Session) -> TierConfig:
     return tier_config
 
 
-def get_user_note_count(user: User, db: Session) -> int:
-    """Get the number of notes (notes) a user has"""
-    count = db.query(func.count(Note.id)).filter(
-        Note.user_id == user.id
+def get_user_resource_count(user: User, db: Session) -> int:
+    """Get the number of resources a user has"""
+    count = db.query(func.count(Resource.id)).filter(
+        Resource.user_id == user.id
     ).scalar() or 0
     return count
 
@@ -186,17 +186,17 @@ def get_user_exercise_count(user: User, db: Session) -> int:
     return count
 
 
-def get_user_summary_count(user: User, db: Session, reset_period: str = None) -> int:
-    """Get the number of summaries a user has (optionally filtered by period)"""
-    query = db.query(func.count(Summary.id)).filter(
-        Summary.note_id.in_(
-            db.query(Note.id).filter(Note.user_id == user.id)
+def get_user_note_count(user: User, db: Session, reset_period: str = None) -> int:
+    """Get the number of notes a user has (optionally filtered by period)"""
+    query = db.query(func.count(Note.id)).filter(
+        Note.resource_id.in_(
+            db.query(Resource.id).filter(Resource.user_id == user.id)
         )
     )
     
     if reset_period:
         period_start = get_period_start(reset_period)
-        query = query.filter(Summary.created_at >= period_start)
+        query = query.filter(Note.created_at >= period_start)
     
     count = query.scalar() or 0
     return count
@@ -204,8 +204,8 @@ def get_user_summary_count(user: User, db: Session, reset_period: str = None) ->
 
 def get_user_storage_used_bytes(user: User, db: Session) -> int:
     """Get total storage used by a user in bytes"""
-    total_bytes = db.query(func.sum(Note.file_size)).filter(
-        Note.user_id == user.id
+    total_bytes = db.query(func.sum(Resource.file_size)).filter(
+        Resource.user_id == user.id
     ).scalar() or 0
     return total_bytes
 
@@ -216,13 +216,13 @@ def get_user_storage_used_gb(user: User, db: Session) -> float:
     return bytes_used / (1024 * 1024 * 1024)
 
 
-def check_quota_notes(user: User, db: Session) -> bool:
-    """Check if user can create another note"""
+def check_quota_resources(user: User, db: Session) -> bool:
+    """Check if user can create another resource"""
     tier_config = get_user_tier_config(user, db)
-    if tier_config.max_notes == -1:  # Unlimited
+    if tier_config.max_resources == -1:  # Unlimited
         return True
-    current_count = get_user_note_count(user, db)
-    return current_count < tier_config.max_notes
+    current_count = get_user_resource_count(user, db)
+    return current_count < tier_config.max_resources
 
 
 def check_quota_subjects(user: User, db: Session) -> bool:
@@ -270,13 +270,13 @@ def check_quota_exercises(user: User, db: Session) -> bool:
     return current_count < tier_config.max_exercises
 
 
-def check_quota_summaries(user: User, db: Session) -> bool:
-    """Check if user can create another summary"""
+def check_quota_notes(user: User, db: Session) -> bool:
+    """Check if user can create another note"""
     tier_config = get_user_tier_config(user, db)
-    if tier_config.max_summaries == -1:  # Unlimited
+    if tier_config.max_notes == -1:  # Unlimited
         return True
-    current_count = get_user_summary_count(user, db, tier_config.summaries_reset_period)
-    return current_count < tier_config.max_summaries
+    current_count = get_user_note_count(user, db, tier_config.notes_reset_period)
+    return current_count < tier_config.max_notes
 
 
 def check_quota_storage(user: User, file_size_bytes: int, db: Session) -> bool:
@@ -292,14 +292,14 @@ def check_quota_storage(user: User, file_size_bytes: int, db: Session) -> bool:
     return new_usage_gb <= max_storage_gb
 
 
-def enforce_quota_notes(user: User, db: Session):
-    """Enforce note quota - raise exception if exceeded"""
-    if not check_quota_notes(user, db):
+def enforce_quota_resources(user: User, db: Session):
+    """Enforce resource quota - raise exception if exceeded"""
+    if not check_quota_resources(user, db):
         tier_config = get_user_tier_config(user, db)
-        current = get_user_note_count(user, db)
+        current = get_user_resource_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Note quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_notes} notes. You have {current}."
+            detail=f"Resource quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_resources} resources. You have {current}."
         )
 
 
@@ -358,14 +358,14 @@ def enforce_quota_exercises(user: User, db: Session):
         )
 
 
-def enforce_quota_summaries(user: User, db: Session):
-    """Enforce summary quota - raise exception if exceeded"""
-    if not check_quota_summaries(user, db):
+def enforce_quota_notes(user: User, db: Session):
+    """Enforce note quota - raise exception if exceeded"""
+    if not check_quota_notes(user, db):
         tier_config = get_user_tier_config(user, db)
-        current = get_user_summary_count(user, db)
+        current = get_user_note_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Summary quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_summaries} summaries. You have {current}."
+            detail=f"Note quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_notes} notes. You have {current}."
         )
 
 
@@ -389,10 +389,10 @@ def get_user_quota_status(user: User, db: Session) -> dict:
         "tier": user.tier,
         "tier_name": tier_config.display_name,
         "quotas": {
-            "notes": {
-                "used": get_user_note_count(user, db),
-                "limit": tier_config.max_notes,
-                "unlimited": tier_config.max_notes == -1,
+            "resources": {
+                "used": get_user_resource_count(user, db),
+                "limit": tier_config.max_resources,
+                "unlimited": tier_config.max_resources == -1,
                 "reset_period": None
             },
             "subjects": {
@@ -425,11 +425,11 @@ def get_user_quota_status(user: User, db: Session) -> dict:
                 "unlimited": tier_config.max_exercises == -1,
                 "reset_period": None
             },
-            "summaries": {
-                "used": get_user_summary_count(user, db, tier_config.summaries_reset_period),
-                "limit": tier_config.max_summaries,
-                "unlimited": tier_config.max_summaries == -1,
-                "reset_period": tier_config.summaries_reset_period
+            "notes": {
+                "used": get_user_note_count(user, db, tier_config.notes_reset_period),
+                "limit": tier_config.max_notes,
+                "unlimited": tier_config.max_notes == -1,
+                "reset_period": tier_config.notes_reset_period
             },
             "storage_gb": {
                 "used": round(get_user_storage_used_gb(user, db), 2),

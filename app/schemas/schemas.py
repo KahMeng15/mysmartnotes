@@ -142,17 +142,17 @@ class SubjectGroupResponse(SubjectGroup):
     subjects: List[SubjectResponse] = []
 
 
-# ========== Note Schemas ==========
-class NoteBase(BaseModel):
+# ========== Resource Schemas ==========
+class ResourceBase(BaseModel):
     title: str
     subject_id: str
 
 
-class NoteCreate(NoteBase):
+class ResourceCreate(ResourceBase):
     pass
 
 
-class Note(NoteBase):
+class Resource(ResourceBase):
     id: str
     file_path: str
     file_type: str
@@ -173,20 +173,20 @@ class Note(NoteBase):
         from_attributes = True
 
 
-class NoteResponse(Note):
-    """Response schema for note endpoints"""
+class ResourceResponse(Resource):
+    """Response schema for resource endpoints"""
     subject: Optional[SubjectResponse] = None
 
 
-# ========== Auth Schemas ==========
-class SummaryBase(BaseModel):
+# ========== Note Schemas ==========
+class NoteBase(BaseModel):
     title: str
     summary_type: str
 
 
-class Summary(SummaryBase):
-    id: int
-    note_id: str
+class Note(NoteBase):
+    id: str
+    resource_id: str
     file_path: str
     created_at: datetime
     
@@ -196,7 +196,7 @@ class Summary(SummaryBase):
 
 # ========== Study Session Schemas ==========
 class StudySessionCreate(BaseModel):
-    note_id: Optional[str] = None
+    resource_id: Optional[str] = None
     session_type: str
     duration_minutes: int
     questions_attempted: int = 0
@@ -232,7 +232,7 @@ class TaskResponse(BaseModel):
 
 # ========== Chat Schemas ==========
 class ChatMessage(BaseModel):
-    note_id: str
+    resource_id: str
     message: str
 
 
@@ -242,15 +242,15 @@ class ChatResponse(BaseModel):
     sources: Optional[List[str]] = None
 
 
-# ========== Note Snapshot Schemas ==========
-class NoteSnapshotCreate(BaseModel):
+# ========== Resource Snapshot Schemas ==========
+class ResourceSnapshotCreate(BaseModel):
     name: str
     content: str
 
 
-class NoteSnapshotResponse(BaseModel):
+class ResourceSnapshotResponse(BaseModel):
     id: int
-    note_id: str
+    resource_id: str
     user_id: int
     name: str
     content: str
@@ -260,8 +260,8 @@ class NoteSnapshotResponse(BaseModel):
         from_attributes = True
 
 
-# ========== Note Content Update ==========
-class NoteContentUpdate(BaseModel):
+# ========== Resource Content Update ==========
+class ResourceContentUpdate(BaseModel):
     extracted_text: str
 
 

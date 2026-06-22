@@ -62,7 +62,7 @@ export default function Dashboard() {
       try {
         const [summaryData, notesData] = await Promise.all([
           fetchApi('/analytics/dashboard-summary'),
-          fetchApi('/notes')
+          fetchApi('/resources')
         ]);
         setSummary(summaryData);
         // Sort notes by newest first and take top 5

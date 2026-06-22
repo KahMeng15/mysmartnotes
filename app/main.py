@@ -36,7 +36,7 @@ from app.config import get_settings
 from app.utils.db import init_db
 from app.utils.crypto import encrypt_secret
 from app.utils.observability import record_request
-from app.routers import auth, subjects, notes, chat, summaries, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, support, ws, prompts, exercises
+from app.routers import auth, subjects, resources, notes, chat, study_sessions, search, analytics, processing, groups, snapshots, templates, admin, support, ws, prompts, exercises
 
 # Configure logging
 from app.logging_config import setup_logging
@@ -438,9 +438,9 @@ async def system_settings_middleware(request: Request, call_next):
 # Include routers
 app.include_router(auth.router)
 app.include_router(subjects.router)
+app.include_router(resources.router)
 app.include_router(notes.router)
 app.include_router(chat.router)
-app.include_router(summaries.router)
 
 app.include_router(study_sessions.router)
 app.include_router(search.router)
@@ -574,15 +574,6 @@ async def serve_pomodoro_popout():
     return FileResponse(os.path.join(static_dir, "pomodoro_popout.html"))
 
 
-# Serve static files and templates
-if os.path.exists(static_dir):
-    try:
-        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
-        logger.info(f"Static files mounted from {static_dir}")
-    except Exception as e:
-        logger.warning(f"Could not mount static files: {e}")
-
-
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
@@ -593,6 +584,15 @@ def health_check():
 def docs():
     """OpenAPI documentation"""
     return {"message": "API documentation available at /docs"}
+
+
+# Serve static files and templates
+if os.path.exists(static_dir):
+    try:
+        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+        logger.info(f"Static files mounted from {static_dir}")
+    except Exception as e:
+        logger.warning(f"Could not mount static files: {e}")
 
 
 if __name__ == "__main__":

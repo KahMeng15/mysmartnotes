@@ -13,9 +13,10 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app.processing.smart_pipeline import SmartPipeline
-from app.models.db import User, Note
+from app.models.db import User, Resource
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
+from app.utils.storage import StorageManager
 
 logger = logging.getLogger(__name__)
 
@@ -162,35 +163,35 @@ async def smart_extract_download(
             pass
 
 
-@router.post("/notes/{note_id}/reprocess-smart")
+@router.post("/resources/{resource_id}/reprocess-smart")
 def reprocess_smart(
-    note_id: str,
+    resource_id: str,
     use_ai: bool = False,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    Reprocess an existing note using the smart font-aware pipeline.
+    Reprocess an existing resource using the smart font-aware pipeline.
     
     This replaces the existing OCR-based extraction with the multi-method
     font-aware pipeline that produces cleaner, more accurate Markdown.
     
-    The result is stored in the note's extracted_text field as Markdown,
+    The result is stored in the resource's extracted_text file as Markdown,
     and in extracted_content_structured as structured JSON segments.
     """
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
+    resource = db.query(Resource).filter(
+        Resource.id == resource_id,
+        Resource.user_id == current_user.id
     ).first()
 
-    if not note:
-        raise HTTPException(status_code=404, detail="Note not found")
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
 
-    if not os.path.exists(note.file_path):
-        raise HTTPException(status_code=404, detail="Note file not found on disk")
+    if not os.path.exists(resource.file_path):
+        raise HTTPException(status_code=404, detail="Resource file not found on disk")
 
     # Only PDF and PPTX supported by smart pipeline
-    file_ext = Path(note.file_path).suffix.lower()
+    file_ext = Path(resource.file_path).suffix.lower()
     if file_ext not in (".pdf", ".pptx"):
         raise HTTPException(
             status_code=400,
@@ -198,24 +199,24 @@ def reprocess_smart(
         )
 
     try:
-        logger.info(f"Smart reprocessing note {note_id} (ai={use_ai})")
+        logger.info(f"Smart reprocessing resource {resource_id} (ai={use_ai})")
 
         pipeline = SmartPipeline(
             use_layout_detection=use_ai,
             use_table_transformer=use_ai,
         )
-        markdown = pipeline.process(note.file_path)
+        markdown = pipeline.process(resource.file_path)
 
         # Convert markdown to structured segments for compatibility with existing UI
         structured_segments = _markdown_to_segments(markdown)
 
-        # Update note record (save to file storage)
-        StorageManager.save_note_text(note_id, markdown)
-        StorageManager.save_note_json(note_id, "structured", structured_segments)
+        # Update resource record (save to file storage)
+        StorageManager.save_resource_text(resource_id, markdown)
+        StorageManager.save_resource_json(resource_id, "structured", structured_segments)
         
-        note.updated_at = datetime.utcnow()
+        resource.updated_at = datetime.utcnow()
         db.commit()
-        db.refresh(note)
+        db.refresh(resource)
 
         # Compute stats
         lines = markdown.split("\n")
@@ -228,7 +229,7 @@ def reprocess_smart(
 
         return JSONResponse({
             "success": True,
-            "note_id": note_id,
+            "resource_id": resource_id,
             "markdown_length": len(markdown),
             "stats": {
                 "headings": headings,
@@ -236,11 +237,11 @@ def reprocess_smart(
                 "table_rows": table_rows,
                 "total_lines": len(lines),
             },
-            "message": "Note reprocessed with smart pipeline"
+            "message": "Resource reprocessed with smart pipeline"
         })
 
     except Exception as e:
-        logger.error(f"Smart reprocess failed for note {note_id}: {e}", exc_info=True)
+        logger.error(f"Smart reprocess failed for resource {resource_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Smart reprocessing failed: {str(e)}")
 
 

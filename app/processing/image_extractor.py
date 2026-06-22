@@ -36,10 +36,11 @@ class ImageExtractor:
     """
     Uses OpenCV to extract significant non-text graphical elements (Figures).
     """
-    def __init__(self, output_dir="output/images", note_id: int = 0):
-        self.note_id = note_id
-        if note_id > 0:
-            self.output_dir = os.path.join(output_dir, str(note_id))
+    def __init__(self, output_dir="output/images", resource_id: str = "0"):
+        self.resource_id = resource_id
+        # Convert to string and handle default empty ID
+        if resource_id and resource_id != "0":
+            self.output_dir = os.path.join(output_dir, resource_id)
         else:
             self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)

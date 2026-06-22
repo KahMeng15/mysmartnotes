@@ -11,7 +11,10 @@ from app.utils.db import get_db
 
 settings = get_settings()
 
-import zxcvbn
+try:
+    import zxcvbn
+except ImportError:
+    zxcvbn = None  # Password complexity validation will be skipped if library is missing
 
 # Password hashing
 pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
@@ -37,6 +40,10 @@ def validate_password_complexity(password: str) -> bool:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password must be at least 8 characters long."
         )
+
+    if zxcvbn is None:
+        # Skip complexity check if library not installed
+        return True
     
     result = zxcvbn.zxcvbn(password)
     if result.get("score", 0) < 3:

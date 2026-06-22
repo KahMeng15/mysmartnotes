@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from typing import Optional, Callable, Any
 
-from app.models.db import User, Note
+from app.models.db import User, Resource
 from app.utils.db import SessionLocal
 from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
@@ -59,7 +59,7 @@ def ensure_valid_markdown_result(markdown: str) -> str:
 
 def extract_markdown_for_user(user: User, file_path: str, progress_callback: Optional[Callable] = None) -> tuple:
     """
-    Process a note with the configured SmartPipeline.
+    Process a resource with the configured SmartPipeline.
     """
     pipeline = get_pipeline_for_user(user)
     try:
@@ -79,7 +79,7 @@ def extract_markdown_for_user(user: User, file_path: str, progress_callback: Opt
 
 def markdown_to_segments(markdown: str) -> list:
     """
-    Convert Markdown text to structured segments compatible with the existing note view UI.
+    Convert Markdown text to structured segments compatible with the existing resource view UI.
     """
     import re
     segments = []
@@ -131,19 +131,19 @@ def markdown_to_segments(markdown: str) -> list:
 
     return segments
 
-def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = False, **kwargs):
-    """Core logic to process a note, used by both worker and (optionally) API."""
-    task_id = kwargs.get("task_id") or f"ocr_{user_id}_{note_id}"
+def process_resource_task(resource_id: str, user_id: int, auto_detect_title: bool = False, **kwargs):
+    """Core logic to process a resource, used by both worker and (optionally) API."""
+    task_id = kwargs.get("task_id") or f"ocr_{user_id}_{resource_id}"
     
     db = SessionLocal()
     try:
-        note = db.query(Note).filter(Note.id == note_id).first()
+        resource = db.query(Resource).filter(Resource.id == resource_id).first()
         user = db.query(User).filter(User.id == user_id).first()
         
-        if not note or not user:
-            logger.error(f"Processing failed: Note {note_id} or User {user_id} not found")
-            TaskManager._update_db_task(task_id, status="failed", error="Note or User not found")
-            return {"status": "error", "message": "Note or User not found"}
+        if not resource or not user:
+            logger.error(f"Processing failed: Resource {resource_id} or User {user_id} not found")
+            TaskManager._update_db_task(task_id, status="failed", error="Resource or User not found")
+            return {"status": "error", "message": "Resource or User not found"}
 
         def is_cancelled():
             """Check if the task has been marked as failed/cancelled in the DB"""
@@ -161,7 +161,7 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
             logger.info(f"Task {task_id} aborted before start")
             return {"status": "cancelled"}
 
-        file_path = note.file_path
+        file_path = resource.file_path
         if not os.path.exists(file_path):
             logger.error(f"Processing failed: File not found at {file_path}")
             TaskManager._update_db_task(task_id, status="failed", error="File not found on disk")
@@ -174,7 +174,7 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
         file_ext = os.path.splitext(file_path)[1].lower()
 
         if file_ext in ('.pdf', '.pptx'):
-            logger.info(f"Processing note {note_id} (SmartPipeline)")
+            logger.info(f"Processing resource {resource_id} (SmartPipeline)")
             progress_callback(15, "Initializing AI pipeline...")
             
             # Custom wrapper to pass messages through the pipeline's callback
@@ -196,9 +196,9 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
             structured_segments = markdown_to_segments(markdown)
             
             # Save to file storage
-            StorageManager.save_note_text(note.id, markdown)
-            StorageManager.save_note_json(note.id, "structured", structured_segments)
-            StorageManager.save_note_json(note.id, "timings", timings)
+            StorageManager.save_resource_text(resource.id, markdown)
+            StorageManager.save_resource_json(resource.id, "structured", structured_segments)
+            StorageManager.save_resource_json(resource.id, "timings", timings)
             
             # Auto-title detection from H1
             if auto_detect_title:
@@ -206,11 +206,11 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
                     if line.strip().startswith('# '):
                         detected_title = line.strip()[2:].strip()
                         if detected_title:
-                            note.title = detected_title
+                            resource.title = detected_title
                             break
             
-            note.processing_time_ms = int((time.time() - start_time) * 1000)
-            note.updated_at = datetime.utcnow()
+            resource.processing_time_ms = int((time.time() - start_time) * 1000)
+            resource.updated_at = datetime.utcnow()
             db.commit()
             
             # STEP 4: Compute and store embeddings
@@ -220,23 +220,23 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
                     return {"status": "cancelled"}
                 try:
                     progress_callback(95, "Generating search embeddings...")
-                    from app.processing.embeddings import update_note_embeddings
-                    update_note_embeddings(note.id, markdown, db)
+                    from app.processing.embeddings import update_resource_embeddings
+                    update_resource_embeddings(resource.id, markdown, db)
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
             TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
-            logger.info(f"Processing complete for note {note_id}")
-            clear_cache_pattern_sync(f"cache_resp:/notes*:u{user.id}*")
-            return {"status": "success", "note_id": note_id}
+            logger.info(f"Processing complete for resource {resource_id}")
+            clear_cache_pattern_sync(f"cache_resp:/resources*:u{user.id}*")
+            return {"status": "success", "resource_id": resource_id}
 
         else:
             # Fallback to OCR for images
-            logger.info(f"Processing note {note_id} (OCR Fallback)")
+            logger.info(f"Processing resource {resource_id} (OCR Fallback)")
             if is_cancelled(): return {"status": "cancelled"}
             
             progress_callback(20, "OCR: Analyzing image...")
-            ocr_result = OCRProcessor.extract_text(file_path, note.file_type, note_id=note_id)
+            ocr_result = OCRProcessor.extract_text(file_path, resource.file_type, note_id=resource_id)
             
             if is_cancelled(): return {"status": "cancelled"}
             progress_callback(80, "Structuring content...")
@@ -246,26 +246,26 @@ def process_note_task(note_id: str, user_id: int, auto_detect_title: bool = Fals
             images_data = ocr_result.get("images", [])
             
             # Save to file storage
-            StorageManager.save_note_text(note.id, raw_text)
-            StorageManager.save_note_json(note.id, "structured", structured_content)
-            StorageManager.save_note_json(note.id, "images", images_data)
+            StorageManager.save_resource_text(resource.id, raw_text)
+            StorageManager.save_resource_json(resource.id, "structured", structured_content)
+            StorageManager.save_resource_json(resource.id, "images", images_data)
 
-            note.processing_time_ms = int((time.time() - start_time) * 1000)
-            note.updated_at = datetime.utcnow()
+            resource.processing_time_ms = int((time.time() - start_time) * 1000)
+            resource.updated_at = datetime.utcnow()
             db.commit()
             
             if raw_text:
                 if is_cancelled(): return {"status": "cancelled"}
                 try:
                     progress_callback(95, "Generating search embeddings...")
-                    from app.processing.embeddings import update_note_embeddings
-                    update_note_embeddings(note.id, raw_text, db)
+                    from app.processing.embeddings import update_resource_embeddings
+                    update_resource_embeddings(resource.id, raw_text, db)
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
             TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
-            clear_cache_pattern_sync(f"cache_resp:/notes*:u{user.id}*")
-            return {"status": "success", "note_id": note_id}
+            clear_cache_pattern_sync(f"cache_resp:/resources*:u{user.id}*")
+            return {"status": "success", "resource_id": resource_id}
 
     except Exception as e:
         if "Task cancelled by user" in str(e):
