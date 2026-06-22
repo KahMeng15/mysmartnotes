@@ -60,6 +60,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 export default function SummaryView() {
   const { summaryId } = useParams();
@@ -530,12 +532,33 @@ export default function SummaryView() {
           background-color: #f8f9fa;
           color: #4b5563;
         }
-        .sticky-markdown code {
+        .sticky-markdown :not(pre) > code {
           background-color: #f1f3f5;
           padding: 0.2rem 0.4rem;
           border-radius: 4px;
           font-family: monospace;
           font-size: 0.9em;
+        }
+        .sticky-markdown pre {
+          background-color: #f8f9fa;
+          color: #212529;
+          padding: 1rem;
+          border-radius: 6px;
+          overflow-x: auto;
+          max-width: 100%;
+          margin: 1rem 0;
+          border: 1px solid #e9ecef;
+        }
+        .sticky-markdown pre code {
+          background-color: transparent;
+          padding: 0;
+          border-radius: 0;
+          font-family: monospace;
+          font-size: 0.9em;
+          color: inherit;
+          white-space: pre;
+          word-break: normal;
+          word-wrap: normal;
         }
         .sticky-markdown table {
           border-collapse: collapse;
@@ -774,7 +797,42 @@ export default function SummaryView() {
                             {extractedTitle}
                           </Title>
                         </div>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            pre(props) {
+                              return <>{props.children}</>;
+                            },
+                            code(props) {
+                              const {children, className, node, ...rest} = props;
+                              const match = /language-(\w+)/.exec(className || '');
+                              const isInline = !match && !String(children).includes('\n');
+                              return !isInline ? (
+                                <SyntaxHighlighter
+                                  {...rest}
+                                  PreTag="div"
+                                  children={String(children).replace(/\n$/, '')}
+                                  language={match ? match[1] : 'text'}
+                                  style={oneLight}
+                                  customStyle={{
+                                    margin: '1rem 0',
+                                    padding: '1rem',
+                                    borderRadius: '6px',
+                                    border: '1px solid #e9ecef',
+                                    backgroundColor: '#f8f9fa',
+                                    fontSize: '0.9em',
+                                    maxWidth: '100%',
+                                    overflowX: 'auto'
+                                  }}
+                                />
+                              ) : (
+                                <code {...rest} className={className}>
+                                  {children}
+                                </code>
+                              );
+                            }
+                          }}
+                        >
                           {displayContent}
                         </ReactMarkdown>
                       </>
