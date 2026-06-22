@@ -130,12 +130,18 @@ export default function SubjectView() {
   const [renameModalOpened, { open: openRenameModal, close: closeRenameModal }] = useDisclosure(false);
   const [deleteNoteModalOpened, { open: openDeleteNoteModal, close: closeDeleteNoteModal }] = useDisclosure(false);
   const [reprocessNoteModalOpened, { open: openReprocessNoteModal, close: closeReprocessNoteModal }] = useDisclosure(false);
-  const [editingNote, setEditingNote] = useState(null);
   const [reprocessingNote, setReprocessingNote] = useState(null);
+  const [reprocessingNoteIds, setReprocessingNoteIds] = useState([]);
+  const [exerciseProgress, setExerciseProgress] = useState({});
+  const [failedExerciseIds, setFailedExerciseIds] = useState([]);
+  const [reprocessingExerciseIds, setReprocessingExerciseIds] = useState([]);
+  const [generatedNoteProgress, setGeneratedNoteProgress] = useState({});
+  const [failedGeneratedNoteIds, setFailedGeneratedNoteIds] = useState([]);
+  const [reprocessingGeneratedNoteIds, setReprocessingGeneratedNoteIds] = useState([]);
+  const [editingNote, setEditingNote] = useState(null);
   const [infoModalNote, setInfoModalNote] = useState(null);
   const [newTitle, setNewTitle] = useState('');
   const [deletingNote, setDeletingNote] = useState(null);
-  const [reprocessingNoteIds, setReprocessingNoteIds] = useState([]);
 
   // Summary Action Modals
   const [renameSummaryModalOpened, { open: openRenameSummaryModal, close: closeRenameSummaryModal }] = useDisclosure(false);
@@ -223,6 +229,86 @@ export default function SubjectView() {
 
     return () => clearInterval(interval);
   }, [notes, failedNoteIds]);
+
+  // Polling for exercise processing progress
+  useEffect(() => {
+    const unprocessedExercises = exercises.filter(ex => !failedExerciseIds.includes(ex.id));
+    if (unprocessedExercises.length === 0) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const updatedExercises = await Promise.all(
+          unprocessedExercises.map(async (ex) => {
+            try {
+              const taskData = await fetchApi(`/search/task?exercise_id=${ex.id}`);
+              if (taskData) {
+                if (taskData.progress !== undefined) {
+                  setExerciseProgress(prev => ({ ...prev, [ex.id]: taskData.progress }));
+                }
+                if (taskData.status === 'completed') {
+                  // Optionally refresh exercise data if needed
+                  return ex; // placeholder
+                }
+                if (taskData.status === 'failed') {
+                  setFailedExerciseIds(prev => [...prev, ex.id]);
+                  return ex;
+                }
+              }
+              return null;
+            } catch (e) {
+              console.error(e);
+              return null;
+            }
+          })
+        );
+        // No state update needed beyond progress tracking for exercises
+      } catch (err) {
+        console.error("Error polling exercise task status", err);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [exercises, failedExerciseIds]);
+
+  // Polling for generated notes processing progress
+  useEffect(() => {
+    const unprocessedGNotes = generatedNotes.filter(gn => {
+      const isProcessed = gn.status === 'completed' || failedGeneratedNoteIds.includes(gn.id);
+      return !isProcessed;
+    });
+    if (unprocessedGNotes.length === 0) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const updatedGNotes = await Promise.all(
+          unprocessedGNotes.map(async (gn) => {
+            try {
+              const taskData = await fetchApi(`/search/task?note_id=${gn.note_id}`);
+              if (taskData) {
+                if (taskData.progress !== undefined) {
+                  setGeneratedNoteProgress(prev => ({ ...prev, [gn.id]: taskData.progress }));
+                }
+                if (taskData.status === 'completed') {
+                  // Refresh generated note data
+                  const refreshed = await fetchApi(`/summaries/${gn.id}?t=${Date.now()}`);
+                  setGeneratedNotes(prev => prev.map(item => item.id === gn.id ? refreshed : item));
+                }
+                if (taskData.status === 'failed') {
+                  setFailedGeneratedNoteIds(prev => [...prev, gn.id]);
+                }
+              }
+              return null;
+            } catch (e) {
+              console.error(e);
+              return null;
+            }
+          })
+        );
+      } catch (err) {
+        console.error("Error polling generated notes task status", err);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [generatedNotes, failedGeneratedNoteIds]);
 
   const handleEditSubjectClick = () => {
     setEditSubjectName(subject.name);
@@ -575,7 +661,7 @@ export default function SubjectView() {
           {exercises.length > 0 ? (
             <Stack spacing="sm">
               {exercises.map((ex) => (
-                <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder>
+                <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
                   <Group justify="space-between" wrap="nowrap">
                     <Group>
                       <Checkbox 
@@ -618,6 +704,16 @@ export default function SubjectView() {
                       </Menu>
                     </Group>
                   </Group>
+                  {/* Progress bar for exercise processing */}
+                  {(reprocessingExerciseIds.includes(ex.id) || exerciseProgress[ex.id]) && (
+                    <Progress
+                      value={exerciseProgress[ex.id] || undefined}
+                      animated={true}
+                      size="xs"
+                      color="orange"
+                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}
+                    />
+                  )}
                 </Card>
               ))}
             </Stack>
@@ -643,7 +739,7 @@ export default function SubjectView() {
                  const displayTitle = gn.is_user_edited ? gn.title : `${templateInfo} - ${resourceName}`;
 
                  return (
-                <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder>
+                <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
                    <Group justify="space-between" wrap="nowrap">
                       <Box>
                         <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${gn.id}`)}>
@@ -677,6 +773,16 @@ export default function SubjectView() {
                         </Menu>
                       </Group>
                    </Group>
+                   {/* Progress bar for generated note processing */}
+                   {(reprocessingGeneratedNoteIds.includes(gn.id) || generatedNoteProgress[gn.id]) && (
+                     <Progress
+                       value={generatedNoteProgress[gn.id] || undefined}
+                       animated={true}
+                       size="xs"
+                       color="orange"
+                       style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}
+                     />
+                   )}
                 </Card>
                  );
               })}
