@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox } from '@mantine/core';
+import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -135,6 +135,7 @@ export default function SubjectView() {
   const [infoModalNote, setInfoModalNote] = useState(null);
   const [newTitle, setNewTitle] = useState('');
   const [deletingNote, setDeletingNote] = useState(null);
+  const [reprocessingNoteIds, setReprocessingNoteIds] = useState([]);
 
   // Summary Action Modals
   const [renameSummaryModalOpened, { open: openRenameSummaryModal, close: closeRenameSummaryModal }] = useDisclosure(false);
@@ -168,6 +169,60 @@ export default function SubjectView() {
     };
     loadData();
   }, [id]);
+
+  const [noteProgress, setNoteProgress] = useState({});
+  const [failedNoteIds, setFailedNoteIds] = useState([]);
+
+  useEffect(() => {
+    const unprocessedNotes = notes.filter(n => {
+      const isProcessed = n.processing_time_ms != null || n.extracted_text != null || n.extracted_content_structured != null || n.output_pdf_path != null;
+      return !isProcessed && !failedNoteIds.includes(n.id);
+    });
+
+    if (unprocessedNotes.length === 0) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const updatedNotes = await Promise.all(
+          unprocessedNotes.map(async (n) => {
+            try {
+              const taskData = await fetchApi(`/search/task?note_id=${n.id}`);
+              if (taskData) {
+                if (taskData.progress !== undefined) {
+                  setNoteProgress(prev => ({ ...prev, [n.id]: taskData.progress }));
+                }
+                if (taskData.status === 'completed') {
+                  return await fetchApi(`/notes/${n.id}?t=${Date.now()}`);
+                }
+                if (taskData.status === 'failed') {
+                  setFailedNoteIds(prev => [...prev, n.id]);
+                  return await fetchApi(`/notes/${n.id}?t=${Date.now()}`);
+                }
+              }
+              return null;
+            } catch (e) {
+              console.error(e);
+              return null;
+            }
+          })
+        );
+
+        const successfullyProcessed = updatedNotes.filter(Boolean);
+        if (successfullyProcessed.length > 0) {
+          setNotes(prevNotes => 
+            prevNotes.map(n => {
+              const match = successfullyProcessed.find(un => un.id === n.id);
+              return match ? match : n;
+            })
+          );
+        }
+      } catch (err) {
+        console.error("Error polling task status", err);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [notes, failedNoteIds]);
 
   const handleEditSubjectClick = () => {
     setEditSubjectName(subject.name);
@@ -291,18 +346,19 @@ export default function SubjectView() {
 
   const executeReprocessNote = async () => {
     if (!reprocessingNote) return;
-    setSubmitting(true);
+    const noteIdToReprocess = reprocessingNote.id;
+    closeReprocessNoteModal();
+    setReprocessingNoteIds(prev => [...prev, noteIdToReprocess]);
     try {
-      const res = await fetchApi(`/notes/${reprocessingNote.id}/reprocess`, {
+      const res = await fetchApi(`/notes/${noteIdToReprocess}/reprocess`, {
         method: 'POST'
       });
       // The API returns the updated note
-      setNotes(notes.map(l => l.id === reprocessingNote.id ? res : l));
-      closeReprocessNoteModal();
+      setNotes(prevNotes => prevNotes.map(l => l.id === noteIdToReprocess ? res : l));
     } catch (err) {
       alert("Failed to reprocess note: " + err.message);
     } finally {
-      setSubmitting(false);
+      setReprocessingNoteIds(prev => prev.filter(id => id !== noteIdToReprocess));
     }
   };
 
@@ -410,6 +466,8 @@ export default function SubjectView() {
             <Stack spacing="sm">
               {filteredNotes.map((note) => {
                 const isProcessed = note.processing_time_ms != null || note.extracted_text != null || note.extracted_content_structured != null || note.output_pdf_path != null;
+                const isReprocessing = reprocessingNoteIds.includes(note.id);
+                const hasFailed = failedNoteIds.includes(note.id);
                 return (
                   <Card
                     key={note.id}
@@ -417,6 +475,7 @@ export default function SubjectView() {
                     padding="md"
                     radius="md"
                     withBorder
+                    style={{ position: 'relative', overflow: 'hidden' }}
                   >
                     <Group justify="space-between" wrap="nowrap">
                       <Box style={{ flex: 1 }}>
@@ -424,9 +483,9 @@ export default function SubjectView() {
                           {note.title}
                         </Text>
                         <Group gap="xs" mt={4}>
-                          {!isProcessed && (
-                            <Badge color="orange" variant="light" size="sm">
-                              Processing...
+                          {(isReprocessing || !isProcessed) && (
+                            <Badge color={hasFailed ? "red" : "orange"} variant="light" size="sm">
+                              {isReprocessing ? 'Reprocessing...' : hasFailed ? 'Failed' : 'Processing...'}
                             </Badge>
                           )}
                           <Text size="xs" c="dimmed">
@@ -454,6 +513,15 @@ export default function SubjectView() {
                         </Menu>
                       </Group>
                     </Group>
+                    {(isReprocessing || (!isProcessed && !hasFailed)) && (
+                      <Progress 
+                        value={isReprocessing ? undefined : (noteProgress[note.id] || 10)}
+                        animated={isReprocessing || (noteProgress[note.id] === undefined || noteProgress[note.id] < 100)} 
+                        size="xs" 
+                        color="orange" 
+                        style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }} 
+                      />
+                    )}
                   </Card>
                 );
               })}
