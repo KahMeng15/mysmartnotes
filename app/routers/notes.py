@@ -1,1168 +1,711 @@
-"""Notes management endpoints"""
-import os
-import json
-import logging
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks, Request
+"""Document generation endpoints"""
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from app.utils.cache import cache_response, clear_cache_pattern_sync
-from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session, joinedload
-from typing import List, Optional, Callable
-import uuid
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import List, Optional
+from datetime import datetime
+import logging
+import random
+import string
 
-from app.models.db import User, Note, Subject, Summary, Task
-from app.schemas.schemas import NoteResponse
+from app.models.db import User, Note, Summary
 from app.utils.auth import get_current_user
-from app.utils.db import get_db, generate_random_id, SessionLocal
+from app.utils.db import get_db, generate_random_id
 from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
-from app.utils.quotas import enforce_quota_notes, enforce_quota_storage
-from app.utils.crypto import decrypt_secret
-from app.processing.ocr import OCRProcessor
-from app.processing.image_extractor import ImageExtractor
-from app.processing.text_processor import ContentType
-from app.processing.smart_pipeline import SmartPipeline
-from app.processing.note_processor import (
-    get_pipeline_for_user,
-    extract_markdown_for_user,
-    markdown_to_segments,
-    process_note_task
-)
+from app.utils.quotas import enforce_quota_summaries
+from app.processing.ai_client import AIClient
 
 logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/notes", tags=["notes"])
-
-# Upload directory - use local temp directory
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "uploads")
-GENERATED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "generated")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(GENERATED_DIR, exist_ok=True)
+router = APIRouter(prefix="/summaries", tags=["summaries"])
 
 
-def _rebuild_note_content(
-    note: "Note",
-    current_user: "User",
-    db: Session,
-    use_v2: bool = True,
-    reset_first: bool = False,
-) -> "Note":
-    """
-    Rebuild a note's extracted content from the original uploaded file.
-    For PDF/PPTX, this reruns the SmartPipeline from scratch. For images,
-    this reruns OCR extraction. Structured content, images, processing time,
-    and embeddings are refreshed together.
-    """
-    if not os.path.exists(note.file_path):
+def format_timestamp(dt: Optional[datetime]) -> str:
+    """Format datetime as ISO string with UTC timezone for client-side parsing"""
+    if not dt:
+        return ""
+    # Add UTC timezone info to ensure JS interprets as UTC
+    if dt.tzinfo is None:
+        # Naive datetime - it's in UTC from our backend
+        iso_str = dt.isoformat()
+        return iso_str + 'Z' if not iso_str.endswith('Z') else iso_str
+    else:
+        return dt.isoformat()
+
+
+
+
+
+class SummaryRequest(BaseModel):
+    note_id: str
+    mode: str = "elaborate"  # quick, simple, elaborate, eli5
+    output_format: str = "sentence"  # sentence, pointform, numbered_list, table
+    processing_method: str = "whole"  # whole, section
+    split_level: str = "h1"  # h1, h2, h3
+    force_regenerate: bool = False
+    include_quickread: bool = False  # Generate quick mode summary alongside main summary
+    custom_prompt: Optional[str] = None  # Single parameter mode prompt
+    prompt_name: Optional[str] = None
+    prompt_icon: Optional[str] = None
+
+
+
+class SummaryResponse(BaseModel):
+    note_id: str
+    title: str
+    content: str
+    is_cached: bool
+    summary_type: str = "summary"
+    quickread: Optional[str] = None  # Optional quickread summary
+    mode: str = "elaborate"
+    output_format: str = "sentence"
+    processing_method: str = "whole"
+    split_level: Optional[str] = None
+    processing_time: Optional[float] = None
+    processing_time_ms: Optional[int] = None
+    model: Optional[str] = None
+    is_user_edited: bool = False
+    id: Optional[str] = None
+    version: Optional[int] = None
+    custom_prompt: Optional[str] = None
+    prompt_name: Optional[str] = None
+    prompt_icon: Optional[str] = None
+
+
+class CheatsheetRequest(BaseModel):
+    note_id: str
+    format: str = "markdown"  # markdown or html
+
+class RenameSummaryRequest(BaseModel):
+    title: str
+
+class CheatsheetResponse(BaseModel):
+    note_id: str
+    title: str
+    content: str
+
+
+class SummaryItemResponse(BaseModel):
+    id: str
+    version: int
+    note_id: str
+    title: str
+    summary_type: str
+    file_path: str
+    created_at: str
+    content: Optional[str] = None
+    quickread: Optional[str] = None  # For summaries
+    mode: Optional[str] = None  # For summaries (elaborate, quick, simple, eli5)
+    output_format: Optional[str] = None  # For summaries (sentence, pointform, numbered_list, table)
+    processing_method: Optional[str] = None  # For summaries (whole, section)
+    split_level: Optional[str] = None  # For summaries (h1, h2, h3)
+    processing_time: Optional[float] = None  # Processing time in seconds
+    processing_time_ms: Optional[int] = None  # Processing time in milliseconds
+    model: Optional[str] = None  # AI model used
+    is_user_edited: bool = False  # Whether the user has edited this summary
+    is_pinned: bool = False  # Whether the summary is pinned
+    prompt_name: Optional[str] = None
+    prompt_icon: Optional[str] = None
+
+
+
+
+@router.post("/summary", response_model=dict)
+async def generate_summary_endpoint(
+    request: SummaryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate or retrieve cached summary for a note"""
+    
+    # Enforce tier quotas
+    enforce_quota_summaries(current_user, db)
+    
+    # Verify note belongs to user
+    note = db.query(Note).filter(
+        Note.id == request.note_id,
+        Note.user_id == current_user.id
+    ).first()
+    
+    if not note:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note file not found"
+            detail="Note not found"
         )
 
-    # Clear cache first to ensure other requests (like SubjectView) immediately see the reset state
-    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+    # Check for existing summary (unless forced)
+    if not request.force_regenerate and not request.custom_prompt:
+        existing_summary = db.query(Summary).filter(
+            Summary.note_id == request.note_id,
+            Summary.summary_type == "summary",
+            Summary.processing_method == request.processing_method,
+            Summary.mode == request.mode,
+            Summary.output_format == request.output_format,
+            Summary.custom_prompt.is_(None)
+        ).order_by(Summary.created_at.desc()).first()
 
-    # Delete output PDF file if it exists
-    if note.output_pdf_path and os.path.exists(note.output_pdf_path):
-        try:
-            os.remove(note.output_pdf_path)
-            logger.info(f"Deleted output PDF for note {note.id}: {note.output_pdf_path}")
-        except Exception as e:
-            logger.warning(f"Error deleting output PDF for note {note.id}: {e}")
-    note.output_pdf_path = None
-    note.processing_time_ms = None
-
-    if reset_first:
-        StorageManager.delete_note_files(note.id)
-
-    note.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(note)
-
-    # Initialize or update Task status to processing
-    task_id = f"ocr_{current_user.id}_{note.id}"
-    db_task = db.query(Task).filter(Task.task_id == task_id).first()
-    if not db_task:
-        db_task = Task(
-            task_id=task_id,
-            user_id=current_user.id,
-            task_type="note_processing",
-            status="processing",
-            progress=10,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        db.add(db_task)
-    else:
-        db_task.status = "processing"
-        db_task.progress = 10
-        db_task.error_message = None
-        db_task.updated_at = datetime.utcnow()
-    db.commit()
+        if existing_summary:
+            return {
+                "note_id": request.note_id,
+                "title": existing_summary.title,
+                "content": StorageManager.get_summary_text(existing_summary.id) or "",
+                "is_cached": True,
+                "summary_type": existing_summary.summary_type,
+                "quickread": StorageManager.get_summary_text(existing_summary.id, is_quickread=True),
+                "mode": existing_summary.mode or "elaborate",
+                "output_format": existing_summary.output_format or "sentence",
+                "processing_method": existing_summary.processing_method or "whole",
+                "split_level": existing_summary.split_level,
+                "processing_time": existing_summary.processing_time,
+                "processing_time_ms": existing_summary.processing_time_ms,
+                "model": existing_summary.model,
+                "is_user_edited": existing_summary.is_user_edited or False,
+                "id": existing_summary.id,
+                "version": existing_summary.version,
+                "custom_prompt": existing_summary.custom_prompt,
+                "prompt_name": existing_summary.prompt_name,
+                "prompt_icon": existing_summary.prompt_icon,
+                "status": "completed"
+            }
+    # If forcing regeneration, we simply bypass the cache check and generate a new one.
 
     import time
-    start_time = time.time()
+    from app.utils.db import generate_random_id
+    doc_id = generate_random_id(db, Summary)
+    task_id = f"summary_{current_user.id}_{request.note_id}_{int(time.time())}"
+    TaskManager.submit_task(
+        task_id, 
+        "summary_generation", 
+        current_user.id, 
+        note_id=note.id,
+        summary_id=doc_id,
+        title=note.title, 
+        mode=request.mode,
+        output_format=request.output_format,
+        processing_method=request.processing_method,
+        split_level=request.split_level,
+        custom_prompt=request.custom_prompt,
+        prompt_name=request.prompt_name,
+        prompt_icon=request.prompt_icon
+    )
+
+    return {"task_id": task_id, "summary_id": doc_id, "status": "pending"}
+
+class GeneratePromptRequest(BaseModel):
+    user_input: str
+
+@router.post("/generate-prompt", response_model=dict)
+async def generate_prompt(
+    request: GeneratePromptRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate a custom prompt based on user's instruction"""
+    ai_client = AIClient(user=current_user, db=db)
+    system_instruction = "You are an expert prompt engineer. The user will give you instructions on how they want their study notes summarized. Your task is to output a JSON object with two keys: 'name' (a short, descriptive title for the template) and 'prompt' (a detailed, well-structured, multi-line instructional prompt that can be directly passed to another AI to generate the summary. Use line breaks `\\n` and clear formatting). Do NOT include any filler text or conversational intro. Output ONLY valid JSON, do not use markdown code blocks."
+    prompt = f"User's request: {request.user_input}"
+    
     try:
-        file_ext = os.path.splitext(note.file_path)[1].lower()
-
-        if file_ext in ('.pdf', '.pptx'):
-            logger.info(f"Rebuilding note {note.id} with SmartPipeline from scratch")
-            raw_text, timings = extract_markdown_for_user(current_user, note.file_path)
-            StorageManager.save_note_json(note.id, "timings", timings)
-            structured_content = markdown_to_segments(raw_text)
-
-            images_data = []
-            if file_ext == '.pdf':
-                try:
-                    extractor = ImageExtractor(note_id=note.id)
-                    images_extracted = extractor.extract_images_from_pdf(note.file_path)
-                    images_data = [img.to_dict() for img in images_extracted]
-                    logger.info(f"Extracted {len(images_data)} images during note rebuild")
-                except Exception as e:
-                    logger.warning(f"Image extraction failed during note rebuild: {e}")
+        generated_response = await ai_client.generate_text(prompt, max_tokens=1000, system_instruction=system_instruction)
+        
+        # Try to parse JSON from response
+        import json
+        import re
+        
+        # Clean up potential markdown formatting
+        cleaned_text = generated_response.strip()
+        if cleaned_text.startswith("```json"):
+            cleaned_text = cleaned_text[7:]
+        if cleaned_text.startswith("```"):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith("```"):
+            cleaned_text = cleaned_text[:-3]
             
-            # Save to file storage
-            StorageManager.save_note_text(note.id, raw_text)
-            StorageManager.save_note_json(note.id, "structured", structured_content)
-            StorageManager.save_note_json(note.id, "images", images_data)
+        try:
+            data = json.loads(cleaned_text.strip())
+            return {"prompt": data.get("prompt", ""), "name": data.get("name", "")}
+        except json.JSONDecodeError:
+            # Fallback if AI didn't return valid JSON
+            return {"prompt": generated_response.strip(), "name": "Generated Prompt"}
+    except Exception as e:
+        logger.error(f"Failed to generate prompt: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate prompt: {str(e)}"
+        )
 
-        else:
-            logger.info(f"Rebuilding note {note.id} with OCR fallback")
-            ocr_result = OCRProcessor.extract_text(
-                note.file_path,
-                note.file_type,
-                note_id=note.id,
-                use_v2=use_v2
-            )
-            raw_text = ocr_result.get("raw_text", "")
-            structured_content = ocr_result.get("structured_content", [])
-            images_data = ocr_result.get("images", [])
-            
-            # Save to file storage
-            StorageManager.save_note_text(note.id, raw_text)
-            StorageManager.save_note_json(note.id, "structured", structured_content)
-            StorageManager.save_note_json(note.id, "images", images_data)
 
-        # Auto-detect title from first H1 heading
-        if raw_text:
-            for line in raw_text.split('\n'):
-                if line.strip().startswith('# '):
-                    detected_title = line.strip()[2:].strip()
-                    if detected_title:
-                        note.title = detected_title
-                        logger.info(f"Auto-detected title '{detected_title}' for note {note.id} during rebuild")
-                        break
 
-        note.processing_time_ms = int((time.time() - start_time) * 1000)
-        note.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(note)
-
-        if raw_text and raw_text.strip():
-            try:
-                from app.processing.embeddings import update_note_embeddings
-                update_note_embeddings(note.id, raw_text, db)
-                logger.info(f"Updated embeddings after rebuilding note {note.id}")
-            except Exception as e:
-                logger.error(f"Error updating embeddings after note rebuild: {e}", exc_info=True)
-
-        logger.info(
-            f"Note rebuild complete: {note.id}, "
-            f"{len(raw_text)} chars, {len(structured_content)} segments, {len(images_data)} images"
+@router.post("/cheatsheet", response_model=CheatsheetResponse)
+async def generate_cheatsheet(
+    request: CheatsheetRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Generate study cheatsheet from note"""
+    
+    # Enforce tier quotas
+    enforce_quota_summaries(current_user, db)
+    
+    # Verify note belongs to user
+    note = db.query(Note).filter(
+        Note.id == request.note_id,
+        Note.user_id == current_user.id
+    ).first()
+    
+    if not note:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Note not found"
+        )
+    
+    note_content = StorageManager.get_note_text(note.id) or ""
+    if not note_content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Note content not available yet. Please wait for processing."
+        )
+    
+    # Generate cheatsheet using AI
+    ai_client = AIClient(current_user, db=db)
+    
+    try:
+        content = await ai_client.generate_summary(
+            content=note_content,
+            output_format=request.format
         )
         
-        # Mark Task complete
-        db_task.status = "completed"
-        db_task.progress = 100
-        db_task.updated_at = datetime.utcnow()
+        # Save generated summary
+        doc_id = generate_random_id(db, Summary)
+        doc = Summary(
+            id=doc_id,
+            note_id=request.note_id,
+            title=f"Cheatsheet - {note.title}",
+            summary_type="cheatsheet",
+            file_path=f"cheatsheet_{note.id}.md"
+        )
+        db.add(doc)
+
+        # Save to storage
+        StorageManager.save_summary_text(doc_id, content)
+
         db.commit()
-        
-        return note
+
+        return CheatsheetResponse(
+            note_id=request.note_id,
+            title=f"Cheatsheet - {note.title}",
+            content=content
+        )
     except Exception as e:
-        logger.error(f"Error during note rebuild for {note.id}: {e}", exc_info=True)
-        # Mark Task failed
-        db_task.status = "failed"
-        db_task.error_message = str(e)
-        db_task.progress = 0
-        db_task.updated_at = datetime.utcnow()
-        db.commit()
-        raise
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating cheatsheet: {str(e)}"
+        )
 
 
-@router.get("", response_model=List[NoteResponse])
-@cache_response(ttl=3600)
-async def get_notes(
+class UpdateSummaryRequest(BaseModel):
+    content: str
+    title: Optional[str] = None
+    quickread: Optional[str] = None
+
+
+@router.put("/{summary_id}", response_model=SummaryItemResponse)
+async def update_generated_summary(
+    summary_id: str,
+    request: UpdateSummaryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a generated summary (e.g. summary edit)"""
+    doc = db.query(Summary).filter(Summary.id == summary_id).first()
+    
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        
+    # Verify ownership through note
+    note = db.query(Note).filter(Note.id == doc.note_id, Note.user_id == current_user.id).first()
+    if not note:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this summary")
+        
+    # Save to storage
+    StorageManager.save_summary_text(doc.id, request.content)
+    if request.title:
+        doc.title = request.title
+    if request.quickread is not None:
+        StorageManager.save_summary_text(doc.id, request.quickread, is_quickread=True)
+
+    # Mark as user edited
+    doc.is_user_edited = True
+
+    db.commit()
+    db.refresh(doc)
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
+    
+    return SummaryItemResponse(
+        id=doc.id,
+        version=doc.version,
+        note_id=doc.note_id,
+        title=doc.title,
+        summary_type=doc.summary_type,
+        file_path=doc.file_path,
+        created_at=format_timestamp(doc.created_at),
+        content=StorageManager.get_summary_text(doc.id),
+        quickread=StorageManager.get_summary_text(doc.id, is_quickread=True),
+        mode=doc.mode,
+        output_format=doc.output_format,
+        processing_method=doc.processing_method,
+        split_level=doc.split_level,
+        processing_time=doc.processing_time,
+        processing_time_ms=doc.processing_time_ms,
+        model=doc.model,
+        is_user_edited=doc.is_user_edited
+    )
+
+@router.get("", response_model=List[SummaryItemResponse])
+async def list_summaries(
     request: Request,
+    note_id: str = None,
     subject_id: str = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all notes for the current user, optionally filtered by subject"""
-    query = db.query(Note).filter(Note.user_id == current_user.id)
+    """List all generated summaries for current user"""
+    query = db.query(Summary).join(Note).filter(
+        Note.user_id == current_user.id
+    )
     
     if subject_id:
         query = query.filter(Note.subject_id == subject_id)
+    if note_id:
+        query = query.filter(Summary.note_id == note_id)
     
-    notes = query.order_by(Note.created_at.desc()).all()
+    summaries = query.all()
     
-    response_notes = []
-    for note in notes:
-        note_data = NoteResponse.from_orm(note)
-        timings = StorageManager.get_note_json(note.id, "timings")
-        if timings:
-            note_data.timings = timings
-        response_notes.append(note_data)
-
-    return response_notes
-
-
-@router.post("/upload", response_model=List[NoteResponse], status_code=status.HTTP_201_CREATED)
-async def upload_note(
-    background_tasks: BackgroundTasks,
-    subject_id: str = Form(...),
-    files: List[UploadFile] = File(...),
-    title: str = Form(None),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Upload multiple note files and create note records"""
-    
-    # Validate subject exists and belongs to user
-    subject = db.query(Subject).filter(
-        Subject.id == subject_id,
-        Subject.user_id == current_user.id
-    ).first()
-    
-    if not subject:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Subject not found"
+    return [
+        SummaryItemResponse(
+            id=d.id,
+            version=d.version,
+            note_id=d.note_id,
+            title=d.title,
+            summary_type=d.summary_type,
+            file_path=d.file_path,
+            created_at=format_timestamp(d.created_at),
+            model=d.model,
+            processing_time_ms=d.processing_time_ms,
+            mode=d.mode,
+            output_format=d.output_format,
+            processing_method=d.processing_method,
+            split_level=d.split_level,
+            is_user_edited=d.is_user_edited or False,
+            prompt_name=d.prompt_name,
+            prompt_icon=d.prompt_icon
         )
-    
-    allowed_types = {
-        "application/pdf": ".pdf",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
-        "application/vnd.ms-powerpoint": ".ppt",
-        "image/png": ".png",
-        "image/jpeg": ".jpg",
-        "image/jpg": ".jpg"
-    }
-
-    processed_notes = []
-
-    for file in files:
-        # Handle auto-title per file
-        auto_detect_title = False
-        file_title = title
-        if not file_title:
-            file_title = os.path.splitext(file.filename)[0]
-            auto_detect_title = True
-        
-        # If multiple files and a title is provided, use the filename as title instead of duplicating the same title
-        if len(files) > 1 and title:
-             file_title = f"{title} - {os.path.splitext(file.filename)[0]}"
-
-        if file.content_type not in allowed_types:
-            logger.warning(f"File type not allowed for {file.filename}: {file.content_type}")
-            continue
-        
-        # Validate file size (50MB max)
-        max_size = 50 * 1024 * 1024  # 50MB
-        contents = await file.read()
-        if len(contents) > max_size:
-            logger.warning(f"File too large: {file.filename}")
-            continue
-        
-        # Enforce tier quotas
-        try:
-            enforce_quota_notes(current_user, db)
-            enforce_quota_storage(current_user, len(contents), db)
-        except HTTPException as e:
-            logger.error(f"Quota exceeded: {e.detail}")
-            # If we already processed some, we return them, otherwise raise for the first one
-            if not processed_notes:
-                raise e
-            break
-        
-        # Create upload directory structure
-        user_upload_dir = os.path.join(UPLOAD_DIR, str(current_user.id))
-        os.makedirs(user_upload_dir, exist_ok=True)
-        
-        # Save file
-        file_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
-        file_path = os.path.join(user_upload_dir, file_name)
-        
-        with open(file_path, "wb") as f:
-            f.write(contents)
-        
-        # Create note record
-        db_note = Note(
-            id=generate_random_id(db, Note),
-            title=file_title,
-            subject_id=subject_id,
-            user_id=current_user.id,
-            file_path=file_path,
-            file_name=file.filename,
-            file_size=len(contents),
-            file_type=file.content_type,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
-        )
-        
-        db.add(db_note)
-        db.commit()
-        db.refresh(db_note)
-        
-        # STEP 3: Process content extraction in background (Offloaded to Worker)
-        task_id = f"ocr_{current_user.id}_{db_note.id}"
-        TaskManager.submit_task(
-            task_id, 
-            "note_processing", 
-            current_user.id, 
-            note_id=db_note.id, 
-            file_name=file.filename,
-            auto_detect_title=auto_detect_title
-        )
-        processed_notes.append(db_note)
-
-    # Clear cache
-    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
-    
-    if not processed_notes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No valid files were uploaded"
-        )
-
-    return processed_notes
+        for d in summaries
+    ]
 
 
-
-@router.get("/{note_id}", response_model=NoteResponse)
-@cache_response(ttl=3600)
-async def get_note(
+@router.get("/{summary_id}", response_model=SummaryItemResponse)
+async def get_summary(
     request: Request,
-    note_id: str,
+    summary_id: str,
+    note_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get a specific note"""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    note = db.query(Note).options(
-        joinedload(Note.subject).joinedload(Subject.group)
-    ).filter(
-        Note.id == note_id,
+    """Get a specific generated summary by ID or version (if note_id provided)"""
+    query = db.query(Summary).join(Note).filter(
         Note.user_id == current_user.id
-    ).first()
+    )
     
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-
-    # Manually populate text fields from storage for the response
-    note_data = NoteResponse.from_orm(note)
-    note_data.extracted_text = StorageManager.get_note_text(note_id)
-
-    # Get structured content and images
-    structured = StorageManager.get_note_json(note_id, "structured")
-    if structured:
-        note_data.extracted_content_structured = json.dumps(structured)
-
-    images = StorageManager.get_note_json(note_id, "images")
-    if images:
-        note_data.extracted_images_metadata = json.dumps(images)
-
-    timings = StorageManager.get_note_json(note_id, "timings")
-    if timings:
-        note_data.timings = timings
-
-    logger.info(f"GET note {note_id}: extracted_text length = {len(note_data.extracted_text) if note_data.extracted_text else 'NULL'}")
-    return note_data
-
-
-@router.put("/{note_id}", response_model=NoteResponse)
-async def update_note(
-    note_id: str,
-    title: str = Form(None),
-    subject_id: str = Form(None),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Update note metadata"""
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
-    ).first()
-    
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-    
-    if title:
-        note.title = title
-    
-    if subject_id:
-        # Verify subject exists and belongs to user
-        subject = db.query(Subject).filter(
-            Subject.id == subject_id,
-            Subject.user_id == current_user.id
-        ).first()
-        if not subject:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Subject not found"
-            )
-        note.subject_id = subject_id
-    
-    note.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(note)
-
-    # Clear cache
-    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
-
-    return note
-
-
-
-@router.post("/{note_id}/reprocess-ocr", response_model=NoteResponse)
-def reprocess_ocr(
-    note_id: str,
-    use_v2: bool = True,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Reprocess OCR for existing note to extract structured content with enhanced v2 processor"""
-    
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
-    ).first()
-    
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-    
-    try:
-        logger.info(f"Reprocessing OCR for note {note_id} (use_v2={use_v2})")
-        note = _rebuild_note_content(note, current_user, db, use_v2=use_v2, reset_first=False)
-        logger.info(f"Successfully reprocessed OCR for note {note_id}")
-        
-        note_data = NoteResponse.from_orm(note)
-        timings = StorageManager.get_note_json(note.id, "timings")
-        if timings:
-            note_data.timings = timings
-            
-        clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
-        return note_data
-        
-    except Exception as e:
-        import traceback
-        import sys
-        traceback.print_exc(file=sys.stderr)
-        logger.error(f"Error reprocessing OCR: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error reprocessing OCR: {str(e)}"
-        )
-
-
-@router.post("/{note_id}/reprocess", response_model=NoteResponse)
-def reprocess_note_from_scratch(
-    note_id: str,
-    use_v2: bool = True,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Fully rebuild a note from the original uploaded file, replacing all derived content."""
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
-    ).first()
-
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-
-    try:
-        logger.info(f"Starting full note rebuild for {note_id}")
-        note = _rebuild_note_content(note, current_user, db, use_v2=use_v2, reset_first=True)
-        logger.info(f"Successfully rebuilt note {note_id} from scratch")
-        
-        note_data = NoteResponse.from_orm(note)
-        timings = StorageManager.get_note_json(note.id, "timings")
-        if timings:
-            note_data.timings = timings
-            
-        clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
-        return note_data
-    except Exception as e:
-        logger.error(f"Error rebuilding note from scratch: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error rebuilding note: {str(e)}"
-        )
-
-
-@router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_note(
-    note_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Delete a note"""
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
-    ).first()
-    
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-    
-    # 1. Delete the actual uploaded file if it exists
-    if note.file_path and os.path.exists(note.file_path):
+    if note_id and summary_id.startswith('v'):
         try:
-            os.remove(note.file_path)
-        except Exception as e:
-            # Log error but don't fail the request
-            logger.warning(f"Error deleting original file: {e}")
-
-    # 2. Delete storage files (extracted text, structured JSON, images)
-    try:
-        StorageManager.delete_note_files(note.id)
-    except Exception as e:
-        logger.warning(f"Error deleting storage files: {e}")
-
-    # 3. Delete database record (cascades to related objects)
-    try:
-        db.delete(note)
-        db.commit()
-        
-        # Clear cache
-        clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error deleting note from database: {e}", exc_info=True)
+            version_num = int(summary_id[1:])
+            summary = query.filter(
+                Summary.note_id == note_id,
+                Summary.version == version_num
+            ).first()
+        except ValueError:
+            summary = None
+    else:
+        summary = query.filter(Summary.id == summary_id).first()
+    
+    if not summary:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database deletion failed: {str(e)}"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Summary not found"
         )
     
-    return None
+    return SummaryItemResponse(
+        id=summary.id,
+        version=summary.version,
+        note_id=summary.note_id,
+        title=summary.title,
+        summary_type=summary.summary_type,
+        file_path=summary.file_path,
+        created_at=format_timestamp(summary.created_at),
+        content=StorageManager.get_summary_text(summary.id),
+        quickread=StorageManager.get_summary_text(summary.id, is_quickread=True),
+        mode=summary.mode,
+        output_format=summary.output_format,
+        processing_method=summary.processing_method,
+        split_level=summary.split_level,
+        processing_time=summary.processing_time,
+        processing_time_ms=summary.processing_time_ms,
+        model=summary.model,
+        is_user_edited=summary.is_user_edited or False,
+        prompt_name=summary.prompt_name,
+        prompt_icon=summary.prompt_icon
+    )
 
 
-@router.post("/{note_id}/generate-pdf", response_model=dict)
-async def generate_pdf(
-    note_id: str,
-    body: dict = {},
+@router.delete("/{summary_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_summary(
+    summary_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Generate OUTPUT.pdf from note content"""
-    
-    # Get note
-    note = db.query(Note).filter(
-        Note.id == note_id,
+    """Delete a generated summary"""
+    summary = db.query(Summary).join(Note).filter(
+        Summary.id == summary_id,
         Note.user_id == current_user.id
     ).first()
-    
-    if not note:
+
+    if not summary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-    
-    # Extract options from body
-    include_toc = body.get("include_toc", True)
-    include_cover = body.get("include_cover", True)
-    
-    try:
-        # Build segments from structured content or markdown
-        from app.processing.text_processor import ContentSegment
-        segments = []
-        images = []
-        
-        if note.extracted_content_structured:
-            # Parse structured content
-            structured_data = json.loads(note.extracted_content_structured)
-            for item in structured_data:
-                segment = ContentSegment(
-                    content=item["content"],
-                    content_type=ContentType(item["type"]),
-                    page_number=item["page"],
-                    confidence=item.get("confidence", 0.9),
-                    metadata=item.get("metadata", {})
-                )
-                segments.append(segment)
-            # Images currently disabled - feature not yet implemented
-        elif note.extracted_text:
-            # Markdown-only: convert to segments
-            structured_data = _markdown_to_segments(note.extracted_text)
-            for item in structured_data:
-                segment = ContentSegment(
-                    content=item["content"],
-                    content_type=ContentType(item["type"]),
-                    page_number=item.get("page", 1),
-                    confidence=item.get("confidence", 0.9),
-                    metadata=item.get("metadata", {})
-                )
-                segments.append(segment)
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Note has no content to export. Please wait for processing to complete."
-            )
-        
-        # Actually generate the PDF
-        from app.processing.document_generator import DocumentGenerator
-        generator = DocumentGenerator(
-            note_id=note.id,
-            note_title=note.title,
-            base_output_dir=GENERATED_DIR,
-        )
-        
-        output_path = generator.generate_pdf(
-            content_segments=segments,
-            extracted_images=images,
-            include_toc=include_toc,
-            include_cover=include_cover,
-        )
-        
-        # Save the output path
-        note.output_pdf_path = output_path
-        note.updated_at = datetime.utcnow()
-        db.commit()
-        
-        logger.info(f"Generated PDF for note {note_id}: {output_path}")
-        
-        return {
-            "success": True,
-            "message": "PDF generated successfully",
-            "download_url": f"/notes/{note_id}/download-pdf",
-            "segments_count": len(segments),
-            "images_count": len(images)
-        }
-    
-    except json.JSONDecodeError as e:
-        logger.error(f"Error parsing structured content: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid structured content format"
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error generating PDF: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error generating PDF: {str(e)}"
+            detail="Document not found"
         )
 
+    # Delete storage files
+    StorageManager.delete_summary_files(summary.id)
 
-@router.get("/{note_id}/download-pdf")
-async def download_pdf(
-    note_id: str,
+    db.delete(summary)
+    db.commit()
+    
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
+    
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/{summary_id}/rename")
+async def rename_summary(
+    summary_id: str,
+    request: RenameSummaryRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Download generated OUTPUT.pdf"""
-    
-    # Get note
-    note = db.query(Note).filter(
-        Note.id == note_id,
+    """Rename a generated summary"""
+    summary = db.query(Summary).join(Note).filter(
+        Summary.id == summary_id,
         Note.user_id == current_user.id
     ).first()
-    
-    if not note:
+
+    if not summary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
+            detail="Summary not found"
         )
+
+    summary.title = request.title
+    summary.is_user_edited = True
+    db.commit()
     
-    if not note.output_pdf_path or not os.path.exists(note.output_pdf_path):
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
+    
+    return {"message": "Summary renamed", "title": summary.title}
+
+
+@router.patch("/{summary_id}/pin")
+async def toggle_pin_summary(
+    summary_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Toggle pin status of a summary"""
+    summary = db.query(Summary).join(Note).filter(
+        Summary.id == summary_id,
+        Note.user_id == current_user.id
+    ).first()
+
+    if not summary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="PDF not generated yet. Please generate it first."
+            detail="Summary not found"
         )
+
+    summary.is_pinned = not summary.is_pinned
+    db.commit()
     
-    try:
-        # Generate safe filename
-        safe_title = "".join(c for c in note.title if c.isalnum() or c in (' ', '-', '_')).strip()
-        filename = f"{safe_title}_OUTPUT.pdf"
-        
-        return FileResponse(
-            path=note.output_pdf_path,
-            filename=filename,
-            media_type="application/pdf"
-        )
-    except Exception as e:
-        logger.error(f"Error downloading PDF: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error downloading PDF"
-        )
+    # Clear cache
+    clear_cache_pattern_sync(f"cache_resp:/summaries*:u{current_user.id}*")
+    
+    return {"message": "Summary pin toggled", "is_pinned": summary.is_pinned}
 
-
-@router.post("/{note_id}/export", response_model=dict)
-async def export_note(
-    note_id: str,
+@router.post("/{summary_id}/export", response_model=dict)
+async def export_summary(
+    summary_id: str,
     body: dict,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Export note as PDF or DOCX"""
+    """Export a specific generated summary as PDF or DOCX"""
+    import os
     import uuid
-    logger.info(f"[Export] Received request for note {note_id} with body: {body}")
-    task_id = str(uuid.uuid4())[:8]
-    _export_progress[task_id] = {"step": "Starting", "percent": 0, "status": "running"}
+    from datetime import datetime
+    from pathlib import Path
+    from app.models.db import Summary, Note, ExportTemplate
+    from app.processing.text_processor import ContentSegment, ContentType
     
-    def progress_callback(step, percent):
-        _export_progress[task_id] = {"step": step, "percent": percent, "status": "running" if percent < 100 else "complete"}
-    
-    export_format = body.get("format", "pdf").lower()
-    if export_format not in ("pdf", "docx"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Format must be 'pdf' or 'docx'"
-        )
-    
-    include_cover = body.get("include_cover")
-    template_id = body.get("template_id", None)
-    
-    # Load template config if provided
-    template_config = None
-    if template_id:
-        from app.models.db import ExportTemplate
-        tmpl = db.query(ExportTemplate).filter(
-            ExportTemplate.id == template_id,
-            (ExportTemplate.user_id == current_user.id) | (ExportTemplate.user_id.is_(None))
-        ).first()
-        if tmpl:
-            template_config = tmpl.config
-            logger.info(f"[Export] Loaded template '{tmpl.name}' (ID: {template_id})")
-            logger.debug(f"[Export] Template Config Keys: {list(template_config.keys()) if template_config else 'None'}")
-            
-            # Apply template settings for include_cover if not explicitly in request body
-            if include_cover is None:
-                include_cover = template_config.get("cover_page", {}).get("enabled", True)
-                
-            logger.info(f"[Export] Cover: {include_cover}")
-        else:
-            logger.warning(f"[Export] Template ID {template_id} not found in database")
-    
-    # Final defaults if still None
-    if include_cover is None: include_cover = True
-
-    # Get note
-    note = db.query(Note).filter(
-        Note.id == note_id,
+    # 1. Verify existence and ownership
+    doc = db.query(Summary).join(Note).filter(
+        Summary.id == summary_id,
         Note.user_id == current_user.id
     ).first()
-
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-
-    # Build segments from structured content or markdown
-    from app.processing.text_processor import ContentSegment, ContentType
-    segments = []
-    images = []  # Currently disabled - image feature not yet implemented
-
-    try:
-        # Inject header segments based on template config
-        if template_config and "header" in template_config:
-            h_cfg = template_config["header"]
-            if h_cfg.get("show_note_title"):
-                segments.append(ContentSegment(
-                    content=note.title,
-                    content_type=ContentType.NOTE_TITLE,
-                    page_number=1
-                ))
-            if h_cfg.get("show_subject_name") and note.subject:
-                segments.append(ContentSegment(
-                    content=note.subject.name,
-                    content_type=ContentType.SUBJECT_NAME,
-                    page_number=1
-                ))
-            if h_cfg.get("show_group_name") and note.subject and note.subject.group_id:
-                from app.models.db import SubjectGroup
-                group = db.query(SubjectGroup).filter(SubjectGroup.id == note.subject.group_id).first()
-                if group:
-                    segments.append(ContentSegment(
-                        content=group.name,
-                        content_type=ContentType.GROUP_NAME,
-                        page_number=1
-                    ))
-
-        # Flag to skip first H1 if we already injected a NOTE_TITLE
-        skip_first_h1 = template_config and template_config.get("header", {}).get("show_note_title", False)
-
-        if note.extracted_content_structured:
-            structured_data = json.loads(note.extracted_content_structured)
-            for item in structured_data:
-                # If it's the first H1 and we are skipping it, do so
-                if skip_first_h1 and item["type"] == "h1":
-                    skip_first_h1 = False  # Only skip the VERY first one
-                    continue
-                
-                segment = ContentSegment(
-                    content=item["content"],
-                    content_type=ContentType(item["type"]),
-                    page_number=item["page"],
-                    confidence=item.get("confidence", 0.9),
-                    metadata=item.get("metadata", {})
-                )
-                segments.append(segment)
-            # Images currently disabled - feature not yet implemented
-        elif note.extracted_text:
-            structured_data = _markdown_to_segments(note.extracted_text)
-            for item in structured_data:
-                # If it's the first H1 and we are skipping it, do so
-                if skip_first_h1 and item["type"] == "h1":
-                    skip_first_h1 = False  # Only skip the VERY first one
-                    continue
-                    
-                segment = ContentSegment(
-                    content=item["content"],
-                    content_type=ContentType(item["type"]),
-                    page_number=item.get("page", 1),
-                    confidence=item.get("confidence", 0.9),
-                    metadata=item.get("metadata", {})
-                )
-                segments.append(segment)
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Note has no content to export. Please wait for processing to complete."
-            )
+    
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
         
-        # Generate the document
-        safe_title = "".join(c for c in note.title if c.isalnum() or c in (' ', '-', '_')).strip()
+    note = db.query(Note).filter(Note.id == doc.note_id).first()
+    
+    # 2. Extract options
+    export_format = body.get("format", "pdf").lower()
+    if export_format not in ("pdf", "docx"):
+        raise HTTPException(status_code=400, detail="Format must be 'pdf' or 'docx'")
+        
+    template_id = body.get("template_id")
+    template = None
+    if template_id:
+        template = db.query(ExportTemplate).filter(ExportTemplate.id == template_id).first()
+        
+    # 3. Build content segments
+    segments = []
+    
+    # Add Quickread as a special section if it exists
+    quickread = StorageManager.get_summary_text(doc.id, is_quickread=True)
+    if quickread:
+        segments.append(ContentSegment(
+            content=quickread,
+            content_type=ContentType.H2,
+            page_number=1,
+            metadata={"title": "Quickread"}
+        ))
+        
+    # Add the main content
+    summary_text = StorageManager.get_summary_text(doc.id) or ""
+    segments.append(ContentSegment(
+        content=summary_text,
+        content_type=ContentType.BODY,
+        page_number=1,
+        metadata={"title": doc.title or "Summary"}
+    ))
+    
+    # 4. Generate the summary
+    generated_dir = "generated"
+    output_dir = os.path.join(generated_dir, str(doc.note_id))
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    
+    safe_title = "".join(c for c in (doc.title or note.title) if c.isalnum() or c in (' ', '-', '_')).strip()
+    filename = f"{safe_title}_{uuid.uuid4().hex[:6]}.{export_format}"
+    output_path = os.path.join(output_dir, filename)
+    
+    try:
+        template_config = template.config if template else None
         
         if export_format == "pdf":
             from app.processing.document_generator import DocumentGenerator
             generator = DocumentGenerator(
-                note_id=note.id,
+                note_id=doc.note_id,
                 note_title=note.title,
-                base_output_dir=GENERATED_DIR,
+                base_output_dir=generated_dir
             )
-            output_path = generator.generate_pdf(
-                content_segments=segments,
-                extracted_images=images,
-                include_toc=False,
-                include_cover=include_cover,
-                template_config=template_config,
-                progress_callback=progress_callback,
-            )
-            note.output_pdf_path = output_path
-            download_filename = f"{safe_title}.pdf"
+            # Generator uses its own internal path, we need to move it after
+            temp_path = generator.generate_pdf(segments, [], template_config=template_config)
+            import shutil
+            shutil.move(temp_path, output_path)
         else:
             from app.processing.docx_generator import DocxGenerator
             generator = DocxGenerator(
-                note_id=note.id,
+                note_id=doc.note_id,
                 note_title=note.title,
-                base_output_dir=GENERATED_DIR,
+                base_output_dir=generated_dir
             )
-            output_path = generator.generate_docx(
-                content_segments=segments,
-                extracted_images=images,
-                include_toc=False,
-                include_cover=include_cover,
-                template_config=template_config,
-                progress_callback=progress_callback,
-            )
-            download_filename = f"{safe_title}.docx"
-        
-        # Store in Summary
-        from app.models.db import Summary
-        gen_doc = Summary(
-            note_id=note.id,
-            title=f"{note.title} ({export_format.upper()})",
+            temp_path = generator.generate_docx(segments, [], template_config=template_config)
+            import shutil
+            shutil.move(temp_path, output_path)
+            
+        # 5. Store export in Summary as a permanent export record
+        new_export = Summary(
+            note_id=doc.note_id,
+            title=f"Export: {doc.title or 'Summary'} ({export_format.upper()})",
             file_path=output_path,
             summary_type=export_format,
+            is_user_edited=False
         )
-        db.add(gen_doc)
-        note.updated_at = datetime.utcnow()
+        db.add(new_export)
         db.commit()
-        
-        logger.info(f"Exported {export_format.upper()} for note {note_id}: {output_path}")
         
         return {
             "success": True,
             "message": f"{export_format.upper()} generated successfully",
-            "download_url": f"/notes/{note_id}/download-export?format={export_format}",
-            "task_id": task_id,
-            "segments_count": len(segments),
-            "images_count": len(images)
+            "download_url": f"/summaries/{summary_id}/download-export?export_id={new_export.id}",
+            "filename": filename
         }
+    except Exception as e:
+        import logging
+        logger = logging.getLogger("app")
+        logger.error(f"Error exporting summary {summary_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error exporting: {str(e)}")
+
+
+@router.get("/{summary_id}/download-export")
+async def download_summary_export(
+    summary_id: str,
+    export_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download a previously generated summary export"""
+    import os
+    from fastapi.responses import FileResponse
+    from app.models.db import Summary, Note
     
-    except json.JSONDecodeError as e:
-        logger.error(f"Error parsing structured content: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid structured content format"
+    try:
+        # Verify export summary exists and user owns the parent note
+        export_doc = db.query(Summary).join(Note).filter(
+            Summary.id == export_id,
+            Note.user_id == current_user.id
+        ).first()
+        
+        if not export_doc:
+            logger.error(f"[Download] Export doc {export_id} not found or unauthorized for user {current_user.id}")
+            raise HTTPException(status_code=404, detail="Exported record not found")
+            
+        if not os.path.exists(export_doc.file_path):
+            logger.error(f"[Download] File not found on disk: {export_doc.file_path}")
+            raise HTTPException(status_code=404, detail="Exported file not found on server")
+            
+        # Get original doc for title
+        original_doc = db.query(Summary).filter(Summary.id == summary_id).first()
+        safe_title = "".join(c for c in ((original_doc.title if original_doc else "Summary") or "Summary") if c.isalnum() or c in (' ', '-', '_')).strip()
+        
+        ext = export_doc.summary_type
+        mime_types = {
+            "pdf": "application/pdf",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
+        
+        return FileResponse(
+            path=export_doc.file_path,
+            filename=f"{safe_title}.{ext}",
+            media_type=mime_types.get(ext, "application/octet-stream")
         )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error exporting {export_format}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error exporting {export_format}: {str(e)}"
-        )
-
-
-# In-memory export progress tracking
-_export_progress = {}
-
-
-@router.get("/{note_id}/export-status/{task_id}")
-async def get_export_status(
-    note_id: str,
-    task_id: str,
-    current_user: User = Depends(get_current_user),
-):
-    """Get export task progress"""
-    progress = _export_progress.get(task_id)
-    if not progress:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return progress
-
-
-@router.get("/{note_id}/download-export")
-async def download_export(
-    note_id: str,
-    format: str = "pdf",
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Download generated export file (PDF or DOCX)"""
-    
-    export_format = format.lower()
-    if export_format not in ("pdf", "docx"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Format must be 'pdf' or 'docx'"
-        )
-    
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
-    ).first()
-    
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-    
-    # Look for the generated file
-    from app.models.db import Summary
-    gen_doc = db.query(Summary).filter(
-        Summary.note_id == note_id,
-        Summary.summary_type == export_format,
-    ).order_by(Summary.created_at.desc()).first()
-    
-    if not gen_doc or not os.path.exists(gen_doc.file_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"{export_format.upper()} not generated yet. Please generate it first."
-        )
-    
-    safe_title = "".join(c for c in note.title if c.isalnum() or c in (' ', '-', '_')).strip()
-    
-    mime_types = {
-        "pdf": "application/pdf",
-        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    }
-    
-    return FileResponse(
-        path=gen_doc.file_path,
-        filename=f"{safe_title}.{export_format}",
-        media_type=mime_types[export_format],
-    )
-
-@router.put("/{note_id}/content", response_model=NoteResponse)
-async def update_note_content(
-    note_id: str,
-    body: dict,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Save edited markdown content back to the note"""
-    note = db.query(Note).options(joinedload(Note.subject)).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
-    ).first()
-    
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-    
-    new_text = body.get("extracted_text")
-    if new_text is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="extracted_text is required"
-        )
-    
-    StorageManager.save_note_text(note.id, new_text)
-    StorageManager.save_note_json(note.id, "structured", _markdown_to_segments(new_text))
-    note.updated_at = datetime.utcnow()
-    
-    # Invalidate existing summary when content changes
-    db.query(Summary).filter(
-        Summary.note_id == note_id,
-        Summary.summary_type == "summary"
-    ).delete()
-    
-    db.commit()
-    db.refresh(note)
-    
-    # Clear cache
-    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
-    
-    # Update embeddings to stay in sync
-    if new_text and new_text.strip():
-        try:
-            from app.processing.embeddings import update_note_embeddings
-            update_note_embeddings(note.id, new_text, db)
-            logger.info(f"Updated embeddings for note {note_id}")
-        except Exception as e:
-            logger.error(f"Error updating embeddings: {e}", exc_info=True)
-            # Don't fail the content update
-    
-    logger.info(f"Updated content for note {note_id}: {len(new_text)} chars")
-    return note
-
-
-@router.get("/{note_id}/download-file")
-async def download_original_file(
-    note_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Download the original uploaded file"""
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
-    ).first()
-    
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-    
-    if not note.file_path or not os.path.exists(note.file_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Original file not found"
-        )
-    
-    return FileResponse(
-        path=note.file_path,
-        filename=note.file_name or f"note_{note_id}",
-        media_type=note.file_type or "application/octet-stream"
-    )
-
-
-@router.get("/{note_id}/processing-logs")
-async def get_note_processing_logs(
-    note_id: str,
-    limit: int = 200,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Return recent log lines related to a specific note's processing.
-    Scans api.log and errors.log for lines mentioning the note_id.
-    """
-    note = db.query(Note).filter(
-        Note.id == note_id,
-        Note.user_id == current_user.id
-    ).first()
-
-    if not note:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Note not found"
-        )
-
-    import re
-    log_dir = os.path.join(os.path.dirname(__file__), "..", "..", "logs")
-    log_files = ["api.log", "errors.log"]
-    entries = []
-
-    for log_file in log_files:
-        log_path = os.path.join(log_dir, log_file)
-        if not os.path.exists(log_path):
-            continue
-        try:
-            # Read last 5MB of each log file to avoid loading huge files
-            max_bytes = 5 * 1024 * 1024
-            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
-                f.seek(0, 2)
-                file_size = f.tell()
-                start = max(0, file_size - max_bytes)
-                f.seek(start)
-                if start > 0:
-                    f.readline()  # skip partial first line
-                lines = f.readlines()
-
-            for line in lines:
-                if note_id not in line:
-                    continue
-                # Skip noisy uvicorn HTTP access lines for this note
-                if "uvicorn.access" in line:
-                    continue
-                # Parse: "2026-06-22 17:10:03,378 [LEVEL] logger.name: message"
-                m = re.match(
-                    r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)\s+\[(\w+)\]\s+([\w\.]+):\s+(.*)',
-                    line.strip()
-                )
-                if m:
-                    entries.append({
-                        "timestamp": m.group(1),
-                        "level": m.group(2),
-                        "logger": m.group(3),
-                        "message": m.group(4),
-                        "source": log_file,
-                    })
-                else:
-                    entries.append({
-                        "timestamp": None,
-                        "level": "INFO",
-                        "logger": log_file,
-                        "message": line.strip(),
-                        "source": log_file,
-                    })
-        except Exception as e:
-            logger.warning(f"Failed to read log file {log_file}: {e}")
-
-    # Sort chronologically, trim to limit
-    entries.sort(key=lambda x: x["timestamp"] or "")
-    entries = entries[-limit:]
-
-    return {
-        "note_id": note_id,
-        "count": len(entries),
-        "entries": entries,
-    }
+        logger.error(f"[Download] Internal error serving export {export_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
