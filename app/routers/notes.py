@@ -59,6 +59,9 @@ def _rebuild_note_content(
             detail="Note file not found"
         )
 
+    # Clear cache first to ensure other requests (like SubjectView) immediately see the reset state
+    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+
     # Delete output PDF file if it exists
     if note.output_pdf_path and os.path.exists(note.output_pdf_path):
         try:
@@ -67,13 +70,14 @@ def _rebuild_note_content(
         except Exception as e:
             logger.warning(f"Error deleting output PDF for note {note.id}: {e}")
     note.output_pdf_path = None
+    note.processing_time_ms = None
 
     if reset_first:
         StorageManager.delete_note_files(note.id)
-        note.processing_time_ms = None
-        note.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(note)
+
+    note.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(note)
 
     # Initialize or update Task status to processing
     task_id = f"ocr_{current_user.id}_{note.id}"

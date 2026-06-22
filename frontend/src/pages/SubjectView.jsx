@@ -204,7 +204,10 @@ export default function SubjectView() {
 
   useEffect(() => {
     const unprocessedNotes = notes.filter(n => {
-      const isProcessed = n.processing_time_ms != null || n.extracted_text != null || n.extracted_content_structured != null || n.output_pdf_path != null;
+      const isProcessed = (n.processing_time_ms != null && n.processing_time_ms > 0) || 
+                          (n.extracted_text != null && n.extracted_text.trim() !== '') || 
+                          (n.extracted_content_structured != null && n.extracted_content_structured !== '[]' && n.extracted_content_structured !== '') || 
+                          (n.output_pdf_path != null && n.output_pdf_path !== '');
       return !isProcessed && !failedNoteIds.includes(n.id);
     });
 
@@ -576,7 +579,10 @@ export default function SubjectView() {
           {filteredNotes.length > 0 ? (
             <Stack spacing="sm">
               {filteredNotes.map((note) => {
-                const isProcessed = note.processing_time_ms != null || note.extracted_text != null || note.extracted_content_structured != null || note.output_pdf_path != null;
+                const isProcessed = (note.processing_time_ms != null && note.processing_time_ms > 0) || 
+                                    (note.extracted_text != null && note.extracted_text.trim() !== '') || 
+                                    (note.extracted_content_structured != null && note.extracted_content_structured !== '[]' && note.extracted_content_structured !== '') || 
+                                    (note.output_pdf_path != null && note.output_pdf_path !== '');
                 const isReprocessing = reprocessingNoteIds.includes(note.id);
                 const hasFailed = failedNoteIds.includes(note.id);
                 return (

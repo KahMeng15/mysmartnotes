@@ -1055,14 +1055,15 @@ class SmartPipeline:
 
     async def _polish_chunk(self, client, chunk_idx: int, chunk: str, is_first_chunk: bool = False, debug_dir: Optional[Path] = None) -> str:
         """Polish a single chunk of markdown using the AI model with streaming."""
-        title_instruction = ""
         if is_first_chunk:
+            heading_rule = "6. ONE H1: Only the main title is #. All other headings must be ## or ###."
             title_instruction = """TITLE RULE: The first line of your output MUST be a single H1 heading (# ) with the 
 EXACT topic title from the slides (e.g., "# Topic 3: Inheritance"). 
 Remove university names, course codes, and noter names.
 """
         else:
-            title_instruction = """HEADING RULE: Do NOT use H1 (# ) headings. Use only H2 (## ) or H3 (### ).
+            heading_rule = "6. NO H1: Do NOT use H1 (# ) headings. Use only H2 (## ) or H3 (### ) for headings."
+            title_instruction = """HEADING RULE: If the input contains H1 (# ) headings, demote them to H2 (## ) headings. Do NOT prefix normal paragraphs or bullet points with ## or ###. Keep them as plain text.
 """
 
         prompt = f"""Task: Clean and format the following note notes into clean Markdown.
@@ -1073,7 +1074,7 @@ CRITICAL RULES:
 3. NO PREAMBLE/INTRO: Output ONLY the markdown between the markers.
 4. NO REASONING: Do not talk to yourself, do not plan, do not list rules.
 5. USE EXACT WORDS: Never rephrase or summarize.
-6. ONE H1: Only the main title is #. Subtitles are ##, ###.
+{heading_rule}
 7. CODE BLOCKS: Use ```java only for actual code.
 
 {title_instruction}
