@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress } from '@mantine/core';
+import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress, ScrollArea, Divider } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh } from '@tabler/icons-react';
+import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi, getAuthToken } from '../lib/api';
 
@@ -138,6 +138,8 @@ export default function SubjectView() {
   const [generatedNoteProgress, setGeneratedNoteProgress] = useState({});
   const [failedGeneratedNoteIds, setFailedGeneratedNoteIds] = useState([]);
   const [reprocessingGeneratedNoteIds, setReprocessingGeneratedNoteIds] = useState([]);
+  // Maps summary id -> task_id for in-flight generations
+  const [pendingSummaryTasks, setPendingSummaryTasks] = useState({});
   const [editingNote, setEditingNote] = useState(null);
   const [infoModalNote, setInfoModalNote] = useState(null);
   const [newTitle, setNewTitle] = useState('');
@@ -150,6 +152,27 @@ export default function SubjectView() {
   const [deletingSummary, setDeletingSummary] = useState(null);
   const [infoModalSummary, setInfoModalSummary] = useState(null);
   const [newSummaryTitle, setNewSummaryTitle] = useState('');
+
+  // Processing Logs
+  const [processingLogsModalOpened, { open: openProcessingLogsModal, close: closeProcessingLogsModal }] = useDisclosure(false);
+  const [processingLogs, setProcessingLogs] = useState(null);
+  const [processingLogsLoading, setProcessingLogsLoading] = useState(false);
+  const [processingLogsNoteId, setProcessingLogsNoteId] = useState(null);
+
+  const fetchProcessingLogs = async (noteId) => {
+    setProcessingLogsNoteId(noteId);
+    setProcessingLogsLoading(true);
+    setProcessingLogs(null);
+    openProcessingLogsModal();
+    try {
+      const data = await fetchApi(`/notes/${noteId}/processing-logs?limit=200`);
+      setProcessingLogs(data);
+    } catch (err) {
+      setProcessingLogs({ error: err.message });
+    } finally {
+      setProcessingLogsLoading(false);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -270,45 +293,47 @@ export default function SubjectView() {
   }, [exercises, failedExerciseIds]);
 
   // Polling for generated notes processing progress
+  // Only polls summaries that have an explicit in-flight task_id set via pendingSummaryTasks.
+  // This prevents source-note reprocess tasks from lighting up ALL summaries as "reprocessing".
   useEffect(() => {
-    const unprocessedGNotes = generatedNotes.filter(gn => {
-      const isProcessed = gn.status === 'completed' || failedGeneratedNoteIds.includes(gn.id);
-      return !isProcessed;
-    });
-    if (unprocessedGNotes.length === 0) return;
+    const pendingEntries = Object.entries(pendingSummaryTasks); // [[summaryId, taskId], ...]
+    if (pendingEntries.length === 0) return;
 
     const interval = setInterval(async () => {
       try {
-        const updatedGNotes = await Promise.all(
-          unprocessedGNotes.map(async (gn) => {
+        await Promise.all(
+          pendingEntries.map(async ([summaryId, taskId]) => {
             try {
-              const taskData = await fetchApi(`/search/task?note_id=${gn.note_id}`);
-              if (taskData) {
-                if (taskData.progress !== undefined) {
-                  setGeneratedNoteProgress(prev => ({ ...prev, [gn.id]: taskData.progress }));
-                }
-                if (taskData.status === 'completed') {
-                  // Refresh generated note data
-                  const refreshed = await fetchApi(`/summaries/${gn.id}?t=${Date.now()}`);
-                  setGeneratedNotes(prev => prev.map(item => item.id === gn.id ? refreshed : item));
-                }
-                if (taskData.status === 'failed') {
-                  setFailedGeneratedNoteIds(prev => [...prev, gn.id]);
-                }
+              const taskData = await fetchApi(`/search/tasks/${taskId}`);
+              if (!taskData) return;
+
+              if (taskData.progress !== undefined) {
+                setGeneratedNoteProgress(prev => ({ ...prev, [summaryId]: taskData.progress }));
               }
-              return null;
+
+              if (taskData.status === 'completed') {
+                // Task done — refresh the summary from server
+                const refreshed = await fetchApi(`/summaries/${summaryId}?t=${Date.now()}`);
+                setGeneratedNotes(prev => prev.map(item => item.id === summaryId ? refreshed : item));
+                // Remove from pending
+                setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[summaryId]; return n; });
+                setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[summaryId]; return n; });
+              } else if (taskData.status === 'failed') {
+                setFailedGeneratedNoteIds(prev => [...prev, summaryId]);
+                setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[summaryId]; return n; });
+                setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[summaryId]; return n; });
+              }
             } catch (e) {
-              console.error(e);
-              return null;
+              console.error('Error polling summary task', e);
             }
           })
         );
       } catch (err) {
-        console.error("Error polling generated notes task status", err);
+        console.error('Error polling generated notes task status', err);
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, [generatedNotes, failedGeneratedNoteIds]);
+  }, [pendingSummaryTasks]);
 
   const handleEditSubjectClick = () => {
     setEditSubjectName(subject.name);
@@ -986,7 +1011,78 @@ export default function SubjectView() {
                 <Text size="sm" c="dimmed">{(infoModalNote.processing_time_ms / 1000).toFixed(2)}s</Text>
               </Group>
             )}
+
+            <Divider mt="md" />
+            <Button
+              variant="light"
+              color="blue"
+              leftSection={<IconClipboardList size={16} />}
+              onClick={() => { setInfoModalNote(null); fetchProcessingLogs(infoModalNote.id); }}
+              fullWidth
+            >
+              View Processing Logs
+            </Button>
           </Stack>
+        )}
+      </Modal>
+
+      {/* Processing Logs Modal */}
+      <Modal
+        opened={processingLogsModalOpened}
+        onClose={closeProcessingLogsModal}
+        title={
+          <Group gap="xs">
+            <IconClipboardList size={18} />
+            <Text fw={600}>Processing Logs</Text>
+            {processingLogsNoteId && <Code fz="xs">{processingLogsNoteId}</Code>}
+          </Group>
+        }
+        centered
+        size="xl"
+      >
+        {processingLogsLoading ? (
+          <Center h={200}><Loader /></Center>
+        ) : processingLogs?.error ? (
+          <Text c="red" size="sm">{processingLogs.error}</Text>
+        ) : processingLogs?.entries?.length === 0 ? (
+          <Text c="dimmed" size="sm" ta="center" py="xl">No processing logs found for this note.</Text>
+        ) : (
+          <>
+            <Text size="xs" c="dimmed" mb="sm">
+              Showing {processingLogs?.entries?.length || 0} log entries
+            </Text>
+            <ScrollArea h={480} type="scroll">
+              <Stack gap={4}>
+                {processingLogs?.entries?.map((entry, i) => {
+                  const levelColor = entry.level === 'ERROR' ? 'red' : entry.level === 'WARNING' ? 'orange' : 'teal';
+                  const bgColor = entry.level === 'ERROR' ? 'var(--mantine-color-red-0)' : entry.level === 'WARNING' ? 'var(--mantine-color-orange-0)' : undefined;
+                  return (
+                    <Box
+                      key={i}
+                      p="xs"
+                      style={{
+                        borderRadius: 4,
+                        backgroundColor: bgColor,
+                        borderLeft: `3px solid var(--mantine-color-${levelColor}-5)`,
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      <Group gap="xs" wrap="nowrap" align="flex-start">
+                        <Badge color={levelColor} size="xs" variant="filled" style={{ flexShrink: 0, marginTop: 2 }}>
+                          {entry.level}
+                        </Badge>
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                          <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace' }}>{entry.timestamp}</Text>
+                          <Text size="xs" style={{ wordBreak: 'break-word', fontFamily: 'monospace' }}>{entry.message}</Text>
+                          <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace' }}>{entry.logger}</Text>
+                        </Box>
+                      </Group>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </ScrollArea>
+          </>
         )}
       </Modal>
     </Box>

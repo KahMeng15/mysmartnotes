@@ -342,7 +342,10 @@ export default function NoteView() {
   };
 
   const isProcessedCheck = (lec) => {
-    return lec.processing_time_ms != null || lec.extracted_text != null || lec.extracted_content_structured != null || lec.output_pdf_path != null;
+    return (lec.processing_time_ms != null && lec.processing_time_ms > 0) || 
+           (lec.extracted_text != null && lec.extracted_text.trim() !== '') || 
+           (lec.extracted_content_structured != null && lec.extracted_content_structured !== '[]' && lec.extracted_content_structured !== '') || 
+           (lec.output_pdf_path != null && lec.output_pdf_path !== '');
   };
 
   if (loading && !note) {

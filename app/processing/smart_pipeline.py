@@ -930,17 +930,20 @@ class SmartPipeline:
         
         Splits the input into manageable chunks to prevent quality degradation
         from long contexts, then reassembles the polished chunks.
+        Works with any configured AI provider (Gemini, Groq, Ollama, etc.).
         """
-        if not self.gemini_api_key or not markdown:
+        if not markdown:
             return markdown
 
         try:
             from app.processing.ai_client import AIClient
             # Create a client which will automatically use the 3-tier fallback system
-            client = AIClient() 
-            
-            # If a specific key was provided to the pipeline, we can override Tier 1
-            if self.gemini_api_key:
+            client = AIClient()
+
+            # Only override Tier 0 with a specific Gemini key if Tier 0 is actually a Gemini tier.
+            # CRITICAL: Do NOT call _init_gemini_tier on a Groq/HuggingFace tier — it would
+            # corrupt tier.model by replacing the AsyncGroq client with a GenerativeModel.
+            if self.gemini_api_key and client.tiers and client.tiers[0].provider == "gemini":
                 client.tiers[0].api_key = self.gemini_api_key
                 client.tiers[0].model_name = self.gemini_model
                 client._init_gemini_tier(client.tiers[0])

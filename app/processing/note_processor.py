@@ -19,18 +19,33 @@ def get_pipeline_for_user(user: User) -> SmartPipeline:
     """Get a SmartPipeline instance with the appropriate settings for this user."""
     from app.config import get_settings
     app_settings = get_settings()
-    
-    # Resolve Gemini API key: ALWAYS pull from environment variables for security
-    gemini_key = app_settings.GLOBAL_AI_TIER1_API_KEY or app_settings.GEMINI_API_KEY
+
+    # Determine whether we have any AI tier available for the polish pass.
+    # We only pass a gemini_api_key if the configured Tier 1 provider is actually Gemini
+    # so that smart_pipeline.py does not try to use a Groq/HF key as a Gemini credential.
+    tier1_provider = getattr(app_settings, "GLOBAL_AI_TIER1_PROVIDER", "gemini").lower()
+    tier1_api_key = getattr(app_settings, "GLOBAL_AI_TIER1_API_KEY", None)
+
+    # Gemini-specific key (for the SmartPipeline's gemini_api_key parameter)
+    gemini_key = None
+    if tier1_provider == "gemini":
+        gemini_key = tier1_api_key or app_settings.GEMINI_API_KEY
+    else:
+        # Fall back to explicit GEMINI_API_KEY if set separately
+        gemini_key = getattr(app_settings, "GEMINI_API_KEY", None) or None
+
     gemini_model = app_settings.GLOBAL_AI_TIER1_MODEL
 
     if not getattr(user, "use_global_ai_config", False):
         if getattr(user, "ai_model", None):
             gemini_model = user.ai_model
 
+    # Enable polish if any tier key is present (Gemini, Groq, etc.)
+    has_any_ai_key = bool(tier1_api_key) or bool(gemini_key)
+
     return SmartPipeline(
-        use_polish=bool(gemini_key),
-        gemini_api_key=gemini_key,
+        use_polish=has_any_ai_key,
+        gemini_api_key=gemini_key,  # May be None for non-Gemini providers — polish still works via AIClient tiers
         gemini_model=gemini_model,
     )
 

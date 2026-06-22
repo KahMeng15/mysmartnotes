@@ -59,6 +59,15 @@ def _rebuild_note_content(
             detail="Note file not found"
         )
 
+    # Delete output PDF file if it exists
+    if note.output_pdf_path and os.path.exists(note.output_pdf_path):
+        try:
+            os.remove(note.output_pdf_path)
+            logger.info(f"Deleted output PDF for note {note.id}: {note.output_pdf_path}")
+        except Exception as e:
+            logger.warning(f"Error deleting output PDF for note {note.id}: {e}")
+    note.output_pdf_path = None
+
     if reset_first:
         StorageManager.delete_note_files(note.id)
         note.processing_time_ms = None
@@ -66,66 +75,104 @@ def _rebuild_note_content(
         db.commit()
         db.refresh(note)
 
+    # Initialize or update Task status to processing
+    task_id = f"ocr_{current_user.id}_{note.id}"
+    db_task = db.query(Task).filter(Task.task_id == task_id).first()
+    if not db_task:
+        db_task = Task(
+            task_id=task_id,
+            user_id=current_user.id,
+            task_type="note_processing",
+            status="processing",
+            progress=10,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(db_task)
+    else:
+        db_task.status = "processing"
+        db_task.progress = 10
+        db_task.error_message = None
+        db_task.updated_at = datetime.utcnow()
+    db.commit()
+
     import time
     start_time = time.time()
-    file_ext = os.path.splitext(note.file_path)[1].lower()
+    try:
+        file_ext = os.path.splitext(note.file_path)[1].lower()
 
-    if file_ext in ('.pdf', '.pptx'):
-        logger.info(f"Rebuilding note {note.id} with SmartPipeline from scratch")
-        raw_text, timings = extract_markdown_for_user(current_user, note.file_path)
-        StorageManager.save_note_json(note.id, "timings", timings)
-        structured_content = markdown_to_segments(raw_text)
+        if file_ext in ('.pdf', '.pptx'):
+            logger.info(f"Rebuilding note {note.id} with SmartPipeline from scratch")
+            raw_text, timings = extract_markdown_for_user(current_user, note.file_path)
+            StorageManager.save_note_json(note.id, "timings", timings)
+            structured_content = markdown_to_segments(raw_text)
 
-        images_data = []
-        if file_ext == '.pdf':
+            images_data = []
+            if file_ext == '.pdf':
+                try:
+                    extractor = ImageExtractor(note_id=note.id)
+                    images_extracted = extractor.extract_images_from_pdf(note.file_path)
+                    images_data = [img.to_dict() for img in images_extracted]
+                    logger.info(f"Extracted {len(images_data)} images during note rebuild")
+                except Exception as e:
+                    logger.warning(f"Image extraction failed during note rebuild: {e}")
+            
+            # Save to file storage
+            StorageManager.save_note_text(note.id, raw_text)
+            StorageManager.save_note_json(note.id, "structured", structured_content)
+            StorageManager.save_note_json(note.id, "images", images_data)
+
+        else:
+            logger.info(f"Rebuilding note {note.id} with OCR fallback")
+            ocr_result = OCRProcessor.extract_text(
+                note.file_path,
+                note.file_type,
+                note_id=note.id,
+                use_v2=use_v2
+            )
+            raw_text = ocr_result.get("raw_text", "")
+            structured_content = ocr_result.get("structured_content", [])
+            images_data = ocr_result.get("images", [])
+            
+            # Save to file storage
+            StorageManager.save_note_text(note.id, raw_text)
+            StorageManager.save_note_json(note.id, "structured", structured_content)
+            StorageManager.save_note_json(note.id, "images", images_data)
+
+        note.processing_time_ms = int((time.time() - start_time) * 1000)
+        note.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(note)
+
+        if raw_text and raw_text.strip():
             try:
-                extractor = ImageExtractor(note_id=note.id)
-                images_extracted = extractor.extract_images_from_pdf(note.file_path)
-                images_data = [img.to_dict() for img in images_extracted]
-                logger.info(f"Extracted {len(images_data)} images during note rebuild")
+                from app.processing.embeddings import update_note_embeddings
+                update_note_embeddings(note.id, raw_text, db)
+                logger.info(f"Updated embeddings after rebuilding note {note.id}")
             except Exception as e:
-                logger.warning(f"Image extraction failed during note rebuild: {e}")
-        
-        # Save to file storage
-        StorageManager.save_note_text(note.id, raw_text)
-        StorageManager.save_note_json(note.id, "structured", structured_content)
-        StorageManager.save_note_json(note.id, "images", images_data)
+                logger.error(f"Error updating embeddings after note rebuild: {e}", exc_info=True)
 
-    else:
-        logger.info(f"Rebuilding note {note.id} with OCR fallback")
-        ocr_result = OCRProcessor.extract_text(
-            note.file_path,
-            note.file_type,
-            note_id=note.id,
-            use_v2=use_v2
+        logger.info(
+            f"Note rebuild complete: {note.id}, "
+            f"{len(raw_text)} chars, {len(structured_content)} segments, {len(images_data)} images"
         )
-        raw_text = ocr_result.get("raw_text", "")
-        structured_content = ocr_result.get("structured_content", [])
-        images_data = ocr_result.get("images", [])
         
-        # Save to file storage
-        StorageManager.save_note_text(note.id, raw_text)
-        StorageManager.save_note_json(note.id, "structured", structured_content)
-        StorageManager.save_note_json(note.id, "images", images_data)
-
-    note.processing_time_ms = int((time.time() - start_time) * 1000)
-    note.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(note)
-
-    if raw_text and raw_text.strip():
-        try:
-            from app.processing.embeddings import update_note_embeddings
-            update_note_embeddings(note.id, raw_text, db)
-            logger.info(f"Updated embeddings after rebuilding note {note.id}")
-        except Exception as e:
-            logger.error(f"Error updating embeddings after note rebuild: {e}", exc_info=True)
-
-    logger.info(
-        f"Note rebuild complete: {note.id}, "
-        f"{len(raw_text)} chars, {len(structured_content)} segments, {len(images_data)} images"
-    )
-    return note
+        # Mark Task complete
+        db_task.status = "completed"
+        db_task.progress = 100
+        db_task.updated_at = datetime.utcnow()
+        db.commit()
+        
+        return note
+    except Exception as e:
+        logger.error(f"Error during note rebuild for {note.id}: {e}", exc_info=True)
+        # Mark Task failed
+        db_task.status = "failed"
+        db_task.error_message = str(e)
+        db_task.progress = 0
+        db_task.updated_at = datetime.utcnow()
+        db.commit()
+        raise
 
 
 @router.get("", response_model=List[NoteResponse])
@@ -1022,3 +1069,86 @@ async def download_original_file(
         media_type=note.file_type or "application/octet-stream"
     )
 
+
+@router.get("/{note_id}/processing-logs")
+async def get_note_processing_logs(
+    note_id: str,
+    limit: int = 200,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Return recent log lines related to a specific note's processing.
+    Scans api.log and errors.log for lines mentioning the note_id.
+    """
+    note = db.query(Note).filter(
+        Note.id == note_id,
+        Note.user_id == current_user.id
+    ).first()
+
+    if not note:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Note not found"
+        )
+
+    import re
+    log_dir = os.path.join(os.path.dirname(__file__), "..", "..", "logs")
+    log_files = ["api.log", "errors.log"]
+    entries = []
+
+    for log_file in log_files:
+        log_path = os.path.join(log_dir, log_file)
+        if not os.path.exists(log_path):
+            continue
+        try:
+            # Read last 5MB of each log file to avoid loading huge files
+            max_bytes = 5 * 1024 * 1024
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                f.seek(0, 2)
+                file_size = f.tell()
+                start = max(0, file_size - max_bytes)
+                f.seek(start)
+                if start > 0:
+                    f.readline()  # skip partial first line
+                lines = f.readlines()
+
+            for line in lines:
+                if note_id not in line:
+                    continue
+                # Skip noisy uvicorn HTTP access lines for this note
+                if "uvicorn.access" in line:
+                    continue
+                # Parse: "2026-06-22 17:10:03,378 [LEVEL] logger.name: message"
+                m = re.match(
+                    r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)\s+\[(\w+)\]\s+([\w\.]+):\s+(.*)',
+                    line.strip()
+                )
+                if m:
+                    entries.append({
+                        "timestamp": m.group(1),
+                        "level": m.group(2),
+                        "logger": m.group(3),
+                        "message": m.group(4),
+                        "source": log_file,
+                    })
+                else:
+                    entries.append({
+                        "timestamp": None,
+                        "level": "INFO",
+                        "logger": log_file,
+                        "message": line.strip(),
+                        "source": log_file,
+                    })
+        except Exception as e:
+            logger.warning(f"Failed to read log file {log_file}: {e}")
+
+    # Sort chronologically, trim to limit
+    entries.sort(key=lambda x: x["timestamp"] or "")
+    entries = entries[-limit:]
+
+    return {
+        "note_id": note_id,
+        "count": len(entries),
+        "entries": entries,
+    }
