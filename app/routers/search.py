@@ -2,9 +2,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
-from app.models.db import User, Resource, Task
+from app.models.db import User, Resource, Task, Note, Exercise
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.utils.storage import StorageManager
@@ -263,7 +263,9 @@ async def get_task_status(
 
 @router.get("/task")
 async def get_resource_task_status(
-    resource_id: str,
+    resource_id: Optional[str] = None,
+    note_id: Optional[str] = None,
+    exercise_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -271,21 +273,57 @@ async def get_resource_task_status(
     import logging
     logger = logging.getLogger(__name__)
     
+    resolved_resource_id = resource_id
+    
+    # 1. Resolve note_id if provided
+    if not resolved_resource_id and note_id:
+        # Check if note_id is actually a resource ID directly (some frontend code calls it note_id)
+        res = db.query(Resource).filter(
+            Resource.id == note_id,
+            Resource.user_id == current_user.id
+        ).first()
+        if res:
+            resolved_resource_id = note_id
+        else:
+            note = db.query(Note).filter(Note.id == note_id).first()
+            if note:
+                resolved_resource_id = note.resource_id
+                
+    # 2. Resolve exercise_id if provided
+    if not resolved_resource_id and exercise_id:
+        res = db.query(Resource).filter(
+            Resource.id == exercise_id,
+            Resource.user_id == current_user.id
+        ).first()
+        if res:
+            resolved_resource_id = exercise_id
+        else:
+            exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
+            if exercise:
+                resolved_resource_id = exercise.resource_id
+
+    if not resolved_resource_id:
+        logger.warning("No resource_id, note_id, or exercise_id provided or resolved")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must provide a valid resource_id, note_id, or exercise_id"
+        )
+
     # Verify resource belongs to user
     resource = db.query(Resource).filter(
-        Resource.id == resource_id,
+        Resource.id == resolved_resource_id,
         Resource.user_id == current_user.id
     ).first()
     
     if not resource:
-        logger.warning(f"Resource {resource_id} not found for user {current_user.id}")
+        logger.warning(f"Resource {resolved_resource_id} not found for user {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Resource not found"
         )
     
     # Try to find the latest OCR task by resource_id pattern (ocr_<user_id>_<resource_id>_<hash>)
-    task_id_pattern = f"ocr_{current_user.id}_{resource_id}%"
+    task_id_pattern = f"ocr_{current_user.id}_{resolved_resource_id}%"
     db_task = db.query(Task).filter(
         Task.user_id == current_user.id,
         Task.task_id.like(task_id_pattern)
