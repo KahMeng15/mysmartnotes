@@ -11,10 +11,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 DATA_DIR = os.path.join(BASE_DIR, "data")
 RESOURCES_DIR = os.path.join(DATA_DIR, "resources")
 NOTES_DIR = os.path.join(DATA_DIR, "notes")
+EXERCISES_DIR = os.path.join(DATA_DIR, "exercises")
 
 # Ensure directories exist
 os.makedirs(RESOURCES_DIR, exist_ok=True)
 os.makedirs(NOTES_DIR, exist_ok=True)
+os.makedirs(EXERCISES_DIR, exist_ok=True)
 
 class StorageManager:
     """Central manager for file-based storage of large text content with Redis caching"""
@@ -28,6 +30,11 @@ class StorageManager:
     def _get_note_path(note_id: str, suffix: str = "", extension: str = "md") -> str:
         filename = f"{note_id}{suffix}.{extension}"
         return os.path.join(NOTES_DIR, filename)
+
+    @staticmethod
+    def _get_exercise_path(exercise_id: str, suffix: str = "", extension: str = "json") -> str:
+        filename = f"{exercise_id}{'_' + suffix if suffix else ''}.{extension}"
+        return os.path.join(EXERCISES_DIR, filename)
 
     # --- Resource Content Methods ---
 
@@ -193,3 +200,43 @@ class StorageManager:
                     logger.info(f"Deleted storage file: {path}")
                 except Exception as e:
                     logger.error(f"Failed to delete {path}: {e}")
+
+    @staticmethod
+    def save_exercise_json(exercise_id: str, data: Union[Dict, Any], suffix: str = ""):
+        """Save structured JSON data for an exercise (like questions)"""
+        path = StorageManager._get_exercise_path(exercise_id, suffix=suffix, extension="json")
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to write JSON for exercise {exercise_id}: {e}")
+            raise e
+
+    @staticmethod
+    def get_exercise_json(exercise_id: str, suffix: str = "") -> Optional[Union[Dict, Any]]:
+        """Retrieve JSON data for an exercise"""
+        path = StorageManager._get_exercise_path(exercise_id, suffix=suffix, extension="json")
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to read JSON for exercise {exercise_id}: {e}")
+            return None
+            
+    @staticmethod
+    def delete_exercise_files(exercise_id: str):
+        """Delete all generated files associated with an exercise"""
+        exercises_dir = EXERCISES_DIR
+        if not os.path.exists(exercises_dir):
+            return
+            
+        for filename in os.listdir(exercises_dir):
+            if filename.startswith(f"{exercise_id}"):
+                file_path = os.path.join(exercises_dir, filename)
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Deleted exercise file: {file_path}")
+                except Exception as e:
+                    logger.error(f"Failed to delete {file_path}: {e}")

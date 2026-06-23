@@ -4,9 +4,10 @@ import time
 import os
 import re as _re
 from datetime import datetime
+from sqlalchemy.orm import Session
 from typing import Dict, Any, List
 
-from app.models.db import User, Exercise, ExerciseQuestion, Task, Resource
+from app.models.db import User, Exercise, Task, Resource
 from app.utils.db import SessionLocal
 from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
@@ -17,6 +18,21 @@ from app.processing.embeddings import retrieve_relevant_chunks
 from app.schemas.exercise import ExerciseCheckResponse
 
 logger = logging.getLogger(__name__)
+
+def _run_async(coro_fn, *args, **kwargs):
+    import asyncio
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+        
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(lambda: asyncio.run(coro_fn(*args, **kwargs)))
+            return future.result()
+    else:
+        return asyncio.run(coro_fn(*args, **kwargs))
 
 def _looks_like_provider_error(raw_response: str) -> bool:
     if not raw_response:
@@ -206,12 +222,12 @@ Respond with ONLY the JSON object.
 """
         
         client = AIClient()
-        import asyncio
-        response = asyncio.run(client.generate_text(
+        response = _run_async(
+            client.generate_text,
             prompt=prompt,
             system_instruction="You are an expert educational content extractor.",
             max_tokens=3500
-        ))
+        )
         
         provider_failed = _looks_like_provider_error(response)
         suggested_title = None
@@ -272,19 +288,14 @@ Respond with ONLY the JSON object.
                         ref_resource_id = chunks[0]["resource_id"]
                 except Exception as e:
                     pass
-                    
-            db_q = ExerciseQuestion(
-                exercise_id=exercise.id,
-                question_text=q_data.get("question_text", ""),
-                answer_text=q_data.get("answer_text", ""),
-                question_type=q_data.get("question_type", "subjective"),
-                options=json.dumps(q_data.get("options")) if q_data.get("options") else None,
-                original_number=str(q_data.get("original_number", "")),
-                order=order,
-                reference_resource_id=ref_resource_id
-            )
-            db.add(db_q)
+            q_data["reference_resource_id"] = ref_resource_id
+            q_data["order"] = order
+            q_data["original_number"] = str(q_data.get("original_number", ""))
+            q_data["id"] = str(order + 1)
             order += 1
+            
+        StorageManager.save_exercise_json(exercise.id, questions_data)
+        exercise.content_path = StorageManager._get_exercise_path(exercise.id)
             
         exercise.processing_time_ms = int((time.time() - start_time) * 1000)
         exercise.updated_at = datetime.utcnow()
@@ -302,21 +313,30 @@ Respond with ONLY the JSON object.
         db.close()
 
 
-def grade_answer(user: User, question: ExerciseQuestion, user_answer: str) -> ExerciseCheckResponse:
+def grade_answer(user: User, question: Dict[str, Any], user_answer: str) -> ExerciseCheckResponse:
+    """Grades a user's answer using the LLM for subjective questions"""
     client = AIClient()
-    prompt = f"Question: {question.question_text}\nCorrect Answer: {question.answer_text}\nUser's Answer: {user_answer}"
+    
+    question_text = question.get("question_text", "")
+    answer_text = question.get("answer_text", "")
+    
+    prompt = f"""
+Question: {question_text}
+Correct Answer: {answer_text}
+User's Answer: {user_answer}
+"""
     system_prompt = (
         "You are grading a student's answer. Compare the User's Answer to the Correct Answer. "
         "Return your evaluation as a strict JSON object with two keys: "
         "'is_correct' (boolean) and 'feedback' (string, a brief explanation of why it's correct or incorrect). "
         "Do NOT include any markdown formatting, just the raw JSON."
     )
-    import asyncio
-    response = asyncio.run(client.generate_text(
+    response = _run_async(
+        client.generate_text,
         prompt=prompt,
         system_instruction=system_prompt,
         max_tokens=4000
-    ))
+    )
     try:
         json_text = response.strip()
         if json_text.startswith("```json"): json_text = json_text[7:]
@@ -326,30 +346,38 @@ def grade_answer(user: User, question: ExerciseQuestion, user_answer: str) -> Ex
         return ExerciseCheckResponse(
             is_correct=result.get("is_correct", False),
             feedback=result.get("feedback", "Could not parse feedback."),
-            correct_answer=question.answer_text
+            correct_answer=answer_text
         )
     except Exception as e:
         return ExerciseCheckResponse(
             is_correct=False,
             feedback="An error occurred while grading your answer.",
-            correct_answer=question.answer_text
+            correct_answer=answer_text
         )
 
-def explain_answer(user: User, question: ExerciseQuestion, user_answer: str = None) -> str:
+def explain_answer(user: User, question: Dict[str, Any], user_answer: str = None) -> str:
+    """Generates an explanation for the correct answer"""
     client = AIClient()
-    prompt = f"Question: {question.question_text}\nCorrect Answer: {question.answer_text}"
+    
+    question_text = question.get("question_text", "")
+    answer_text = question.get("answer_text", "")
+    
+    prompt = f"""
+Question: {question_text}
+Correct Answer: {answer_text}
+"""
     if user_answer:
         prompt += f"\nUser's Attempt: {user_answer}"
     system_prompt = (
         "Explain the correct answer to this question clearly and simply. "
         "If the user provided an attempt, explain where they went wrong or right."
     )
-    import asyncio
-    return asyncio.run(client.generate_text(
+    return _run_async(
+        client.generate_text,
         prompt=prompt,
         system_instruction=system_prompt,
         max_tokens=4000
-    )).strip()
+    ).strip()
 
 def generate_exercise_task(exercise_id: str, user_id: int, req_data: Dict[str, Any], task_id: str = None, **kwargs):
     db = SessionLocal()
@@ -414,12 +442,12 @@ Respond with ONLY the JSON array.
 """
         
         client = AIClient()
-        import asyncio
-        response = asyncio.run(client.generate_text(
+        response = _run_async(
+            client.generate_text,
             prompt=prompt,
             system_instruction="You are an expert educational content generator.",
             max_tokens=8192
-        ))
+        )
         
         try:
             json_text = response.strip()
@@ -434,17 +462,13 @@ Respond with ONLY the JSON array.
         
         order = 0
         for q in questions_data:
-            new_q = ExerciseQuestion(
-                exercise_id=exercise_id,
-                question_text=q.get("question_text", "Unknown Question"),
-                answer_text=str(q.get("answer_text", "")),
-                question_type=q.get("question_type", "subjective"),
-                options=json.dumps(q.get("options")) if q.get("options") else None,
-                original_number=q.get("original_number", str(order + 1)),
-                order=order
-            )
-            db.add(new_q)
+            q["original_number"] = str(q.get("original_number", order + 1))
+            q["order"] = order
+            q["id"] = str(order + 1)
             order += 1
+            
+        StorageManager.save_exercise_json(exercise_id, questions_data)
+        exercise.content_path = StorageManager._get_exercise_path(exercise_id)
             
         exercise.processing_time_ms = int((time.time() - start_time) * 1000)
         exercise.updated_at = datetime.utcnow()

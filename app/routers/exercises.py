@@ -4,10 +4,10 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 
-from app.models.db import User, Exercise, ExerciseQuestion, Subject, Task
+from app.models.db import User, Exercise, Subject, Task
 from app.schemas.exercise import ExerciseResponse, ExerciseCreate, ExerciseUpdate, ExerciseCheckRequest, ExerciseCheckResponse, ExerciseExplainRequest, ExerciseGenerateRequest
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id, SessionLocal
@@ -43,6 +43,9 @@ def get_exercises_by_subject(subject_id: str, db: Session = Depends(get_db), cur
         params = StorageManager.get_resource_json(ex.id, "parameters")
         if params:
             ex_data.parameters = params
+        questions = StorageManager.get_exercise_json(ex.id)
+        if questions:
+            ex_data.questions = questions
         response_exercises.append(ex_data)
     return response_exercises
 
@@ -60,6 +63,26 @@ def get_exercise(exercise_id: str, db: Session = Depends(get_db), current_user: 
     params = StorageManager.get_resource_json(exercise.id, "parameters")
     if params:
         ex_data.parameters = params
+    questions = StorageManager.get_exercise_json(exercise.id)
+    if questions:
+        ex_data.questions = questions
+    return ex_data
+
+@router.put("/{exercise_id}/content", response_model=ExerciseResponse)
+def update_exercise_content(exercise_id: str, payload: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Update exercise questions (JSON)"""
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+        
+    questions = payload.get("questions", [])
+    StorageManager.save_exercise_json(exercise.id, questions)
+    
+    exercise.updated_at = datetime.utcnow()
+    db.commit()
+    
+    ex_data = ExerciseResponse.from_orm(exercise)
+    ex_data.questions = questions
     return ex_data
 
 @router.post("/upload", response_model=ExerciseResponse)
@@ -162,53 +185,62 @@ def merge_exercises(
     db.refresh(new_ex)
     return new_ex
 
-@router.post("/questions/{question_id}/grade", response_model=ExerciseCheckResponse)
+@router.post("/{exercise_id}/questions/{question_id}/grade")
 def grade_exercise_answer(
-    question_id: int,
+    exercise_id: str,
+    question_id: str,
     req: ExerciseCheckRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Grade a subjective or coding answer using AI"""
-    question = db.query(ExerciseQuestion).join(Exercise).filter(
-        ExerciseQuestion.id == question_id,
-        Exercise.user_id == current_user.id
-    ).first()
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+        
+    questions = StorageManager.get_exercise_json(exercise_id) or []
+    question = next((q for q in questions if str(q.get("id")) == str(question_id)), None)
     
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
         
     # Standard string match fallback for objective
-    if question.question_type == "objective":
-        is_correct = req.user_answer.strip().lower() == question.answer_text.strip().lower()
+    if question.get("question_type") == "objective":
+        answer_text = question.get("answer_text", "")
+        is_correct = req.user_answer.strip().lower() == answer_text.strip().lower()
         return ExerciseCheckResponse(
             is_correct=is_correct,
             feedback="Correct!" if is_correct else "Incorrect.",
-            correct_answer=question.answer_text
+            correct_answer=answer_text
         )
         
     # Use AI to grade
     return grade_answer(current_user, question, req.user_answer)
 
-@router.post("/questions/{question_id}/explain")
+@router.post("/{exercise_id}/questions/{question_id}/explain")
 def explain_exercise_answer(
-    question_id: int,
+    exercise_id: str,
+    question_id: str,
     req: ExerciseExplainRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Generate an AI explanation for the question"""
-    question = db.query(ExerciseQuestion).join(Exercise).filter(
-        ExerciseQuestion.id == question_id,
-        Exercise.user_id == current_user.id
-    ).first()
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+        
+    questions = StorageManager.get_exercise_json(exercise_id) or []
+    question = next((q for q in questions if str(q.get("id")) == str(question_id)), None)
     
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
         
     explanation = explain_answer(current_user, question, req.user_answer)
-    question.explanation = explanation
-    db.commit()
+    
+    # Save the generated explanation back to JSON so it persists
+    question["explanation"] = explanation
+    StorageManager.save_exercise_json(exercise_id, questions)
     
     return {"explanation": explanation}
 
@@ -222,11 +254,14 @@ def delete_exercise(exercise_id: str, db: Session = Depends(get_db), current_use
     if not exercise:
         raise HTTPException(status_code=404, detail="Exercise not found")
         
+    # Clean up physical files
     if exercise.file_path and os.path.exists(exercise.file_path):
         try:
             os.remove(exercise.file_path)
-        except:
+        except Exception as e:
             pass
+            
+    StorageManager.delete_exercise_files(exercise_id)
             
     db.delete(exercise)
     db.commit()

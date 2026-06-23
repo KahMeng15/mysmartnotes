@@ -210,6 +210,7 @@ class Exercise(Base):
     # Source file info if uploaded
     file_path = Column(String(512), nullable=True)
     file_name = Column(String(255), nullable=True)
+    content_path = Column(String(512), nullable=True)  # Path to the generated JSON file
     
     model = Column(String(100), nullable=True)  # AI model used if generated/parsed
     processing_time_ms = Column(Integer, nullable=True)
@@ -221,50 +222,9 @@ class Exercise(Base):
     group = relationship("SubjectGroup", back_populates="exercises")
     subject = relationship("Subject", back_populates="exercises")
     resource = relationship("Resource", back_populates="exercises")
-    questions = relationship("ExerciseQuestion", back_populates="exercise", cascade="all, delete-orphan")
-    progress = relationship("ExerciseProgress", back_populates="exercise", cascade="all, delete-orphan")
 
 
-class ExerciseQuestion(Base):
-    """Questions for an Exercise"""
-    __tablename__ = "exercise_questions"
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    exercise_id = Column(String(16), ForeignKey("exercises.id", ondelete="CASCADE"), nullable=False, index=True)
-    question_text = Column(Text, nullable=False)
-    answer_text = Column(Text, nullable=False)
-    question_type = Column(String(50), default="subjective")  # objective, subjective, fill_in_the_blank, etc.
-    options = Column(JSON, nullable=True)  # Store options for multiple choice
-    original_number = Column(String(20), nullable=True)  # e.g. "1.1", "Q5"
-    order = Column(Integer, default=0)
-    explanation = Column(Text, nullable=True)
-    
-    # Reference to the highest matching resource
-    reference_resource_id = Column(String(16), ForeignKey("resources.id", ondelete="SET NULL"), nullable=True)
-    
-    # Relationships
-    exercise = relationship("Exercise", back_populates="questions")
-    progress = relationship("ExerciseProgress", back_populates="question", cascade="all, delete-orphan")
-    reference_resource = relationship("Resource", foreign_keys=[reference_resource_id])
 
-
-class ExerciseProgress(Base):
-    """Spaced Repetition / Progress track per user per question"""
-    __tablename__ = "exercise_progress"
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    exercise_id = Column(String(16), ForeignKey("exercises.id", ondelete="CASCADE"), nullable=False, index=True)
-    question_id = Column(Integer, ForeignKey("exercise_questions.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    is_correct = Column(Boolean, default=False)
-    times_tested = Column(Integer, default=0)
-    
-    last_reviewed_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Relationships
-    exercise = relationship("Exercise", back_populates="progress")
-    question = relationship("ExerciseQuestion", back_populates="progress")
-    user = relationship("User")
 
 
 class StudySession(Base):
