@@ -482,7 +482,7 @@ export default function SubjectView() {
               if (t.progress !== undefined) {
                 summaryProgress[summaryId] = t.progress;
               }
-            } else if (t.task_type === 'resource_processing') {
+            } else if (t.task_type === 'resource_processing' || t.task_type === 'ocr') {
               const noteId = t.input_data?.kwargs?.resource_id || (t.task_id && t.task_id.startsWith('ocr_') ? t.task_id.split('_').slice(2).join('_') : null);
               if (noteId) {
                 initialReprocessingNoteIds.push(noteId);

@@ -31,6 +31,7 @@ import Settings from './pages/Settings';
 import GroupView from './pages/GroupView';
 import AdminPage from './pages/Admin';
 import { fetchApi } from './lib/api';
+import TaskQueueModal from './components/TaskQueueModal';
 
 function GlobalToasts() {
   const [toasts, setToasts] = useState([]);
@@ -179,6 +180,7 @@ function AppLayout({ children }) {
         {children}
       </AppShell.Main>
       <GlobalToasts />
+      <TaskQueueModal />
     </AppShell>
   );
 }
