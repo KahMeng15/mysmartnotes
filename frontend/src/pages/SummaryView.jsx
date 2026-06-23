@@ -9,6 +9,7 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import * as TablerIcons from '@tabler/icons-react';
+import { formatParams } from '../lib/formatters';
 
 const MODE_ICONS = {
   quick: <IconBolt size={14} />,
@@ -174,7 +175,7 @@ export default function SummaryView() {
 
   const handleRename = (summary, e) => {
     e.stopPropagation();
-    const details = summary.prompt_name || [summary.mode, summary.output_format, summary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+    const details = summary.prompt_name || formatParams(summary.mode, summary.output_format, summary.processing_method);
     const defaultTitle = details || `Version ${summary.version}`;
     const currentName = summary.is_user_edited ? summary.title : defaultTitle;
     
@@ -185,7 +186,7 @@ export default function SummaryView() {
   const confirmRename = async () => {
     if (!renameModalSummary || !renameInput.trim()) return;
     
-    const details = renameModalSummary.prompt_name || [renameModalSummary.mode, renameModalSummary.output_format, renameModalSummary.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+    const details = renameModalSummary.prompt_name || formatParams(renameModalSummary.mode, renameModalSummary.output_format, renameModalSummary.processing_method);
     const currentName = renameModalSummary.is_user_edited ? renameModalSummary.title : (details || `Version ${renameModalSummary.version}`);
     
     if (renameInput === currentName) {

@@ -5,6 +5,7 @@ import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile
 import * as TablerIcons from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi, getAuthToken } from '../lib/api';
+import { formatParams } from '../lib/formatters';
 
 const MODE_ICONS = {
   quick: <IconBolt size={14} />,
@@ -260,7 +261,7 @@ export default function SubjectView() {
         
         const parameterStr = parameterType === 'single'
           ? finalPromptName
-          : [noteMode, noteFormat, noteMethod].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+          : formatParams(noteMode, noteFormat, noteMethod);
         
         finalTitle = `${parameterStr} - ${suffix}`;
       }
@@ -914,7 +915,7 @@ export default function SubjectView() {
         <Tabs.List>
           <Tabs.Tab value="resource">Resources</Tabs.Tab>
           <Tabs.Tab value="exercise">Exercises</Tabs.Tab>
-          <Tabs.Tab value="notes">Generated Notes</Tabs.Tab>
+          <Tabs.Tab value="notes">Notes</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="resource" pt="xl">
@@ -1128,7 +1129,7 @@ export default function SubjectView() {
               {generatedNotes.map((gn) => {
                  const relatedNote = notes.find(n => n.id === gn.note_id);
                  const resourceName = relatedNote ? relatedNote.title : 'Unknown Resource';
-                 const templateInfo = gn.prompt_name || [gn.mode, gn.output_format, gn.processing_method].filter(Boolean).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' • ');
+                 const templateInfo = gn.prompt_name || formatParams(gn.mode, gn.output_format, gn.processing_method);
                  const displayTitle = gn.title || `${templateInfo} - ${resourceName}`;
 
                  const isProcessed = (gn.processing_time_ms != null && gn.processing_time_ms > 0) || 
@@ -1212,7 +1213,7 @@ export default function SubjectView() {
             </Stack>
           ) : (
             <Center h={200}>
-              <Text c="dimmed">No generated notes found.</Text>
+              <Text c="dimmed">No notes found.</Text>
             </Center>
           )}
         </Tabs.Panel>
