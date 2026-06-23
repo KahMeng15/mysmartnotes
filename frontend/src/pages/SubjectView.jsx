@@ -930,7 +930,7 @@ export default function SubjectView() {
                 const isCancelled = cancelledNoteIds.includes(note.id);
                 // Also treat it as failed if it's not processed, has no active task, and is not reprocessing/cancelled
                 const hasFailed = failedNoteIds.includes(note.id) || (!isProcessed && !resourceTasks[note.id] && !isReprocessing && !isCancelled);
-                
+
                 return (
                   <Card
                     key={note.id}
@@ -995,7 +995,7 @@ export default function SubjectView() {
                     </Group>
                     {(isReprocessing || (!isProcessed && !hasFailed)) && (
                       <Progress 
-                        value={isReprocessing ? undefined : (noteProgress[note.id] ?? 10)}
+                        value={noteProgress[note.id] ?? 10}
                         animated={isReprocessing || (noteProgress[note.id] === undefined || noteProgress[note.id] < 100)} 
                         size="xs" 
                         color="orange" 

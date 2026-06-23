@@ -66,14 +66,18 @@ export default function TaskQueueModal() {
           </Group>
 
           {!isMinimized && (
-            <ScrollArea.Autosize maxHeight={300} offsetScrollbars>
+            <ScrollArea.Autosize mah={300} offsetScrollbars>
               <Stack gap="xs">
                 {visibleTasks.map((task, index) => {
                   let title = task.task_type;
-                  if (task.input_data && task.input_data.kwargs && task.input_data.kwargs.title) {
-                    title = task.input_data.kwargs.title;
-                  } else if (task.input_data && task.input_data.kwargs && task.input_data.kwargs.file_path) {
-                    title = task.input_data.kwargs.file_path.split('/').pop();
+                  if (task.input_data && task.input_data.kwargs) {
+                    if (task.input_data.kwargs.title) {
+                      title = task.input_data.kwargs.title;
+                    } else if (task.input_data.kwargs.file_name) {
+                      title = task.input_data.kwargs.file_name;
+                    } else if (task.input_data.kwargs.file_path) {
+                      title = task.input_data.kwargs.file_path.split('/').pop();
+                    }
                   }
 
                   let typeLabel = task.task_type;
