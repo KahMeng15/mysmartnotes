@@ -745,7 +745,7 @@ Sorry, I am here to help you study better and smarter with your resources. I am 
             if target_resource_ids:
                 try:
                     from app.processing.embeddings import retrieve_relevant_chunks, combine_snippets
-                    raw_chunks = retrieve_relevant_chunks(query=message, note_ids=target_resource_ids, db=db, top_k=5)
+                    raw_chunks = retrieve_relevant_chunks(query=message, resource_ids=target_resource_ids, db=db, top_k=5)
                     # Filter for confident chunks (score >= 15.0)
                     chunks = [c for c in raw_chunks if c["score"] >= 15.0]
                     
