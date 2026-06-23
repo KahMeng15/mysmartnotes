@@ -79,6 +79,9 @@ export default function TaskQueueModal() {
                       title = task.input_data.kwargs.file_path.split('/').pop();
                     }
                   }
+                  
+                  // Hide common file extensions from the title
+                  title = title.replace(/\.[^/.]+$/, "");
 
                   let typeLabel = task.task_type;
                   if (typeLabel === 'resource_processing' || typeLabel === 'ocr') typeLabel = 'Processing resource';
@@ -100,7 +103,7 @@ export default function TaskQueueModal() {
                         <Group gap="xs" wrap="nowrap" style={{ flex: 1, overflow: 'hidden' }}>
                           {getTaskIcon(task.status)}
                           <div style={{ flex: 1, overflow: 'hidden' }}>
-                            <Text size="sm" fw={500} truncate>{title}</Text>
+                            <Text size="sm" fw={500} lineClamp={2} style={{ wordBreak: 'break-word' }}>{title}</Text>
                             <Text size="xs" c="dimmed" truncate>{displaySubtitle}</Text>
                           </div>
                         </Group>

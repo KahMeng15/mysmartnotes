@@ -790,6 +790,8 @@ export default function SubjectView() {
     if (!reprocessingNote) return;
     const noteIdToReprocess = reprocessingNote.id;
     closeReprocessNoteModal();
+    setFailedNoteIds(prev => prev.filter(id => id !== noteIdToReprocess));
+    setCancelledNoteIds(prev => prev.filter(id => id !== noteIdToReprocess));
     setReprocessingNoteIds(prev => [...prev, noteIdToReprocess]);
     try {
       const res = await fetchApi(`/resources/${noteIdToReprocess}/reprocess`, {
@@ -799,7 +801,6 @@ export default function SubjectView() {
       setNotes(prevNotes => prevNotes.map(l => l.id === noteIdToReprocess ? res : l));
     } catch (err) {
       alert("Failed to reprocess note: " + err.message);
-    } finally {
       setReprocessingNoteIds(prev => prev.filter(id => id !== noteIdToReprocess));
     }
   };
