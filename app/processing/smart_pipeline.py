@@ -332,13 +332,27 @@ class SmartPipeline:
         while i < len(lines):
             line = lines[i]
 
-            # Clean the main title by dropping loud all-caps course prefixes before "Topic N".
+            # Clean the main title by dropping course prefixes before "Topic N" or "Chapter N".
             if i == 0 and line.startswith("# "):
                 title = line[2:].strip()
+                
+                if not re.search(r"\b(?:Topic|Chapter)\b", title, flags=re.IGNORECASE):
+                    # Search ahead up to 5 lines for a Chapter or Topic designation
+                    for j in range(1, min(6, len(lines))):
+                        next_line = lines[j].strip()
+                        clean_next = re.sub(r"^#+\s*", "", next_line)
+                        if re.search(r"^.*?\b(?:Topic|Chapter)\s+\d+.*$", clean_next, flags=re.IGNORECASE):
+                            # Found the real chapter/topic name! Extract and make it the main title.
+                            title = re.sub(r"^.*?\b((?:Topic|Chapter)\s+\d+.*)$", r"\1", clean_next, flags=re.IGNORECASE)
+                            # Remove that line from the list so we don't duplicate it
+                            lines.pop(j)
+                            break
+
                 title = re.sub(
-                    r"^(?:[A-Z][A-Z\-&/]+(?:\s+[A-Z][A-Z\-&/]+)+)\s+(Topic\s+\d+.*)$",
+                    r"^.*?\b((?:Topic|Chapter)\s+\d+.*)$",
                     r"\1",
                     title,
+                    flags=re.IGNORECASE,
                 )
                 line = f"# {title}"
 
@@ -630,9 +644,14 @@ class SmartPipeline:
             slide_blocks = []
             current_slide_title = ""
 
-            for shape in slide.shapes:
-                if not shape.has_text_frame:
-                    continue
+            def _get_text_shapes(shapes):
+                for shape in shapes:
+                    if getattr(shape, "shape_type", None) == 6:  # MSO_SHAPE_TYPE.GROUP
+                        yield from _get_text_shapes(shape.shapes)
+                    elif getattr(shape, "has_text_frame", False):
+                        yield shape
+
+            for shape in _get_text_shapes(slide.shapes):
 
                 # Determine shape-level role
                 shape_role = "body"
@@ -764,12 +783,13 @@ class SmartPipeline:
 
             # --- Slide-level Filtering ---
             # 1. Skip if the title is in the skip list and there's very little content
+            # (Do not skip the first slide, as it contains the main document title)
             title_lower = current_slide_title.lower().strip()
-            if any(kw in title_lower for kw in self._SKIP_SLIDE_TITLES) and len(slide_blocks) <= 5:
+            if slide_num > 1 and any(kw in title_lower for kw in self._SKIP_SLIDE_TITLES) and len(slide_blocks) <= 5:
                 logger.debug(f"Skip low-value slide {slide_num}: '{current_slide_title}'")
                 continue
 
-            if slide_blocks and not self._has_substantive_slide_content(slide_blocks):
+            if slide_num > 1 and slide_blocks and not self._has_substantive_slide_content(slide_blocks):
                 logger.debug(f"Skip non-substantive PPTX slide {slide_num}: '{current_slide_title}'")
                 continue
 
@@ -947,6 +967,13 @@ class SmartPipeline:
                 client.tiers[0].api_key = self.gemini_api_key
                 client.tiers[0].model_name = self.gemini_model
                 client._init_gemini_tier(client.tiers[0])
+            
+            # Extract the original main title to enforce it later
+            original_title = None
+            for line in markdown.split("\n"):
+                if line.startswith("# "):
+                    original_title = line
+                    break
 
             chunks = self._split_into_chunks(markdown)
             num_chunks = len(chunks)
@@ -1011,7 +1038,10 @@ class SmartPipeline:
             for line in lines:
                 # If this is the very first heading in the entire document, force it to be H1
                 if not first_heading_seen and re.match(r'^#{1,6}\s+', line):
-                    line = re.sub(r'^#{1,6}\s+', '# ', line)
+                    if original_title:
+                        line = original_title
+                    else:
+                        line = re.sub(r'^#{1,6}\s+', '# ', line)
                     first_heading_seen = True
                     seen_h1 = True
                 # Enforce only ONE H1
