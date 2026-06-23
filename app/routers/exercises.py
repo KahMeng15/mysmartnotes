@@ -15,6 +15,11 @@ from app.config import get_settings
 from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
 from app.processing.exercise_processor import process_exercise_task, grade_answer, explain_answer, generate_exercise_task
+from app.processing.document_generator import ContentSegment, ContentType
+import uuid
+import os
+
+_export_progress = {}
 
 logger = logging.getLogger(__name__)
 
@@ -450,3 +455,168 @@ async def get_exercise_processing_logs(
         entries = entries[:limit]
 
     return {"entries": entries}
+
+@router.post("/{exercise_id}/export", response_model=dict)
+async def export_exercise(
+    exercise_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Export an exercise to PDF or DOCX using DocumentGenerator"""
+    logger.info(f"[Export] Received request for exercise {exercise_id} with body: {body}")
+    task_id = str(uuid.uuid4())[:8]
+    _export_progress[task_id] = {"step": "Starting", "percent": 0, "status": "running"}
+    
+    def progress_callback(step, percent):
+        _export_progress[task_id] = {"step": step, "percent": percent, "status": "running" if percent < 100 else "complete"}
+    
+    export_format = body.get("format", "pdf").lower()
+    if export_format not in ("pdf", "docx"):
+        raise HTTPException(status_code=400, detail="Format must be 'pdf' or 'docx'")
+        
+    include_cover = body.get("include_cover", True)
+    template_id = body.get("template_id", None)
+    
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+        
+    questions = db.query(ExerciseQuestion).filter(ExerciseQuestion.exercise_id == exercise.id).order_by(ExerciseQuestion.order).all()
+    if not questions:
+        raise HTTPException(status_code=400, detail="Exercise has no questions to export.")
+        
+    template_config = None
+    if template_id:
+        from app.models.db import ExportTemplate
+        tmpl = db.query(ExportTemplate).filter(
+            ExportTemplate.id == template_id,
+            (ExportTemplate.user_id == current_user.id) | (ExportTemplate.user_id.is_(None))
+        ).first()
+        if tmpl:
+            template_config = tmpl.config
+
+    segments = []
+    
+    if template_config and "header" in template_config:
+        h_cfg = template_config["header"]
+        if h_cfg.get("show_note_title"):
+            segments.append(ContentSegment(content=exercise.title, content_type=ContentType.NOTE_TITLE, page_number=1))
+            
+    import json
+    for i, q in enumerate(questions):
+        q_text = f"**Q{i+1}:** {q.question_text}"
+        segments.append(ContentSegment(content=q_text, content_type=ContentType.H3, page_number=1))
+        
+        if q.question_type == "objective" and q.options:
+            try:
+                opts = json.loads(q.options) if isinstance(q.options, str) else q.options
+                for opt in opts:
+                    segments.append(ContentSegment(content=f"- {opt}", content_type=ContentType.LIST, page_number=1))
+            except:
+                pass
+                
+        ans_text = f"**Answer:** {q.answer_text}"
+        segments.append(ContentSegment(content="", content_type=ContentType.BODY, page_number=1))
+        segments.append(ContentSegment(content=ans_text, content_type=ContentType.BODY, page_number=1))
+        segments.append(ContentSegment(content="", content_type=ContentType.BODY, page_number=1))
+
+    try:
+        from app.routers.processing import GENERATED_DIR
+        safe_title = "".join(c for c in exercise.title if c.isalnum() or c in (' ', '-', '_')).strip()
+        
+        if export_format == "pdf":
+            from app.processing.document_generator import DocumentGenerator
+            generator = DocumentGenerator(
+                lecture_id=exercise.id,
+                lecture_title=f"Exercise: {exercise.title}",
+                base_output_dir=GENERATED_DIR,
+            )
+            output_path = generator.generate_pdf(
+                content_segments=segments,
+                extracted_images=[],
+                include_toc=False,
+                include_cover=include_cover,
+                template_config=template_config,
+                progress_callback=progress_callback,
+            )
+        else:
+            from app.processing.docx_generator import DocxGenerator
+            generator = DocxGenerator(
+                lecture_id=exercise.id,
+                lecture_title=f"Exercise: {exercise.title}",
+                base_output_dir=GENERATED_DIR,
+            )
+            output_path = generator.generate_docx(
+                content_segments=segments,
+                extracted_images=[],
+                include_toc=False,
+                include_cover=include_cover,
+                template_config=template_config,
+                progress_callback=progress_callback,
+            )
+            
+        _export_progress[task_id] = {
+            "step": "Complete", 
+            "percent": 100, 
+            "status": "complete", 
+            "output_path": output_path
+        }
+        
+        return {
+            "success": True,
+            "message": f"{export_format.upper()} generated successfully",
+            "download_url": f"/exercises/{exercise.id}/download-export?format={export_format}&task_id={task_id}",
+            "task_id": task_id,
+            "segments_count": len(segments),
+            "images_count": 0
+        }
+    except Exception as e:
+        logger.error(f"Error exporting {export_format}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{exercise_id}/export-status/{task_id}")
+async def get_export_status(
+    exercise_id: str,
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    progress = _export_progress.get(task_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return progress
+
+@router.get("/{exercise_id}/download-export")
+async def download_export(
+    exercise_id: str,
+    task_id: str,
+    format: str = "pdf",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    from fastapi.responses import FileResponse
+    export_format = format.lower()
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+        
+    progress = _export_progress.get(task_id)
+    if not progress or "output_path" not in progress:
+        raise HTTPException(status_code=404, detail="Export not ready or task not found")
+        
+    output_path = progress["output_path"]
+    if not os.path.exists(output_path):
+        raise HTTPException(status_code=404, detail=f"{export_format.upper()} file not found.")
+        
+    safe_title = "".join(c for c in exercise.title if c.isalnum() or c in (' ', '-', '_')).strip()
+    
+    mime_types = {
+        "pdf": "application/pdf",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    
+    return FileResponse(
+        path=output_path,
+        filename=f"{safe_title}.{export_format}",
+        media_type=mime_types.get(export_format, "application/octet-stream"),
+    )

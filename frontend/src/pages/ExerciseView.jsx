@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { 
   Box, Title, Text, Group, Card, Button, Stack, Loader, Center, 
-  Badge, ActionIcon, Textarea, Collapse, Radio, Paper, Alert
+  Badge, ActionIcon, Textarea, Collapse, Radio, Paper, Alert, Menu
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 
 export default function ExerciseView() {
@@ -24,6 +24,7 @@ export default function ExerciseView() {
   const [explanations, setExplanations] = useState({});
   const [gradingLoading, setGradingLoading] = useState({});
   const [explainLoading, setExplainLoading] = useState({});
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchApi(`/exercises/${id}`)
@@ -71,6 +72,39 @@ export default function ExerciseView() {
     }
   };
 
+  const handleExport = async (format) => {
+    setExporting(true);
+    try {
+      const res = await fetchApi(`/exercises/${id}/export`, {
+        method: 'POST',
+        body: JSON.stringify({ format, include_cover: true })
+      });
+      if (res && res.task_id) {
+        // Poll for export completion
+        const interval = setInterval(async () => {
+          try {
+            const statusRes = await fetchApi(`/exercises/${id}/export-status/${res.task_id}`);
+            if (statusRes.status === 'complete') {
+              clearInterval(interval);
+              window.location.href = res.download_url;
+              setExporting(false);
+            } else if (statusRes.status === 'failed') {
+              clearInterval(interval);
+              alert("Export failed.");
+              setExporting(false);
+            }
+          } catch (e) {
+            clearInterval(interval);
+            setExporting(false);
+          }
+        }, 2000);
+      }
+    } catch (e) {
+      alert("Failed to start export: " + e.message);
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return <Center h="50vh"><Loader size="lg" /></Center>;
   }
@@ -99,6 +133,21 @@ export default function ExerciseView() {
            <Button variant={isTestMode ? "filled" : "light"} color="indigo" onClick={() => setIsTestMode(!isTestMode)}>
              {isTestMode ? "Exit Test Mode" : "Enter Test Mode"}
            </Button>
+           <Menu shadow="md" width={200}>
+             <Menu.Target>
+               <Button variant="outline" color="gray" leftSection={<IconDownload size={16} />} loading={exporting}>
+                 Export
+               </Button>
+             </Menu.Target>
+             <Menu.Dropdown>
+               <Menu.Item leftSection={<IconFileTypePdf size={14} color="red" />} onClick={() => handleExport('pdf')}>
+                 Export as PDF
+               </Menu.Item>
+               <Menu.Item leftSection={<IconFileTypeDocx size={14} color="blue" />} onClick={() => handleExport('docx')}>
+                 Export as DOCX
+               </Menu.Item>
+             </Menu.Dropdown>
+           </Menu>
         </Group>
       </Group>
 

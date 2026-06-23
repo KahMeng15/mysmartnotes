@@ -436,6 +436,7 @@ export default function SubjectView() {
   const [reprocessingNoteIds, setReprocessingNoteIds] = useState([]);
   const [exerciseProgress, setExerciseProgress] = useState({});
   const [failedExerciseIds, setFailedExerciseIds] = useState([]);
+  const [completedExerciseIds, setCompletedExerciseIds] = useState([]);
   const [reprocessingExerciseIds, setReprocessingExerciseIds] = useState([]);
   const [generatedNoteProgress, setGeneratedNoteProgress] = useState({});
   const [failedGeneratedNoteIds, setFailedGeneratedNoteIds] = useState(() => JSON.parse(localStorage.getItem('failedGeneratedNoteIds') || '[]'));
@@ -635,7 +636,7 @@ export default function SubjectView() {
 
   // Polling for exercise processing progress
   useEffect(() => {
-    const unprocessedExercises = exercises.filter(ex => !failedExerciseIds.includes(ex.id) && !(ex.questions && ex.questions.length > 0));
+    const unprocessedExercises = exercises.filter(ex => !failedExerciseIds.includes(ex.id) && !completedExerciseIds.includes(ex.id) && !(ex.questions && ex.questions.length > 0));
     if (unprocessedExercises.length === 0) return;
 
     const poll = async () => {
@@ -656,6 +657,8 @@ export default function SubjectView() {
                   setExerciseProgress(prev => ({ ...prev, [ex.id]: taskData.progress }));
                 }
                 if (taskData.status === 'completed') {
+                  setCompletedExerciseIds(prev => [...prev, ex.id]);
+                  setExerciseProgress(prev => { const newP = {...prev}; delete newP[ex.id]; return newP; });
                   if (subject && subject.id) {
                     fetchApi(`/exercises/subject/${subject.id}`).then(data => setExercises(data || []));
                   }
@@ -685,8 +688,9 @@ export default function SubjectView() {
 
     poll();
     const interval = setInterval(poll, 2000);
+
     return () => clearInterval(interval);
-  }, [exercises, failedExerciseIds]);
+  }, [exercises, failedExerciseIds, completedExerciseIds]);
 
   // Polling for generated notes processing progress
   // Only polls summaries that have an explicit in-flight task_id set via pendingSummaryTasks.
@@ -935,6 +939,7 @@ export default function SubjectView() {
     const exId = reprocessingExercise.id;
     closeReprocessExerciseModal();
     setFailedExerciseIds(prev => prev.filter(id => id !== exId));
+    setCompletedExerciseIds(prev => prev.filter(id => id !== exId));
     setReprocessingExerciseIds(prev => [...prev, exId]);
     try {
       await fetchApi(`/exercises/${exId}/reprocess`, {
@@ -1250,7 +1255,7 @@ export default function SubjectView() {
                     </Group>
                   </Group>
                   {/* Progress bar for exercise processing */}
-                  {(reprocessingExerciseIds.includes(ex.id) || typeof exerciseProgress[ex.id] === 'number') && (
+                  {(reprocessingExerciseIds.includes(ex.id) || (typeof exerciseProgress[ex.id] === 'number' && !completedExerciseIds.includes(ex.id))) && !(ex.questions && ex.questions.length > 0) && (
                     <Progress
                       value={exerciseProgress[ex.id] || undefined}
                       animated={true}

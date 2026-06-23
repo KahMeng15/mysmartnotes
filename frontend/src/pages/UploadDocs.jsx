@@ -96,7 +96,7 @@ export default function UploadDocs() {
         }
         setProgress(100);
         setTimeout(() => {
-          navigate(`/subject/${selectedSubject}/exercise`);
+          navigate(`/subject/${selectedSubject}/exercises`);
         }, 800);
       } else {
         const formData = new FormData();
