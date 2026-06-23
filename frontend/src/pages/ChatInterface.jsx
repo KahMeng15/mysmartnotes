@@ -245,8 +245,8 @@ const MetadataBlock = ({ msg, messageIndex, setMessages, handleRepeat }) => {
                     onClick={() => {
                       if (src.is_web) {
                         window.open(src.url, '_blank');
-                      } else if (src.note_id) {
-                        window.open(`/resource/${src.note_id}?highlight=${encodeURIComponent(src.text_preview)}`, '_blank');
+                      } else if (src.resource_id) {
+                        window.open(`/resource/${src.resource_id}?highlight=${encodeURIComponent(src.text_preview)}`, '_blank');
                       }
                     }}
                   >
@@ -775,8 +775,8 @@ export default function ChatInterface() {
                   const src = sources[sourceIndex];
                   if (src.is_web) {
                     window.open(src.url, '_blank');
-                  } else if (src.note_id) {
-                    window.open(`/resource/${src.note_id}?highlight=${encodeURIComponent(src.text_preview)}`, '_blank');
+                  } else if (src.resource_id) {
+                    window.open(`/resource/${src.resource_id}?highlight=${encodeURIComponent(src.text_preview)}`, '_blank');
                   }
                 }
               }}
