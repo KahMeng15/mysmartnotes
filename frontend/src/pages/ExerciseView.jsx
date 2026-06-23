@@ -165,7 +165,7 @@ export default function ExerciseView() {
                     )}
                   </Group>
 
-                  <Collapse in={hasGraded}>
+                  <Collapse in={hasGraded ? "true" : undefined}>
                     <Alert 
                       mt="md" 
                       color={grade?.is_correct ? 'green' : 'red'} 
@@ -178,7 +178,7 @@ export default function ExerciseView() {
                     </Alert>
                   </Collapse>
                   
-                  <Collapse in={!!explanation}>
+                  <Collapse in={!!explanation ? "true" : undefined}>
                      <Paper mt="md" p="md" bg="var(--mantine-color-gray-0)">
                        <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle' }}/><b>AI Explanation:</b> {explanation}</Text>
                      </Paper>
@@ -186,7 +186,7 @@ export default function ExerciseView() {
                 </Box>
               ) : (
                 <Box mt="md">
-                  <Collapse in={showAns}>
+                  <Collapse in={showAns ? "true" : undefined}>
                     <Paper p="md" bg="var(--mantine-color-blue-0)" radius="sm">
                       <Text fw={500} c="blue.9">Answer:</Text>
                       <Text c="blue.9">{q.answer_text || "No answer provided."}</Text>

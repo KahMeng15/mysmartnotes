@@ -120,6 +120,14 @@ export default function SubjectView() {
 
   const [selectedResources, setSelectedResources] = useState([]);
   const [createNoteModalOpened, setCreateNoteModalOpened] = useState(false);
+  
+  const [createExerciseModalOpened, setCreateExerciseModalOpened] = useState(false);
+  const [exerciseScope, setExerciseScope] = useState([]);
+  const [exerciseQuestionTypes, setExerciseQuestionTypes] = useState(["Short answer", "Long answer", "Objective", "Fill in the blank"]);
+  const [exerciseLengths, setExerciseLengths] = useState(["Short", "Medium", "Long"]);
+  const [exerciseDifficulties, setExerciseDifficulties] = useState(["Easy", "Medium", "Hard"]);
+  const [generatingExercise, setGeneratingExercise] = useState(false);
+
   const [noteMode, setNoteMode] = useState('elaborate');
   const [noteFormat, setNoteFormat] = useState('sentence');
   const [noteMethod, setNoteMethod] = useState('whole');
@@ -185,6 +193,35 @@ export default function SubjectView() {
       console.error("Failed to generate prompt", err);
     } finally {
       setGeneratingNewPrompt(false);
+    }
+  };
+
+  const handleCreateExercise = async () => {
+    if (exerciseScope.length === 0) {
+      alert("Please select at least one resource.");
+      return;
+    }
+    setGeneratingExercise(true);
+    try {
+      await fetchApi('/exercises/generate', {
+        method: 'POST',
+        body: JSON.stringify({
+          subject_id: subject.id,
+          resource_ids: exerciseScope,
+          question_types: exerciseQuestionTypes,
+          lengths: exerciseLengths,
+          difficulties: exerciseDifficulties,
+          num_questions: 10
+        })
+      });
+      setCreateExerciseModalOpened(false);
+      setExerciseScope([]);
+      window.location.reload(); // Refresh to show new background task
+    } catch (e) {
+      console.error(e);
+      alert("Failed to generate exercise: " + e.message);
+    } finally {
+      setGeneratingExercise(false);
     }
   };
 
@@ -592,14 +629,20 @@ export default function SubjectView() {
         const updatedExercises = await Promise.all(
           unprocessedExercises.map(async (ex) => {
             try {
-              const taskData = await fetchApi(`/search/tasks/extract_ex_${ex.id}`);
+              // Try extraction task first
+              let taskData = await fetchApi(`/search/tasks/extract_ex_${ex.id}`).catch(() => null);
+              
+              // If not found, try generation task
+              if (!taskData) {
+                taskData = await fetchApi(`/search/tasks/generate_ex_${ex.id}`).catch(() => null);
+              }
+
               if (taskData) {
                 if (taskData.progress !== undefined) {
                   setExerciseProgress(prev => ({ ...prev, [ex.id]: taskData.progress }));
                 }
                 if (taskData.status === 'completed') {
-                  // Optionally refresh exercise data if needed
-                  return ex; // placeholder
+                  return ex;
                 }
                 if (taskData.status === 'failed') {
                   setFailedExerciseIds(prev => [...prev, ex.id]);
@@ -871,9 +914,21 @@ export default function SubjectView() {
           <ActionIcon variant="light" color="red" size="lg" title="Delete Subject" onClick={openDeleteSubjectModal}>
             <IconTrash size={18} />
           </ActionIcon>
-          <Button variant="light" leftSection={<IconSparkles size={16} />} onClick={() => setCreateNoteModalOpened(true)}>
-            Create
-          </Button>
+          <Menu shadow="md" width={200} position="bottom-end">
+            <Menu.Target>
+              <Button variant="light" leftSection={<IconSparkles size={16} />}>
+                Create
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconFileText size={14} />} onClick={() => setCreateNoteModalOpened(true)}>
+                Study Notes
+              </Menu.Item>
+              <Menu.Item leftSection={<IconBrain size={14} />} onClick={() => setCreateExerciseModalOpened(true)}>
+                Exercise / Quiz
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
           <Button leftSection={<IconUpload size={16} />} onClick={() => navigate(`/upload?subject_id=${subject.id}`)}>
             Upload
           </Button>
@@ -1283,6 +1338,72 @@ export default function SubjectView() {
           <Button variant="default" onClick={closeReprocessNoteModal}>Cancel</Button>
           <Button color="orange" onClick={executeReprocessNote} loading={submitting}>Start Reprocessing</Button>
         </Group>
+      </Modal>
+
+      <Modal opened={createExerciseModalOpened} onClose={() => setCreateExerciseModalOpened(false)} title="Create Exercise" centered size="lg">
+        <form onSubmit={(e) => { e.preventDefault(); handleCreateExercise(); }}>
+          <Stack gap="md">
+            <Text size="sm">Select resources and configure parameters to generate an exercise using AI.</Text>
+            
+            <MultiSelect
+              label="Scope (Select Resources)"
+              description="Choose which resources to base the exercise on."
+              placeholder="Pick files"
+              data={[
+                { value: 'all', label: 'All Resources (Select/Deselect All)' },
+                ...sortedProcessableNotes.map(n => ({ value: n.id, label: n.title }))
+              ]}
+              value={exerciseScope}
+              onChange={(values) => {
+                if (values.includes('all')) {
+                  const processableIds = sortedProcessableNotes.map(n => n.id);
+                  if (exerciseScope.length === processableIds.length) {
+                    setExerciseScope([]);
+                  } else {
+                    setExerciseScope(processableIds);
+                  }
+                } else {
+                  setExerciseScope(values);
+                }
+              }}
+              searchable
+              clearable
+              required
+            />
+
+            <MultiSelect
+              label="Question Type"
+              description="Select types of questions to include."
+              data={['Short answer', 'Long answer', 'Objective', 'Fill in the blank']}
+              value={exerciseQuestionTypes}
+              onChange={setExerciseQuestionTypes}
+              required
+            />
+
+            <MultiSelect
+              label="Question Length"
+              description="Select lengths of questions."
+              data={['Short', 'Medium', 'Long']}
+              value={exerciseLengths}
+              onChange={setExerciseLengths}
+              required
+            />
+
+            <MultiSelect
+              label="Difficulty"
+              description="Select difficulties of questions."
+              data={['Easy', 'Medium', 'Hard']}
+              value={exerciseDifficulties}
+              onChange={setExerciseDifficulties}
+              required
+            />
+
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={() => setCreateExerciseModalOpened(false)}>Cancel</Button>
+              <Button type="submit" loading={generatingExercise} leftSection={<IconBrain size={16} />}>Generate Exercise</Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       <Modal opened={createNoteModalOpened} onClose={() => setCreateNoteModalOpened(false)} title="Create Note" centered size="lg">

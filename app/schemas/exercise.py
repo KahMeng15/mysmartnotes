@@ -82,3 +82,11 @@ class BulkExerciseQuestionUpdate(BaseModel):
 
 class BulkExerciseUpdate(BaseModel):
     questions: List[BulkExerciseQuestionUpdate]
+
+class ExerciseGenerateRequest(BaseModel):
+    subject_id: str
+    resource_ids: List[str]
+    question_types: List[str] = ["Short answer", "Long answer", "Objective", "Fill in the blank"]
+    lengths: List[str] = ["Short", "Medium", "Long"]
+    difficulties: List[str] = ["Easy", "Medium", "Hard"]
+    num_questions: int = 10

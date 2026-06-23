@@ -8,6 +8,7 @@ from typing import Dict, Any, List
 from app.models.db import User, Exercise, ExerciseQuestion, Task, Resource
 from app.utils.db import SessionLocal
 from app.utils.tasks import TaskManager
+from app.utils.storage import StorageManager
 from app.processing.ocr import OCRProcessor
 from app.processing.note_processor import get_pipeline_for_user
 from app.processing.ai_client import AIClient
@@ -69,11 +70,12 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None):
         )
         
         client = AIClient()
-        response = client.generate_text(
+        import asyncio
+        response = asyncio.run(client.generate_text(
             prompt=f"Text:\n{raw_text}",
-            system_prompt=system_prompt,
-            temperature=0.1
-        )
+            system_instruction=system_prompt,
+            max_tokens=8192
+        ))
         
         try:
             # Strip markdown code blocks if the LLM adds them despite instructions
@@ -103,11 +105,12 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None):
             
             # If no answer, optionally generate one
             if not answer:
-                ans_resp = client.generate_text(
+                import asyncio
+                ans_resp = asyncio.run(client.generate_text(
                     prompt=f"Answer this question concisely and accurately: {q_data.get('question_text', '')}",
-                    system_prompt="You are a helpful study assistant. Provide a direct and correct answer.",
-                    temperature=0.3
-                )
+                    system_instruction="You are a helpful study assistant. Provide a direct and correct answer.",
+                    max_tokens=2000
+                ))
                 answer = ans_resp.strip()
                 
             # Find reference resource
@@ -159,11 +162,12 @@ def grade_answer(user: User, question: ExerciseQuestion, user_answer: str) -> Ex
         "Do NOT include any markdown formatting, just the raw JSON."
     )
     
-    response = client.generate_text(
+    import asyncio
+    response = asyncio.run(client.generate_text(
         prompt=prompt,
-        system_prompt=system_prompt,
-        temperature=0.1
-    )
+        system_instruction=system_prompt,
+        max_tokens=4000
+    ))
     
     try:
         # Strip potential code blocks
@@ -197,8 +201,103 @@ def explain_answer(user: User, question: ExerciseQuestion, user_answer: str = No
         "If the user provided an attempt, explain where they went wrong or right."
     )
     
-    return client.generate_text(
+    import asyncio
+    return asyncio.run(client.generate_text(
         prompt=prompt,
-        system_prompt=system_prompt,
-        temperature=0.7
-    ).strip()
+        system_instruction=system_prompt,
+        max_tokens=4000
+    )).strip()
+
+def generate_exercise_task(exercise_id: str, user_id: int, req_data: Dict[str, Any], task_id: str = None):
+    db = SessionLocal()
+    try:
+        exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
+        user = db.query(User).filter(User.id == user_id).first()
+        if not exercise or not user:
+            TaskManager._update_db_task(task_id, status="failed", error="Exercise or User not found")
+            return
+            
+        def progress_callback(percent, message=None):
+            if task_id:
+                TaskManager.update_task_progress(task_id, percent, message=message)
+
+        progress_callback(10, "Fetching resources...")
+        
+        resource_ids = req_data.get("resource_ids", [])
+        resources_text = ""
+        for r_id in resource_ids:
+            r = db.query(Resource).filter(Resource.id == r_id, Resource.user_id == user_id).first()
+            if r:
+                r_text = StorageManager.get_resource_text(r.id)
+                if r_text:
+                    resources_text += f"\n--- {r.title} ---\n{r_text}\n"
+
+        if not resources_text.strip():
+            raise ValueError("No content found in the selected resources.")
+            
+        progress_callback(40, "Using AI to generate exercise...")
+        
+        question_types = ", ".join(req_data.get("question_types", []))
+        lengths = ", ".join(req_data.get("lengths", []))
+        difficulties = ", ".join(req_data.get("difficulties", []))
+        num_questions = req_data.get("num_questions", 5)
+
+        system_prompt = (
+            f"You are an AI assistant specialized in generating educational exercises. "
+            f"Based on the provided text, generate an exercise with exactly {num_questions} questions. "
+            f"Include the following question types: {question_types}. "
+            f"Target difficulty levels: {difficulties}. "
+            f"Target lengths: {lengths}. "
+            "Return the output STRICTLY as a JSON array of objects with the following keys: "
+            "'original_number' (string, e.g., '1', '2'), 'question_text' (string), 'answer_text' (string), "
+            "'question_type' (string), 'options' (array of strings, or null if not applicable). "
+            "Do NOT wrap the JSON in markdown code blocks. Ensure valid JSON."
+        )
+        
+        client = AIClient()
+        import asyncio
+        response = asyncio.run(client.generate_text(
+            prompt=f"Text:\n{resources_text}",
+            system_instruction=system_prompt,
+            max_tokens=8192
+        ))
+        
+        try:
+            json_text = response.strip()
+            if json_text.startswith("```json"): json_text = json_text[7:]
+            if json_text.startswith("```"): json_text = json_text[3:]
+            if json_text.endswith("```"): json_text = json_text[:-3]
+            
+            print(f"DEBUG LLM JSON TEXT:\n{json_text}\n")
+            
+            questions_data = json.loads(json_text.strip())
+        except json.JSONDecodeError:
+            print(f"Failed to parse LLM JSON response: {json_text}")
+            raise ValueError("Failed to parse generated questions into JSON format.")
+            
+        progress_callback(80, "Saving generated exercise...")
+        
+        order = 0
+        for q in questions_data:
+            new_q = ExerciseQuestion(
+                exercise_id=exercise_id,
+                question_text=q.get("question_text", "Unknown Question"),
+                answer_text=q.get("answer_text", ""),
+                question_type=q.get("question_type", "subjective"),
+                options=q.get("options", None),
+                original_number=q.get("original_number", str(order + 1)),
+                order=order
+            )
+            db.add(new_q)
+            order += 1
+            
+        db.commit()
+        progress_callback(100, "Exercise generation complete.")
+        TaskManager._update_db_task(task_id, status="completed")
+        
+    except Exception as e:
+        logger.error(f"Exercise generation failed: {str(e)}")
+        TaskManager._update_db_task(task_id, status="failed", error=str(e))
+    finally:
+        db.close()
+

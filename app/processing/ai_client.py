@@ -221,10 +221,29 @@ class AIClient:
             # Legacy fallback for perfectly formatted clean text without braces
             clean_text = text.strip()
             parsed = json.loads(clean_text)
+            if isinstance(parsed, list):
+                return json.dumps(parsed)
             if "final_answer" in parsed:
                 return str(parsed["final_answer"]).strip()
             elif "title" in parsed:
                 return str(parsed["title"]).strip()
+        except Exception:
+            pass
+
+        # Try to extract a JSON array directly if the above failed
+        try:
+            end = text.rfind(']')
+            if end != -1:
+                count = 0
+                for i in range(end, -1, -1):
+                    if text[i] == ']':
+                        count += 1
+                    elif text[i] == '[':
+                        count -= 1
+                        if count == 0:
+                            parsed = json.loads(text[i:end+1])
+                            if isinstance(parsed, list):
+                                return json.dumps(parsed)
         except Exception:
             pass
         
@@ -314,7 +333,7 @@ class AIClient:
 
         return text.strip()
 
-    async def _generate_with_tier(self, tier: AITier, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None) -> str:
+    async def _generate_with_tier(self, tier: AITier, prompt: str, max_tokens: int, system_instruction: Optional[str] = None, raw_output: bool = False) -> str:
         """Helper to generate text using a specific tier"""
         # Validation
         if tier.provider == "gemini" and not tier.model:
@@ -341,12 +360,13 @@ class AIClient:
                 return await asyncio.to_thread(active_model.generate_content, modified_prompt, generation_config=cfg)
 
             res = await self._with_retries_and_timeout(f"gemini_{tier.model_name}", _gemini_call)
+            print(f"DEBUG GEMINI RES: {res}")
             if res.candidates and res.candidates[0].content.parts:
                 parts = res.candidates[0].content.parts
                 text = "".join(p.text for p in parts if hasattr(p, 'text'))
                 self.last_successful_tier = tier
                 logger.info(f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})")
-                return self._extract_polished_answer(text)
+                return text if raw_output else self._extract_polished_answer(text)
         
         elif tier.provider == "ollama":
             async def _ollama_call():
@@ -355,17 +375,21 @@ class AIClient:
             res = await self._with_retries_and_timeout(f"ollama_{tier.model_name}", _ollama_call)
             self.last_successful_tier = tier
             logger.info(f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})")
-            return self._extract_polished_answer(res)
+            return res if raw_output else self._extract_polished_answer(res)
 
-        elif tier.provider == "huggingface" and tier.model:
+        elif tier.provider == "huggingface":
+            if not tier.model:
+                raise ValueError(f"Huggingface model not initialized for {tier.model_name}")
             async def _hf_call():
                 return tier.model.text_generation(modified_prompt, max_new_tokens=max_tokens, system_instruction=system_instruction)
             
             res = await self._with_retries_and_timeout(f"hf_{tier.model_name}", _hf_call)
             self.last_successful_tier = tier
-            return self._extract_polished_answer(res)
+            return res if raw_output else self._extract_polished_answer(res)
         
-        elif tier.provider == "groq" and tier.model:
+        elif tier.provider == "groq":
+            if not tier.model:
+                raise ValueError(f"Groq model not initialized for {tier.model_name}")
             async def _groq_call():
                 messages = []
                 if system_instruction:
@@ -386,18 +410,18 @@ class AIClient:
             res = await self._with_retries_and_timeout(f"groq_{tier.model_name}", _groq_call)
             self.last_successful_tier = tier
             logger.info(f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})")
-            return self._extract_polished_answer(res)
+            return res if raw_output else self._extract_polished_answer(res)
         
-        return ""
+        raise ValueError(f"Generation fell through for provider: {tier.provider}")
 
-    async def generate_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None) -> str:
+    async def generate_text(self, prompt: str, max_tokens: int = 500, system_instruction: Optional[str] = None, raw_output: bool = False) -> str:
         """Unary generation with 3-tier fallback logic."""
         last_error = None
         
         for i, tier in enumerate(self.tiers):
             try:
                 logger.info(f"Attempting generation with Tier {i+1} ({tier.provider}: {tier.model_name})")
-                return await self._generate_with_tier(tier, prompt, max_tokens, system_instruction)
+                return await self._generate_with_tier(tier, prompt, max_tokens, system_instruction, raw_output)
             except Exception as e:
                 logger.error(f"Tier {i+1} ({tier.provider}) failed: {e}")
                 last_error = e

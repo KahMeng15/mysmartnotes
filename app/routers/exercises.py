@@ -8,11 +8,11 @@ from typing import List, Optional
 import uuid
 
 from app.models.db import User, Exercise, ExerciseQuestion, Subject, Task
-from app.schemas.exercise import ExerciseResponse, ExerciseCreate, ExerciseUpdate, ExerciseCheckRequest, ExerciseCheckResponse, ExerciseExplainRequest
+from app.schemas.exercise import ExerciseResponse, ExerciseCreate, ExerciseUpdate, ExerciseCheckRequest, ExerciseCheckResponse, ExerciseExplainRequest, ExerciseGenerateRequest
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id, SessionLocal
 from app.utils.tasks import TaskManager
-from app.processing.exercise_processor import process_exercise_task, grade_answer, explain_answer
+from app.processing.exercise_processor import process_exercise_task, grade_answer, explain_answer, generate_exercise_task
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def upload_exercise(
         raise HTTPException(status_code=404, detail="Subject not found")
 
     # Save file
-    file_id = f"ex_{generate_random_id()}"
+    file_id = f"ex_{generate_random_id(db, Exercise)}"
     ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
     user_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", f"user_{current_user.id}")
     os.makedirs(user_dir, exist_ok=True)
@@ -80,12 +80,11 @@ def upload_exercise(
 
     # Launch background task to process the file and extract questions
     task_id = f"extract_ex_{file_id}"
-    TaskManager.create_task(
-        db,
+    TaskManager.submit_task(
         task_id=task_id,
         user_id=current_user.id,
         task_type="exercise_extraction",
-        input_data={"exercise_id": file_id}
+        exercise_id=file_id
     )
     
     background_tasks.add_task(process_exercise_task, exercise_id=file_id, user_id=current_user.id, task_id=task_id)
@@ -113,7 +112,7 @@ def merge_exercises(
         
     subject_id = exercises[0].subject_id
     
-    new_ex_id = f"ex_{generate_random_id()}"
+    new_ex_id = f"ex_{generate_random_id(db, Exercise)}"
     new_ex = Exercise(
         id=new_ex_id,
         user_id=current_user.id,
@@ -213,3 +212,42 @@ def delete_exercise(exercise_id: str, db: Session = Depends(get_db), current_use
     db.delete(exercise)
     db.commit()
     return {"status": "success"}
+
+@router.post("/generate", response_model=ExerciseResponse)
+def generate_exercise(
+    req: ExerciseGenerateRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate an exercise using AI from resources"""
+    subject = db.query(Subject).filter(Subject.id == req.subject_id, Subject.user_id == current_user.id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    file_id = f"ex_{generate_random_id(db, Exercise)}"
+    
+    exercise = Exercise(
+        id=file_id,
+        user_id=current_user.id,
+        subject_id=req.subject_id,
+        group_id=subject.group_id,
+        title="Generated Exercise",
+        model="gemini-2.5-pro",
+    )
+    db.add(exercise)
+    db.commit()
+    db.refresh(exercise)
+
+    task_id = f"generate_ex_{file_id}"
+    TaskManager.submit_task(
+        task_id=task_id,
+        user_id=current_user.id,
+        task_type="exercise_generation",
+        exercise_id=file_id,
+        req=req.dict()
+    )
+    
+    background_tasks.add_task(generate_exercise_task, exercise_id=file_id, user_id=current_user.id, req_data=req.dict(), task_id=task_id)
+    
+    return exercise
