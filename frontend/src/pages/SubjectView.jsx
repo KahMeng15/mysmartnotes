@@ -635,7 +635,7 @@ export default function SubjectView() {
 
   // Polling for exercise processing progress
   useEffect(() => {
-    const unprocessedExercises = exercises.filter(ex => !failedExerciseIds.includes(ex.id));
+    const unprocessedExercises = exercises.filter(ex => !failedExerciseIds.includes(ex.id) && !(ex.questions && ex.questions.length > 0));
     if (unprocessedExercises.length === 0) return;
 
     const poll = async () => {
@@ -656,12 +656,19 @@ export default function SubjectView() {
                   setExerciseProgress(prev => ({ ...prev, [ex.id]: taskData.progress }));
                 }
                 if (taskData.status === 'completed') {
+                  if (subject && subject.id) {
+                    fetchApi(`/exercises/subject/${subject.id}`).then(data => setExercises(data || []));
+                  }
                   return ex;
                 }
-                if (taskData.status === 'failed') {
+                if (taskData.status === 'failed' || taskData.status === 'cancelled') {
                   setFailedExerciseIds(prev => [...prev, ex.id]);
                   return ex;
                 }
+              } else {
+                // Task not found in DB but exercise has no questions, meaning it failed or was dismissed
+                setFailedExerciseIds(prev => [...prev, ex.id]);
+                return ex;
               }
               return null;
             } catch (e) {
@@ -1179,7 +1186,12 @@ export default function SubjectView() {
         <Tabs.Panel value="exercise" pt="xl">
           {exercises.length > 0 ? (
             <Stack spacing="sm">
-              {exercises.map((ex) => (
+              {exercises.map((ex) => {
+                const isProcessed = ex.questions && ex.questions.length > 0;
+                const hasFailed = failedExerciseIds.includes(ex.id);
+                const isProcessing = !isProcessed && !hasFailed;
+                
+                return (
                 <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
                   <Group justify="space-between" wrap="nowrap">
                     <Group>
@@ -1187,9 +1199,16 @@ export default function SubjectView() {
                         <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/exercises/${ex.id}`)}>
                           {ex.title}
                         </Text>
-                        <Text size="xs" c="dimmed">
-                          {formatNoteDate(ex.created_at)}
-                        </Text>
+                        <Group gap="xs" mt={4}>
+                          {(isProcessing || hasFailed) && (
+                            <Badge color={hasFailed ? "red" : "orange"} variant="light" size="sm">
+                              {hasFailed ? 'Failed' : 'Processing...'}
+                            </Badge>
+                          )}
+                          <Text size="xs" c="dimmed">
+                            {formatNoteDate(ex.created_at)}
+                          </Text>
+                        </Group>
                         {ex.parameters && (
                           <Group gap="xs" mt="xs">
                             {ex.parameters.question_types && ex.parameters.question_types.length > 0 && (
@@ -1241,7 +1260,8 @@ export default function SubjectView() {
                     />
                   )}
                 </Card>
-              ))}
+              );
+              })}
             </Stack>
           ) : (
             <Center h={200}>

@@ -17,7 +17,7 @@ from app.schemas.exercise import ExerciseCheckResponse
 
 logger = logging.getLogger(__name__)
 
-def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None):
+def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None, **kwargs):
     db = SessionLocal()
     try:
         exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
@@ -208,7 +208,7 @@ def explain_answer(user: User, question: ExerciseQuestion, user_answer: str = No
         max_tokens=4000
     )).strip()
 
-def generate_exercise_task(exercise_id: str, user_id: int, req_data: Dict[str, Any], task_id: str = None):
+def generate_exercise_task(exercise_id: str, user_id: int, req_data: Dict[str, Any], task_id: str = None, **kwargs):
     db = SessionLocal()
     try:
         exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()

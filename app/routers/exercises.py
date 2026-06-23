@@ -99,10 +99,9 @@ def upload_exercise(
         task_id=task_id,
         user_id=current_user.id,
         task_type="exercise_extraction",
-        exercise_id=file_id
+        exercise_id=file_id,
+        title=exercise.title
     )
-    
-    background_tasks.add_task(process_exercise_task, exercise_id=file_id, user_id=current_user.id, task_id=task_id)
     
     return exercise
 
@@ -302,10 +301,9 @@ def generate_exercise(
         user_id=current_user.id,
         task_type="exercise_generation",
         exercise_id=file_id,
-        req=req.dict()
+        req_data=req.dict(),
+        title=title
     )
-    
-    background_tasks.add_task(generate_exercise_task, exercise_id=file_id, user_id=current_user.id, req_data=req.dict(), task_id=task_id)
     
     ex_data = ExerciseResponse.from_orm(exercise)
     ex_data.parameters = req.dict()
@@ -359,9 +357,9 @@ def reprocess_exercise(
             task_id=task_id,
             user_id=current_user.id,
             task_type="exercise_extraction",
-            exercise_id=exercise_id
+            exercise_id=exercise_id,
+            title=exercise.title
         )
-        background_tasks.add_task(process_exercise_task, exercise_id=exercise_id, user_id=current_user.id, task_id=task_id)
     elif params:
         task_id = f"generate_ex_{exercise_id}"
         TaskManager.submit_task(
@@ -369,9 +367,9 @@ def reprocess_exercise(
             user_id=current_user.id,
             task_type="exercise_generation",
             exercise_id=exercise_id,
-            req=params
+            req_data=params,
+            title=exercise.title
         )
-        background_tasks.add_task(generate_exercise_task, exercise_id=exercise_id, user_id=current_user.id, req_data=params, task_id=task_id)
     else:
         raise HTTPException(status_code=400, detail="Cannot reprocess: missing file or generation parameters")
         

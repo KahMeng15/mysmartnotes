@@ -242,6 +242,24 @@ async def cancel_task(
     return {"status": "cancelled"}
 
 
+@router.post("/tasks/{task_id}/dismiss")
+async def dismiss_task(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Dismiss a background processing task (removes it from DB)"""
+    from app.models.db import Task
+    task = db.query(Task).filter(
+        Task.task_id == task_id,
+        Task.user_id == current_user.id
+    ).first()
+    if task:
+        db.delete(task)
+        db.commit()
+    return {"status": "dismissed"}
+
+
 @router.get("/tasks/{task_id}")
 async def get_task_status(
     task_id: str,

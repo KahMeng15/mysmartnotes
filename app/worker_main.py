@@ -15,6 +15,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 from app.processing.note_processor import process_resource_task
+from app.processing.exercise_processor import process_exercise_task, generate_exercise_task
 
 # Registry of supported tasks (can be sync or async)
 TASK_REGISTRY = {
@@ -23,6 +24,8 @@ TASK_REGISTRY = {
     "resource_processing": process_resource_task,
     "note_generation": NoteTask.generate,
     "chat_response": ChatTask.respond,
+    "exercise_extraction": process_exercise_task,
+    "exercise_generation": generate_exercise_task,
 }
 
 async def process_next_task():

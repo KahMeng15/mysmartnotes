@@ -42,7 +42,12 @@ export default function TaskQueueModal() {
     }
   };
 
-  const handleDismiss = (taskId) => {
+  const handleDismiss = async (taskId) => {
+    try {
+      await fetchApi(`/search/tasks/${taskId}/dismiss`, { method: 'POST' });
+    } catch (err) {
+      console.error('Failed to dismiss task', err);
+    }
     setDismissedTaskIds(prev => new Set(prev).add(taskId));
   };
 
@@ -102,6 +107,7 @@ export default function TaskQueueModal() {
                     let typeLabel = task.task_type;
                     if (typeLabel === 'resource_processing' || typeLabel === 'ocr') typeLabel = 'Processing resource';
                     if (typeLabel === 'exercise_extraction') typeLabel = 'Extracting exercise';
+                    if (typeLabel === 'exercise_generation') typeLabel = 'Generating exercise';
                     if (typeLabel === 'note_generation') typeLabel = 'Generating note';
                     if (typeLabel === 'embedding') typeLabel = 'Indexing resource';
 
