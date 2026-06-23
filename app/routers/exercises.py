@@ -11,7 +11,9 @@ from app.models.db import User, Exercise, ExerciseQuestion, Subject, Task
 from app.schemas.exercise import ExerciseResponse, ExerciseCreate, ExerciseUpdate, ExerciseCheckRequest, ExerciseCheckResponse, ExerciseExplainRequest, ExerciseGenerateRequest
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id, SessionLocal
+from app.config import get_settings
 from app.utils.tasks import TaskManager
+from app.utils.storage import StorageManager
 from app.processing.exercise_processor import process_exercise_task, grade_answer, explain_answer, generate_exercise_task
 
 logger = logging.getLogger(__name__)
@@ -28,8 +30,16 @@ def get_exercises_by_subject(subject_id: str, db: Session = Depends(get_db), cur
     exercises = db.query(Exercise).filter(
         Exercise.subject_id == subject_id,
         Exercise.user_id == current_user.id
-    ).all()
-    return exercises
+    ).order_by(Exercise.created_at.desc()).all()
+    
+    response_exercises = []
+    for ex in exercises:
+        ex_data = ExerciseResponse.from_orm(ex)
+        params = StorageManager.get_resource_json(ex.id, "parameters")
+        if params:
+            ex_data.parameters = params
+        response_exercises.append(ex_data)
+    return response_exercises
 
 @router.get("/{exercise_id}", response_model=ExerciseResponse)
 def get_exercise(exercise_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -40,7 +50,12 @@ def get_exercise(exercise_id: str, db: Session = Depends(get_db), current_user: 
     ).first()
     if not exercise:
         raise HTTPException(status_code=404, detail="Exercise not found")
-    return exercise
+        
+    ex_data = ExerciseResponse.from_orm(exercise)
+    params = StorageManager.get_resource_json(exercise.id, "parameters")
+    if params:
+        ex_data.parameters = params
+    return ex_data
 
 @router.post("/upload", response_model=ExerciseResponse)
 def upload_exercise(
@@ -227,17 +242,59 @@ def generate_exercise(
 
     file_id = f"ex_{generate_random_id(db, Exercise)}"
     
+    title = req.title.strip() if req.title and req.title.strip() else None
+    if not title:
+        if req.resource_ids:
+            from app.models.db import Resource
+            resources = db.query(Resource).filter(Resource.id.in_(req.resource_ids)).all()
+            titles = [r.title for r in resources if r.title]
+            if len(titles) > 2:
+                base_title = f"{titles[0]} + {len(titles)-1} others Exercise"
+            elif titles:
+                base_title = f"{' & '.join(titles)} Exercise"
+            else:
+                base_title = "Generated Exercise"
+        else:
+            base_title = "Generated Exercise"
+            
+        import re
+        existing_exs = db.query(Exercise).filter(
+            Exercise.subject_id == req.subject_id,
+            Exercise.user_id == current_user.id,
+            Exercise.title.like(f"{base_title}%")
+        ).all()
+        
+        if existing_exs:
+            max_counter = 0
+            for ex in existing_exs:
+                if ex.title == base_title:
+                    max_counter = max(max_counter, 1)
+                else:
+                    m = re.search(r' (\d+)$', ex.title)
+                    if m:
+                        max_counter = max(max_counter, int(m.group(1)))
+            if max_counter > 0:
+                title = f"{base_title} {max_counter + 1}"
+            else:
+                title = base_title
+        else:
+            title = base_title
+
     exercise = Exercise(
         id=file_id,
         user_id=current_user.id,
         subject_id=req.subject_id,
         group_id=subject.group_id,
-        title="Generated Exercise",
-        model="gemini-2.5-pro",
+        title=title,
+        model=current_user.ai_model or get_settings().GLOBAL_AI_TIER1_MODEL,
     )
     db.add(exercise)
     db.commit()
     db.refresh(exercise)
+
+    db.refresh(exercise)
+
+    StorageManager.save_resource_json(file_id, "parameters", req.dict())
 
     task_id = f"generate_ex_{file_id}"
     TaskManager.submit_task(
@@ -250,4 +307,148 @@ def generate_exercise(
     
     background_tasks.add_task(generate_exercise_task, exercise_id=file_id, user_id=current_user.id, req_data=req.dict(), task_id=task_id)
     
-    return exercise
+    ex_data = ExerciseResponse.from_orm(exercise)
+    ex_data.parameters = req.dict()
+    return ex_data
+
+@router.patch("/{exercise_id}/rename", response_model=ExerciseResponse)
+def rename_exercise(
+    exercise_id: str,
+    req: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    exercise = db.query(Exercise).filter(
+        Exercise.id == exercise_id,
+        Exercise.user_id == current_user.id
+    ).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+    
+    if "title" in req:
+        exercise.title = req["title"]
+        db.commit()
+        db.refresh(exercise)
+    
+    ex_data = ExerciseResponse.from_orm(exercise)
+    params = StorageManager.get_resource_json(exercise.id, "parameters")
+    if params:
+        ex_data.parameters = params
+    return ex_data
+
+@router.post("/{exercise_id}/reprocess", response_model=ExerciseResponse)
+def reprocess_exercise(
+    exercise_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    exercise = db.query(Exercise).filter(
+        Exercise.id == exercise_id,
+        Exercise.user_id == current_user.id
+    ).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+        
+    params = StorageManager.get_resource_json(exercise.id, "parameters")
+    
+    # Based on whether it's an uploaded file or generated
+    if exercise.file_path and os.path.exists(exercise.file_path):
+        task_id = f"extract_ex_{exercise_id}"
+        TaskManager.submit_task(
+            task_id=task_id,
+            user_id=current_user.id,
+            task_type="exercise_extraction",
+            exercise_id=exercise_id
+        )
+        background_tasks.add_task(process_exercise_task, exercise_id=exercise_id, user_id=current_user.id, task_id=task_id)
+    elif params:
+        task_id = f"generate_ex_{exercise_id}"
+        TaskManager.submit_task(
+            task_id=task_id,
+            user_id=current_user.id,
+            task_type="exercise_generation",
+            exercise_id=exercise_id,
+            req=params
+        )
+        background_tasks.add_task(generate_exercise_task, exercise_id=exercise_id, user_id=current_user.id, req_data=params, task_id=task_id)
+    else:
+        raise HTTPException(status_code=400, detail="Cannot reprocess: missing file or generation parameters")
+        
+    ex_data = ExerciseResponse.from_orm(exercise)
+    if params:
+        ex_data.parameters = params
+    return ex_data
+
+@router.get("/{exercise_id}/processing-logs")
+async def get_exercise_processing_logs(
+    exercise_id: str,
+    limit: int = 200,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    exercise = db.query(Exercise).filter(
+        Exercise.id == exercise_id,
+        Exercise.user_id == current_user.id
+    ).first()
+
+    if not exercise:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Exercise not found"
+        )
+
+    import re
+    log_dir = os.path.join(os.path.dirname(__file__), "..", "..", "logs")
+    log_files = ["api.log", "errors.log"]
+    entries = []
+
+    for log_file in log_files:
+        log_path = os.path.join(log_dir, log_file)
+        if not os.path.exists(log_path):
+            continue
+        try:
+            max_bytes = 5 * 1024 * 1024
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                f.seek(0, 2)
+                file_size = f.tell()
+                start = max(0, file_size - max_bytes)
+                f.seek(start)
+                if start > 0:
+                    f.readline()
+                lines = f.readlines()
+
+            for line in lines:
+                if exercise_id not in line:
+                    continue
+                if "uvicorn.access" in line:
+                    continue
+                m = re.match(
+                    r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)\s+\[(\w+)\]\s+([\w\.]+):\s+(.*)',
+                    line.strip()
+                )
+                if m:
+                    entries.append({
+                        "timestamp": m.group(1),
+                        "level": m.group(2),
+                        "logger": m.group(3),
+                        "message": m.group(4),
+                        "source": log_file,
+                    })
+                else:
+                    entries.append({
+                        "timestamp": "",
+                        "level": "INFO",
+                        "logger": "unknown",
+                        "message": line.strip(),
+                        "source": log_file,
+                    })
+        except Exception as e:
+            logger.error(f"Error reading {log_file}: {e}")
+
+    # sort newest first
+    entries.sort(key=lambda x: x["timestamp"], reverse=True)
+    if limit > 0:
+        entries = entries[:limit]
+
+    return {"entries": entries}

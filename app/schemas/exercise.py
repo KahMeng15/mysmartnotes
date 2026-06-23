@@ -38,6 +38,7 @@ class ExerciseBase(BaseModel):
     file_name: Optional[str] = None
     model: Optional[str] = None
     processing_time_ms: Optional[int] = None
+    parameters: Optional[Any] = None
 
 class ExerciseCreate(ExerciseBase):
     pass
@@ -86,6 +87,7 @@ class BulkExerciseUpdate(BaseModel):
 class ExerciseGenerateRequest(BaseModel):
     subject_id: str
     resource_ids: List[str]
+    title: Optional[str] = None
     question_types: List[str] = ["Short answer", "Long answer", "Objective", "Fill in the blank"]
     lengths: List[str] = ["Short", "Medium", "Long"]
     difficulties: List[str] = ["Easy", "Medium", "Hard"]

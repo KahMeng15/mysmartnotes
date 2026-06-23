@@ -122,6 +122,7 @@ export default function SubjectView() {
   const [createNoteModalOpened, setCreateNoteModalOpened] = useState(false);
   
   const [createExerciseModalOpened, setCreateExerciseModalOpened] = useState(false);
+  const [exerciseTitle, setExerciseTitle] = useState('');
   const [exerciseScope, setExerciseScope] = useState([]);
   const [exerciseQuestionTypes, setExerciseQuestionTypes] = useState(["Short answer", "Long answer", "Objective", "Fill in the blank"]);
   const [exerciseLengths, setExerciseLengths] = useState(["Short", "Medium", "Long"]);
@@ -208,6 +209,7 @@ export default function SubjectView() {
         body: JSON.stringify({
           subject_id: subject.id,
           resource_ids: exerciseScope,
+          title: exerciseTitle,
           question_types: exerciseQuestionTypes,
           lengths: exerciseLengths,
           difficulties: exerciseDifficulties,
@@ -215,6 +217,7 @@ export default function SubjectView() {
         })
       });
       setCreateExerciseModalOpened(false);
+      setExerciseTitle('');
       setExerciseScope([]);
       window.location.reload(); // Refresh to show new background task
     } catch (e) {
@@ -458,6 +461,17 @@ export default function SubjectView() {
   const [infoModalNote, setInfoModalNote] = useState(null);
   const [newTitle, setNewTitle] = useState('');
   const [deletingNote, setDeletingNote] = useState(null);
+
+  const [renameExerciseModalOpened, { open: openRenameExerciseModal, close: closeRenameExerciseModal }] = useDisclosure(false);
+  const [deleteExerciseModalOpened, { open: openDeleteExerciseModal, close: closeDeleteExerciseModal }] = useDisclosure(false);
+  const [reprocessExerciseModalOpened, { open: openReprocessExerciseModal, close: closeReprocessExerciseModal }] = useDisclosure(false);
+  const [mergeExerciseModalOpened, { open: openMergeExerciseModal, close: closeMergeExerciseModal }] = useDisclosure(false);
+  
+  const [editingExercise, setEditingExercise] = useState(null);
+  const [newExerciseTitle, setNewExerciseTitle] = useState('');
+  const [deletingExercise, setDeletingExercise] = useState(null);
+  const [reprocessingExercise, setReprocessingExercise] = useState(null);
+  const [infoModalExercise, setInfoModalExercise] = useState(null);
 
   // Summary Action Modals
   const [renameSummaryModalOpened, { open: openRenameSummaryModal, close: closeRenameSummaryModal }] = useDisclosure(false);
@@ -852,6 +866,79 @@ export default function SubjectView() {
     }
   };
 
+  const openRenameExercise = (ex) => {
+    setEditingExercise(ex);
+    setNewExerciseTitle(ex.title);
+    openRenameExerciseModal();
+  };
+
+  const openDeleteExercise = (ex) => {
+    setDeletingExercise(ex);
+    openDeleteExerciseModal();
+  };
+
+  const openReprocessExercise = (ex) => {
+    setReprocessingExercise(ex);
+    openReprocessExerciseModal();
+  };
+
+  const handleRenameExercise = async () => {
+    if (!newExerciseTitle.trim() || !editingExercise) return;
+    setSubmitting(true);
+    try {
+      await fetchApi(`/exercises/${editingExercise.id}/rename`, {
+        method: 'PATCH',
+        body: JSON.stringify({ title: newExerciseTitle.trim() })
+      });
+      setExercises(exercises.map(e => e.id === editingExercise.id ? { ...e, title: newExerciseTitle.trim() } : e));
+      closeRenameExerciseModal();
+    } catch (err) {
+      // fallback to put if patch is not supported
+      try {
+        await fetchApi(`/exercises/${editingExercise.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ title: newExerciseTitle.trim() })
+        });
+        setExercises(exercises.map(e => e.id === editingExercise.id ? { ...e, title: newExerciseTitle.trim() } : e));
+        closeRenameExerciseModal();
+      } catch (innerErr) {
+        alert("Failed to rename exercise: " + err.message);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const executeDeleteExercise = async () => {
+    if (!deletingExercise) return;
+    setSubmitting(true);
+    try {
+      await fetchApi(`/exercises/${deletingExercise.id}`, { method: 'DELETE' });
+      setExercises(exercises.filter(e => e.id !== deletingExercise.id));
+      closeDeleteExerciseModal();
+    } catch (err) {
+      alert("Failed to delete exercise: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const executeReprocessExercise = async () => {
+    if (!reprocessingExercise) return;
+    const exId = reprocessingExercise.id;
+    closeReprocessExerciseModal();
+    setFailedExerciseIds(prev => prev.filter(id => id !== exId));
+    setReprocessingExerciseIds(prev => [...prev, exId]);
+    try {
+      await fetchApi(`/exercises/${exId}/reprocess`, {
+        method: 'POST'
+      });
+    } catch (err) {
+      alert("Failed to reprocess exercise: " + err.message);
+      setReprocessingExerciseIds(prev => prev.filter(id => id !== exId));
+    }
+  };
+
   const sortedProcessableNotes = useMemo(() => {
     return notes
       .filter(n => {
@@ -926,6 +1013,9 @@ export default function SubjectView() {
               </Menu.Item>
               <Menu.Item leftSection={<IconBrain size={14} />} onClick={() => setCreateExerciseModalOpened(true)}>
                 Exercise / Quiz
+              </Menu.Item>
+              <Menu.Item leftSection={<IconLayersLinked size={14} />} onClick={openMergeExerciseModal}>
+                Merge Exercises
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
@@ -1087,47 +1177,12 @@ export default function SubjectView() {
         </Tabs.Panel>
         
         <Tabs.Panel value="exercise" pt="xl">
-          <Group mb="md" justify="space-between">
-            <Text>Select multiple exercises to merge them into one.</Text>
-            {selectedExercises.length > 1 && (
-              <Button 
-                onClick={async () => {
-                  setMerging(true);
-                  try {
-                    const res = await fetchApi('/exercises/merge', {
-                      method: 'POST',
-                      body: JSON.stringify({ exercise_ids: selectedExercises, title: "Merged Exercises" })
-                    });
-                    setExercises([...exercises, res]);
-                    setSelectedExercises([]);
-                  } catch (e) {
-                    alert("Failed to merge exercises: " + e.message);
-                  } finally {
-                    setMerging(false);
-                  }
-                }}
-                loading={merging}
-              >
-                Merge Selected ({selectedExercises.length})
-              </Button>
-            )}
-          </Group>
           {exercises.length > 0 ? (
             <Stack spacing="sm">
               {exercises.map((ex) => (
                 <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
                   <Group justify="space-between" wrap="nowrap">
                     <Group>
-                      <Checkbox 
-                        checked={selectedExercises.includes(ex.id)}
-                        onChange={(e) => {
-                          if (e.currentTarget.checked) {
-                            setSelectedExercises([...selectedExercises, ex.id]);
-                          } else {
-                            setSelectedExercises(selectedExercises.filter(id => id !== ex.id));
-                          }
-                        }}
-                      />
                       <Box style={{ flex: 1 }}>
                         <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/exercises/${ex.id}`)}>
                           {ex.title}
@@ -1135,6 +1190,25 @@ export default function SubjectView() {
                         <Text size="xs" c="dimmed">
                           {formatNoteDate(ex.created_at)}
                         </Text>
+                        {ex.parameters && (
+                          <Group gap="xs" mt="xs">
+                            {ex.parameters.question_types && ex.parameters.question_types.length > 0 && (
+                              <Badge variant="light" color="blue" size="xs" fw={500}>
+                                {ex.parameters.question_types.length === 1 ? ex.parameters.question_types[0] : `${ex.parameters.question_types.length} Types`}
+                              </Badge>
+                            )}
+                            {ex.parameters.difficulties && ex.parameters.difficulties.length > 0 && (
+                              <Badge variant="light" color="red" size="xs" fw={500}>
+                                {ex.parameters.difficulties.length === 1 ? ex.parameters.difficulties[0] : 'Mixed Difficulty'}
+                              </Badge>
+                            )}
+                            {ex.parameters.lengths && ex.parameters.lengths.length > 0 && (
+                              <Badge variant="light" color="teal" size="xs" fw={500}>
+                                {ex.parameters.lengths.length === 1 ? ex.parameters.lengths[0] : 'Mixed Length'}
+                              </Badge>
+                            )}
+                          </Group>
+                        )}
                       </Box>
                     </Group>
                     <Group gap="xs" wrap="nowrap">
@@ -1148,12 +1222,10 @@ export default function SubjectView() {
                           </ActionIcon>
                         </Menu.Target>
                         <Menu.Dropdown>
-                          <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={async () => {
-                            if (confirm("Delete this exercise?")) {
-                              await fetchApi(`/exercises/${ex.id}`, { method: 'DELETE' });
-                              setExercises(exercises.filter(e => e.id !== ex.id));
-                            }
-                          }}>Delete</Menu.Item>
+                          <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRenameExercise(ex)}>Rename</Menu.Item>
+                          <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocessExercise(ex)}>Reprocess</Menu.Item>
+                          <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalExercise(ex); }}>System Info</Menu.Item>
+                          <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDeleteExercise(ex)}>Delete</Menu.Item>
                         </Menu.Dropdown>
                       </Menu>
                     </Group>
@@ -1344,6 +1416,13 @@ export default function SubjectView() {
         <form onSubmit={(e) => { e.preventDefault(); handleCreateExercise(); }}>
           <Stack gap="md">
             <Text size="sm">Select resources and configure parameters to generate an exercise using AI.</Text>
+            
+            <TextInput
+              label="Exercise Title (Optional)"
+              placeholder="If empty, a name will be auto-generated"
+              value={exerciseTitle}
+              onChange={(e) => setExerciseTitle(e.currentTarget.value)}
+            />
             
             <MultiSelect
               label="Scope (Select Resources)"
@@ -1673,6 +1752,141 @@ export default function SubjectView() {
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={closeDeleteSummaryModal}>Cancel</Button>
               <Button type="submit" color="red" loading={submitting} data-autofocus>Delete</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      {/* Exercise Modals */}
+      <Modal opened={renameExerciseModalOpened} onClose={closeRenameExerciseModal} title="Rename Exercise" centered>
+        <form onSubmit={(e) => { e.preventDefault(); handleRenameExercise(); }}>
+          <Stack>
+            <TextInput label="Exercise Title" value={newExerciseTitle} onChange={(e) => setNewExerciseTitle(e.currentTarget.value)} data-autofocus />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeRenameExerciseModal}>Cancel</Button>
+              <Button type="submit" loading={submitting}>Save</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      <Modal opened={deleteExerciseModalOpened} onClose={closeDeleteExerciseModal} title="Confirm Delete" centered>
+        <form onSubmit={(e) => { e.preventDefault(); executeDeleteExercise(); }}>
+          <Stack>
+            <Text size="sm">Are you sure you want to delete <b>{deletingExercise?.title}</b>? This action cannot be undone.</Text>
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeDeleteExerciseModal}>Cancel</Button>
+              <Button type="submit" color="red" loading={submitting} data-autofocus>Delete</Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
+
+      <Modal opened={reprocessExerciseModalOpened} onClose={closeReprocessExerciseModal} title="Reprocess Exercise" centered>
+        <Text size="sm" mb="lg">
+          Are you sure you want to reprocess <b>{reprocessingExercise?.title}</b>? This will regenerate the exercise using the same configuration. This operation might take a while.
+        </Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={closeReprocessExerciseModal}>Cancel</Button>
+          <Button color="orange" onClick={executeReprocessExercise} loading={submitting}>Start Reprocessing</Button>
+        </Group>
+      </Modal>
+
+      <Modal opened={!!infoModalExercise} onClose={() => setInfoModalExercise(null)} title="System Info (Exercise)" centered>
+        <Stack>
+          <Text size="sm"><b>ID:</b> {infoModalExercise?.id}</Text>
+          <Text size="sm"><b>Created:</b> {infoModalExercise?.created_at ? new Date(infoModalExercise.created_at).toLocaleString() : ''}</Text>
+          {infoModalExercise?.model && (
+            <Text size="sm"><b>Model:</b> {infoModalExercise.model}</Text>
+          )}
+          {infoModalExercise?.file_name && (
+            <Text size="sm"><b>File Name:</b> {infoModalExercise.file_name}</Text>
+          )}
+          {infoModalExercise?.parameters && (
+            <>
+              <Divider label="Parameters" labelPosition="center" />
+              {infoModalExercise.parameters.num_questions && (
+                <Text size="sm"><b>Questions:</b> {infoModalExercise.parameters.num_questions}</Text>
+              )}
+              {infoModalExercise.parameters.question_types && (
+                <Text size="sm"><b>Question Types:</b> {infoModalExercise.parameters.question_types.join(', ')}</Text>
+              )}
+              {infoModalExercise.parameters.difficulties && (
+                <Text size="sm"><b>Difficulties:</b> {infoModalExercise.parameters.difficulties.join(', ')}</Text>
+              )}
+              {infoModalExercise.parameters.lengths && (
+                <Text size="sm"><b>Lengths:</b> {infoModalExercise.parameters.lengths.join(', ')}</Text>
+              )}
+              {infoModalExercise.parameters.resource_ids && (
+                <Text size="sm"><b>Source Resources:</b> {infoModalExercise.parameters.resource_ids.length}</Text>
+              )}
+            </>
+          )}
+          <Divider mt="md" />
+          <Button
+            variant="light"
+            color="blue"
+            leftSection={<IconClipboardList size={16} />}
+            onClick={async () => { 
+              const exId = infoModalExercise.id;
+              setInfoModalExercise(null);
+              setProcessingLogsNoteId(exId);
+              setProcessingLogsLoading(true);
+              setProcessingLogs(null);
+              openProcessingLogsModal();
+              try {
+                const data = await fetchApi(`/exercises/${exId}/processing-logs?limit=200`);
+                setProcessingLogs(data);
+              } catch (err) {
+                setProcessingLogs({ error: err.message });
+              } finally {
+                setProcessingLogsLoading(false);
+              }
+            }}
+            fullWidth
+          >
+            View Processing Logs
+          </Button>
+        </Stack>
+      </Modal>
+
+      <Modal opened={mergeExerciseModalOpened} onClose={closeMergeExerciseModal} title="Merge Exercises" centered size="lg">
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          if (selectedExercises.length < 2) {
+            alert("Please select at least two exercises to merge.");
+            return;
+          }
+          setMerging(true);
+          try {
+            const res = await fetchApi('/exercises/merge', {
+              method: 'POST',
+              body: JSON.stringify({ exercise_ids: selectedExercises, title: "Merged Exercises" })
+            });
+            setExercises([...exercises, res]);
+            setSelectedExercises([]);
+            closeMergeExerciseModal();
+          } catch (err) {
+            alert("Failed to merge exercises: " + err.message);
+          } finally {
+            setMerging(false);
+          }
+        }}>
+          <Stack gap="md">
+            <Text size="sm">Select multiple exercises to merge them into a single comprehensive exercise.</Text>
+            <MultiSelect
+              label="Select Exercises"
+              placeholder="Pick exercises to merge"
+              data={exercises.map(ex => ({ value: ex.id, label: ex.title }))}
+              value={selectedExercises}
+              onChange={setSelectedExercises}
+              searchable
+              clearable
+              required
+            />
+            <Group justify="flex-end" mt="md">
+              <Button variant="default" onClick={closeMergeExerciseModal}>Cancel</Button>
+              <Button type="submit" loading={merging} leftSection={<IconLayersLinked size={16} />}>Merge Exercises</Button>
             </Group>
           </Stack>
         </form>
