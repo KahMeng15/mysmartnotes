@@ -546,7 +546,11 @@ export default function SubjectView() {
                 }
                 if (taskData.status === 'failed') {
                   setReprocessingNoteIds(prev => prev.filter(id => id !== n.id));
-                  setFailedNoteIds(prev => [...prev, n.id]);
+                  if (taskData.error === 'Cancelled by user') {
+                    setCancelledNoteIds(prev => [...prev, n.id]);
+                  } else {
+                    setFailedNoteIds(prev => [...prev, n.id]);
+                  }
                   return await fetchApi(`/resources/${n.id}?t=${Date.now()}`);
                 }
               }

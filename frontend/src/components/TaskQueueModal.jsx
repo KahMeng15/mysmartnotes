@@ -90,7 +90,10 @@ export default function TaskQueueModal() {
                   if (typeLabel === 'embedding') typeLabel = 'Indexing resource';
 
                   const isRunning = task.status === 'pending' || task.status === 'processing' || task.status === 'running';
-                  const statusFormatted = task.status.charAt(0).toUpperCase() + task.status.slice(1);
+                  let statusFormatted = task.status.charAt(0).toUpperCase() + task.status.slice(1);
+                  if (task.status === 'failed' && task.error === 'Cancelled by user') {
+                    statusFormatted = 'Cancelled';
+                  }
                   const displaySubtitle = `${typeLabel} (${isRunning ? 'Running' : statusFormatted})`;
 
                   return (
