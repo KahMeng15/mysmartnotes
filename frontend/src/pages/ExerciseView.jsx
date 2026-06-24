@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 
 export default function ExerciseView() {
@@ -399,29 +399,57 @@ export default function ExerciseView() {
                           </Box>
                         ) : (
                           <Box mt="md">
-                            {showAns ? (
+                            {(showAns || viewMode === 'hide') && (
                               <Box>
-                                <Paper p="md" bg="var(--mantine-color-blue-0)" radius="sm">
-                                  <Text fw={500} c="blue.9">Answer:</Text>
-                                  <Text c="blue.9">{q.answer_text || "No answer provided."}</Text>
+                                <Paper 
+                                  p="md" 
+                                  bg="var(--mantine-color-blue-0)" 
+                                  radius="sm"
+                                  style={{
+                                    cursor: !showAns ? 'pointer' : 'default',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                  onClick={() => {
+                                    if (!showAns && viewMode === 'hide') {
+                                      toggleReveal(q.id);
+                                    }
+                                  }}
+                                >
+                                  {!showAns && (
+                                    <Center style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, background: 'rgba(231, 245, 255, 0.3)' }}>
+                                      <Badge size="lg" variant="light" color="blue" style={{ pointerEvents: 'none' }}>
+                                        Click to reveal answer
+                                      </Badge>
+                                    </Center>
+                                  )}
+                                  <Box style={{ filter: !showAns ? 'blur(6px)' : 'none', opacity: !showAns ? 0.5 : 1, transition: 'filter 0.3s ease, opacity 0.3s ease', userSelect: !showAns ? 'none' : 'auto', pointerEvents: !showAns ? 'none' : 'auto' }}>
+                                    <Text fw={500} c="blue.9">Answer:</Text>
+                                    <Text c="blue.9">{q.answer_text || "No answer provided."}</Text>
+                                    
+                                    <Box mt="md">
+                                      {showAns && explanation && (
+                                        <Paper p="md" bg="var(--mantine-color-white)" radius="sm" mb="sm">
+                                          <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b> {explanation}</Text>
+                                        </Paper>
+                                      )}
+                                      <Group gap="xs">
+                                        {!explanation && (
+                                          <Button size="xs" variant="light" color="grape" loading={explainLoading[q.id]} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }} leftSection={<IconBulb size={14} />}>
+                                            Ask AI to Explain
+                                          </Button>
+                                        )}
+                                        {viewMode === 'hide' && (
+                                          <Button size="xs" variant="subtle" color="gray" onClick={(e) => { e.stopPropagation(); toggleReveal(q.id); }} leftSection={showAns ? <IconEyeOff size={14} /> : <IconEye size={14} />}>
+                                            {showAns ? "Re-hide Answer" : "Reveal Answer"}
+                                          </Button>
+                                        )}
+                                      </Group>
+                                    </Box>
+                                  </Box>
                                 </Paper>
-                                
-                                {explanation ? (
-                                  <Paper mt="sm" p="md" bg="var(--mantine-color-gray-0)" radius="sm">
-                                    <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle' }}/><b>Explanation:</b> {explanation}</Text>
-                                  </Paper>
-                                ) : (
-                                   <Button mt="sm" size="xs" variant="subtle" color="grape" loading={explainLoading[q.id]} onClick={() => handleExplain(q.id)}>
-                                     Generate Explanation
-                                   </Button>
-                                )}
                               </Box>
-                            ) : (
-                              viewMode === 'hide' && (
-                                <Button variant="light" color="gray" onClick={() => toggleReveal(q.id)}>
-                                  Click to Show Answer
-                                </Button>
-                              )
                             )}
                           </Box>
                         )}
