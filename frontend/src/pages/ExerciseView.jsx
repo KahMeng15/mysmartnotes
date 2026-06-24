@@ -450,23 +450,42 @@ export default function ExerciseView() {
                     return (
                       <Card key={q.id} shadow="sm" padding="lg" radius="md" withBorder>
                         <Box mb="xs">
-                          <Group gap="xs" wrap="nowrap">
+                          <Group gap={8} wrap="nowrap">
                             {q.difficulty && (
-                              <Text size="xs" c="dimmed" fw={600} tt="uppercase">
+                              <Text size="xs" c="dimmed" fw={500}>
                                 {q.difficulty}
                               </Text>
                             )}
-                            {q.difficulty && q.reference_resource_title && (
-                              <Text size="xs" c="dimmed">•</Text>
+                            {q.difficulty && (q.topic || q.reference_resource_title) && (
+                              <Text size="xs" c="dimmed" fw={500}>|</Text>
+                            )}
+                            {q.topic && (
+                              <Text size="xs" c="dimmed" fw={500}>
+                                {q.topic}
+                              </Text>
+                            )}
+                            {q.topic && q.reference_resource_title && (
+                              <Text size="xs" c="dimmed" fw={500}>|</Text>
                             )}
                             {q.reference_resource_title && (
                               <Text 
                                 size="xs" 
                                 c="dimmed" 
-                                style={q.reference_resource_id ? { cursor: 'pointer', textDecoration: 'underline' } : {}} 
-                                onClick={() => q.reference_resource_id && navigate(`/resource/${q.reference_resource_id}`)}
+                                fw={500}
+                                style={q.reference_resource_id ? { cursor: 'pointer', transition: 'color 0.2s' } : {}} 
+                                onMouseEnter={(e) => { if (q.reference_resource_id) e.currentTarget.style.color = 'var(--mantine-color-blue-6)'; }}
+                                onMouseLeave={(e) => { if (q.reference_resource_id) e.currentTarget.style.color = 'var(--mantine-color-dimmed)'; }}
+                                onClick={() => {
+                                  if (q.reference_resource_id) {
+                                    let url = `/resource/${q.reference_resource_id}`;
+                                    if (q.reference_quote) {
+                                      url += `?highlight=${encodeURIComponent(q.reference_quote)}`;
+                                    }
+                                    navigate(url);
+                                  }
+                                }}
                               >
-                                From: {q.reference_resource_title}
+                                {q.reference_resource_title}
                               </Text>
                             )}
                           </Group>
@@ -476,9 +495,6 @@ export default function ExerciseView() {
                             <Text fw={600} size="lg">
                               {idx + 1}. {q.question_text}
                             </Text>
-                            {q.topic && (
-                               <Badge size="xs" variant="light" color="indigo" mt="xs">{q.topic}</Badge>
-                            )}
                           </Box>
                         </Group>
 
@@ -544,9 +560,6 @@ export default function ExerciseView() {
                                 <Text fw={500}>{grade?.feedback}</Text>
                                 {!grade?.is_correct && (
                                   <Text mt="xs" size="sm"><b>Correct Answer:</b> {grade?.correct_answer}</Text>
-                                )}
-                                {q.reference_quote && (
-                                  <Text mt="xs" size="sm" fs="italic"><b>Source Reference:</b> "{q.reference_quote}"</Text>
                                 )}
                               </Alert>
                             )}
@@ -614,12 +627,6 @@ export default function ExerciseView() {
                                   <Box style={{ filter: !showAns ? 'blur(6px)' : 'none', opacity: !showAns ? 0.5 : 1, transition: 'filter 0.3s ease, opacity 0.3s ease', userSelect: !showAns ? 'none' : 'auto', pointerEvents: !showAns ? 'none' : 'auto' }}>
                                     <Text fw={500} c="blue.9">Answer:</Text>
                                     <Text c="blue.9">{q.answer_text || "No answer provided."}</Text>
-                                    
-                                    {q.reference_quote && (
-                                      <Text size="sm" c="dimmed" mt="xs" fs="italic">
-                                        Source Reference: "{q.reference_quote}"
-                                      </Text>
-                                    )}
                                     
                                     <Box mt="md">
                                       {explanation && !showExplanations[q.id] && (
