@@ -423,14 +423,30 @@ def generate_exercise_task(exercise_id: str, user_id: int, req_data: Dict[str, A
         types_str = ", ".join(question_types)
         lengths_str = ", ".join(lengths)
         diff_str = ", ".join(difficulties)
+        
+        advanced = req_data.get("advanced", False)
+        distribution = req_data.get("distribution", {})
+        
+        if advanced and distribution:
+            dist_diff = f"{distribution.get('easy', 0)} Easy, {distribution.get('medium', 0)} Medium, {distribution.get('hard', 0)} Hard"
+            dist_len = f"{distribution.get('short', 0)} Short, {distribution.get('medLen', 0)} Medium, {distribution.get('long', 0)} Long"
+            dist_type = f"{distribution.get('typeShort', 0)} Short Answer, {distribution.get('typeLong', 0)} Long Answer, {distribution.get('typeObj', 0)} Objective (Multiple Choice), {distribution.get('typeFill', 0)} Fill in the blank"
+            
+            prompt = f"""Generate exactly {num_questions} quiz questions based on the following content.
 
-        prompt = f"""Generate exactly {num_questions} quiz questions based on the following content.
+Target question types distribution: {dist_type}.
+Target question lengths distribution: {dist_len}.
+Target question difficulties distribution: {dist_diff}.
+"""
+        else:
+            prompt = f"""Generate exactly {num_questions} quiz questions based on the following content.
 
 The questions MUST be of the following types: {types_str}. 
 Target lengths: {lengths_str}.
 Target difficulties: {diff_str}.
 If "mixed" is specified, provide a relatively even mix of 'objective' (multiple choice), 'subjective' (short answer), and 'fill_in_the_blank'.
-
+"""
+        prompt += f"""
 Content:
 {resources_text}
 

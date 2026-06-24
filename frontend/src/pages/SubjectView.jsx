@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress, ScrollArea, Divider, MultiSelect, SegmentedControl } from '@mantine/core';
+import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress, ScrollArea, Divider, MultiSelect, SegmentedControl, NumberInput, Collapse, Switch, Paper } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit, IconX } from '@tabler/icons-react';
 import * as TablerIcons from '@tabler/icons-react';
@@ -129,6 +129,49 @@ export default function SubjectView() {
   const [exerciseDifficulties, setExerciseDifficulties] = useState(["Easy", "Medium", "Hard"]);
   const [generatingExercise, setGeneratingExercise] = useState(false);
 
+  const [exerciseNumQuestions, setExerciseNumQuestions] = useState(10);
+  const [exerciseAdvanced, setExerciseAdvanced] = useState(false);
+  const [exerciseEasy, setExerciseEasy] = useState(3);
+  const [exerciseMedium, setExerciseMedium] = useState(4);
+  const [exerciseHard, setExerciseHard] = useState(3);
+  const [exerciseShort, setExerciseShort] = useState(4);
+  const [exerciseMedLen, setExerciseMedLen] = useState(3);
+  const [exerciseLong, setExerciseLong] = useState(3);
+  const [exerciseTypeShort, setExerciseTypeShort] = useState(3);
+  const [exerciseTypeLong, setExerciseTypeLong] = useState(3);
+  const [exerciseTypeObj, setExerciseTypeObj] = useState(2);
+  const [exerciseTypeFill, setExerciseTypeFill] = useState(2);
+
+  useEffect(() => {
+    if (exerciseNumQuestions > 0 && !exerciseAdvanced) {
+      const q = exerciseNumQuestions;
+
+      // Distribute difficulties
+      const diffs = exerciseDifficulties.length > 0 ? exerciseDifficulties : ["Easy"];
+      setExerciseEasy(diffs.includes("Easy") ? Math.floor(q / diffs.length) + (q % diffs.length > 0 ? 1 : 0) : 0);
+      setExerciseMedium(diffs.includes("Medium") ? Math.floor(q / diffs.length) + (diffs.includes("Easy") ? (q % diffs.length > 1 ? 1 : 0) : (q % diffs.length > 0 ? 1 : 0)) : 0);
+      setExerciseHard(diffs.includes("Hard") ? q - (diffs.includes("Easy") ? (Math.floor(q / diffs.length) + (q % diffs.length > 0 ? 1 : 0)) : 0) - (diffs.includes("Medium") ? (Math.floor(q / diffs.length) + (diffs.includes("Easy") ? (q % diffs.length > 1 ? 1 : 0) : (q % diffs.length > 0 ? 1 : 0))) : 0) : 0);
+      
+      // Simplify distribution logic by using a helper function
+      const distribute = (options, mapping) => {
+        const counts = {};
+        options.forEach(o => counts[o] = 0);
+        for(let i=0; i<q; i++) {
+          if (options.length > 0) {
+            counts[options[i % options.length]]++;
+          }
+        }
+        return mapping.map(key => counts[key] || 0);
+      };
+
+      const [s, m, l] = distribute(exerciseLengths.length ? exerciseLengths : ["Short"], ["Short", "Medium", "Long"]);
+      setExerciseShort(s); setExerciseMedLen(m); setExerciseLong(l);
+
+      const [ts, tl, to, tf] = distribute(exerciseQuestionTypes.length ? exerciseQuestionTypes : ["Short answer"], ["Short answer", "Long answer", "Objective", "Fill in the blank"]);
+      setExerciseTypeShort(ts); setExerciseTypeLong(tl); setExerciseTypeObj(to); setExerciseTypeFill(tf);
+    }
+  }, [exerciseNumQuestions, exerciseAdvanced, exerciseLengths, exerciseDifficulties, exerciseQuestionTypes]);
+
   const [noteMode, setNoteMode] = useState('elaborate');
   const [noteFormat, setNoteFormat] = useState('sentence');
   const [noteMethod, setNoteMethod] = useState('whole');
@@ -213,7 +256,20 @@ export default function SubjectView() {
           question_types: exerciseQuestionTypes,
           lengths: exerciseLengths,
           difficulties: exerciseDifficulties,
-          num_questions: 10
+          num_questions: exerciseNumQuestions,
+          advanced: exerciseAdvanced,
+          distribution: {
+            easy: exerciseEasy,
+            medium: exerciseMedium,
+            hard: exerciseHard,
+            short: exerciseShort,
+            medLen: exerciseMedLen,
+            long: exerciseLong,
+            typeShort: exerciseTypeShort,
+            typeLong: exerciseTypeLong,
+            typeObj: exerciseTypeObj,
+            typeFill: exerciseTypeFill
+          }
         })
       });
       setCreateExerciseModalOpened(false);
@@ -1024,7 +1080,7 @@ export default function SubjectView() {
                 Study Notes
               </Menu.Item>
               <Menu.Item leftSection={<IconBrain size={14} />} onClick={() => setCreateExerciseModalOpened(true)}>
-                Exercise / Quiz
+                Exercise
               </Menu.Item>
               <Menu.Item leftSection={<IconLayersLinked size={14} />} onClick={openMergeExerciseModal}>
                 Merge Exercises
@@ -1475,6 +1531,16 @@ export default function SubjectView() {
               required
             />
 
+            <NumberInput
+              label="Total Number of Questions"
+              description="How many questions should the AI generate?"
+              value={exerciseNumQuestions}
+              onChange={setExerciseNumQuestions}
+              min={1}
+              max={100}
+              required
+            />
+
             <MultiSelect
               label="Question Type"
               description="Select types of questions to include."
@@ -1501,6 +1567,42 @@ export default function SubjectView() {
               onChange={setExerciseDifficulties}
               required
             />
+
+            <Switch
+              label="Advanced Settings"
+              checked={exerciseAdvanced}
+              onChange={(e) => setExerciseAdvanced(e.currentTarget.checked)}
+              mt="sm"
+            />
+            
+            {exerciseAdvanced && (
+              <Paper withBorder p="md" radius="md" mt="sm">
+                <Text size="sm" fw={500} mb="xs">Question Difficulties Distribution</Text>
+                <Group grow mb="md">
+                  <NumberInput label="Easy" value={exerciseEasy} onChange={setExerciseEasy} min={0} />
+                  <NumberInput label="Medium" value={exerciseMedium} onChange={setExerciseMedium} min={0} />
+                  <NumberInput label="Hard" value={exerciseHard} onChange={setExerciseHard} min={0} />
+                </Group>
+                <Text size="sm" c="dimmed" mb="md">Sum: {exerciseEasy + exerciseMedium + exerciseHard} / {exerciseNumQuestions}</Text>
+
+                <Text size="sm" fw={500} mb="xs">Question Lengths Distribution</Text>
+                <Group grow mb="md">
+                  <NumberInput label="Short" value={exerciseShort} onChange={setExerciseShort} min={0} />
+                  <NumberInput label="Medium" value={exerciseMedLen} onChange={setExerciseMedLen} min={0} />
+                  <NumberInput label="Long" value={exerciseLong} onChange={setExerciseLong} min={0} />
+                </Group>
+                <Text size="sm" c="dimmed" mb="md">Sum: {exerciseShort + exerciseMedLen + exerciseLong} / {exerciseNumQuestions}</Text>
+
+                <Text size="sm" fw={500} mb="xs">Question Types Distribution</Text>
+                <Group grow>
+                  <NumberInput label="Short Ans" value={exerciseTypeShort} onChange={setExerciseTypeShort} min={0} />
+                  <NumberInput label="Long Ans" value={exerciseTypeLong} onChange={setExerciseTypeLong} min={0} />
+                  <NumberInput label="Multiple Choice" value={exerciseTypeObj} onChange={setExerciseTypeObj} min={0} />
+                  <NumberInput label="Fill in Blank" value={exerciseTypeFill} onChange={setExerciseTypeFill} min={0} />
+                </Group>
+                <Text size="sm" c="dimmed" mt="xs">Sum: {exerciseTypeShort + exerciseTypeLong + exerciseTypeObj + exerciseTypeFill} / {exerciseNumQuestions}</Text>
+              </Paper>
+            )}
 
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={() => setCreateExerciseModalOpened(false)}>Cancel</Button>

@@ -99,7 +99,7 @@ def upload_exercise(
         raise HTTPException(status_code=404, detail="Subject not found")
 
     # Save file
-    file_id = f"ex_{generate_random_id(db, Exercise)}"
+    file_id = generate_random_id(db, Exercise)
     ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
     user_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", f"user_{current_user.id}")
     os.makedirs(user_dir, exist_ok=True)
@@ -154,7 +154,7 @@ def merge_exercises(
         
     subject_id = exercises[0].subject_id
     
-    new_ex_id = f"ex_{generate_random_id(db, Exercise)}"
+    new_ex_id = generate_random_id(db, Exercise)
     new_ex = Exercise(
         id=new_ex_id,
         user_id=current_user.id,
@@ -303,7 +303,7 @@ def generate_exercise(
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
 
-    file_id = f"ex_{generate_random_id(db, Exercise)}"
+    file_id = generate_random_id(db, Exercise)
     
     title = req.title.strip() if req.title and req.title.strip() else None
     if not title:

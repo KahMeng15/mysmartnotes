@@ -93,4 +93,4 @@ class ExerciseGenerateRequest(BaseModel):
     question_types: List[str] = ["Short answer", "Long answer", "Objective", "Fill in the blank"]
     lengths: List[str] = ["Short", "Medium", "Long"]
     difficulties: List[str] = ["Easy", "Medium", "Hard"]
-    num_questions: int = 10
+    num_questions: int = Field(10, ge=1, le=100)

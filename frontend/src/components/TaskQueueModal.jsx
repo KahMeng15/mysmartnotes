@@ -12,20 +12,44 @@ export default function TaskQueueModal() {
     // Only run if user is logged in
     if (!localStorage.getItem('token')) return;
 
+    let timeoutId;
+    let currentInterval = 3000;
+
     const fetchTasks = async () => {
       try {
         const data = await fetchApi('/search/tasks/active');
         if (data && data.tasks) {
           setTasks(data.tasks);
+          
+          if (data.tasks.length > 0) {
+            currentInterval = 3000; // Poll fast when tasks are active
+          } else {
+            // Increase interval when idle, maxing out at 30 seconds
+            currentInterval = Math.min(currentInterval + 3000, 30000);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch tasks', err);
+        currentInterval = 15000; // Wait longer on error
       }
+      
+      timeoutId = setTimeout(fetchTasks, currentInterval);
     };
 
     fetchTasks();
-    const interval = setInterval(fetchTasks, 3000);
-    return () => clearInterval(interval);
+
+    // Listen for custom event to instantly reset polling when a task is submitted
+    const handleTaskStarted = () => {
+      clearTimeout(timeoutId);
+      currentInterval = 3000;
+      fetchTasks();
+    };
+    window.addEventListener('task_started', handleTaskStarted);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('task_started', handleTaskStarted);
+    };
   }, []);
 
   // active tasks minus dismissed minus chat
