@@ -780,11 +780,6 @@ export default function ExerciseView() {
                                     <Text c="blue.9">{q.answer_text || "No answer provided."}</Text>
                                     
                                     <Box mt="md">
-                                      {explanation && !showExplanations[q.id] && (
-                                        <Button size="xs" variant="light" color="grape" mb="sm" onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: true })); }} leftSection={<IconBulb size={14} />}>
-                                          Show AI Explanation
-                                        </Button>
-                                      )}
                                       {explanation && showExplanations[q.id] && (
                                         <Paper p="md" bg="var(--mantine-color-white)" radius="sm" mb="sm">
                                           <Group justify="space-between" align="flex-start" wrap="nowrap">
@@ -817,14 +812,20 @@ export default function ExerciseView() {
                                           </Group>
                                         </Paper>
                                       )}
-                                      <Group gap="xs">
+                                      
+                                      <Group gap="xs" mt="xs">
+                                        {explanation && !showExplanations[q.id] && (
+                                          <Button size="xs" variant="light" color="grape" onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: true })); }} leftSection={<IconBulb size={14} />}>
+                                            Show AI Explanation
+                                          </Button>
+                                        )}
                                         {!explanation && (
                                           <Button size="xs" variant="light" color="grape" loading={explainLoading[q.id]} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }} leftSection={<IconBulb size={14} />}>
                                             Ask AI to Explain
                                           </Button>
                                         )}
                                         {viewMode === 'hide' && (
-                                          <Button size="xs" variant="subtle" color="gray" onClick={(e) => { e.stopPropagation(); toggleReveal(q.id); }} leftSection={showAns ? <IconEyeOff size={14} /> : <IconEye size={14} />}>
+                                          <Button size="xs" variant="default" onClick={(e) => { e.stopPropagation(); toggleReveal(q.id); }} leftSection={showAns ? <IconEyeOff size={14} /> : <IconEye size={14} />}>
                                             {showAns ? "Re-hide Answer" : "Reveal Answer"}
                                           </Button>
                                         )}
