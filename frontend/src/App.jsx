@@ -2,7 +2,7 @@ import SummaryView from "./pages/SummaryView";
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
-import { AppShell, Burger, Group, Text, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification } from '@mantine/core';
+import { AppShell, Burger, Group, Text, Button, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconDashboard, 
@@ -32,16 +32,22 @@ import AdminPage from './pages/Admin';
 import { fetchApi } from './lib/api';
 import TaskQueueModal from './components/TaskQueueModal';
 
+const CAT_BASE = "https://http.cat";
+
 function GlobalToasts() {
   const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
     const handleError = (e) => {
       const id = Date.now() + Math.random();
-      setToasts(prev => [...prev, { id, message: e.detail }]);
+      const detail = e.detail || {};
+      const message = typeof detail === 'string' ? detail : (detail.message || 'An error occurred');
+      const status = detail.status || null;
+      const catUrl = detail.catUrl || (status ? `${CAT_BASE}/${status}` : null);
+      setToasts(prev => [...prev, { id, message, status, catUrl }]);
       setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== id));
-      }, 5000);
+      }, 6000);
     };
     window.addEventListener('apiError', handleError);
     return () => window.removeEventListener('apiError', handleError);
@@ -51,8 +57,23 @@ function GlobalToasts() {
     <Portal>
       <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {toasts.map(t => (
-          <Notification key={t.id} title="System Error" color="red" onClose={() => setToasts(prev => prev.filter(x => x.id !== t.id))}>
-            {t.message}
+          <Notification
+            key={t.id}
+            title={t.status ? `Error ${t.status}` : "System Error"}
+            color="red"
+            onClose={() => setToasts(prev => prev.filter(x => x.id !== t.id))}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {t.catUrl && (
+                <img
+                  src={t.catUrl}
+                  alt={`HTTP ${t.status}`}
+                  style={{ height: 48, borderRadius: 6, flexShrink: 0 }}
+                  onError={(e) => { e.target.style.display = 'none' }}
+                />
+              )}
+              <Text size="sm">{t.message}</Text>
+            </div>
           </Notification>
         ))}
       </div>
@@ -188,6 +209,16 @@ function RootRedirect() {
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
 }
 
+function NotFound() {
+  return (
+    <Center style={{ height: '80vh', flexDirection: 'column', gap: 24 }}>
+      <img src="https://http.cat/404" alt="404" style={{ height: 300, borderRadius: 12 }} />
+      <Text size="xl" fw={600} c="dimmed">Page not found</Text>
+      <Button component={NavLink} to="/dashboard" variant="light">Go home</Button>
+    </Center>
+  );
+}
+
 function App() {
   return (
     <Router>
@@ -207,9 +238,9 @@ function App() {
           <Route path="/subject/:id/:tab" element={<SubjectView />} />
           <Route path="/resource/:id" element={<NoteView />} />
           <Route path="/note/:summaryId" element={<SummaryView />} />
-
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>
     </Router>

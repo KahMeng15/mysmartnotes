@@ -172,11 +172,15 @@ from app.utils.db import SessionLocal
 
 
 # Custom exception handlers — API-only JSON responses
+_CAT_BASE = "https://http.cat"
+
+
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    code = exc.status_code
     return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail},
+        status_code=code,
+        content={"detail": exc.detail, "cat_url": f"{_CAT_BASE}/{code}"},
     )
 
 
@@ -185,7 +189,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={"detail": "Internal server error", "cat_url": f"{_CAT_BASE}/500"},
     )
 
 
@@ -435,6 +439,17 @@ try:
     logger.info(f"Output files mounted from {output_dir}")
 except Exception as e:
     logger.warning(f"Could not mount output files: {e}")
+
+@app.get("/http-cat/{status_code}")
+async def http_cat_proxy(status_code: int):
+    """Proxy to http.cat images (404, 500, etc.)"""
+    import httpx
+    url = f"https://http.cat/{status_code}"
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
+        from starlette.responses import Response
+        return Response(content=resp.content, media_type=resp.headers.get("content-type", "image/jpeg"))
+
 
 @app.get("/health")
 def health_check():
