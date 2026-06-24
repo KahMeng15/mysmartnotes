@@ -117,6 +117,7 @@ def init_db():
         apply_postgresql_migrations()
         apply_postgresql_user_security_migrations()
         apply_content_dissociation_migrations()
+        apply_note_resource_ids_migration()
     except Exception as e:
         logger.error(f"Failed to apply PostgreSQL migrations: {e}")
 
@@ -312,6 +313,27 @@ def apply_postgresql_user_security_migrations():
         logger.info("PostgreSQL user security migrations applied successfully")
     except Exception as e:
         logger.error(f"PostgreSQL user security migration failed: {e}", exc_info=True)
+
+
+def apply_note_resource_ids_migration():
+    """Add resource_ids column to notes table if it doesn't exist"""
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'notes' AND column_name = 'resource_ids'"
+            ))
+            if not result.fetchone():
+                conn.execute(text(
+                    "ALTER TABLE notes ADD COLUMN resource_ids TEXT"
+                ))
+                conn.commit()
+                logger.info("Added resource_ids column to notes table")
+            else:
+                logger.info("resource_ids column already exists in notes table")
+    except Exception as e:
+        logger.error(f"Failed to add resource_ids column: {e}", exc_info=True)
 
 
 def drop_all_tables():

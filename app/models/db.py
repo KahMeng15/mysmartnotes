@@ -172,6 +172,7 @@ class Note(Base):
     is_user_edited = Column(Boolean, default=False)
     is_pinned = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    resource_ids = Column(Text, nullable=True)
     
     # Relationships
     resource = relationship("Resource", back_populates="notes")

@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional, Callable
 import uuid
 
-from app.models.db import User, Resource, Subject, Note, Task
+from app.models.db import User, Resource, Subject, Note, Task, Exercise
 from app.schemas.schemas import ResourceResponse
+from app.schemas.exercise import ExerciseResponse
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id, SessionLocal
 from app.utils.tasks import TaskManager
@@ -347,8 +348,6 @@ async def get_resource(
     db: Session = Depends(get_db)
 ):
     """Get a specific note"""
-    import logging
-    logger = logging.getLogger(__name__)
     
     note = db.query(Resource).options(
         joinedload(Resource.subject).joinedload(Subject.group)
@@ -1166,3 +1165,119 @@ async def get_resource_processing_logs(
         "count": len(entries),
         "entries": entries,
     }
+
+
+@router.get("/{resource_id}/related")
+def get_related_content(
+    resource_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all notes and exercises related to a resource (direct + merged)"""
+    try:
+        resource = db.query(Resource).filter(
+            Resource.id == resource_id,
+            Resource.user_id == current_user.id
+        ).first()
+        if not resource:
+            raise HTTPException(status_code=404, detail="Resource not found")
+
+        # Direct notes (resource_id matches)
+        direct_notes = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
+            Resource.user_id == current_user.id,
+            Note.resource_id == resource_id
+        ).order_by(Note.created_at.desc()).all()
+
+        # Merged notes (note's resource_ids JSON contains this resource_id)
+        merged_notes = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
+            Resource.user_id == current_user.id,
+            Note.resource_id != resource_id,
+            Note.resource_ids.isnot(None)
+        ).order_by(Note.created_at.desc()).all()
+        merged_notes = [
+            n for n in merged_notes
+            if n.resource_ids and resource_id in json.loads(n.resource_ids)
+        ]
+
+        # Direct exercises
+        direct_exercises = db.query(Exercise).filter(
+            Exercise.user_id == current_user.id,
+            Exercise.resource_id == resource_id
+        ).order_by(Exercise.created_at.desc()).all()
+
+        # Merged exercises (check parameters JSON for resource_ids)
+        subject_exercises = db.query(Exercise).filter(
+            Exercise.user_id == current_user.id,
+            Exercise.resource_id != resource_id,
+            Exercise.subject_id == resource.subject_id
+        ).order_by(Exercise.created_at.desc()).all()
+        merged_exercises = []
+        for ex in subject_exercises:
+            params = StorageManager.get_resource_json(ex.id, "parameters")
+            if params and isinstance(params, dict):
+                r_ids = params.get("resource_ids", [])
+                if resource_id in r_ids:
+                    merged_exercises.append(ex)
+
+        all_notes = direct_notes + merged_notes
+        all_notes.sort(key=lambda n: n.created_at or datetime.min, reverse=True)
+
+        all_exercises = direct_exercises + merged_exercises
+        all_exercises.sort(key=lambda e: e.created_at or datetime.min, reverse=True)
+
+        def format_timestamp(dt):
+            if not dt:
+                return ""
+            if dt.tzinfo is None:
+                return dt.isoformat() + 'Z'
+            return dt.isoformat()
+
+        notes_data = []
+        for n in all_notes:
+            notes_data.append({
+                "id": n.id,
+                "version": n.version,
+                "resource_id": n.resource_id,
+                "title": n.title,
+                "summary_type": n.summary_type,
+                "file_path": n.file_path,
+                "created_at": format_timestamp(n.created_at),
+                "mode": n.mode,
+                "output_format": n.output_format,
+                "processing_method": n.processing_method,
+                "split_level": n.split_level,
+                "model": n.model,
+                "is_user_edited": n.is_user_edited or False,
+                "is_pinned": n.is_pinned or False,
+                "prompt_name": n.prompt_name,
+                "prompt_icon": n.prompt_icon,
+                "resource_ids": n.resource_ids,
+            })
+
+        exercises_data = []
+        for ex in all_exercises:
+            params = StorageManager.get_resource_json(ex.id, "parameters") or {}
+            exercises_data.append({
+                "id": ex.id,
+                "title": ex.title,
+                "resource_id": ex.resource_id,
+                "subject_id": ex.subject_id,
+                "group_id": ex.group_id,
+                "file_path": ex.file_path,
+                "file_name": ex.file_name,
+                "model": ex.model,
+                "processing_time_ms": ex.processing_time_ms,
+                "created_at": format_timestamp(ex.created_at),
+                "updated_at": format_timestamp(ex.updated_at),
+                "parameters": params,
+            })
+
+        return {
+            "notes": notes_data,
+            "exercises": exercises_data,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching related content for resource {resource_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

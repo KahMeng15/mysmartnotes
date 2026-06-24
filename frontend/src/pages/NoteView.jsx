@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu } from '@mantine/core';
+import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu, Divider } from '@mantine/core';
 import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt } from '@tabler/icons-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -39,6 +39,10 @@ export default function NoteView() {
 
   const [saveModalOpened, setSaveModalOpened] = useState(false);
   const [cancelModalOpened, setCancelModalOpened] = useState(false);
+
+  const [relatedNotes, setRelatedNotes] = useState([]);
+  const [relatedExercises, setRelatedExercises] = useState([]);
+  const [loadingRelated, setLoadingRelated] = useState(false);
 
   const contentForRender = useMemo(() => {
     if (!content || !refPosition) return content;
@@ -328,6 +332,18 @@ export default function NoteView() {
 
     return () => clearInterval(interval);
   }, [id, note?.processing_time_ms, note?.extracted_text, note?.output_pdf_path]);
+
+  useEffect(() => {
+    if (!note || !note.id) return;
+    setLoadingRelated(true);
+    fetchApi(`/resources/${note.id}/related`)
+      .then(data => {
+        setRelatedNotes(data.notes || []);
+        setRelatedExercises(data.exercises || []);
+      })
+      .catch(err => console.error("Failed to load related content", err))
+      .finally(() => setLoadingRelated(false));
+  }, [note?.id]);
 
   const startEditing = () => {
     if (editor) {
@@ -643,11 +659,18 @@ export default function NoteView() {
                         onClick={startEditing}
                       />
                     </Tooltip>
-                    <Tooltip label="View Summaries" disabled={sidebarOpen} position="left">
+                    <Tooltip label="Create Note" disabled={sidebarOpen} position="left">
                       <MantineNavLink
-                        label={sidebarOpen ? "View Summaries" : ""}
+                        label={sidebarOpen ? "Create Note" : ""}
                         leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
-                        onClick={() => navigate(`/subject/${note.subject.id}/notes`)}
+                        onClick={() => navigate(`/subject/${note.subject.id}?createNote=true&resourceId=${note.id}`)}
+                      />
+                    </Tooltip>
+                    <Tooltip label="Create Exercise" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Create Exercise" : ""}
+                        leftSection={<IconBolt size="1.2rem" stroke={1.5} />}
+                        onClick={() => navigate(`/subject/${note.subject.id}?createExercise=true&resourceId=${note.id}`)}
                       />
                     </Tooltip>
                     <Tooltip label="Quick Chat" disabled={sidebarOpen} position="left">
@@ -655,13 +678,6 @@ export default function NoteView() {
                         label={sidebarOpen ? "Quick Chat" : ""}
                         leftSection={<IconMessageChatbot size="1.2rem" stroke={1.5} />}
                         onClick={() => setChatOpened(true)}
-                      />
-                    </Tooltip>
-                    <Tooltip label="Generate Exercise" disabled={sidebarOpen} position="left">
-                      <MantineNavLink
-                        label={sidebarOpen ? "Generate Exercise" : ""}
-                        leftSection={<IconBolt size="1.2rem" stroke={1.5} />}
-                        onClick={() => navigate(`/subject/${note.subject.id}/exercise`)}
                       />
                     </Tooltip>
                     <Menu position="left-start" withArrow>
@@ -768,6 +784,43 @@ export default function NoteView() {
                   </>
                 )}
               </Stack>
+
+              {sidebarOpen && !isEditing && isProcessed && (
+                <>
+                  <Divider my="sm" />
+                  <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="xs">Related</Text>
+                  {loadingRelated ? (
+                    <Center py="sm"><Loader size="sm" /></Center>
+                  ) : relatedNotes.length === 0 && relatedExercises.length === 0 ? (
+                    <Text size="xs" c="dimmed" py="sm">No related content</Text>
+                  ) : (
+                    <Stack gap={4}>
+                      {relatedNotes.map(rn => (
+                        <Text
+                          key={rn.id}
+                          size="xs"
+                          style={{ cursor: 'pointer' }}
+                          c="blue"
+                          onClick={() => navigate(`/notes/${rn.id}?resourceId=${rn.resource_id}`)}
+                        >
+                          {rn.title}
+                        </Text>
+                      ))}
+                      {relatedExercises.map(re => (
+                        <Text
+                          key={re.id}
+                          size="xs"
+                          style={{ cursor: 'pointer' }}
+                          c="teal"
+                          onClick={() => navigate(`/exercises/${re.id}`)}
+                        >
+                          {re.title}
+                        </Text>
+                      ))}
+                    </Stack>
+                  )}
+                </>
+              )}
             </Box>
 
             <Box mt="auto" pt="sm">

@@ -92,7 +92,7 @@ export default function TaskQueueModal() {
       <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, width: 350, transition: 'all 0.3s ease' }}>
         <Card shadow="xl" padding="md" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)' }}>
           <Group justify="space-between" mb={(isMinimized && !hasActiveTasks) ? 0 : "sm"}>
-            <Text fw={600} size="sm">Background Tasks ({visibleTasks.length})</Text>
+            <Text fw={600} size="sm">Tasks ({visibleTasks.length})</Text>
             <Group gap="xs">
               <ActionIcon variant="subtle" size="sm" onClick={() => setIsMinimized(!isMinimized)}>
                 {isMinimized ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}

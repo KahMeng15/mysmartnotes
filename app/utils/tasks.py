@@ -344,6 +344,8 @@ class NoteTask:
                     Note.resource_id == resource_id
                 ).scalar() or 0
                 next_version = max_version + 1
+                import json
+                r_ids = kwargs.get("resource_ids")
                 
                 doc = Note(
                     id=doc_id,
@@ -361,7 +363,8 @@ class NoteTask:
                     prompt_icon=prompt_icon,
                     processing_time=processing_time,
                     processing_time_ms=int(processing_time * 1000),
-                    model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()
+                    model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize(),
+                    resource_ids=json.dumps(r_ids) if r_ids and len(r_ids) > 1 else None
                 )
                 db.add(doc)
             db.commit()

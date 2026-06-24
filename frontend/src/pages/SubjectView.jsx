@@ -3,7 +3,7 @@ import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center,
 import { useDisclosure } from '@mantine/hooks';
 import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit, IconX } from '@tabler/icons-react';
 import * as TablerIcons from '@tabler/icons-react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi, getAuthToken } from '../lib/api';
 import { formatParams } from '../lib/formatters';
 
@@ -110,6 +110,7 @@ const formatNoteDate = (dateString) => {
 export default function SubjectView() {
   const { id, tab } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   const [subject, setSubject] = useState(null);
   const [notes, setNotes] = useState([]);
@@ -625,6 +626,26 @@ export default function SubjectView() {
     };
     loadData();
   }, [id]);
+
+  useEffect(() => {
+    if (loading || !subject) return;
+
+    const createNote = searchParams.get('createNote');
+    const createExercise = searchParams.get('createExercise');
+    const resourceId = searchParams.get('resourceId');
+
+    if (createNote === 'true' && resourceId) {
+      setSelectedResources([resourceId]);
+      setActiveTab('resource');
+      setCreateNoteModalOpened(true);
+      window.history.replaceState({}, '', `/subject/${id}`);
+    } else if (createExercise === 'true' && resourceId) {
+      setExerciseScope([resourceId]);
+      setActiveTab('resource');
+      setCreateExerciseModalOpened(true);
+      window.history.replaceState({}, '', `/subject/${id}`);
+    }
+  }, [loading, subject, searchParams, id]);
 
   const [noteProgress, setNoteProgress] = useState({});
   const [failedNoteIds, setFailedNoteIds] = useState([]);

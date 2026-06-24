@@ -109,6 +109,7 @@ class NoteItemResponse(BaseModel):
     is_pinned: bool = False  # Whether the summary is pinned
     prompt_name: Optional[str] = None
     prompt_icon: Optional[str] = None
+    resource_ids: Optional[str] = None  # JSON string of all resource IDs for merged notes
 
 
 
@@ -207,6 +208,7 @@ async def generate_note_endpoint(
     ).scalar() or 0
     next_version = max_version + 1
 
+    import json
     doc = Note(
         id=doc_id,
         version=next_version,
@@ -222,6 +224,7 @@ async def generate_note_endpoint(
         prompt_name=request.prompt_name,
         prompt_icon=request.prompt_icon,
         processing_time_ms=0,
+        resource_ids=json.dumps(r_ids) if len(r_ids) > 1 else None,
     )
     db.add(doc)
     db.commit()
@@ -456,7 +459,8 @@ async def list_notes(
             split_level=d.split_level,
             is_user_edited=d.is_user_edited or False,
             prompt_name=d.prompt_name,
-            prompt_icon=d.prompt_icon
+            prompt_icon=d.prompt_icon,
+            resource_ids=d.resource_ids
         )
         for d in summaries
     ]
@@ -513,7 +517,8 @@ async def get_note(
         model=summary.model,
         is_user_edited=summary.is_user_edited or False,
         prompt_name=summary.prompt_name,
-        prompt_icon=summary.prompt_icon
+        prompt_icon=summary.prompt_icon,
+        resource_ids=summary.resource_ids
     )
 
 
