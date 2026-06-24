@@ -28,7 +28,6 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -168,36 +167,26 @@ app.add_middleware(
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from app.models.db import SystemSettings, IPFilter, UserLog
+from app.models.db import SystemSettings, IPFilter
 from app.utils.db import SessionLocal
 
 
-# Custom exception handlers for HTTP status codes
-@app.exception_handler(404)
-async def not_found_exception_handler(request: Request, exc):
-    return FileResponse(os.path.join(static_dir, "error-404.html"), media_type="text/html")
-
-
+# Custom exception handlers — API-only JSON responses
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    if exc.status_code == 404:
-        return FileResponse(os.path.join(static_dir, "error-404.html"), media_type="text/html", status_code=404)
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
     )
 
 
-@app.exception_handler(500)
-async def internal_error_exception_handler(request: Request, exc):
-    logger.error(f"Internal server error: {exc}", exc_info=True)
-    return FileResponse(os.path.join(static_dir, "error-500.html"), media_type="text/html", status_code=500)
-
-
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return FileResponse(os.path.join(static_dir, "error-500.html"), media_type="text/html", status_code=500)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 @app.middleware("http")
@@ -212,19 +201,6 @@ async def request_observability_middleware(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    
-    # Updated CSP with more allowed sources
-    csp = (
-        "default-src 'self'; "
-        "img-src 'self' data: https:; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://unpkg.com https://cdnjs.cloudflare.com; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
-        "font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; "
-        "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; "
-        "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com; "
-        "media-src 'self' https://assets.mixkit.co"
-    )
-    response.headers["Content-Security-Policy"] = csp
 
     if _is_production():
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -301,10 +277,6 @@ async def csrf_protection_middleware(request: Request, call_next):
 
 @app.middleware("http")
 async def system_settings_middleware(request: Request, call_next):
-    # Skip for static files or dependencies that don't need db to avoid overhead on every tiny asset
-    if request.url.path.startswith("/styles/") or request.url.path.startswith("/js/") or request.url.path.startswith("/fonts/"):
-        return await call_next(request)
-
     db = SessionLocal()
     try:
         sys_settings = db.query(SystemSettings).first()
@@ -318,7 +290,7 @@ async def system_settings_middleware(request: Request, call_next):
             
             # 2. Maintenance Mode
             # Allow /admin, /auth, /login, /maintenance, and /static files to bypass
-            bypass_paths = ["/admin", "/auth", "/login", "/maintenance", "/styles", "/js", "/fonts", "/favicon.ico"]
+            bypass_paths = ["/admin", "/auth"]
             is_bypassed = any(request.url.path.startswith(path) for path in bypass_paths)
             
             if sys_settings.maintenance_mode and not is_bypassed:
@@ -347,11 +319,6 @@ async def system_settings_middleware(request: Request, call_next):
                         logger.error(f"Error verifying admin bypass: {e}")
                 
                 if not is_admin:
-                    # If it's a browser request (HTML), redirect to maintenance page
-                    if "text/html" in request.headers.get("accept", ""):
-                        from starlette.responses import RedirectResponse
-                        return RedirectResponse(url="/maintenance")
-                    # Otherwise return 503 JSON
                     return JSONResponse(status_code=503, content={"detail": "System is undergoing maintenance. Only administrators can access."})
             
         # 3. IP Filtering
@@ -360,12 +327,6 @@ async def system_settings_middleware(request: Request, call_next):
             if f.rule_type == "specific_ip" and f.filter_type == "blacklist" and f.value == client_ip:
                 return JSONResponse(status_code=403, content={"detail": "Your IP has been blacklisted."})
             # (Country blocking would require geoip database, skipped for simple implementation but model supports it)
-
-        # 4. Log page open
-        if request.method == "GET" and ".html" in request.url.path:
-            user_agent = request.headers.get("user-agent", "Unknown")
-            db.add(UserLog(action="page_access", ip_address=client_ip, device_info=user_agent, details=request.url.path))
-            db.commit()
 
         response = await call_next(request)
 
@@ -475,105 +436,6 @@ try:
 except Exception as e:
     logger.warning(f"Could not mount output files: {e}")
 
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-
-# Dynamic routes for Note view/edit explicitly serving static files
-@app.get("/note/{id}")
-async def serve_note_view(id: str):
-    return FileResponse(os.path.join(static_dir, "note.html"))
-
-@app.get("/note/{id}/summary")
-async def serve_summary_view(id: str):
-    return FileResponse(os.path.join(static_dir, "summary.html"))
-
-@app.get("/note/{id}/summary/{summary_id}")
-async def serve_summary_version_view(id: str, summary_id: str):
-    return FileResponse(os.path.join(static_dir, "summary.html"))
-
-@app.get("/note/{id}/summary/{summary_id}/edit")
-async def serve_summary_edit_view(id: str, summary_id: str):
-    return FileResponse(os.path.join(static_dir, "summary.html"))
-
-@app.get("/note/{id}/edit")
-async def serve_note_edit(id: str):
-    return FileResponse(os.path.join(static_dir, "note.html"))
-
-@app.get("/login")
-async def serve_login():
-    return FileResponse(os.path.join(static_dir, "login.html"))
-
-@app.get("/reset-password")
-async def serve_reset_password():
-    return FileResponse(os.path.join(static_dir, "reset-password.html"))
-
-@app.get("/signup")
-async def serve_signup():
-    # Serve login.html (signup panel inside) with invitation token if provided
-    return FileResponse(os.path.join(static_dir, "login.html"))
-
-@app.get("/dashboard")
-async def serve_dashboard():
-    return FileResponse(os.path.join(static_dir, "dashboard.html"))
-
-@app.get("/mynotes")
-async def serve_mynotes():
-    return FileResponse(os.path.join(static_dir, "mynotes.html"))
-
-@app.get("/chat")
-async def serve_chat():
-    return FileResponse(os.path.join(static_dir, "chat.html"))
-
-@app.get("/chat/{id}")
-async def serve_chat_with_id(id: str):
-    return FileResponse(os.path.join(static_dir, "chat.html"))
-
-@app.get("/exporttemplates")
-async def serve_export_templates():
-    return FileResponse(os.path.join(static_dir, "exporttemplate-selector.html"))
-
-@app.get("/admin")
-async def serve_admin():
-    return FileResponse(os.path.join(static_dir, "admin.html"))
-
-@app.get("/admin/diagnostics")
-async def serve_diagnostics():
-    return FileResponse(os.path.join(static_dir, "http-status-diagnostics.html"))
-
-@app.get("/maintenance")
-async def serve_maintenance():
-    return FileResponse(os.path.join(static_dir, "maintenance.html"))
-
-@app.get("/exporttemplate/{id}")
-async def serve_export_template(id: str):
-    return FileResponse(os.path.join(static_dir, "exporttemplate-editor.html"))
-
-@app.get("/pomodoro")
-async def serve_pomodoro():
-    return FileResponse(os.path.join(static_dir, "pomodoro.html"))
-
-
-
-@app.get("/settings")
-async def serve_settings():
-    return FileResponse(os.path.join(static_dir, "settings.html"))
-
-@app.get("/upload")
-async def serve_upload():
-    return FileResponse(os.path.join(static_dir, "upload.html"))
-
-@app.get("/settings.html")
-async def redirect_settings_html():
-    return RedirectResponse(url="/settings", status_code=307)
-
-@app.get("/upload.html")
-async def redirect_upload_html():
-    return RedirectResponse(url="/upload", status_code=307)
-
-@app.get("/pomodoro_popout.html")
-async def serve_pomodoro_popout():
-    return FileResponse(os.path.join(static_dir, "pomodoro_popout.html"))
-
-
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
@@ -584,15 +446,6 @@ def health_check():
 def docs():
     """OpenAPI documentation"""
     return {"message": "API documentation available at /docs"}
-
-
-# Serve static files and templates
-if os.path.exists(static_dir):
-    try:
-        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
-        logger.info(f"Static files mounted from {static_dir}")
-    except Exception as e:
-        logger.warning(f"Could not mount static files: {e}")
 
 
 if __name__ == "__main__":
