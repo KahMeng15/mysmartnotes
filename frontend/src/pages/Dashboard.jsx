@@ -744,34 +744,35 @@ export default function Dashboard() {
     <Box pt="lg">
       {/* Welcome Section */}
       <Box mb="xl">
-        <Text ff="Instrument Serif, serif" fs="italic" style={{ fontSize: 'clamp(2rem, 8vw, 4rem)', fontWeight: 700, lineHeight: 0.9, color: '#171738', wordBreak: 'break-word' }}>
+        <Text ff="Instrument Serif, serif" fs="italic" style={{ fontSize: 'clamp(3rem, 12vw, 6rem)', fontWeight: 700, lineHeight: 0.9, color: '#171738', wordBreak: 'break-word' }}>
           {greeting}
         </Text>
-        <Text c="dimmed" size={{ base: 'sm', md: 'lg' }} mt="md">
+        <Text c="dimmed" size={{ base: 'sm', md: 'lg' }} mt={4}>
           {message}
         </Text>
       </Box>
 
       {/* Quick Stats */}
-      <SimpleGrid cols={{ base: 1, xs: 2, md: 4 }} spacing="lg" mb="xl">
+      <SimpleGrid cols={{ base: 2, md: 4 }} spacing="sm" mb="xl">
         {stats.map((stat) => (
-          <Card key={stat.label} withBorder padding="lg" radius="md">
-            <Group justify="space-between">
-              <Text size="xs" c="dimmed" fw={700} tt="uppercase">
-                {stat.label}
-              </Text>
-              <ThemeIcon color={stat.color} variant="light" size={38} radius="md">
-                <stat.icon size={20} stroke={1.5} />
-              </ThemeIcon>
-            </Group>
-            <Group align="flex-end" spacing="xs" mt={25}>
+          <Card key={stat.label} withBorder padding="md" radius="md" style={{ minHeight: 110 }}>
+            <Stack gap={0} style={{ height: '100%' }}>
+              <Group justify="space-between" align="center">
+                <Text size="xs" c="dimmed" fw={700} tt="uppercase" truncate style={{ flex: 1 }}>
+                  {stat.label}
+                </Text>
+                <ThemeIcon color={stat.color} variant="light" size={34} radius="md" style={{ flexShrink: 0 }}>
+                  <stat.icon size={18} stroke={1.5} />
+                </ThemeIcon>
+              </Group>
+              <Box style={{ flex: 1 }} />
               <Text size="xl" fw={700} lh={1}>
                 {stat.value}
               </Text>
-              <Text c="teal" size="sm" fw={500}>
+              <Text c="teal" size="xs" fw={500} mt={2}>
                 {stat.delta}
               </Text>
-            </Group>
+            </Stack>
           </Card>
         ))}
       </SimpleGrid>
@@ -780,7 +781,7 @@ export default function Dashboard() {
       <Title order={3} mb="md" fw={600} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>
         Quick Actions
       </Title>
-      <SimpleGrid cols={{ base: 2, sm: 3, md: 5 }} spacing="lg" mb="xl">
+      <Group gap="lg" mb="xl" style={{ flexWrap: 'nowrap', overflowX: 'auto' }}>
         {quickActions.map((action) => (
           <UnstyledButton
             key={action.label}
@@ -790,11 +791,13 @@ export default function Dashboard() {
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: theme.spacing.xl,
+              padding: theme.spacing.md,
               borderRadius: theme.radius.md,
               backgroundColor: '#fff',
               transition: 'transform 150ms ease, box-shadow 150ms ease',
               border: `1px solid ${theme.colors.gray[2]}`,
+              flex: 1,
+              minWidth: 80,
               '&:hover': {
                 transform: 'translateY(-2px)',
                 boxShadow: theme.shadows.sm,
@@ -809,7 +812,7 @@ export default function Dashboard() {
             </Text>
           </UnstyledButton>
         ))}
-      </SimpleGrid>
+      </Group>
 
       {/* Recent Items Section */}
       <Title order={3} mb="md" mt="xl" fw={600} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>Recent Items</Title>

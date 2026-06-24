@@ -193,7 +193,7 @@ function AppLayout({ children }) {
         </AppShell.Section>
       </AppShell.Navbar>
 
-      <AppShell.Main>
+      <AppShell.Main pb={{ base: 64, sm: 0 }}>
         {children}
       </AppShell.Main>
       <AppShell.Footer hiddenFrom="sm" p={0} style={{ borderTop: '1px solid var(--mantine-color-gray-2)' }}>
