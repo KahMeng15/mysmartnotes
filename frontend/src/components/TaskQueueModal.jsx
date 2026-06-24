@@ -89,7 +89,7 @@ export default function TaskQueueModal() {
 
   return (
     <Portal>
-      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, width: 350, transition: 'all 0.3s ease' }}>
+      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 100, width: 350, transition: 'all 0.3s ease' }}>
         <Card shadow="xl" padding="md" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)' }}>
           <Group justify="space-between" mb={(isMinimized && !hasActiveTasks) ? 0 : "sm"}>
             <Text fw={600} size="sm">Tasks ({visibleTasks.length})</Text>

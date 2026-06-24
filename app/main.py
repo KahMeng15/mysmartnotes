@@ -453,8 +453,23 @@ async def http_cat_proxy(status_code: int):
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy"}
+    """Health check endpoint — distinguishes API vs DB status."""
+    from app.utils.db import SessionLocal
+    from sqlalchemy import text
+    db_ok = False
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+        db.commit()
+        db_ok = True
+    except Exception:
+        db_ok = False
+    finally:
+        db.close()
+
+    if db_ok:
+        return {"status": "healthy", "api": "ok", "database": "ok"}
+    return {"status": "degraded", "api": "ok", "database": "down"}
 
 
 @app.get("/docs")

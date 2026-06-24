@@ -2,7 +2,7 @@ import SummaryView from "./pages/SummaryView";
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
-import { AppShell, Burger, Group, Text, Button, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification } from '@mantine/core';
+import { AppShell, Burger, Group, Text, Button, Loader, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconDashboard, 
@@ -65,12 +65,14 @@ function GlobalToasts() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {t.catUrl && (
-                <img
-                  src={t.catUrl}
-                  alt={`HTTP ${t.status}`}
-                  style={{ height: 48, borderRadius: 6, flexShrink: 0 }}
-                  onError={(e) => { e.target.style.display = 'none' }}
-                />
+                <a href={t.catUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0, lineHeight: 0 }}>
+                  <img
+                    src={t.catUrl}
+                    alt={`HTTP ${t.status}`}
+                    style={{ height: 48, borderRadius: 6, cursor: 'pointer' }}
+                    onError={(e) => { e.target.style.display = 'none' }}
+                  />
+                </a>
               )}
               <Text size="sm">{t.message}</Text>
             </div>
@@ -219,9 +221,87 @@ function NotFound() {
   );
 }
 
+function ServiceUnavailable({ message }) {
+  return (
+    <Center style={{ height: '100vh', flexDirection: 'column', gap: 24, padding: 24 }}>
+      <img src="https://http.cat/503" alt="503" style={{ height: 260, borderRadius: 12 }} />
+      <Text size="xl" fw={600} c="dimmed" ta="center">{message}</Text>
+      <Text size="sm" c="gray.5" ta="center">Please try again later.</Text>
+      <Button onClick={() => window.location.reload()} variant="light" mt="md">
+        Retry
+      </Button>
+    </Center>
+  );
+}
+
+/** Checks /health. Returns true if healthy, dispatches service_unreachable event on failure. */
+async function checkHealth() {
+  try {
+    const res = await fetch('/api/health');
+    if (!res.ok) {
+      window.dispatchEvent(new CustomEvent('service_unreachable', { detail: { source: 'api' } }));
+      return false;
+    }
+    const data = await res.json();
+    if (data?.database === 'down') {
+      window.dispatchEvent(new CustomEvent('service_unreachable', { detail: { source: 'database' } }));
+      return false;
+    }
+    if (data?.status !== 'healthy') {
+      window.dispatchEvent(new CustomEvent('service_unreachable', { detail: { source: 'api' } }));
+      return false;
+    }
+    return true;
+  } catch {
+    window.dispatchEvent(new CustomEvent('service_unreachable', { detail: { source: 'api' } }));
+    return false;
+  }
+}
+
+/** Inside Router — checks health on every route change. */
+function ServiceGuard({ setBootStatus }) {
+  const location = useLocation();
+
+  useEffect(() => {
+    checkHealth().then(() => {});
+  }, [location.pathname]);
+
+  return null;
+}
+
 function App() {
+  const [bootStatus, setBootStatus] = useState('loading');
+  const [failureSource, setFailureSource] = useState('api');
+
+  useEffect(() => {
+    checkHealth().then((healthy) => {
+      if (healthy) setBootStatus('ok');
+    });
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      setFailureSource(e.detail?.source || 'api');
+      setBootStatus('down');
+    };
+    window.addEventListener('service_unreachable', handler);
+    return () => window.removeEventListener('service_unreachable', handler);
+  }, []);
+
+  if (bootStatus === 'loading') {
+    return <Center h="100vh"><Loader size="lg" /></Center>;
+  }
+
+  if (bootStatus === 'down') {
+    const msg = failureSource === 'database'
+      ? 'Database is not responding — the database server may be down.'
+      : 'API is not reachable — the application server may be down.';
+    return <ServiceUnavailable message={msg} />;
+  }
+
   return (
     <Router>
+      <ServiceGuard />
       <AppLayout>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
