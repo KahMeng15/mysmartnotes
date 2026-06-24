@@ -2,8 +2,7 @@ import SummaryView from "./pages/SummaryView";
 
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
-import { AppShell, Burger, Group, Text, Button, Loader, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { AppShell, Group, Text, Button, Loader, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification, Stack } from '@mantine/core';
 import { 
   IconDashboard, 
   IconLogin, 
@@ -84,7 +83,6 @@ function GlobalToasts() {
 }
 
 function AppLayout({ children }) {
-  const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
   const [navOpen, setNavOpen] = useState(true);
   const [user, setUser] = useState(null);
   const location = useLocation();
@@ -125,9 +123,9 @@ function AppLayout({ children }) {
       navbar={{
         width: navOpen ? 250 : 80,
         breakpoint: 'sm',
-        collapsed: { mobile: !mobileOpened },
+        collapsed: { mobile: true },
       }}
-      padding={(location.pathname.startsWith('/note/') || location.pathname.startsWith('/resource/') || location.pathname.startsWith('/chat') || location.pathname.startsWith('/exercises/')) ? 0 : { base: 'sm', sm: 'md' }}
+      padding={(location.pathname.startsWith('/note/') || location.pathname.startsWith('/resource/') || location.pathname.startsWith('/chat') || location.pathname.startsWith('/exercises/')) ? 0 : 'md'}
       bg="#ffffff"
     >
       <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
@@ -138,7 +136,7 @@ function AppLayout({ children }) {
               MySmartNotes
             </Text>
           </Group>
-          <Burger opened={mobileOpened} onClick={toggleMobile} hiddenFrom="sm" size="sm" />
+
         </Group>
 
         <AppShell.Section grow component={ScrollArea}>
@@ -198,6 +196,50 @@ function AppLayout({ children }) {
       <AppShell.Main>
         {children}
       </AppShell.Main>
+      <AppShell.Footer hiddenFrom="sm" p={0} style={{ borderTop: '1px solid var(--mantine-color-gray-2)' }}>
+        <Group justify="space-evenly" gap={0} p="xs" style={{ height: 56 }}>
+          {[
+            { to: '/dashboard', icon: IconDashboard, label: 'Dashboard' },
+            { to: '/mynotes', icon: IconBooks, label: 'Notes' },
+            { to: '/chat', icon: IconMessageDots, label: 'Chat' },
+            { to: '/upload', icon: IconUpload, label: 'Upload' },
+          ].map(item => {
+            const Icon = item.icon;
+            const isActive = location.pathname.startsWith(item.to) ||
+              (item.to === '/mynotes' && (location.pathname.startsWith('/group/') || location.pathname.startsWith('/subject/') || location.pathname.startsWith('/resource/') || location.pathname.startsWith('/note/')));
+            return (
+              <NavLink key={item.to} to={item.to} style={{ textDecoration: 'none', color: isActive ? '#171738' : '#868e96' }}>
+                <Stack gap={2} align="center">
+                  <Icon size={22} />
+                  <Text size={10} fw={isActive ? 600 : 400}>{item.label}</Text>
+                </Stack>
+              </NavLink>
+            );
+          })}
+          {user?.is_admin && (
+            <NavLink to="/admin" style={{ textDecoration: 'none', color: location.pathname === '/admin' ? '#171738' : '#868e96' }}>
+              <Stack gap={2} align="center">
+                <IconShieldCheck size={22} />
+                <Text size={10} fw={location.pathname === '/admin' ? 600 : 400}>Admin</Text>
+              </Stack>
+            </NavLink>
+          )}
+          <Menu position="top" withArrow>
+            <Menu.Target>
+              <UnstyledButton>
+                <Stack gap={2} align="center">
+                  <Avatar radius="xl" color="blue" size="sm">{user ? (user.nickname || user.username || 'U').substring(0, 2).toUpperCase() : 'U'}</Avatar>
+                  <Text size={10}>Profile</Text>
+                </Stack>
+              </UnstyledButton>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item component={NavLink} to="/settings" leftSection={<IconSettings size={14} />}>Settings</Menu.Item>
+              <Menu.Item component={NavLink} to="/login" color="red" leftSection={<IconLogin size={14} />} onClick={() => localStorage.removeItem('token')}>Logout</Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </AppShell.Footer>
       <GlobalToasts />
       <TaskQueueModal />
     </AppShell>

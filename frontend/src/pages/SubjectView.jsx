@@ -1106,7 +1106,7 @@ export default function SubjectView() {
           </ActionIcon>
           <Menu shadow="md" width={200} position="bottom-end">
             <Menu.Target>
-              <Button variant="light" leftSection={<IconSparkles size={16} />} size={{ base: 'sm', md: 'md' }}>
+              <Button variant="light" leftSection={<IconSparkles size={16} />} size="sm">
                 Create
               </Button>
             </Menu.Target>
@@ -1124,7 +1124,7 @@ export default function SubjectView() {
           </Menu>
           <Menu shadow="md" width={200} position="bottom-end">
             <Menu.Target>
-              <Button leftSection={<IconUpload size={16} />} size={{ base: 'sm', md: 'md' }}>
+              <Button leftSection={<IconUpload size={16} />} size="sm">
                 Upload
               </Button>
             </Menu.Target>
@@ -1173,7 +1173,7 @@ export default function SubjectView() {
           ]}
           leftSection={<IconArrowsSort size={16} />}
           style={{ width: 180 }}
-          size={{ base: 'sm', md: 'md' }}
+          size="sm"
         />
       </Group>
 

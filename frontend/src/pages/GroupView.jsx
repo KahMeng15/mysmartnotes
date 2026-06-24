@@ -268,7 +268,7 @@ export default function GroupView() {
               </ActionIcon>
             </>
           )}
-          <Button leftSection={<IconPlus size={16} />} onClick={handleAddSubjectClick} variant="light" color="blue" size={{ base: 'sm', md: 'md' }}>
+          <Button leftSection={<IconPlus size={16} />} onClick={handleAddSubjectClick} variant="light" color="blue" size="sm">
             Add Subject
           </Button>
         </Group>
@@ -307,7 +307,7 @@ export default function GroupView() {
           ]}
           leftSection={<IconArrowsSort size={16} />}
           style={{ width: 180 }}
-          size={{ base: 'sm', md: 'md' }}
+          size="sm"
         />
       </Group>
 

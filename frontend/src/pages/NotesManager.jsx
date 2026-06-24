@@ -221,7 +221,7 @@ export default function NotesManager() {
       {/* Header */}
       <Group justify="space-between" mb="lg" wrap="wrap" gap="sm">
         <Title order={1} fw={800} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738', fontSize: 'clamp(1.5rem, 5vw, 2.5rem)' }}>My Notes</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={() => { setNewGroupName(''); openGroupModal(); }} size={{ base: 'sm', md: 'md' }}>
+        <Button leftSection={<IconPlus size={16} />} onClick={() => { setNewGroupName(''); openGroupModal(); }} size="sm">
           Create Group
         </Button>
       </Group>
@@ -260,7 +260,7 @@ export default function NotesManager() {
           ]}
           leftSection={<IconArrowsSort size={16} />}
           style={{ width: 180 }}
-          size={{ base: 'sm', md: 'md' }}
+          size="sm"
         />
       </Group>
 
