@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Title, Tabs, Table, Button, Group, Badge, Modal, Select, TextInput, NumberInput, Switch, Stack, Paper, Text, ScrollArea, Box, Radio, Divider, Textarea } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
+import { useMediaQuery } from '@mantine/hooks';
 import { fetchApi } from '../lib/api';
 import { IconShieldCheck, IconUsers, IconMail, IconStack2, IconSettings, IconClock, IconServer, IconListDetails, IconDatabase, IconActivity, IconMessages } from '@tabler/icons-react';
 
@@ -83,7 +84,7 @@ function AdminUsers() {
                   {u.is_admin && <Text c="grape" size="xs">Admin</Text>}
                 </Table.Td>
                 <Table.Td>
-                  <Group gap="xs">
+                  <Group gap="xs" wrap="nowrap">
                     <Button size="xs" variant="outline" onClick={() => { setSelectedUser(u); setNewTier(u.tier); setTierModalOpen(true); }}>Tier</Button>
                     {u.is_active ? (
                       <Button size="xs" color="red" variant="light" onClick={() => handleAction(u.id, 'deactivate')}>Deactivate</Button>
@@ -389,7 +390,7 @@ function AdminIpFilters() {
           <TextInput label="Value" value={value} onChange={(e) => setValue(e.currentTarget.value)} />
           <Button onClick={add}>Add</Button>
         </Group>
-        <Table mt="md">
+        <ScrollArea><Table mt="md">
           <Table.Thead><Table.Tr><Table.Th>ID</Table.Th><Table.Th>Type</Table.Th><Table.Th>Value</Table.Th><Table.Th>Action</Table.Th></Table.Tr></Table.Thead>
           <Table.Tbody>
             {filters.map(f => (
@@ -401,7 +402,7 @@ function AdminIpFilters() {
               </Table.Tr>
             ))}
           </Table.Tbody>
-        </Table>
+        </Table></ScrollArea>
       </Paper>
     </Stack>
   );
@@ -625,6 +626,7 @@ function AdminGlobalPrompts() {
 }
 
 export default function AdminPage() {
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -657,7 +659,7 @@ export default function AdminPage() {
         <Title order={2}>Admin Dashboard</Title>
       </Group>
 
-      <Tabs defaultValue="users" orientation="vertical" placement="left">
+      <Tabs defaultValue="users" orientation={isMobile ? 'horizontal' : 'vertical'} placement="left">
         <Tabs.List>
           <Tabs.Tab value="users" leftSection={<IconUsers size={16} />}>Users</Tabs.Tab>
           <Tabs.Tab value="invitations" leftSection={<IconMail size={16} />}>Invitations</Tabs.Tab>
@@ -672,7 +674,7 @@ export default function AdminPage() {
           <Tabs.Tab value="global-prompts" leftSection={<IconMessages size={16} />}>Global Prompts</Tabs.Tab>
         </Tabs.List>
 
-        <Box pl="md" style={{ flex: 1 }}>
+        <Box pl={{ base: 0, sm: 'md' }} style={{ flex: 1 }}>
           <Tabs.Panel value="users"><AdminUsers /></Tabs.Panel>
           <Tabs.Panel value="invitations"><AdminInvitations /></Tabs.Panel>
           <Tabs.Panel value="tiers"><AdminTiers /></Tabs.Panel>

@@ -1074,17 +1074,17 @@ export default function SubjectView() {
       `}</style>
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20, margin: '-16px -16px 20px -16px' }}>
-        <Group justify="space-between">
-          <Group>
+        <Group justify="space-between" wrap="wrap" gap="xs">
+          <Group wrap="wrap" gap="xs">
             <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
-            <Group gap="xs" ml="xs">
-              <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate('/mynotes')}>Notes</Text>
+            <Group gap="xs" ml="xs" wrap="wrap">
+              <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate('/mynotes')} style={{ whiteSpace: 'nowrap' }}>Notes</Text>
               {subject.group && (
                 <>
                   <Text size="sm" c="dimmed">/</Text>
-                  <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${subject.group.id}`)}>{subject.group.name}</Text>
+                  <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${subject.group.id}`)} style={{ whiteSpace: 'nowrap' }}>{subject.group.name}</Text>
                 </>
               )}
             </Group>
@@ -1092,12 +1092,12 @@ export default function SubjectView() {
         </Group>
       </Box>
 
-      <Group justify="space-between" mb="lg">
-        <Box>
-          <Title order={1}>{subject.name}</Title>
+      <Group justify="space-between" mb="lg" wrap="wrap" gap="sm">
+        <Box style={{ minWidth: 200, flex: 1 }}>
+          <Title order={1} style={{ fontSize: 'clamp(1.3rem, 4vw, 2rem)' }}>{subject.name}</Title>
           <Text c="dimmed">{subject.description || 'No description'}</Text>
         </Box>
-        <Group gap="xs">
+        <Group gap="xs" wrap="wrap">
           <ActionIcon variant="light" color="gray" size="lg" title="Edit Subject" onClick={handleEditSubjectClick}>
             <IconEdit size={18} />
           </ActionIcon>
@@ -1106,7 +1106,7 @@ export default function SubjectView() {
           </ActionIcon>
           <Menu shadow="md" width={200} position="bottom-end">
             <Menu.Target>
-              <Button variant="light" leftSection={<IconSparkles size={16} />}>
+              <Button variant="light" leftSection={<IconSparkles size={16} />} size={{ base: 'sm', md: 'md' }}>
                 Create
               </Button>
             </Menu.Target>
@@ -1124,7 +1124,7 @@ export default function SubjectView() {
           </Menu>
           <Menu shadow="md" width={200} position="bottom-end">
             <Menu.Target>
-              <Button leftSection={<IconUpload size={16} />}>
+              <Button leftSection={<IconUpload size={16} />} size={{ base: 'sm', md: 'md' }}>
                 Upload
               </Button>
             </Menu.Target>
@@ -1140,13 +1140,13 @@ export default function SubjectView() {
         </Group>
       </Group>
 
-      <Group mb="xl" align="flex-end">
+      <Group mb="xl" align="flex-end" wrap="wrap" gap="sm">
         <TextInput
           placeholder="Search notes..."
           leftSection={<IconSearch size={16} />}
           value={search}
           onChange={(e) => setSearch(e.currentTarget.value)}
-          style={{ flexGrow: 1 }}
+          style={{ flexGrow: 1, minWidth: 200 }}
         />
         <Select
           value={sort}
@@ -1173,6 +1173,7 @@ export default function SubjectView() {
           ]}
           leftSection={<IconArrowsSort size={16} />}
           style={{ width: 180 }}
+          size={{ base: 'sm', md: 'md' }}
         />
       </Group>
 
@@ -1205,9 +1206,9 @@ export default function SubjectView() {
                     withBorder
                     style={{ position: 'relative', overflow: 'hidden' }}
                   >
-                    <Group justify="space-between" wrap="nowrap">
-                      <Box style={{ flex: 1 }}>
-                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/resource/${note.id}`)}>
+                    <Group justify="space-between" wrap="nowrap" align="flex-start">
+                      <Box style={{ flex: 1, minWidth: 0 }}>
+                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/resource/${note.id}`)} lineClamp={2}>
                           {note.title}
                         </Text>
                         <Group gap="xs" mt={4}>
@@ -1222,8 +1223,11 @@ export default function SubjectView() {
                         </Group>
                       </Box>
 
-                      <Group gap="xs">
-                        <Button variant="light" size="sm" onClick={() => navigate(`/resource/${note.id}`)}>
+                      <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                        <Button variant="light" size="sm" onClick={() => navigate(`/resource/${note.id}`)} hiddenFrom="xs" px="xs">
+                          View
+                        </Button>
+                        <Button variant="light" size="sm" onClick={() => navigate(`/resource/${note.id}`)} visibleFrom="xs">
                           View Resource
                         </Button>
                         <Menu position="bottom-end" withinPortal>
@@ -1304,44 +1308,42 @@ export default function SubjectView() {
                 
                 return (
                 <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
-                  <Group justify="space-between" wrap="nowrap">
-                    <Group>
-                      <Box style={{ flex: 1 }}>
-                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/exercises/${ex.id}`)}>
-                          {ex.title}
+                  <Group justify="space-between" wrap="nowrap" align="flex-start">
+                    <Box style={{ flex: 1, minWidth: 0 }}>
+                      <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/exercises/${ex.id}`)} lineClamp={2}>
+                        {ex.title}
+                      </Text>
+                      <Group gap="xs" mt={4}>
+                        {(isProcessing || hasFailed) && (
+                          <Badge color={hasFailed ? "red" : "orange"} variant="light" size="sm">
+                            {hasFailed ? 'Failed' : 'Processing...'}
+                          </Badge>
+                        )}
+                        <Text size="xs" c="dimmed">
+                          {formatNoteDate(ex.created_at)}
                         </Text>
-                        <Group gap="xs" mt={4}>
-                          {(isProcessing || hasFailed) && (
-                            <Badge color={hasFailed ? "red" : "orange"} variant="light" size="sm">
-                              {hasFailed ? 'Failed' : 'Processing...'}
+                      </Group>
+                      {isProcessed && (
+                        <Group gap="xs" mt="xs" wrap="wrap">
+                          <Badge variant="light" color="indigo" size="xs" fw={500}>
+                             {ex.questions.length} Questions
+                          </Badge>
+                          {qTypes.length > 0 && (
+                            <Badge variant="light" color="blue" size="xs" fw={500}>
+                              {qTypes.map(t => t.charAt(0).toUpperCase() + t.replace(/_/g, ' ').slice(1)).join(', ')}
                             </Badge>
                           )}
-                          <Text size="xs" c="dimmed">
-                            {formatNoteDate(ex.created_at)}
-                          </Text>
-                        </Group>
-                        {isProcessed && (
-                          <Group gap="xs" mt="xs">
-                            <Badge variant="light" color="indigo" size="xs" fw={500}>
-                               {ex.questions.length} Questions
+                          {qDifficulties.length > 0 && (
+                            <Badge variant="light" color="red" size="xs" fw={500}>
+                              {qDifficulties.join(', ')}
                             </Badge>
-                            {qTypes.length > 0 && (
-                              <Badge variant="light" color="blue" size="xs" fw={500}>
-                                {qTypes.map(t => t.charAt(0).toUpperCase() + t.replace(/_/g, ' ').slice(1)).join(', ')}
-                              </Badge>
-                            )}
-                            {qDifficulties.length > 0 && (
-                              <Badge variant="light" color="red" size="xs" fw={500}>
-                                {qDifficulties.join(', ')}
-                              </Badge>
-                            )}
-                          </Group>
-                        )}
-                      </Box>
-                    </Group>
-                    <Group gap="xs" wrap="nowrap">
+                          )}
+                        </Group>
+                      )}
+                    </Box>
+                    <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                       <Button variant="light" size="sm" onClick={() => navigate(`/exercises/${ex.id}`)}>
-                        View Exercise
+                        View
                       </Button>
                       <Menu position="bottom-end" withinPortal>
                         <Menu.Target>
@@ -1416,9 +1418,9 @@ export default function SubjectView() {
 
                  return (
                 <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
-                   <Group justify="space-between" wrap="nowrap">
-                      <Box style={{ flex: 1 }}>
-                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${gn.id}`)}>
+                   <Group justify="space-between" wrap="nowrap" align="flex-start">
+                      <Box style={{ flex: 1, minWidth: 0 }}>
+                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${gn.id}`)} lineClamp={2}>
                           {displayTitle}
                         </Text>
                         <Group gap="xs" mt={4}>
@@ -1432,9 +1434,9 @@ export default function SubjectView() {
                           </Text>
                         </Group>
                       </Box>
-                      <Group gap="xs" wrap="nowrap">
+                      <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                         <Button variant="light" size="sm" onClick={() => navigate(`/note/${gn.id}`)}>
-                          View Note
+                          View
                         </Button>
                         <Menu position="bottom-end">
                           <Menu.Target>

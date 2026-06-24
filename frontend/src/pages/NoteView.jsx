@@ -523,22 +523,22 @@ export default function NoteView() {
 
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
-        <Group justify="space-between">
-          <Group>
+        <Group justify="space-between" wrap="wrap" gap="xs">
+          <Group wrap="wrap" gap="xs">
             <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
             {note?.subject && (
-              <Group gap="xs" ml="xs">
+              <Group gap="xs" ml="xs" wrap="wrap">
                 {note.subject.group && (
                   <>
-                    <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${note.subject.group.id}`)}>{note.subject.group.name}</Text>
+                    <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${note.subject.group.id}`)} style={{ whiteSpace: 'nowrap' }}>{note.subject.group.name}</Text>
                     <Text size="sm" c="dimmed">/</Text>
                   </>
                 )}
-                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}`)}>{note.subject.name}</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}`)} style={{ whiteSpace: 'nowrap' }}>{note.subject.name}</Text>
                 <Text size="sm" c="dimmed">/</Text>
-                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}/resource`)}>Resource</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}/resource`)} style={{ whiteSpace: 'nowrap' }}>Resource</Text>
               </Group>
             )}
             {!isProcessed && (
@@ -547,6 +547,16 @@ export default function NoteView() {
               </Badge>
             )}
           </Group>
+          {isProcessed && !isEditing && (
+            <Group gap="xs" hiddenFrom="sm">
+              <ActionIcon variant="light" color="blue" size="sm" onClick={startEditing}>
+                <IconPencil size={16} />
+              </ActionIcon>
+              <ActionIcon variant="light" color="gray" size="sm" onClick={handleExportMarkdown}>
+                <IconDownload size={16} />
+              </ActionIcon>
+            </Group>
+          )}
         </Group>
       </Box>
 
@@ -648,7 +658,7 @@ export default function NoteView() {
 
         {/* Right Sidebar */}
         {isProcessed && (
-          <Box w={sidebarOpen ? 250 : 80} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
+          <Box w={sidebarOpen ? 250 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
             <Box style={{ flex: 1, overflowY: 'auto' }}>
               <Stack gap={0} align="stretch">
                 {sidebarOpen && <Title order={5} fw={600} c="dimmed" mb="xs">Smart Actions</Title>}

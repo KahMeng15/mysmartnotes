@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Box, Title, Paper, ScrollArea, TextInput, ActionIcon, Group, Text, Stack, Loader, Flex, Divider, Center, Select, Badge, Menu, Modal, Button, Rating, Popover, Textarea } from '@mantine/core';
+import { Box, Title, Paper, ScrollArea, TextInput, ActionIcon, Group, Text, Stack, Loader, Flex, Divider, Center, Select, Badge, Menu, Modal, Button, Rating, Popover, Textarea, Drawer } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
   IconSend, IconPlus, IconClockHour4, IconMessageCircle2, IconAdjustmentsHorizontal,
@@ -292,6 +292,7 @@ export default function ChatInterface() {
 
   // Settings State
   const [settingsOpened, { toggle: toggleSettings, close: closeSettings }] = useDisclosure(false);
+  const [mobileDrawerOpened, { open: openMobileDrawer, close: closeMobileDrawer }] = useDisclosure(false);
   
   // Context Selection State
   const [contextType, setContextType] = useState('global');
@@ -829,7 +830,7 @@ export default function ChatInterface() {
     <Flex h="100vh">
       {/* Sidebar: Conversations */}
       {sidebarOpened && (
-        <Box 
+        <Box visibleFrom="sm"
           style={{ 
             width: sidebarWidth, 
             minWidth: '200px', 
@@ -909,6 +910,76 @@ export default function ChatInterface() {
       </Box>
       )}
 
+      {/* Mobile Conversations Drawer */}
+      <Drawer
+        opened={mobileDrawerOpened}
+        onClose={closeMobileDrawer}
+        title={
+          <Group justify="space-between" style={{ width: '100%' }}>
+            <Title order={4} fw={700} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>Conversations</Title>
+            <ActionIcon variant="default" size="sm" onClick={() => { closeMobileDrawer(); startNewChat(); }}>
+              <IconPlus size={16} />
+            </ActionIcon>
+          </Group>
+        }
+        padding="md"
+        size="85%"
+        hiddenFrom="sm"
+        zIndex={1000}
+      >
+        <ScrollArea h="calc(100vh - 80px)" p="xs">
+        {conversations.length === 0 ? (
+          <Center h={100}>
+            <Text size="sm" c="dimmed">No past conversations</Text>
+          </Center>
+        ) : (
+          <Stack gap={2}>
+            {[...conversations].sort((a, b) => b.is_pinned - a.is_pinned).map(conv => (
+              <Paper 
+                key={conv.conversation_id} 
+                p={6} 
+                radius="sm" 
+                style={{ 
+                  cursor: 'pointer', 
+                  backgroundColor: currentConversationId === conv.conversation_id ? '#eef2ff' : 'transparent',
+                  border: currentConversationId === conv.conversation_id ? '1px solid #c7d2fe' : '1px solid transparent',
+                  transition: 'all 0.2s'
+                }}
+                onClick={() => { closeMobileDrawer(); navigate(`/chat/${conv.conversation_id}`); }}
+              >
+                <Group justify="space-between" wrap="nowrap">
+                  <Group gap="xs" style={{ flex: 1, overflow: 'hidden' }} wrap="nowrap">
+                    {conv.is_pinned && <IconPinFilled size={12} style={{ flexShrink: 0, color: '#f59f00' }} />}
+                    <Text size="sm" fw={currentConversationId === conv.conversation_id ? 600 : 500} lineClamp={1}>
+                      {conv.title}
+                    </Text>
+                  </Group>
+                  <Menu shadow="md" width={150} position="bottom-end" withinPortal>
+                    <Menu.Target>
+                      <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
+                        <IconDotsVertical size={16} />
+                      </ActionIcon>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Item leftSection={<IconPencil size={14} />} onClick={(e) => { e.stopPropagation(); setConversationToRename(conv); setNewTitle(conv.title); setRenameModalOpened(true); }}>
+                        Rename
+                      </Menu.Item>
+                      <Menu.Item leftSection={<IconPin size={14} />} onClick={(e) => handlePin(conv, e)}>
+                        {conv.is_pinned ? 'Unpin' : 'Pin'}
+                      </Menu.Item>
+                      <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => handleDeleteClick(conv, e)}>
+                        Delete
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                </Group>
+              </Paper>
+            ))}
+          </Stack>
+        )}
+      </ScrollArea>
+      </Drawer>
+
       {/* Main Chat Area */}
       <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#fff', position: 'relative' }}>
         
@@ -919,10 +990,20 @@ export default function ChatInterface() {
             size="md" 
             onClick={() => setSidebarOpened(true)}
             style={{ position: 'absolute', top: 16, left: 16, zIndex: 100 }}
+            visibleFrom="sm"
           >
             <IconLayoutSidebarLeftExpand size={20} />
           </ActionIcon>
         )}
+        <ActionIcon 
+          variant="default" 
+          size="md" 
+          onClick={openMobileDrawer}
+          style={{ position: 'absolute', top: 16, left: 16, zIndex: 100 }}
+          hiddenFrom="sm"
+        >
+          <IconLayoutSidebarLeftExpand size={20} />
+        </ActionIcon>
         
         {/* Header Removed */}
 
@@ -1150,7 +1231,7 @@ export default function ChatInterface() {
                     
                     <Divider />
 
-                    <Group grow align="flex-start">
+                    <Group grow align="flex-start" visibleFrom="sm">
                       {/* AI Mode Options */}
                       <Box>
                         <Text size="sm" fw={600} mb="xs" c="dimmed">AI Mode</Text>
@@ -1203,6 +1284,56 @@ export default function ChatInterface() {
                         </Group>
                       </Box>
                     </Group>
+                    <Stack gap="md" hiddenFrom="sm">
+                      <Box>
+                        <Text size="sm" fw={600} mb="xs" c="dimmed">AI Mode</Text>
+                        <Group gap="xs" wrap="wrap">
+                          {['quick', 'simple', 'normal', 'elaborate', 'eli5'].map(mode => (
+                            <Badge 
+                              key={mode}
+                              component="button"
+                              onClick={() => handleAiModeChange(mode)}
+                              variant={aiMode === mode ? "filled" : "light"}
+                              color="blue"
+                              size="md"
+                              tt="capitalize"
+                              fw={600}
+                              style={{ cursor: 'pointer' }}
+                              leftSection={modeIcons[mode]}
+                            >
+                              {modeLabels[mode]}
+                            </Badge>
+                          ))}
+                        </Group>
+                      </Box>
+                      <Box>
+                        <Text size="sm" fw={600} mb="xs" c="dimmed">Output Format</Text>
+                        <Group gap="xs" wrap="wrap">
+                          {[
+                            { value: 'sentence', label: 'Sentence' }, 
+                            { value: 'pointform', label: 'Pointform' },
+                            { value: 'numbered_list', label: 'Numbered List' },
+                            { value: 'table', label: 'Table' },
+                            { value: 'mix', label: 'Mix' }
+                          ].map(format => (
+                            <Badge 
+                              key={format.value}
+                              component="button"
+                              onClick={() => handleOutputFormatChange(format.value)}
+                              variant={outputFormat === format.value ? "filled" : "light"}
+                              color="teal"
+                              size="md"
+                              tt="capitalize"
+                              fw={600}
+                              style={{ cursor: 'pointer' }}
+                              leftSection={formatIcons[format.value]}
+                            >
+                              {format.label}
+                            </Badge>
+                          ))}
+                        </Group>
+                      </Box>
+                    </Stack>
                   </Stack>
                 </Paper>
               )}

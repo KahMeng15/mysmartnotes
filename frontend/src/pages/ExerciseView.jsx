@@ -417,23 +417,45 @@ export default function ExerciseView() {
       `}</style>
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
-        <Group justify="space-between">
-          <Group>
+        <Group justify="space-between" wrap="wrap" gap="xs">
+          <Group wrap="wrap" gap="xs">
             <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
             {exercise?.subject && (
-              <Group gap="xs" ml="xs">
+              <Group gap="xs" ml="xs" wrap="wrap">
                 {exercise.subject.group && (
                   <>
-                    <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${exercise.subject.group.id}`)}>{exercise.subject.group.name}</Text>
+                    <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${exercise.subject.group.id}`)} style={{ whiteSpace: 'nowrap' }}>{exercise.subject.group.name}</Text>
                     <Text size="sm" c="dimmed">/</Text>
                   </>
                 )}
-                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${exercise.subject.id}`)}>{exercise.subject.name}</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${exercise.subject.id}`)} style={{ whiteSpace: 'nowrap' }}>{exercise.subject.name}</Text>
                 <Text size="sm" c="dimmed">/</Text>
-                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${exercise.subject.id}/exercise`)}>Exercise</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${exercise.subject.id}/exercise`)} style={{ whiteSpace: 'nowrap' }}>Exercise</Text>
               </Group>
+            )}
+          </Group>
+          <Group gap="xs" hiddenFrom="sm">
+            {!editMode && (
+              <>
+                <ActionIcon variant="light" color="blue" size="sm" onClick={() => setEditMode(true)} title="Edit Questions">
+                  <IconPencil size={16} />
+                </ActionIcon>
+                <ActionIcon variant="light" color="gray" size="sm" onClick={handleResetExercise} title="Reset Exercise">
+                  <IconRefresh size={16} />
+                </ActionIcon>
+              </>
+            )}
+            {editMode && (
+              <>
+                <ActionIcon variant="light" color="blue" size="sm" onClick={handleSaveEdits} loading={savingEdits} title="Save Changes">
+                  <IconDeviceFloppy size={16} />
+                </ActionIcon>
+                <ActionIcon variant="light" color="red" size="sm" onClick={() => setEditMode(false)} title="Cancel Edit">
+                  <IconX size={16} />
+                </ActionIcon>
+              </>
             )}
           </Group>
         </Group>

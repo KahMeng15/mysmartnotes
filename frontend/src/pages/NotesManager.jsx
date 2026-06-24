@@ -219,21 +219,21 @@ export default function NotesManager() {
   return (
     <Box>
       {/* Header */}
-      <Group justify="space-between" mb="lg">
-        <Title order={1} fw={800} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>My Notes</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={() => { setNewGroupName(''); openGroupModal(); }}>
+      <Group justify="space-between" mb="lg" wrap="wrap" gap="sm">
+        <Title order={1} fw={800} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738', fontSize: 'clamp(1.5rem, 5vw, 2.5rem)' }}>My Notes</Title>
+        <Button leftSection={<IconPlus size={16} />} onClick={() => { setNewGroupName(''); openGroupModal(); }} size={{ base: 'sm', md: 'md' }}>
           Create Group
         </Button>
       </Group>
 
       {/* Controls */}
-      <Group mb="xl" align="flex-end">
+      <Group mb="xl" align="flex-end" wrap="wrap" gap="sm">
         <TextInput
           placeholder="Search groups, subjects..."
           leftSection={<IconSearch size={16} />}
           value={search}
           onChange={(e) => setSearch(e.currentTarget.value)}
-          style={{ flexGrow: 1 }}
+          style={{ flexGrow: 1, minWidth: 200 }}
         />
         <Select
           value={sort}
@@ -260,6 +260,7 @@ export default function NotesManager() {
           ]}
           leftSection={<IconArrowsSort size={16} />}
           style={{ width: 180 }}
+          size={{ base: 'sm', md: 'md' }}
         />
       </Group>
 

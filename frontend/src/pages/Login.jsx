@@ -332,21 +332,21 @@ export default function Login() {
       </Box>
 
       {/* Right Side: Auth Forms */}
-      <Box
-        style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          padding: '60px 8%',
-          backgroundColor: '#fff',
-          overflowY: 'auto',
-        }}
-      >
-        <Box style={{ width: '100%', maxWidth: '420px', margin: '0 auto' }}>
-          <Title order={1} mb={40} fw={800} style={{ fontSize: '3rem', lineHeight: 1.1, color: '#171738' }}>
-            my<br />smart<br />notes
-          </Title>
+        <Box
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '32px 5%',
+            backgroundColor: '#fff',
+            overflowY: 'auto',
+          }}
+        >
+          <Box style={{ width: '100%', maxWidth: '420px', margin: '0 auto' }}>
+            <Title order={1} mb={40} fw={800} style={{ fontSize: 'clamp(2rem, 10vw, 3rem)', lineHeight: 1.1, color: '#171738' }}>
+              my<br />smart<br />notes
+            </Title>
 
           {/* Global alerts */}
           {success && (

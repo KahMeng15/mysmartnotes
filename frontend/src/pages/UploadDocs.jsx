@@ -159,7 +159,7 @@ export default function UploadDocs() {
             />
           </Box>
           
-          <Group grow align="flex-start">
+          <Stack gap="sm">
             <Select
               label="Group"
               placeholder="Filter by Group (Optional)"
@@ -179,7 +179,7 @@ export default function UploadDocs() {
               searchable
               required
             />
-          </Group>
+          </Stack>
 
           <Box>
             <Text fw={500} size="sm" mb={3}>Files <Text component="span" c="red">*</Text></Text>
@@ -189,22 +189,22 @@ export default function UploadDocs() {
               accept={[...PDF_MIME_TYPE, ...IMAGE_MIME_TYPE, ...MS_POWERPOINT_MIME_TYPE]}
               mb="md"
             >
-              <Group justify="center" gap="xl" mih={150} style={{ pointerEvents: 'none', padding: '40px' }}>
+              <Group justify="center" gap="md" mih={120} style={{ pointerEvents: 'none', padding: 'clamp(16px, 4vw, 40px)' }}>
                 <Dropzone.Accept>
-                  <IconUpload size={50} color="var(--mantine-color-blue-6)" stroke={1.5} />
+                  <IconUpload size={40} color="var(--mantine-color-blue-6)" stroke={1.5} />
                 </Dropzone.Accept>
                 <Dropzone.Reject>
-                  <IconX size={50} color="var(--mantine-color-red-6)" stroke={1.5} />
+                  <IconX size={40} color="var(--mantine-color-red-6)" stroke={1.5} />
                 </Dropzone.Reject>
                 <Dropzone.Idle>
-                  <IconFile size={50} color="var(--mantine-color-dimmed)" stroke={1.5} />
+                  <IconFile size={40} color="var(--mantine-color-dimmed)" stroke={1.5} />
                 </Dropzone.Idle>
 
                 <div>
-                  <Text size="xl" inline>
+                  <Text size={{ base: 'md', sm: 'xl' }} inline>
                     Drag files here or click to select files
                   </Text>
-                  <Text size="sm" c="dimmed" inline mt={7}>
+                  <Text size="xs" c="dimmed" inline mt={7}>
                     {uploadType === 'exercise' ? "Attach PDFs, PPTXs, or Image files of worksheets/exams to process" : "Attach PDFs, PPTXs, or Image files to process"}
                   </Text>
                 </div>
@@ -237,17 +237,17 @@ export default function UploadDocs() {
             </Box>
           )}
 
-          <Group justify="flex-end" mt="xl">
-            <Button 
-              leftSection={<IconUpload size={16} />} 
-              onClick={handleUpload}
-              loading={uploading}
-              disabled={!selectedSubject || files.length === 0}
-              size="md"
-            >
-              Upload
-            </Button>
-          </Group>
+          <Button 
+            leftSection={<IconUpload size={16} />} 
+            onClick={handleUpload}
+            loading={uploading}
+            disabled={!selectedSubject || files.length === 0}
+            size="md"
+            fullWidth
+            mt="xl"
+          >
+            Upload
+          </Button>
         </Stack>
       </Box>
     </Box>

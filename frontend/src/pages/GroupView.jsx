@@ -252,12 +252,12 @@ export default function GroupView() {
         </Group>
       </Box>
 
-      <Group justify="space-between" mb="lg">
+      <Group justify="space-between" mb="lg" wrap="wrap" gap="sm">
         <Box>
-          <Title order={1}>{group.name}</Title>
+          <Title order={1} style={{ fontSize: 'clamp(1.3rem, 4vw, 2rem)' }}>{group.name}</Title>
           <Text c="dimmed">{subjects.length} Subjects</Text>
         </Box>
-        <Group gap="xs">
+        <Group gap="xs" wrap="wrap">
           {id !== 'ungrouped' && (
             <>
               <ActionIcon variant="light" color="gray" size="lg" title="Edit Group" onClick={handleEditGroupClick}>
@@ -268,19 +268,19 @@ export default function GroupView() {
               </ActionIcon>
             </>
           )}
-          <Button leftSection={<IconPlus size={16} />} onClick={handleAddSubjectClick} variant="light" color="blue">
+          <Button leftSection={<IconPlus size={16} />} onClick={handleAddSubjectClick} variant="light" color="blue" size={{ base: 'sm', md: 'md' }}>
             Add Subject
           </Button>
         </Group>
       </Group>
 
-      <Group mb="xl" align="flex-end">
+      <Group mb="xl" align="flex-end" wrap="wrap" gap="sm">
         <TextInput
           placeholder="Search subjects..."
           leftSection={<IconSearch size={16} />}
           value={search}
           onChange={(e) => setSearch(e.currentTarget.value)}
-          style={{ flexGrow: 1 }}
+          style={{ flexGrow: 1, minWidth: 200 }}
         />
         <Select
           value={sort}
@@ -307,6 +307,7 @@ export default function GroupView() {
           ]}
           leftSection={<IconArrowsSort size={16} />}
           style={{ width: 180 }}
+          size={{ base: 'sm', md: 'md' }}
         />
       </Group>
 

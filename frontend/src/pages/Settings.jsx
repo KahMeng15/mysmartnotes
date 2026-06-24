@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Paper, Tabs, TextInput, Textarea, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader, ActionIcon, Table, Modal } from '@mantine/core';
+import { Box, Title, Paper, Tabs, TextInput, Textarea, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader, ActionIcon, Table, Modal, ScrollArea } from '@mantine/core';
 import { IconEdit, IconTrash, IconPlus, IconSparkles } from '@tabler/icons-react';
+import { useMediaQuery } from '@mantine/hooks';
 import { fetchApi } from '../lib/api';
 
 export default function Settings() {
+  const isMobile = useMediaQuery('(max-width: 48em)');
   const [activeTab, setActiveTab] = useState('profile');
   
   const [profile, setProfile] = useState({ nickname: '', full_name: '', email: '' });
@@ -162,8 +164,8 @@ export default function Settings() {
     <Box maw={800} mx="auto">
       <Title order={2} mb="xl">Account Settings</Title>
 
-      <Tabs value={activeTab} onChange={setActiveTab} orientation="vertical" variant="pills">
-        <Tabs.List mr="xl">
+      <Tabs value={activeTab} onChange={setActiveTab} orientation={isMobile ? 'horizontal' : 'vertical'} variant="pills">
+        <Tabs.List mr={isMobile ? 0 : 'xl'}>
           <Tabs.Tab value="profile">Profile</Tabs.Tab>
           <Tabs.Tab value="account">Account & Security</Tabs.Tab>
           <Tabs.Tab value="prompts">Prompt Templates</Tabs.Tab>
@@ -239,6 +241,7 @@ export default function Settings() {
             {userPrompts.length === 0 ? (
               <Text c="dimmed" size="sm">You haven't created any custom templates yet.</Text>
             ) : (
+              <ScrollArea>
               <Table>
                 <Table.Thead>
                   <Table.Tr>
@@ -263,7 +266,7 @@ export default function Settings() {
                     </Table.Tr>
                   ))}
                 </Table.Tbody>
-              </Table>
+              </Table></ScrollArea>
             )}
           </Paper>
         </Tabs.Panel>
@@ -273,16 +276,16 @@ export default function Settings() {
             <Title order={4} mb="md">Account Usage</Title>
             
             {stats && (
-              <Group grow mb="xl">
-                <Box>
+              <Group grow mb="xl" wrap="wrap">
+                <Box miw={120}>
                   <Text size="xl" fw={700}>{stats.total_notes || 0}</Text>
                   <Text size="sm" c="dimmed">Total Notes Processed</Text>
                 </Box>
-                <Box>
+                <Box miw={120}>
                   <Text size="xl" fw={700}>{stats.total_chat_messages || 0}</Text>
                   <Text size="sm" c="dimmed">AI Questions Asked</Text>
                 </Box>
-                <Box>
+                <Box miw={120}>
                   <Text size="xl" fw={700}>{stats.total_quizzes_taken || 0}</Text>
                   <Text size="sm" c="dimmed">Quizzes Completed</Text>
                 </Box>
