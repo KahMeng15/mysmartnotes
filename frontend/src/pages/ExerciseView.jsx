@@ -246,7 +246,10 @@ export default function ExerciseView() {
     try {
       const res = await fetchApi(`/exercises/${id}/questions/${qId}/explain`, {
         method: 'POST',
-        body: JSON.stringify({ user_answer: userAnswers[qId] || "" })
+        body: JSON.stringify({ 
+          user_answer: userAnswers[qId] || null,
+          view_mode: viewMode
+        })
       });
       setExplanations(prev => ({ ...prev, [qId]: res.explanation }));
       setShowExplanations(prev => ({ ...prev, [qId]: true }));

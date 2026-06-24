@@ -78,6 +78,7 @@ class ExerciseExplainRequest(BaseModel):
     ai_mode: str = "elaborate"
     output_format: str = "sentence"
     user_answer: Optional[str] = None
+    view_mode: Optional[str] = "hide"  # hide, show, interactive, exam, conversation
 
 class BulkExerciseQuestionUpdate(BaseModel):
     id: int

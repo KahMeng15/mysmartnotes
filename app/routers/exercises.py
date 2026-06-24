@@ -237,7 +237,7 @@ def explain_exercise_answer(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
         
-    explanation = explain_answer(current_user, question, req.user_answer)
+    explanation = explain_answer(current_user, question, req.user_answer, req.view_mode)
     
     # Save the generated explanation back to JSON so it persists
     question["explanation"] = explanation

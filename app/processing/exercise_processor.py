@@ -357,8 +357,15 @@ User's Answer: {user_answer}
             correct_answer=answer_text
         )
 
-def explain_answer(user: User, question: Dict[str, Any], user_answer: str = None) -> str:
-    """Generates an explanation for the correct answer"""
+def explain_answer(user: User, question: Dict[str, Any], user_answer: str = None, view_mode: str = "hide") -> str:
+    """Generates an explanation for the correct answer
+    
+    Args:
+        user: The user requesting the explanation
+        question: The question dict containing question_text and answer_text
+        user_answer: Optional user's attempt at the question
+        view_mode: The current viewing mode ('hide', 'show', 'interactive', 'exam', 'conversation')
+    """
     client = AIClient()
     
     question_text = question.get("question_text", "")
@@ -368,13 +375,29 @@ def explain_answer(user: User, question: Dict[str, Any], user_answer: str = None
 Question: {question_text}
 Correct Answer: {answer_text}
 """
-    if user_answer:
+    # Only include user attempt if they provided one AND we're in an interactive/exam mode
+    has_user_answer = user_answer and user_answer.strip()
+    is_interactive_mode = view_mode in ("interactive", "exam", "conversation")
+    
+    if has_user_answer and is_interactive_mode:
         prompt += f"\nUser's Attempt: {user_answer}"
-    system_prompt = (
-        "Explain the correct answer to this question in 1-3 concise sentences. "
-        "Address the reader directly. Be extremely brief and straight to the point. "
-        "If an attempt is provided, briefly state why it is right or wrong."
-    )
+    
+    # Tailor system prompt based on view mode
+    if is_interactive_mode and has_user_answer:
+        # Interactive/exam modes with user answer: provide personalized feedback
+        system_prompt = (
+            "Evaluate the user's attempt and explain why it is correct or incorrect. "
+            "Be concise and directly address the user. State clearly if the answer is right or wrong, "
+            "then briefly explain the key concept. Keep response to 1-3 sentences."
+        )
+    else:
+        # View modes (hide, show) or interactive without answer: just explain the answer
+        system_prompt = (
+            "Explain the correct answer to this question in 1-3 concise sentences. "
+            "Address the reader directly. Be extremely brief and straight to the point. "
+            "Focus on why this is the correct answer and the key concept."
+        )
+    
     return _run_async(
         client.generate_text,
         prompt=prompt,
