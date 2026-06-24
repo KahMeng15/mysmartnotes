@@ -127,8 +127,8 @@ export default function ExerciseView() {
     const question = exercise.questions.find(q => q.id === qId);
     if (!question) return;
 
-    // Client-side auto-grade for objective/fill-in-the-blank
-    if (question.question_type === 'objective' || question.question_type === 'fill_in_the_blank') {
+    // Client-side auto-grade for objective only
+    if (question.question_type === 'objective') {
       const correctAns = question.answer_text.trim().toLowerCase();
       const userAns = answer.trim().toLowerCase();
       const isCorrect = userAns === correctAns || correctAns.includes(userAns) || userAns.includes(correctAns);
@@ -481,7 +481,7 @@ export default function ExerciseView() {
                                     if (q.reference_quote) {
                                       url += `?highlight=${encodeURIComponent(q.reference_quote)}`;
                                     }
-                                    navigate(url);
+                                    window.open(url, '_blank');
                                   }
                                 }}
                               >
@@ -512,13 +512,23 @@ export default function ExerciseView() {
                                  </Stack>
                                </Radio.Group>
                             ) : (
-                              <Textarea 
-                                placeholder="Type your answer here..."
-                                value={userAnswers[q.id] || ''}
-                                onChange={(e) => setUserAnswers({...userAnswers, [q.id]: e.currentTarget.value})}
-                                minRows={2}
-                                disabled={hasGraded || (isExam && !examActive)}
-                              />
+                                <Textarea 
+                                  placeholder="Type your answer here... (Press Enter to submit, Shift+Enter for new line)"
+                                  value={userAnswers[q.id] || ''}
+                                  onChange={(e) => setUserAnswers({...userAnswers, [q.id]: e.currentTarget.value})}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                      if (!isExam && !hasGraded) {
+                                        e.preventDefault();
+                                        if (userAnswers[q.id]) {
+                                          handleGrade(q.id);
+                                        }
+                                      }
+                                    }
+                                  }}
+                                  minRows={2}
+                                  disabled={hasGraded || (isExam && !examActive)}
+                                />
                             )}
                             
                             {!isExam && (
