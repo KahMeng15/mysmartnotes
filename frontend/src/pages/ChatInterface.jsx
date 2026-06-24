@@ -827,7 +827,7 @@ export default function ChatInterface() {
         </Group>
       </Modal>
 
-    <Flex h="100vh">
+    <Flex style={{ height: '100dvh' }}>
       {/* Sidebar: Conversations */}
       {sidebarOpened && (
         <Box visibleFrom="sm"
@@ -843,7 +843,7 @@ export default function ChatInterface() {
             backgroundColor: '#fafafa'
           }}
         >
-          <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', height: '60px', display: 'flex', alignItems: 'center' }}>
+          <Box px={16} py="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', height: '60px', display: 'flex', alignItems: 'center' }}>
             <Group justify="space-between" style={{ width: '100%' }}>
               <Title order={4} fw={700} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Conversations</Title>
               <Group gap="xs" wrap="nowrap">
@@ -856,25 +856,25 @@ export default function ChatInterface() {
               </Group>
             </Group>
           </Box>
-          <ScrollArea style={{ flex: 1, display: 'block' }} p="xs">
-          {conversations.length === 0 ? (
-            <Center h={100}>
-              <Text size="sm" c="dimmed">No past conversations</Text>
-            </Center>
-          ) : (
-            <Stack gap={2}>
-              {[...conversations].sort((a, b) => b.is_pinned - a.is_pinned).map(conv => (
-                <Paper 
-                  key={conv.conversation_id} 
-                  p={6} 
-                  radius="sm" 
-                  style={{ 
-                    cursor: 'pointer', 
-                    backgroundColor: currentConversationId === conv.conversation_id ? '#eef2ff' : 'transparent',
-                    border: currentConversationId === conv.conversation_id ? '1px solid #c7d2fe' : '1px solid transparent',
-                    transition: 'all 0.2s'
-                  }}
-                  onClick={() => navigate(`/chat/${conv.conversation_id}`)}
+        <ScrollArea style={{ flex: 1, display: 'block' }} p="xs">
+        {conversations.length === 0 ? (
+          <Center h={100}>
+            <Text size="sm" c="dimmed">No past conversations</Text>
+          </Center>
+        ) : (
+          <Stack gap={2}>
+            {[...conversations].sort((a, b) => b.is_pinned - a.is_pinned).map(conv => (
+              <Paper 
+                key={conv.conversation_id} 
+                p={6} 
+                radius="sm" 
+                style={{ 
+                  cursor: 'pointer', 
+                  backgroundColor: currentConversationId === conv.conversation_id ? '#eef2ff' : 'transparent',
+                  border: currentConversationId === conv.conversation_id ? '1px solid #c7d2fe' : '1px solid transparent',
+                  transition: 'all 0.2s'
+                }}
+                onClick={() => navigate(`/chat/${conv.conversation_id}`)}
                 >
                   <Group justify="space-between" wrap="nowrap">
                     <Group gap="xs" style={{ flex: 1, overflow: 'hidden' }} wrap="nowrap">
@@ -922,12 +922,14 @@ export default function ChatInterface() {
             </ActionIcon>
           </Group>
         }
-        padding="md"
+        padding={0}
         size="85%"
         hiddenFrom="sm"
         zIndex={1000}
+        styles={{ header: { padding: '16px' } }}
       >
-        <ScrollArea h="calc(100vh - 80px)" p="xs">
+        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <ScrollArea style={{ flex: 1 }} px="xs">
         {conversations.length === 0 ? (
           <Center h={100}>
             <Text size="sm" c="dimmed">No past conversations</Text>
@@ -978,6 +980,7 @@ export default function ChatInterface() {
           </Stack>
         )}
       </ScrollArea>
+      </Box>
       </Drawer>
 
       {/* Main Chat Area */}
@@ -1088,7 +1091,36 @@ export default function ChatInterface() {
             {/* Action Pills to toggle settings - Hidden when settings open */}
             {!settingsOpened && (
               <Group justify="space-between" mb="sm" align="center">
-                <Group gap="xs" wrap="wrap">
+                <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }} hiddenFrom="sm">
+                  <Badge 
+                    component="button" 
+                    onClick={toggleSettings} 
+                    variant="light" color="grape" size="sm" tt="capitalize" fw={600}
+                    leftSection={contextIcons[contextType]}
+                    style={{ cursor: 'pointer', transition: 'transform 0.1s', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  >
+                    {getContextPillText()}
+                  </Badge>
+                  <Badge 
+                    component="button" 
+                    onClick={toggleSettings} 
+                    variant="light" color="blue" size="sm" tt="capitalize" fw={600}
+                    leftSection={modeIcons[aiMode]}
+                    style={{ cursor: 'pointer', transition: 'transform 0.1s', flex: 1, minWidth: 0 }}
+                  >
+                    {modeLabels[aiMode]}
+                  </Badge>
+                  <Badge 
+                    component="button" 
+                    onClick={toggleSettings} 
+                    variant="light" color="teal" size="sm" tt="capitalize" fw={600}
+                    leftSection={formatIcons[outputFormat]}
+                    style={{ cursor: 'pointer', transition: 'transform 0.1s', flex: 1, minWidth: 0 }}
+                  >
+                    {formatLabels[outputFormat]}
+                  </Badge>
+                </Group>
+                <Group gap="xs" wrap="wrap" visibleFrom="sm">
                   <Badge 
                     component="button" 
                     onClick={toggleSettings} 
@@ -1098,7 +1130,6 @@ export default function ChatInterface() {
                   >
                     {getContextPillText()}
                   </Badge>
-
                   <Badge 
                     component="button" 
                     onClick={toggleSettings} 
@@ -1108,7 +1139,6 @@ export default function ChatInterface() {
                   >
                     {modeLabels[aiMode]}
                   </Badge>
-
                   <Badge 
                     component="button" 
                     onClick={toggleSettings} 
@@ -1119,8 +1149,7 @@ export default function ChatInterface() {
                     {formatLabels[outputFormat]}
                   </Badge>
                 </Group>
-                
-                <ActionIcon variant="subtle" color="gray" radius="xl" onClick={toggleSettings}>
+                <ActionIcon variant="subtle" color="gray" radius="xl" onClick={toggleSettings} style={{ flexShrink: 0 }}>
                   <IconAdjustmentsHorizontal size={18} />
                 </ActionIcon>
               </Group>
@@ -1359,7 +1388,7 @@ export default function ChatInterface() {
               }
               styles={{ input: { fontSize: 'var(--mantine-font-size-sm)', paddingRight: '50px', backgroundColor: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' } }}
             />
-            <Text size="xs" ta="center" c="dimmed" mt="xs">
+            <Text size="xs" ta="center" c="dimmed" mt={{ base: 2, sm: 'md' }} fz={10}>
               AI can make mistakes. Verify important information from your original notes.
             </Text>
           </Box>
