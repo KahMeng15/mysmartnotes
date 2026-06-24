@@ -393,6 +393,17 @@ export default function ExerciseView() {
     });
     return Array.from(resourcesMap.entries()).map(([title, id]) => ({ title, id }));
   })();
+  const detectedQuestionTypes = (() => {
+    if (!exercise?.questions) return [];
+    const types = new Set();
+    exercise.questions.forEach(q => {
+      if (q.question_type) types.add(q.question_type);
+    });
+    return Array.from(types).map(t => {
+      const formatted = t.replace(/_/g, ' ');
+      return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    });
+  })();
 
   return (
     <Box h="100vh" style={{ display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
@@ -926,44 +937,25 @@ export default function ExerciseView() {
                         )}
                       </Box>
                       
-                      {isAiGenerated && exercise.parameters && (
+                      {detectedQuestionTypes.length > 0 && (
                         <>
                           <Divider my={4} />
-                          
                           <Group justify="space-between" wrap="nowrap">
                             <Text size="xs" fw={600} c="dimmed">Question Types</Text>
                             <Text size="xs" fw={500} ta="right">
-                              {Array.isArray(exercise.parameters.question_types) 
-                                ? exercise.parameters.question_types.map(t => t.replace(/_/g, ' ')).join(', ') 
-                                : 'All Types'}
-                            </Text>
-                          </Group>
-                          
-                          <Group justify="space-between" wrap="nowrap">
-                            <Text size="xs" fw={600} c="dimmed">Difficulty</Text>
-                            <Text size="xs" fw={500} ta="right">
-                              {Array.isArray(exercise.parameters.difficulties) 
-                                ? exercise.parameters.difficulties.join(', ') 
-                                : 'All Difficulties'}
-                            </Text>
-                          </Group>
-                          
-                          <Group justify="space-between" wrap="nowrap">
-                            <Text size="xs" fw={600} c="dimmed">Question Length</Text>
-                            <Text size="xs" fw={500} ta="right" style={{ textTransform: 'capitalize' }}>
-                              {Array.isArray(exercise.parameters.lengths) 
-                                ? exercise.parameters.lengths.join(', ') 
-                                : 'All Lengths'}
-                            </Text>
-                          </Group>
-                          
-                          <Group justify="space-between" wrap="nowrap">
-                            <Text size="xs" fw={600} c="dimmed">Number of Questions</Text>
-                            <Text size="xs" fw={500}>
-                              {exercise.parameters.num_questions || exercise.questions?.length || 0} Questions
+                              {detectedQuestionTypes.join(', ')}
                             </Text>
                           </Group>
                         </>
+                      )}
+
+                      {exercise.questions?.length > 0 && (
+                        <Group justify="space-between" wrap="nowrap">
+                          <Text size="xs" fw={600} c="dimmed">Questions</Text>
+                          <Text size="xs" fw={500}>
+                            {exercise.questions.length}
+                          </Text>
+                        </Group>
                       )}
                     </Stack>
                   </Card>
