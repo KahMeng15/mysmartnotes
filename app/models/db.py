@@ -262,6 +262,7 @@ class Task(Base):
     input_data = Column(Text)  # JSON
     result = Column(Text)  # JSON
     error_message = Column(Text)
+    message = Column(Text) # Status message for the progress bar
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

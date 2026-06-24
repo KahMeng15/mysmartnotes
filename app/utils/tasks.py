@@ -98,6 +98,8 @@ class TaskManager:
                 db_task.error_message = error
             if progress is not None:
                 db_task.progress = min(100, max(0, progress))
+            if message is not None:
+                db_task.message = message
             db_task.updated_at = datetime.utcnow()
             db.commit()
 
@@ -138,6 +140,7 @@ class TaskManager:
                     "updated_at": db_task.updated_at.isoformat() if db_task.updated_at else None,
                     "result": _deserialize_result(db_task.result),
                     "error": db_task.error_message,
+                    "message": db_task.message,
                     "task_type": db_task.task_type,
                 }
         except Exception as exc:
@@ -176,7 +179,8 @@ class TaskManager:
                 "created_at": t.created_at.isoformat() if t.created_at else None,
                 "updated_at": t.updated_at.isoformat() if t.updated_at else None,
                 "input_data": _deserialize_result(t.input_data),
-                "error": t.error_message
+                "error": t.error_message,
+                "message": t.message
             } for t in tasks]
         except Exception as exc:
             logger.error(f"Failed to load active tasks for user {user_id}: {exc}")

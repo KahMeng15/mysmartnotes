@@ -3,7 +3,7 @@ import {
   Box, Title, Text, Group, Card, Button, Stack, Loader, Center, 
   Badge, ActionIcon, Textarea, Collapse, Radio, Paper, Alert, Menu,
   Grid, Select, SegmentedControl, TextInput, Divider, NumberInput, Switch,
-  Container, ScrollArea, Tooltip, NavLink as MantineNavLink
+  Container, ScrollArea, Tooltip, NavLink as MantineNavLink, Progress
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -41,18 +41,69 @@ export default function ExerciseView() {
   const [editedQuestions, setEditedQuestions] = useState([]);
   const [savingEdits, setSavingEdits] = useState(false);
 
+  // Processing state
+  const [processingStatus, setProcessingStatus] = useState(null);
+
   useEffect(() => {
-    fetchApi(`/exercises/${id}`)
-      .then(data => {
+    let active = true;
+    let pollInterval = null;
+
+    const fetchExercise = async () => {
+      try {
+        const data = await fetchApi(`/exercises/${id}`);
+        if (!active) return;
         setExercise(data);
         setEditedQuestions(JSON.parse(JSON.stringify(data.questions || [])));
         setLoading(false);
-      })
-      .catch(err => {
+
+        if (!data.questions || data.questions.length === 0) {
+          // Polling for progress
+          const checkStatus = async () => {
+            try {
+              let taskData = await fetchApi(`/search/tasks/extract_ex_${id}`).catch(() => null);
+              if (!taskData) {
+                taskData = await fetchApi(`/search/tasks/generate_ex_${id}`).catch(() => null);
+              }
+              if (!active) return;
+              if (taskData) {
+                setProcessingStatus({
+                  status: taskData.status,
+                  progress: taskData.progress,
+                  message: taskData.message
+                });
+                if (taskData.status === 'completed') {
+                  if (pollInterval) clearInterval(pollInterval);
+                  const refreshed = await fetchApi(`/exercises/${id}`);
+                  if (!active) return;
+                  setExercise(refreshed);
+                  setEditedQuestions(JSON.parse(JSON.stringify(refreshed.questions || [])));
+                } else if (taskData.status === 'failed' || taskData.status === 'cancelled') {
+                  if (pollInterval) clearInterval(pollInterval);
+                }
+              } else {
+                setProcessingStatus({ status: 'failed', message: 'Task not found or failed.' });
+                if (pollInterval) clearInterval(pollInterval);
+              }
+            } catch (e) {}
+          };
+          
+          checkStatus();
+          pollInterval = setInterval(checkStatus, 3000);
+        }
+      } catch (err) {
+        if (!active) return;
         console.error(err);
         alert("Failed to load exercise");
         setLoading(false);
-      });
+      }
+    };
+
+    fetchExercise();
+
+    return () => {
+      active = false;
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [id]);
 
   useEffect(() => {
@@ -282,6 +333,42 @@ export default function ExerciseView() {
                   )}
                 </Group>
               </div>
+
+              {(!exercise.questions || exercise.questions.length === 0) && (
+                <Box mb="xl">
+                  {processingStatus ? (
+                    <Card withBorder padding="xl" shadow="sm">
+                      <Stack align="center" spacing="md">
+                        {processingStatus.status === 'failed' || processingStatus.status === 'cancelled' ? (
+                          <>
+                            <IconX size={48} color="red" />
+                            <Title order={3} c="red">Processing {processingStatus.status}</Title>
+                            <Text>{processingStatus.message || "An error occurred during generation."}</Text>
+                          </>
+                        ) : (
+                          <>
+                            <Loader size="lg" color="blue" />
+                            <Title order={3}>Generating Exercise...</Title>
+                            <Text c="dimmed">{processingStatus.message || "Please wait while we process your exercise."}</Text>
+                            <Box w="100%" mt="md">
+                              <Progress value={processingStatus.progress || 10} animated size="xl" radius="xl" />
+                              <Text ta="center" mt="xs" size="sm" c="dimmed">{processingStatus.progress || 10}%</Text>
+                            </Box>
+                          </>
+                        )}
+                      </Stack>
+                    </Card>
+                  ) : (
+                    <Card withBorder padding="xl" shadow="sm">
+                      <Stack align="center" spacing="md">
+                        <Loader size="lg" color="blue" />
+                        <Title order={3}>Generating Exercise...</Title>
+                        <Text c="dimmed">Please wait while we prepare your exercise.</Text>
+                      </Stack>
+                    </Card>
+                  )}
+                </Box>
+              )}
 
               <Stack spacing="xl">
                 {editMode ? (
