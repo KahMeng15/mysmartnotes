@@ -1270,6 +1270,8 @@ export default function SubjectView() {
                 const hasFailed = failedExerciseIds.includes(ex.id);
                 const isCancelled = cancelledExerciseIds.includes(ex.id);
                 const isProcessing = !isProcessed && !hasFailed && !isCancelled;
+                const qTypes = isProcessed ? [...new Set(ex.questions.map(q => q.question_type).filter(Boolean))] : [];
+                const qDifficulties = isProcessed ? [...new Set(ex.questions.map(q => q.difficulty).filter(Boolean))] : [];
                 
                 return (
                 <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
@@ -1289,46 +1291,20 @@ export default function SubjectView() {
                             {formatNoteDate(ex.created_at)}
                           </Text>
                         </Group>
-                        {ex.parameters && (
+                        {isProcessed && (
                           <Group gap="xs" mt="xs">
                             <Badge variant="light" color="indigo" size="xs" fw={500}>
-                               {ex.questions?.length || ex.parameters.num_questions || 0} Questions
+                               {ex.questions.length} Questions
                             </Badge>
-                            
-                            {ex.parameters.resource_ids && ex.parameters.resource_ids.length > 0 && (
-                              <Badge variant="light" color="cyan" size="xs" fw={500}>
-                                {ex.parameters.resource_ids.length} Resource{ex.parameters.resource_ids.length > 1 ? 's' : ''} Covered
+                            {qTypes.length > 0 && (
+                              <Badge variant="light" color="blue" size="xs" fw={500}>
+                                {qTypes.map(t => t.charAt(0).toUpperCase() + t.replace(/_/g, ' ').slice(1)).join(', ')}
                               </Badge>
                             )}
-
-                            {ex.parameters.question_types && (
-                              ex.parameters.question_types.length === 4 ? (
-                                <Badge key="type-all" variant="light" color="blue" size="xs" fw={500}>All Question Types</Badge>
-                              ) : (
-                                ex.parameters.question_types.map(t => (
-                                  <Badge key={`type-${t}`} variant="light" color="blue" size="xs" fw={500}>{t}</Badge>
-                                ))
-                              )
-                            )}
-                            
-                            {ex.parameters.difficulties && (
-                              ex.parameters.difficulties.length === 3 ? (
-                                <Badge key="diff-all" variant="light" color="red" size="xs" fw={500}>All Difficulties</Badge>
-                              ) : (
-                                ex.parameters.difficulties.map(d => (
-                                  <Badge key={`diff-${d}`} variant="light" color="red" size="xs" fw={500}>{d}</Badge>
-                                ))
-                              )
-                            )}
-                            
-                            {ex.parameters.lengths && (
-                              ex.parameters.lengths.length === 3 ? (
-                                <Badge key="len-all" variant="light" color="teal" size="xs" fw={500}>All Lengths</Badge>
-                              ) : (
-                                ex.parameters.lengths.map(l => (
-                                  <Badge key={`len-${l}`} variant="light" color="teal" size="xs" fw={500}>{l} Length</Badge>
-                                ))
-                              )
+                            {qDifficulties.length > 0 && (
+                              <Badge variant="light" color="red" size="xs" fw={500}>
+                                {qDifficulties.join(', ')}
+                              </Badge>
                             )}
                           </Group>
                         )}
