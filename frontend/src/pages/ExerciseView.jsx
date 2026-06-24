@@ -3,7 +3,7 @@ import {
   Box, Title, Text, Group, Card, Button, Stack, Loader, Center, 
   Badge, ActionIcon, Textarea, Collapse, Radio, Paper, Alert, Menu,
   Grid, Select, SegmentedControl, TextInput, Divider, NumberInput, Switch,
-  Container, ScrollArea, Tooltip, NavLink as MantineNavLink, Progress
+  Container, ScrollArea, Tooltip, NavLink as MantineNavLink, Progress, Modal
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -11,21 +11,54 @@ import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, Icon
 import { fetchApi } from '../lib/api';
 
 export default function ExerciseView() {
-  const { id } = useParams();
+  const { id, mode } = useParams();
   const navigate = useNavigate();
   const [exercise, setExercise] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const urlToMode = {
+    'hide-answers': 'hide',
+    'show-answers': 'show',
+    'interactive': 'interactive',
+    'exam': 'exam',
+    'conversation': 'conversation'
+  };
+
+  const modeToUrl = {
+    'hide': 'hide-answers',
+    'show': 'show-answers',
+    'interactive': 'interactive',
+    'exam': 'exam',
+    'conversation': 'conversation'
+  };
+
   // Layout & Mode state
-  const [viewMode, setViewMode] = useState('hide'); // hide, show, interactive, exam, conversation
+  const [viewMode, setViewMode] = useState(mode && urlToMode[mode] ? urlToMode[mode] : 'hide');
   const [editMode, setEditMode] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    if (mode && urlToMode[mode]) {
+      const mappedMode = urlToMode[mode];
+      setViewMode(mappedMode);
+      setShowExplanations({});
+      if (mappedMode !== 'exam') {
+        setExamActive(false);
+        if (timerRef.current) clearInterval(timerRef.current);
+      }
+    } else {
+      navigate(`/exercises/${id}/hide-answers`, { replace: true });
+    }
+  }, [mode, id]);
 
   // Exam state
   const [examTimerMinutes, setExamTimerMinutes] = useState(15);
   const [examTimeRemaining, setExamTimeRemaining] = useState(null); // seconds
   const [examActive, setExamActive] = useState(false);
+  const [examCompleted, setExamCompleted] = useState(false);
+  const [showTimeUpModal, setShowTimeUpModal] = useState(false);
+  const [customMinutes, setCustomMinutes] = useState(5);
   const timerRef = useRef(null);
 
   // User input and feedback state
@@ -110,7 +143,8 @@ export default function ExerciseView() {
     if (examActive && examTimeRemaining !== null) {
       if (examTimeRemaining <= 0) {
         clearInterval(timerRef.current);
-        handleSubmitExam();
+        setExamActive(false);
+        setShowTimeUpModal(true);
       } else {
         timerRef.current = setInterval(() => {
           setExamTimeRemaining(prev => prev - 1);
@@ -242,6 +276,7 @@ export default function ExerciseView() {
   const handleStartExam = () => {
     setExamTimeRemaining(examTimerMinutes * 60);
     setExamActive(true);
+    setExamCompleted(false);
     setUserAnswers({});
     setGradingResults({});
     setExplanations({});
@@ -250,6 +285,7 @@ export default function ExerciseView() {
 
   const handleSubmitExam = () => {
     setExamActive(false);
+    setExamCompleted(true);
     clearInterval(timerRef.current);
     handleCheckAll();
   };
@@ -315,10 +351,72 @@ export default function ExerciseView() {
       </Box>
 
       <Box style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <ScrollArea 
-          style={{ flex: 1, backgroundColor: '#fff' }} 
-          p={0}
-        >
+        <Box style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {!editMode && viewMode === 'exam' && !examActive && !examCompleted && (
+            <Paper
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 100,
+                background: 'rgba(255, 255, 255, 0.75)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                padding: '40px',
+                textAlign: 'center',
+                userSelect: 'none',
+              }}
+            >
+              <IconClock size={64} stroke={1.2} style={{ color: 'var(--mantine-color-indigo-5)', marginBottom: '16px' }} />
+              <Title order={2} mb="xs" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>Exam Mode Locked</Title>
+              <Text c="dimmed" size="sm" style={{ maxWidth: '360px' }} mb="xl">
+                The questions and answer choices are hidden to ensure a fair test. Start the exam to activate the timer and reveal the questions.
+              </Text>
+              <Button size="md" radius="md" color="indigo" onClick={handleStartExam} style={{ boxShadow: '0 4px 12px rgba(76, 110, 245, 0.2)' }}>
+                Start Exam & Timer
+              </Button>
+            </Paper>
+          )}
+
+          {examActive && (
+            <Box
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '24px',
+                zIndex: 90,
+                pointerEvents: 'none'
+              }}
+            >
+              <Badge 
+                color={examTimeRemaining < 60 ? "red" : "blue"} 
+                size="lg" 
+                variant="filled"
+                leftSection={<IconClock size={16} />}
+                style={{
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+                  height: '36px',
+                  fontSize: '14px',
+                  pointerEvents: 'auto',
+                  display: 'inline-flex',
+                  alignItems: 'center'
+                }}
+              >
+                {formatTime(examTimeRemaining)}
+              </Badge>
+            </Box>
+          )}
+
+          <ScrollArea 
+            style={{ flex: 1, backgroundColor: '#fff' }} 
+            p={0}
+          >
           <Container size="md" p={0} pt={0} pb="xl">
             <Box px="md">
               <div className="summary-header" style={{ marginBottom: '1.5rem', marginTop: '1.5rem' }}>
@@ -326,11 +424,6 @@ export default function ExerciseView() {
                   <Title order={1} style={{ marginTop: 0, marginBottom: 0, color: '#171738', fontWeight: 700 }}>
                     {exercise.title}
                   </Title>
-                  {examActive && (
-                    <Badge color={examTimeRemaining < 60 ? "red" : "blue"} size="lg" leftSection={<IconClock size={14} />}>
-                      {formatTime(examTimeRemaining)}
-                    </Badge>
-                  )}
                 </Group>
               </div>
 
@@ -370,8 +463,16 @@ export default function ExerciseView() {
                 </Box>
               )}
 
-              <Stack spacing="xl">
-                {editMode ? (
+                <Stack 
+                  spacing="xl"
+                  style={{ 
+                    filter: (!editMode && viewMode === 'exam' && !examActive && !examCompleted) ? 'blur(10px)' : 'none', 
+                    pointerEvents: (!editMode && viewMode === 'exam' && !examActive && !examCompleted) ? 'none' : 'auto',
+                    userSelect: (!editMode && viewMode === 'exam' && !examActive && !examCompleted) ? 'none' : 'auto',
+                    transition: 'filter 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
+                  {editMode ? (
                   <Box>
                     <Text fw={600} mb="md">Edit Questions (Changes saved to JSON)</Text>
                     {editedQuestions.map((q, idx) => (
@@ -512,23 +613,21 @@ export default function ExerciseView() {
                                  </Stack>
                                </Radio.Group>
                             ) : (
-                                <Textarea 
-                                  placeholder="Type your answer here... (Press Enter to submit, Shift+Enter for new line)"
-                                  value={userAnswers[q.id] || ''}
-                                  onChange={(e) => setUserAnswers({...userAnswers, [q.id]: e.currentTarget.value})}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                      if (!isExam && !hasGraded) {
-                                        e.preventDefault();
-                                        if (userAnswers[q.id]) {
-                                          handleGrade(q.id);
-                                        }
-                                      }
+                              <Textarea 
+                                placeholder="Type your answer here..."
+                                value={userAnswers[q.id] || ''}
+                                onChange={(e) => setUserAnswers({...userAnswers, [q.id]: e.currentTarget.value})}
+                                minRows={2}
+                                disabled={hasGraded || (isExam && !examActive)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    if (userAnswers[q.id]) {
+                                      handleGrade(q.id);
                                     }
-                                  }}
-                                  minRows={2}
-                                  disabled={hasGraded || (isExam && !examActive)}
-                                />
+                                  }
+                                }}
+                              />
                             )}
                             
                             {!isExam && (
@@ -715,6 +814,7 @@ export default function ExerciseView() {
             </Box>
           </Container>
         </ScrollArea>
+      </Box>
 
         {/* Right Sidebar */}
         <Box w={sidebarOpen ? 280 : 80} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
@@ -761,12 +861,7 @@ export default function ExerciseView() {
                         value={viewMode}
                         onChange={(v) => {
                           if (v === 'conversation') return;
-                          setViewMode(v);
-                          setShowExplanations({});
-                          if (examActive && v !== 'exam') {
-                             setExamActive(false);
-                             clearInterval(timerRef.current);
-                          }
+                          navigate(`/exercises/${id}/${modeToUrl[v]}`);
                         }}
                         data={[
                           { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEyeOff size={16} stroke={1.5} /><Text size="sm">Hide Answers</Text></Group>, value: 'hide' },
@@ -836,6 +931,72 @@ export default function ExerciseView() {
           </Box>
         </Box>
       </Box>
+
+      <Modal
+        opened={showTimeUpModal}
+        onClose={() => {}}
+        withCloseButton={false}
+        closeOnClickOutside={false}
+        closeOnEscape={false}
+        title={<Text fw={700} size="lg" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>Time's Up!</Text>}
+        centered
+        radius="md"
+        padding="xl"
+      >
+        <Stack spacing="md" align="center">
+          <IconClock size={48} color="var(--mantine-color-red-6)" stroke={1.5} />
+          <Text size="sm" ta="center" c="dimmed">
+            Your exam time has expired. Would you like to add more time or submit and grade your answers now?
+          </Text>
+          
+          <Group grow style={{ width: '100%' }} mt="xs">
+            <Button 
+              variant="outline" 
+              color="indigo" 
+              onClick={() => {
+                setExamTimeRemaining(5 * 60);
+                setExamActive(true);
+                setShowTimeUpModal(false);
+              }}
+            >
+              Add 5 Mins
+            </Button>
+            
+            <Button 
+              color="green" 
+              onClick={() => {
+                handleSubmitExam();
+                setShowTimeUpModal(false);
+              }}
+            >
+              Grade Now
+            </Button>
+          </Group>
+          
+          <Divider label="Or Custom Time" labelPosition="center" style={{ width: '100%' }} my="xs" />
+          
+          <Group align="flex-end" gap="xs" style={{ width: '100%' }}>
+            <NumberInput 
+              style={{ flex: 1 }}
+              placeholder="Minutes"
+              min={1}
+              max={120}
+              value={customMinutes}
+              onChange={(val) => setCustomMinutes(val || 5)}
+            />
+            <Button 
+              color="indigo" 
+              onClick={() => {
+                setExamTimeRemaining((customMinutes || 5) * 60);
+                setExamActive(true);
+                setShowTimeUpModal(false);
+              }}
+            >
+              Add Time
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Box>
   );
 }

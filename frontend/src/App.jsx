@@ -204,8 +204,8 @@ function App() {
           <Route path="/upload" element={<UploadDocs />} />
           <Route path="/chat" element={<ChatInterface />} />
           <Route path="/chat/:cvid" element={<ChatInterface />} />
-          <Route path="/exercises" element={<Navigate to="/mynotes" replace />} />
           <Route path="/exercises/:id" element={<ExerciseView />} />
+          <Route path="/exercises/:id/:mode" element={<ExerciseView />} />
           <Route path="/group/:id" element={<GroupView />} />
           <Route path="/subject/:id" element={<SubjectView />} />
           <Route path="/subject/:id/:tab" element={<SubjectView />} />
