@@ -311,12 +311,51 @@ def generate_exercise(
             from app.models.db import Resource
             resources = db.query(Resource).filter(Resource.id.in_(req.resource_ids)).all()
             titles = [r.title for r in resources if r.title]
-            if len(titles) > 2:
-                base_title = f"{titles[0]} + {len(titles)-1} others Exercise"
-            elif titles:
-                base_title = f"{' & '.join(titles)} Exercise"
+            
+            import re
+            def format_ranges(nums):
+                if not nums: return ""
+                sorted_nums = sorted(list(set(nums)))
+                ranges = []
+                start = end = sorted_nums[0]
+                for n in sorted_nums[1:]:
+                    if n == end + 1:
+                        end = n
+                    else:
+                        ranges.append(str(start) if start == end else f"{start}-{end}")
+                        start = end = n
+                ranges.append(str(start) if start == end else f"{start}-{end}")
+                if len(ranges) == 1: return ranges[0]
+                elif len(ranges) == 2: return f"{ranges[0]} & {ranges[1]}"
+                return ", ".join(ranges[:-1]) + f", {ranges[-1]}"
+
+            extracted_nums = []
+            common_prefix = None
+            valid_extraction = True
+            for t in titles:
+                m = re.match(r'^([A-Za-z]+)\s*(\d+)', t.strip(), re.IGNORECASE)
+                if m:
+                    prefix = m.group(1).title()
+                    num = int(m.group(2))
+                    if common_prefix is None:
+                        common_prefix = prefix
+                    elif common_prefix != prefix:
+                        common_prefix = "Resource"
+                    extracted_nums.append(num)
+                else:
+                    valid_extraction = False
+                    break
+            
+            if valid_extraction and extracted_nums:
+                ranges_str = format_ranges(extracted_nums)
+                base_title = f"{common_prefix} {ranges_str} Exercise"
             else:
-                base_title = "Generated Exercise"
+                if len(titles) > 2:
+                    base_title = f"{titles[0]} + {len(titles)-1} others Exercise"
+                elif titles:
+                    base_title = f"{' & '.join(titles)} Exercise"
+                else:
+                    base_title = "Generated Exercise"
         else:
             base_title = "Generated Exercise"
             

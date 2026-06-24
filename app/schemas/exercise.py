@@ -10,6 +10,11 @@ class ExerciseQuestionBase(BaseModel):
     options: Optional[Any] = None
     order: int = 0
     explanation: Optional[str] = None
+    topic: Optional[str] = None
+    reference_quote: Optional[str] = None
+    difficulty: Optional[str] = None
+    reference_resource_id: Optional[str] = None
+    reference_resource_title: Optional[str] = None
 
 class ExerciseQuestionCreate(ExerciseQuestionBase):
     pass
@@ -21,11 +26,11 @@ class ExerciseQuestionUpdate(BaseModel):
     options: Optional[Any] = None
     order: Optional[int] = None
     explanation: Optional[str] = None
+    topic: Optional[str] = None
+    reference_quote: Optional[str] = None
 
 class ExerciseQuestionResponse(ExerciseQuestionBase):
     id: str
-    exercise_id: Optional[str] = None
-    reference_resource_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -82,6 +87,8 @@ class BulkExerciseQuestionUpdate(BaseModel):
     options: Optional[Any] = None
     order: int
     explanation: Optional[str] = None
+    topic: Optional[str] = None
+    reference_quote: Optional[str] = None
 
 class BulkExerciseUpdate(BaseModel):
     questions: List[BulkExerciseQuestionUpdate]

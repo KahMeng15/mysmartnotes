@@ -400,11 +400,13 @@ def generate_exercise_task(exercise_id: str, user_id: int, req_data: Dict[str, A
         
         resource_ids = req_data.get("resource_ids", [])
         resources_text = ""
+        title_to_id = {}
         for r_id in resource_ids:
             r = db.query(Resource).filter(Resource.id == r_id, Resource.user_id == user_id).first()
             if r:
                 r_text = StorageManager.get_resource_text(r.id)
                 if r_text:
+                    title_to_id[r.title.strip()] = r.id
                     resources_text += f"\n--- {r.title} ---\n{r_text}\n"
 
         if not resources_text.strip():
@@ -501,6 +503,10 @@ Each object must have the following keys:
 - "answer_text": The correct answer (for AI and user reference).
 - "question_type": Must be exactly one of: "objective", "subjective", "fill_in_the_blank".
 - "options": (ONLY for "objective" type) a list of 4 string options containing the correct answer and 3 distractors. Leave as null for other types.
+- "topic": A short 1-4 word description of the specific topic or concept this question covers.
+- "difficulty": Must be "Easy", "Medium", or "Hard".
+- "resource_title": The exact title of the resource (from the --- Title --- headers above) that this question was derived from.
+- "reference_quote": A short, exact excerpt or line from the content that supports the answer.
 
 Respond with ONLY the JSON array.
 """
@@ -520,7 +526,24 @@ Respond with ONLY the JSON array.
                 if json_text.endswith("```"): json_text = json_text[:-3]
                 questions_data = json.loads(json_text.strip())
                 if isinstance(questions_data, list):
-                    valid_questions = [q for q in questions_data if isinstance(q, dict) and "question_text" in q]
+                    valid_questions = []
+                    for q in questions_data:
+                        if isinstance(q, dict) and "question_text" in q:
+                            # Map resource_title to reference_resource_id
+                            r_title = q.get("resource_title", "")
+                            if r_title:
+                                r_title_clean = r_title.strip()
+                                # exact match or fallback to substring match
+                                mapped_id = title_to_id.get(r_title_clean)
+                                if not mapped_id:
+                                    for t, r_id in title_to_id.items():
+                                        if t.lower() in r_title_clean.lower() or r_title_clean.lower() in t.lower():
+                                            mapped_id = r_id
+                                            break
+                                if mapped_id:
+                                    q["reference_resource_id"] = mapped_id
+                                q["reference_resource_title"] = r_title_clean
+                            valid_questions.append(q)
                     all_questions_data.extend(valid_questions)
                 else:
                     valid_questions = []

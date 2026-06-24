@@ -405,6 +405,16 @@ export default function ExerciseView() {
                             newQs[idx].answer_text = e.currentTarget.value;
                             setEditedQuestions(newQs);
                           }} />
+                          <TextInput label="Topic" value={q.topic || ''} onChange={(e) => {
+                            const newQs = [...editedQuestions];
+                            newQs[idx].topic = e.currentTarget.value;
+                            setEditedQuestions(newQs);
+                          }} />
+                          <Textarea label="Reference Quote" value={q.reference_quote || ''} onChange={(e) => {
+                            const newQs = [...editedQuestions];
+                            newQs[idx].reference_quote = e.currentTarget.value;
+                            setEditedQuestions(newQs);
+                          }} />
                           {q.question_type === 'objective' && (
                             <Textarea label="Options (JSON Array)" value={typeof q.options === 'string' ? q.options : JSON.stringify(q.options || [])} onChange={(e) => {
                               const newQs = [...editedQuestions];
@@ -439,20 +449,37 @@ export default function ExerciseView() {
 
                     return (
                       <Card key={q.id} shadow="sm" padding="lg" radius="md" withBorder>
+                        <Box mb="xs">
+                          <Group gap="xs" wrap="nowrap">
+                            {q.difficulty && (
+                              <Text size="xs" c="dimmed" fw={600} tt="uppercase">
+                                {q.difficulty}
+                              </Text>
+                            )}
+                            {q.difficulty && q.reference_resource_title && (
+                              <Text size="xs" c="dimmed">•</Text>
+                            )}
+                            {q.reference_resource_title && (
+                              <Text 
+                                size="xs" 
+                                c="dimmed" 
+                                style={q.reference_resource_id ? { cursor: 'pointer', textDecoration: 'underline' } : {}} 
+                                onClick={() => q.reference_resource_id && navigate(`/resource/${q.reference_resource_id}`)}
+                              >
+                                From: {q.reference_resource_title}
+                              </Text>
+                            )}
+                          </Group>
+                        </Box>
                         <Group justify="space-between" align="flex-start" mb="sm">
-                          <Text fw={600} size="lg">
-                            {idx + 1}. {q.question_text}
-                          </Text>
-                          {q.reference_resource_id && (
-                            <Badge 
-                              leftSection={<IconBook size={12} />} 
-                              variant="dot" 
-                              style={{ cursor: 'pointer' }}
-                              onClick={() => navigate(`/resource/${q.reference_resource_id}`)}
-                            >
-                              View Source
-                            </Badge>
-                          )}
+                          <Box>
+                            <Text fw={600} size="lg">
+                              {idx + 1}. {q.question_text}
+                            </Text>
+                            {q.topic && (
+                               <Badge size="xs" variant="light" color="indigo" mt="xs">{q.topic}</Badge>
+                            )}
+                          </Box>
                         </Group>
 
                         {isInteractive ? (
@@ -517,6 +544,9 @@ export default function ExerciseView() {
                                 <Text fw={500}>{grade?.feedback}</Text>
                                 {!grade?.is_correct && (
                                   <Text mt="xs" size="sm"><b>Correct Answer:</b> {grade?.correct_answer}</Text>
+                                )}
+                                {q.reference_quote && (
+                                  <Text mt="xs" size="sm" fs="italic"><b>Source Reference:</b> "{q.reference_quote}"</Text>
                                 )}
                               </Alert>
                             )}
@@ -584,6 +614,12 @@ export default function ExerciseView() {
                                   <Box style={{ filter: !showAns ? 'blur(6px)' : 'none', opacity: !showAns ? 0.5 : 1, transition: 'filter 0.3s ease, opacity 0.3s ease', userSelect: !showAns ? 'none' : 'auto', pointerEvents: !showAns ? 'none' : 'auto' }}>
                                     <Text fw={500} c="blue.9">Answer:</Text>
                                     <Text c="blue.9">{q.answer_text || "No answer provided."}</Text>
+                                    
+                                    {q.reference_quote && (
+                                      <Text size="sm" c="dimmed" mt="xs" fs="italic">
+                                        Source Reference: "{q.reference_quote}"
+                                      </Text>
+                                    )}
                                     
                                     <Box mt="md">
                                       {explanation && !showExplanations[q.id] && (
