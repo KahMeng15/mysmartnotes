@@ -11,7 +11,6 @@ import {
   IconBooks, 
   IconUpload, 
   IconMessageDots, 
-  IconBolt, 
   IconSettings,
   IconChartBar,
   IconLayoutSidebarLeftCollapse,
@@ -128,9 +127,6 @@ function AppLayout({ children }) {
           </Tooltip>
           <Tooltip label="Chat" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/chat" label={navOpen ? "Chat" : ""} leftSection={<IconMessageDots size="1.2rem" stroke={1.5} />} />
-          </Tooltip>
-          <Tooltip label="Exercises" disabled={navOpen} position="right">
-            <MantineNavLink component={NavLink} to="/exercises" label={navOpen ? "Exercises" : ""} leftSection={<IconBolt size="1.2rem" stroke={1.5} />} />
           </Tooltip>
           <Tooltip label="Upload" disabled={navOpen} position="right">
             <MantineNavLink component={NavLink} to="/upload" label={navOpen ? "Upload" : ""} leftSection={<IconUpload size="1.2rem" stroke={1.5} />} />
