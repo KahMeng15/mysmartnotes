@@ -1206,11 +1206,13 @@ def get_related_content(
         ).order_by(Exercise.created_at.desc()).all()
 
         # Merged exercises (check parameters JSON for resource_ids)
+        from sqlalchemy import or_
         subject_exercises = db.query(Exercise).filter(
             Exercise.user_id == current_user.id,
-            Exercise.resource_id != resource_id,
+            or_(Exercise.resource_id != resource_id, Exercise.resource_id.is_(None)),
             Exercise.subject_id == resource.subject_id
         ).order_by(Exercise.created_at.desc()).all()
+
         merged_exercises = []
         for ex in subject_exercises:
             params = StorageManager.get_resource_json(ex.id, "parameters")

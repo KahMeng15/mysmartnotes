@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu, Divider } from '@mantine/core';
+import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu, Divider, Card } from '@mantine/core';
 import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt } from '@tabler/icons-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -516,6 +516,9 @@ export default function NoteView() {
         .clickable-crumb:hover {
           text-decoration: underline;
         }
+        .related-card:hover {
+          background-color: var(--mantine-color-gray-0);
+        }
       `}</style>
 
       {/* Sticky Header */}
@@ -796,26 +799,36 @@ export default function NoteView() {
                   ) : (
                     <Stack gap={4}>
                       {relatedNotes.map(rn => (
-                        <Text
+                        <Card
                           key={rn.id}
-                          size="xs"
-                          style={{ cursor: 'pointer' }}
-                          c="blue"
-                          onClick={() => navigate(`/notes/${rn.id}?resourceId=${rn.resource_id}`)}
+                          withBorder
+                          padding="sm"
+                          radius="sm"
+                          style={{ cursor: 'pointer', transition: 'background-color 0.15s' }}
+                          className="related-card"
+                          onClick={() => navigate(`/note/${rn.id}?resourceId=${rn.resource_id}`)}
                         >
-                          {rn.title}
-                        </Text>
+                          <Group gap="xs" wrap="nowrap" align="center">
+                            <Text size="sm" fw={500} lineClamp={1} style={{ flex: 1 }}>{rn.title}</Text>
+                            <Badge size="sm" color="blue" variant="light">Note</Badge>
+                          </Group>
+                        </Card>
                       ))}
                       {relatedExercises.map(re => (
-                        <Text
+                        <Card
                           key={re.id}
-                          size="xs"
-                          style={{ cursor: 'pointer' }}
-                          c="teal"
+                          withBorder
+                          padding="sm"
+                          radius="sm"
+                          style={{ cursor: 'pointer', transition: 'background-color 0.15s' }}
+                          className="related-card"
                           onClick={() => navigate(`/exercises/${re.id}`)}
                         >
-                          {re.title}
-                        </Text>
+                          <Group gap="xs" wrap="nowrap" align="center">
+                            <Text size="sm" fw={500} lineClamp={1} style={{ flex: 1 }}>{re.title}</Text>
+                            <Badge size="sm" color="teal" variant="light">Exercise</Badge>
+                          </Group>
+                        </Card>
                       ))}
                     </Stack>
                   )}
