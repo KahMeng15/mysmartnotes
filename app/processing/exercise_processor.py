@@ -181,6 +181,22 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None, *
         if not raw_text.strip():
             raise ValueError("No text could be extracted from the file.")
             
+        progress_callback(30, "Loading subject resources...")
+        
+        subject_resources = db.query(Resource.id, Resource.title).filter(
+            Resource.subject_id == exercise.subject_id,
+            Resource.user_id == user_id
+        ).all()
+        resource_titles = [(r.id, r.title) for r in subject_resources]
+        title_to_id = {title.strip(): rid for rid, title in resource_titles if title}
+        
+        if title_to_id:
+            resource_context = "The following resources exist in this subject. For each extracted question, identify which resource it likely references:\n"
+            for rid, rtitle in resource_titles:
+                resource_context += f"- {rtitle}\n"
+        else:
+            resource_context = ""
+        
         progress_callback(40, "Using AI to parse questions and answers...")
         
         text = raw_text
@@ -196,6 +212,7 @@ Text to process:
 {text}
 ---
 
+{resource_context}
 Rules:
 1. **Identify Questions and Answers**: Pair each question with its corresponding answer. Questions may start with numbers like "1.1", "Q1:", "a.", etc.
 2. **Generate Missing Answers**: If 'generate_missing_answers' is true, generate accurate answers for any questions that are missing them, based on context.
@@ -216,6 +233,10 @@ Rules:
         - `"answer_text"`: The answer.
         - `"question_type"`: One of `"objective"`, `"subjective"`, `"fill_in_the_blank"`.
         - `"options"`: For `"objective"`, an array of 4 options. `null` for others.
+        - `"topic"`: A short 1-4 word description of the specific topic or concept this question covers.
+        - `"difficulty"`: Must be "Easy", "Medium", or "Hard".
+        - `"resource_title"`: The exact title of the resource (from the list above) that this question likely references. `null` if unclear.
+        - `"reference_quote"`: A short excerpt from the extracted text (not from the resource list) that supports the answer. `null` if none.
 
 Generate_missing_answers: True
 Respond with ONLY the JSON object.
@@ -226,7 +247,7 @@ Respond with ONLY the JSON object.
             client.generate_text,
             prompt=prompt,
             system_instruction="You are an expert educational content extractor.",
-            max_tokens=3500
+            max_tokens=8192
         )
         
         provider_failed = _looks_like_provider_error(response)
@@ -257,12 +278,29 @@ Respond with ONLY the JSON object.
             if not q_text: continue
             q_type = _normalize_type(str(q_data.get("question_type", "subjective")))
             options = q_data.get("options") if q_type == "objective" else None
+            
+            r_title = q_data.get("resource_title") or ""
+            r_title_clean = r_title.strip() if r_title else ""
+            mapped_id = None
+            if r_title_clean and title_to_id:
+                mapped_id = title_to_id.get(r_title_clean)
+                if not mapped_id:
+                    for t, rid in title_to_id.items():
+                        if t.lower() in r_title_clean.lower() or r_title_clean.lower() in t.lower():
+                            mapped_id = rid
+                            break
+            
             normalized_questions.append({
                 "question_text": q_text,
                 "original_number": q_data.get("original_number"),
                 "answer_text": str(q_data.get("answer_text", "")).strip(),
                 "question_type": q_type,
                 "options": options,
+                "topic": q_data.get("topic"),
+                "difficulty": q_data.get("difficulty"),
+                "reference_resource_id": mapped_id,
+                "reference_resource_title": r_title_clean if r_title_clean else None,
+                "reference_quote": q_data.get("reference_quote"),
             })
 
         if not normalized_questions:
@@ -273,22 +311,26 @@ Respond with ONLY the JSON object.
         if suggested_title and exercise.title == "Uploaded Exercise":
             exercise.title = suggested_title
 
-        progress_callback(80, "Mapping references and generating missing answers...")
+        progress_callback(80, "Mapping references via embeddings fallback...")
         
-        subject_resources = db.query(Resource.id).filter(Resource.subject_id == exercise.subject_id).all()
-        subject_resource_ids = [r.id for r in subject_resources]
+        subject_resource_ids = [rid for rid, _ in resource_titles]
         
         order = 0
         for q_data in questions_data:
-            ref_resource_id = None
-            if subject_resource_ids:
+            if not q_data.get("reference_resource_id") and subject_resource_ids:
                 try:
                     chunks = retrieve_relevant_chunks(q_data.get("question_text", ""), subject_resource_ids, db, top_k=1)
                     if chunks:
-                        ref_resource_id = chunks[0]["resource_id"]
+                        q_data["reference_resource_id"] = chunks[0]["resource_id"]
+                        if not q_data.get("reference_resource_title"):
+                            for rid, rtitle in resource_titles:
+                                if rid == chunks[0]["resource_id"]:
+                                    q_data["reference_resource_title"] = rtitle
+                                    break
+                        if not q_data.get("reference_quote"):
+                            q_data["reference_quote"] = chunks[0].get("text", "")[:200]
                 except Exception as e:
                     pass
-            q_data["reference_resource_id"] = ref_resource_id
             q_data["order"] = order
             q_data["original_number"] = str(q_data.get("original_number", ""))
             q_data["id"] = str(order + 1)

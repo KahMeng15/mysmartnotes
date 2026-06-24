@@ -1093,9 +1093,21 @@ export default function SubjectView() {
               </Menu.Item>
             </Menu.Dropdown>
           </Menu>
-          <Button leftSection={<IconUpload size={16} />} onClick={() => navigate(`/upload?subject_id=${subject.id}`)}>
-            Upload
-          </Button>
+          <Menu shadow="md" width={200} position="bottom-end">
+            <Menu.Target>
+              <Button leftSection={<IconUpload size={16} />}>
+                Upload
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconFileText size={14} />} onClick={() => navigate(`/upload?subject_id=${subject.id}&type=resource`)}>
+                Resource
+              </Menu.Item>
+              <Menu.Item leftSection={<IconBrain size={14} />} onClick={() => navigate(`/upload?subject_id=${subject.id}&type=exercise`)}>
+                Exercise
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       </Group>
 

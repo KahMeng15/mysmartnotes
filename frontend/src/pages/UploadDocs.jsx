@@ -81,22 +81,27 @@ export default function UploadDocs() {
 
     try {
       if (uploadType === 'exercise') {
-        // Upload each file to `/exercises/upload` sequentially
+        const exerciseIds = [];
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const formData = new FormData();
           formData.append('subject_id', selectedSubject);
           formData.append('file', file);
 
-          await fetchApi('/exercises/upload', {
+          const res = await fetchApi('/exercises/upload', {
             method: 'POST',
             body: formData,
           });
+          if (res && res.id) exerciseIds.push(res.id);
           setProgress(Math.round(20 + (80 * (i + 1) / files.length)));
         }
         setProgress(100);
         setTimeout(() => {
-          navigate(`/subject/${selectedSubject}/exercises`);
+          if (exerciseIds.length === 1) {
+            navigate(`/exercises/${exerciseIds[0]}`);
+          } else {
+            navigate(`/subject/${selectedSubject}/exercise`);
+          }
         }, 800);
       } else {
         const formData = new FormData();
