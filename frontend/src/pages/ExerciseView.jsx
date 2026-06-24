@@ -649,7 +649,9 @@ export default function ExerciseView() {
                                 onClick={() => {
                                   if (q.reference_resource_id) {
                                     let url = `/resource/${q.reference_resource_id}`;
-                                    if (q.reference_quote) {
+                                    if (q.reference_chunk_position !== undefined && q.reference_chunk_position !== null) {
+                                      url += `?ref=${q.reference_chunk_position}`;
+                                    } else if (q.reference_quote) {
                                       url += `?highlight=${encodeURIComponent(q.reference_quote)}`;
                                     }
                                     window.open(url, '_blank');

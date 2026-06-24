@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu } from '@mantine/core';
 import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt } from '@tabler/icons-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
@@ -22,6 +23,7 @@ export default function NoteView() {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const highlightText = searchParams.get('highlight');
+  const refPosition = searchParams.get('ref');
   
   const [note, setNote] = useState(null);
   const [content, setContent] = useState('');
@@ -37,6 +39,13 @@ export default function NoteView() {
 
   const [saveModalOpened, setSaveModalOpened] = useState(false);
   const [cancelModalOpened, setCancelModalOpened] = useState(false);
+
+  const contentForRender = useMemo(() => {
+    if (!content || !refPosition) return content;
+    const pos = parseInt(refPosition, 10);
+    if (isNaN(pos) || pos < 0 || pos > content.length) return content;
+    return content.slice(0, pos) + '<span id="ref-target"></span>' + content.slice(pos);
+  }, [content, refPosition]);
 
   const editor = useEditor({
     extensions: [
@@ -182,7 +191,29 @@ export default function NoteView() {
   }, [content, isEditing, isRawMode]);
 
   useEffect(() => {
-    if (!highlightText || loading || !markdownRef.current || isEditing || isRawMode) return;
+    if (loading || !markdownRef.current || isEditing || isRawMode) return;
+
+    if (refPosition) {
+      const scrollTimer = setTimeout(() => {
+        const anchor = document.getElementById('ref-target');
+        if (!anchor) return;
+        const parent = anchor.parentElement;
+        if (parent) {
+          parent.style.backgroundColor = '#fff3e0';
+          parent.style.borderRadius = '4px';
+          parent.style.padding = '4px 0';
+        }
+        const rect = anchor.getBoundingClientRect();
+        if (rect && rect.top && viewportRef.current) {
+          const viewportRect = viewportRef.current.getBoundingClientRect();
+          const scrollTop = viewportRef.current.scrollTop + (rect.top - viewportRect.top) - (viewportRect.height / 2);
+          viewportRef.current.scrollTo({ top: scrollTop, behavior: 'smooth' });
+        }
+      }, 600);
+      return () => clearTimeout(scrollTimer);
+    }
+
+    if (!highlightText) return;
 
     const highlightTimer = setTimeout(() => {
       const root = markdownRef.current;
@@ -252,7 +283,7 @@ export default function NoteView() {
     }, 600);
 
     return () => clearTimeout(highlightTimer);
-  }, [highlightText, loading, content, isEditing, isRawMode]);
+  }, [refPosition, highlightText, loading, content, isEditing, isRawMode]);
 
   useEffect(() => {
     const loadNote = async () => {
@@ -549,6 +580,7 @@ export default function NoteView() {
                     ) : content ? (
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeRaw]}
                         components={{
                           pre(props) {
                             return <>{props.children}</>;
@@ -583,7 +615,7 @@ export default function NoteView() {
                           }
                         }}
                       >
-                        {content}
+                        {contentForRender || content}
                       </ReactMarkdown>
                     ) : (
                       <Center h={200}><Text c="dimmed">No content extracted.</Text></Center>

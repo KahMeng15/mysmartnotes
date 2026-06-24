@@ -317,11 +317,12 @@ Respond with ONLY the JSON object.
         
         order = 0
         for q_data in questions_data:
-            if not q_data.get("reference_resource_id") and subject_resource_ids:
+            if subject_resource_ids:
                 try:
                     chunks = retrieve_relevant_chunks(q_data.get("question_text", ""), subject_resource_ids, db, top_k=1)
                     if chunks:
-                        q_data["reference_resource_id"] = chunks[0]["resource_id"]
+                        if not q_data.get("reference_resource_id"):
+                            q_data["reference_resource_id"] = chunks[0]["resource_id"]
                         if not q_data.get("reference_resource_title"):
                             for rid, rtitle in resource_titles:
                                 if rid == chunks[0]["resource_id"]:
@@ -329,6 +330,7 @@ Respond with ONLY the JSON object.
                                     break
                         if not q_data.get("reference_quote"):
                             q_data["reference_quote"] = chunks[0].get("text", "")[:200]
+                        q_data["reference_chunk_position"] = chunks[0].get("position")
                 except Exception as e:
                     pass
             q_data["order"] = order
@@ -630,6 +632,7 @@ Respond with ONLY the JSON array.
                     q["reference_resource_id"] = chunks[0]["resource_id"]
                     q["reference_resource_title"] = resource_id_to_title.get(chunks[0]["resource_id"])
                     q["reference_quote"] = chunks[0].get("text", "")[:300]
+                    q["reference_chunk_position"] = chunks[0].get("position")
             except Exception as e:
                 logger.warning(f"Embedding lookup failed for question {order}: {e}")
             
