@@ -255,6 +255,8 @@ export default function ExerciseView() {
                   </>
                 )}
                 <Text size="sm" fw={500} c="dimmed" style={{ cursor: 'pointer' }} onClick={() => navigate(`/subject/${exercise.subject.id}`)}>{exercise.subject.name}</Text>
+                <Text size="sm" c="dimmed">/</Text>
+                <Text size="sm" fw={500} c="dimmed">Exercise</Text>
               </Group>
             )}
           </Group>
