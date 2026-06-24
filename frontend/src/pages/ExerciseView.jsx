@@ -135,9 +135,9 @@ export default function ExerciseView() {
           // Polling for progress
           const checkStatus = async () => {
             try {
-              let taskData = await fetchApi(`/search/tasks/extract_ex_${id}`).catch(() => null);
+              let taskData = await fetchApi(`/search/tasks/extract_${id}`).catch(() => null);
               if (!taskData) {
-                taskData = await fetchApi(`/search/tasks/generate_ex_${id}`).catch(() => null);
+                taskData = await fetchApi(`/search/tasks/generate_${id}`).catch(() => null);
               }
               if (!active) return;
               if (taskData) {

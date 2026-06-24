@@ -706,11 +706,11 @@ export default function SubjectView() {
           unprocessedExercises.map(async (ex) => {
             try {
               // Try extraction task first
-              let taskData = await fetchApi(`/search/tasks/extract_ex_${ex.id}`).catch(() => null);
+              let taskData = await fetchApi(`/search/tasks/extract_${ex.id}`).catch(() => null);
               
               // If not found, try generation task
               if (!taskData) {
-                taskData = await fetchApi(`/search/tasks/generate_ex_${ex.id}`).catch(() => null);
+                taskData = await fetchApi(`/search/tasks/generate_${ex.id}`).catch(() => null);
               }
 
               if (taskData) {
@@ -1350,7 +1350,7 @@ export default function SubjectView() {
                           <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalExercise(ex); }}>System Info</Menu.Item>
                           {(isProcessing || reprocessingExerciseIds.includes(ex.id)) ? (
                             <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
-                              const taskId = exerciseTasks[ex.id] || `generate_ex_${ex.id}`; // fallback if polling hasn't hit yet
+                              const taskId = exerciseTasks[ex.id] || `generate_${ex.id}`; // fallback if polling hasn't hit yet
                               try {
                                 await fetchApi(`/search/tasks/${taskId}/cancel`, { method: 'POST' });
                                 setCancelledExerciseIds(prev => [...prev, ex.id]);

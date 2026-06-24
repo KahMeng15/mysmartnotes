@@ -122,7 +122,7 @@ def upload_exercise(
     db.refresh(exercise)
 
     # Launch background task to process the file and extract questions
-    task_id = f"extract_ex_{file_id}"
+    task_id = f"extract_{file_id}"
     TaskManager.submit_task(
         task_id=task_id,
         user_id=current_user.id,
@@ -398,7 +398,7 @@ def generate_exercise(
 
     StorageManager.save_resource_json(file_id, "parameters", req.dict())
 
-    task_id = f"generate_ex_{file_id}"
+    task_id = f"generate_{file_id}"
     TaskManager.submit_task(
         task_id=task_id,
         user_id=current_user.id,
@@ -455,7 +455,7 @@ def reprocess_exercise(
     
     # Based on whether it's an uploaded file or generated
     if exercise.file_path and os.path.exists(exercise.file_path):
-        task_id = f"extract_ex_{exercise_id}"
+        task_id = f"extract_{exercise_id}"
         TaskManager.submit_task(
             task_id=task_id,
             user_id=current_user.id,
@@ -464,7 +464,7 @@ def reprocess_exercise(
             title=exercise.title
         )
     elif params:
-        task_id = f"generate_ex_{exercise_id}"
+        task_id = f"generate_{exercise_id}"
         TaskManager.submit_task(
             task_id=task_id,
             user_id=current_user.id,
