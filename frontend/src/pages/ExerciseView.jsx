@@ -336,6 +336,19 @@ export default function ExerciseView() {
     setRevealedAnswers(prev => ({ ...prev, [qId]: !prev[qId] }));
   };
 
+  const handleResetExercise = () => {
+    setUserAnswers({});
+    setGradingResults({});
+    setExplanations({});
+    setRevealedAnswers({});
+    setShowExplanations({});
+    setExamActive(false);
+    setExamCompleted(false);
+    setExamTimeRemaining(null);
+    if (timerRef.current) clearInterval(timerRef.current);
+    localStorage.removeItem(`exercise_exam_${id}`);
+  };
+
   const handleSaveEdits = async () => {
     setSavingEdits(true);
     try {
@@ -365,6 +378,18 @@ export default function ExerciseView() {
     const s = seconds % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
+
+  const isAiGenerated = !!exercise?.parameters;
+  const coveredResources = (() => {
+    if (!exercise || !exercise.questions) return [];
+    const resourcesMap = new Map();
+    exercise.questions.forEach(q => {
+      if (q.reference_resource_title) {
+        resourcesMap.set(q.reference_resource_title, q.reference_resource_id || null);
+      }
+    });
+    return Array.from(resourcesMap.entries()).map(([title, id]) => ({ title, id }));
+  })();
 
   return (
     <Box h="100vh" style={{ display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
@@ -863,6 +888,83 @@ export default function ExerciseView() {
         <Box w={sidebarOpen ? 280 : 80} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
           <Box style={{ flex: 1, overflowY: 'auto' }}>
             <Stack gap={0} align="stretch">
+              {sidebarOpen && (
+                <Box mb="md">
+                  <Title order={5} fw={600} c="dimmed" mb="xs">Exercise Info</Title>
+                  <Card p="sm" radius="md" withBorder bg="var(--mantine-color-gray-0)" mb="md">
+                    <Stack gap="xs">
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="xs" fw={600} c="dimmed">Type</Text>
+                        <Badge size="xs" color={isAiGenerated ? 'blue' : 'green'} variant="light">
+                          {isAiGenerated ? 'AI Generated' : 'Imported'}
+                        </Badge>
+                      </Group>
+                      
+                      <Box>
+                        <Text size="xs" fw={600} c="dimmed" mb={4}>Resources Covered</Text>
+                        {coveredResources.length > 0 ? (
+                          <Stack gap={4}>
+                            {coveredResources.map((res, idx) => (
+                              <Text 
+                                key={idx} 
+                                size="xs" 
+                                c={res.id ? "blue.6" : "dark"} 
+                                style={res.id ? { cursor: 'pointer', textDecoration: 'underline' } : {}}
+                                onClick={() => res.id && window.open(`/resource/${res.id}`, '_blank')}
+                              >
+                                • {res.title}
+                              </Text>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Text size="xs" c="dimmed" fs="italic">No resources linked</Text>
+                        )}
+                      </Box>
+                      
+                      {isAiGenerated && exercise.parameters && (
+                        <>
+                          <Divider my={4} />
+                          
+                          <Group justify="space-between" wrap="nowrap">
+                            <Text size="xs" fw={600} c="dimmed">Question Types</Text>
+                            <Text size="xs" fw={500} ta="right">
+                              {Array.isArray(exercise.parameters.question_types) 
+                                ? exercise.parameters.question_types.map(t => t.replace(/_/g, ' ')).join(', ') 
+                                : 'All Types'}
+                            </Text>
+                          </Group>
+                          
+                          <Group justify="space-between" wrap="nowrap">
+                            <Text size="xs" fw={600} c="dimmed">Difficulty</Text>
+                            <Text size="xs" fw={500} ta="right">
+                              {Array.isArray(exercise.parameters.difficulties) 
+                                ? exercise.parameters.difficulties.join(', ') 
+                                : 'All Difficulties'}
+                            </Text>
+                          </Group>
+                          
+                          <Group justify="space-between" wrap="nowrap">
+                            <Text size="xs" fw={600} c="dimmed">Question Length</Text>
+                            <Text size="xs" fw={500} ta="right" style={{ textTransform: 'capitalize' }}>
+                              {Array.isArray(exercise.parameters.lengths) 
+                                ? exercise.parameters.lengths.join(', ') 
+                                : 'All Lengths'}
+                            </Text>
+                          </Group>
+                          
+                          <Group justify="space-between" wrap="nowrap">
+                            <Text size="xs" fw={600} c="dimmed">Number of Questions</Text>
+                            <Text size="xs" fw={500}>
+                              {exercise.parameters.num_questions || exercise.questions?.length || 0} Questions
+                            </Text>
+                          </Group>
+                        </>
+                      )}
+                    </Stack>
+                  </Card>
+                </Box>
+              )}
+
               {sidebarOpen && <Title order={5} fw={600} c="dimmed" mb="xs">Smart Actions</Title>}
 
               {!editMode ? (
@@ -872,6 +974,14 @@ export default function ExerciseView() {
                       label={sidebarOpen ? "Edit Questions" : ""}
                       leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
                       onClick={() => setEditMode(true)}
+                    />
+                  </Tooltip>
+
+                  <Tooltip label="Reset Exercise" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Reset Exercise" : ""}
+                      leftSection={<IconRefresh size="1.2rem" stroke={1.5} color="var(--mantine-color-orange-6)" />}
+                      onClick={handleResetExercise}
                     />
                   </Tooltip>
 
