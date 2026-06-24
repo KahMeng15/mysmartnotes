@@ -743,7 +743,7 @@ export default function SummaryView() {
                 )}
                 <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}`)}>{note.subject.name}</Text>
                 <Text size="sm" c="dimmed">/</Text>
-                <Text size="sm" fw={500} c="dimmed">Note</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}/notes`)}>Note</Text>
               </Group>
             )}
           </Group>

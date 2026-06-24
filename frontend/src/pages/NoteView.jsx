@@ -519,7 +519,7 @@ export default function NoteView() {
                 )}
                 <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}`)}>{note.subject.name}</Text>
                 <Text size="sm" c="dimmed">/</Text>
-                <Text size="sm" fw={500} c="dimmed">Resource</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}/resource`)}>Resource</Text>
               </Group>
             )}
             {!isProcessed && (

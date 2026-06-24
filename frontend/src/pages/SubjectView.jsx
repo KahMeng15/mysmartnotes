@@ -1043,6 +1043,14 @@ export default function SubjectView() {
 
   return (
     <Box>
+      <style>{`
+        .clickable-crumb {
+          cursor: pointer;
+        }
+        .clickable-crumb:hover {
+          text-decoration: underline;
+        }
+      `}</style>
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20, margin: '-16px -16px 20px -16px' }}>
         <Group justify="space-between">
@@ -1051,11 +1059,11 @@ export default function SubjectView() {
               <IconChevronLeft size={20} />
             </ActionIcon>
             <Group gap="xs" ml="xs">
-              <Text size="sm" fw={500} c="dimmed" style={{ cursor: 'pointer' }} onClick={() => navigate('/mynotes')}>Notes</Text>
+              <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate('/mynotes')}>Notes</Text>
               {subject.group && (
                 <>
                   <Text size="sm" c="dimmed">/</Text>
-                  <Text size="sm" fw={500} c="dimmed" style={{ cursor: 'pointer' }} onClick={() => navigate(`/group/${subject.group.id}`)}>{subject.group.name}</Text>
+                  <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${subject.group.id}`)}>{subject.group.name}</Text>
                 </>
               )}
             </Group>

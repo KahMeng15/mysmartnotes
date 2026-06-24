@@ -407,6 +407,14 @@ export default function ExerciseView() {
 
   return (
     <Box h="100vh" style={{ display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+      <style>{`
+        .clickable-crumb {
+          cursor: pointer;
+        }
+        .clickable-crumb:hover {
+          text-decoration: underline;
+        }
+      `}</style>
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
         <Group justify="space-between">
@@ -418,13 +426,13 @@ export default function ExerciseView() {
               <Group gap="xs" ml="xs">
                 {exercise.subject.group && (
                   <>
-                    <Text size="sm" fw={500} c="dimmed" style={{ cursor: 'pointer' }} onClick={() => navigate(`/group/${exercise.subject.group.id}`)}>{exercise.subject.group.name}</Text>
+                    <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${exercise.subject.group.id}`)}>{exercise.subject.group.name}</Text>
                     <Text size="sm" c="dimmed">/</Text>
                   </>
                 )}
-                <Text size="sm" fw={500} c="dimmed" style={{ cursor: 'pointer' }} onClick={() => navigate(`/subject/${exercise.subject.id}`)}>{exercise.subject.name}</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${exercise.subject.id}`)}>{exercise.subject.name}</Text>
                 <Text size="sm" c="dimmed">/</Text>
-                <Text size="sm" fw={500} c="dimmed">Exercise</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${exercise.subject.id}/exercise`)}>Exercise</Text>
               </Group>
             )}
           </Group>
