@@ -369,8 +369,9 @@ Correct Answer: {answer_text}
     if user_answer:
         prompt += f"\nUser's Attempt: {user_answer}"
     system_prompt = (
-        "Explain the correct answer to this question clearly and simply. "
-        "If the user provided an attempt, explain where they went wrong or right."
+        "Explain the correct answer to this question in 1-3 concise sentences. "
+        "Address the reader directly. Be extremely brief and straight to the point. "
+        "If an attempt is provided, briefly state why it is right or wrong."
     )
     return _run_async(
         client.generate_text,

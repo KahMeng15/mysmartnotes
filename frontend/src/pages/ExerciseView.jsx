@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 
 export default function ExerciseView() {
@@ -35,6 +35,7 @@ export default function ExerciseView() {
   const [gradingLoading, setGradingLoading] = useState({});
   const [explainLoading, setExplainLoading] = useState({});
   const [revealedAnswers, setRevealedAnswers] = useState({});
+  const [showExplanations, setShowExplanations] = useState({});
 
   // Editing state
   const [editedQuestions, setEditedQuestions] = useState([]);
@@ -121,10 +122,23 @@ export default function ExerciseView() {
         body: JSON.stringify({ user_answer: userAnswers[qId] || "" })
       });
       setExplanations(prev => ({ ...prev, [qId]: res.explanation }));
+      setShowExplanations(prev => ({ ...prev, [qId]: true }));
     } catch (e) {
       alert("Failed to get explanation: " + e.message);
     } finally {
       setExplainLoading(prev => ({ ...prev, [qId]: false }));
+    }
+  };
+
+  const handleDeleteExplanation = async (qId) => {
+    try {
+      await fetchApi(`/exercises/${id}/questions/${qId}/explain`, {
+        method: 'DELETE'
+      });
+      setExplanations(prev => ({ ...prev, [qId]: null }));
+      setShowExplanations(prev => ({ ...prev, [qId]: false }));
+    } catch (e) {
+      alert("Failed to delete explanation: " + e.message);
     }
   };
 
@@ -370,9 +384,14 @@ export default function ExerciseView() {
                                 >
                                   Check Answer
                                 </Button>
-                                {hasGraded && (
+                                {hasGraded && !explanation && (
                                   <Button variant="light" color="grape" loading={explainLoading[q.id]} onClick={() => handleExplain(q.id)} leftSection={<IconBulb size={16} />}>
-                                    AI Explanation
+                                    Ask AI to Explain
+                                  </Button>
+                                )}
+                                {hasGraded && explanation && !showExplanations[q.id] && (
+                                  <Button variant="light" color="grape" onClick={() => setShowExplanations(prev => ({...prev, [q.id]: true}))} leftSection={<IconBulb size={16} />}>
+                                    Show AI Explanation
                                   </Button>
                                 )}
                               </Group>
@@ -391,10 +410,37 @@ export default function ExerciseView() {
                               </Alert>
                             )}
                             
-                            {!!explanation && (
-                               <Paper mt="md" p="md" bg="var(--mantine-color-gray-0)">
-                                 <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle' }}/><b>AI Explanation:</b> {explanation}</Text>
-                               </Paper>
+                            {explanation && showExplanations[q.id] && (
+                                <Paper mt="md" p="md" bg="var(--mantine-color-white)" radius="sm" withBorder>
+                                  <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                    {explainLoading[q.id] ? (
+                                       <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
+                                    ) : (
+                                      <>
+                                        <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b> {explanation}</Text>
+                                        <Menu position="bottom-end" shadow="sm">
+                                          <Menu.Target>
+                                            <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
+                                              <IconDotsVertical size={14} />
+                                            </ActionIcon>
+                                          </Menu.Target>
+                                          <Menu.Dropdown>
+                                            <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }}>
+                                              Regenerate Explanation
+                                            </Menu.Item>
+                                            <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
+                                              Hide Explanation
+                                            </Menu.Item>
+                                            <Menu.Divider />
+                                            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(q.id); }}>
+                                              Delete Explanation
+                                            </Menu.Item>
+                                          </Menu.Dropdown>
+                                        </Menu>
+                                      </>
+                                    )}
+                                  </Group>
+                                </Paper>
                             )}
                           </Box>
                         ) : (
@@ -429,9 +475,41 @@ export default function ExerciseView() {
                                     <Text c="blue.9">{q.answer_text || "No answer provided."}</Text>
                                     
                                     <Box mt="md">
-                                      {showAns && explanation && (
+                                      {explanation && !showExplanations[q.id] && (
+                                        <Button size="xs" variant="light" color="grape" mb="sm" onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: true })); }} leftSection={<IconBulb size={14} />}>
+                                          Show AI Explanation
+                                        </Button>
+                                      )}
+                                      {explanation && showExplanations[q.id] && (
                                         <Paper p="md" bg="var(--mantine-color-white)" radius="sm" mb="sm">
-                                          <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b> {explanation}</Text>
+                                          <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                            {explainLoading[q.id] ? (
+                                               <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
+                                            ) : (
+                                              <>
+                                                <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b> {explanation}</Text>
+                                                <Menu position="bottom-end" shadow="sm">
+                                                  <Menu.Target>
+                                                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
+                                                      <IconDotsVertical size={14} />
+                                                    </ActionIcon>
+                                                  </Menu.Target>
+                                                  <Menu.Dropdown>
+                                                    <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }}>
+                                                      Regenerate
+                                                    </Menu.Item>
+                                                    <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
+                                                      Hide
+                                                    </Menu.Item>
+                                                    <Menu.Divider />
+                                                    <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(q.id); }}>
+                                                      Delete
+                                                    </Menu.Item>
+                                                  </Menu.Dropdown>
+                                                </Menu>
+                                              </>
+                                            )}
+                                          </Group>
                                         </Paper>
                                       )}
                                       <Group gap="xs">
@@ -520,17 +598,18 @@ export default function ExerciseView() {
                         onChange={(v) => {
                           if (v === 'conversation') return;
                           setViewMode(v);
+                          setShowExplanations({});
                           if (examActive && v !== 'exam') {
                              setExamActive(false);
                              clearInterval(timerRef.current);
                           }
                         }}
                         data={[
-                          { label: 'Hide Answers', value: 'hide' },
-                          { label: 'Show All Answers', value: 'show' },
-                          { label: 'Interactive (Fill in)', value: 'interactive' },
-                          { label: 'Exam Mode (Timer)', value: 'exam' },
-                          { label: 'Conversation', value: 'conversation', disabled: true }
+                          { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEyeOff size={16} stroke={1.5} /><Text size="sm">Hide Answers</Text></Group>, value: 'hide' },
+                          { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEye size={16} stroke={1.5} /><Text size="sm">Show All Answers</Text></Group>, value: 'show' },
+                          { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEdit size={16} stroke={1.5} /><Text size="sm">Interactive</Text></Group>, value: 'interactive' },
+                          { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconClock size={16} stroke={1.5} /><Text size="sm">Exam Mode</Text></Group>, value: 'exam' },
+                          { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconMessageDots size={16} stroke={1.5} /><Text size="sm" c="dimmed">Conversation</Text></Group>, value: 'conversation', disabled: true }
                         ]}
                       />
                     </Box>

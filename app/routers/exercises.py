@@ -244,6 +244,29 @@ def explain_exercise_answer(
     
     return {"explanation": explanation}
 
+@router.delete("/{exercise_id}/questions/{question_id}/explain")
+def delete_exercise_explanation(
+    exercise_id: str,
+    question_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete an AI explanation for the question"""
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+        
+    questions = StorageManager.get_exercise_json(exercise_id) or []
+    question = next((q for q in questions if str(q.get("id")) == str(question_id)), None)
+    
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+        
+    question["explanation"] = None
+    StorageManager.save_exercise_json(exercise_id, questions)
+    
+    return {"message": "Explanation deleted"}
+
 @router.delete("/{exercise_id}")
 def delete_exercise(exercise_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Delete an exercise"""
