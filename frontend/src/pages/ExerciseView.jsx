@@ -142,6 +142,20 @@ export default function ExerciseView() {
     }
   };
 
+  const handleResetQuestion = (qId) => {
+    setUserAnswers(prev => ({ ...prev, [qId]: "" }));
+    setGradingResults(prev => {
+      const newResults = { ...prev };
+      delete newResults[qId];
+      return newResults;
+    });
+    setShowExplanations(prev => {
+      const newShow = { ...prev };
+      delete newShow[qId];
+      return newShow;
+    });
+  };
+
   const handleExport = async (format) => {
     setExporting(true);
     try {
@@ -377,22 +391,30 @@ export default function ExerciseView() {
                             
                             {!isExam && (
                               <Group mt="md">
-                                <Button 
-                                  loading={gradingLoading[q.id]} 
-                                  onClick={() => handleGrade(q.id)}
-                                  disabled={hasGraded || !userAnswers[q.id]}
-                                >
-                                  Check Answer
-                                </Button>
-                                {hasGraded && !explanation && (
-                                  <Button variant="light" color="grape" loading={explainLoading[q.id]} onClick={() => handleExplain(q.id)} leftSection={<IconBulb size={16} />}>
-                                    Ask AI to Explain
+                                {!hasGraded ? (
+                                  <Button 
+                                    loading={gradingLoading[q.id]} 
+                                    onClick={() => handleGrade(q.id)}
+                                    disabled={!userAnswers[q.id]}
+                                  >
+                                    Check Answer
                                   </Button>
-                                )}
-                                {hasGraded && explanation && !showExplanations[q.id] && (
-                                  <Button variant="light" color="grape" onClick={() => setShowExplanations(prev => ({...prev, [q.id]: true}))} leftSection={<IconBulb size={16} />}>
-                                    Show AI Explanation
-                                  </Button>
+                                ) : (
+                                  <>
+                                    <Button variant="light" color="gray" onClick={() => handleResetQuestion(q.id)} leftSection={<IconRefresh size={16} />}>
+                                      Reset
+                                    </Button>
+                                    {!explanation && (
+                                      <Button variant="light" color="grape" loading={explainLoading[q.id]} onClick={() => handleExplain(q.id)} leftSection={<IconBulb size={16} />}>
+                                        Ask AI to Explain
+                                      </Button>
+                                    )}
+                                    {explanation && !showExplanations[q.id] && (
+                                      <Button variant="light" color="grape" onClick={() => setShowExplanations(prev => ({...prev, [q.id]: true}))} leftSection={<IconBulb size={16} />}>
+                                        Show AI Explanation
+                                      </Button>
+                                    )}
+                                  </>
                                 )}
                               </Group>
                             )}

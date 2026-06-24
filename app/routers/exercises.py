@@ -204,8 +204,9 @@ def grade_exercise_answer(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
         
-    # Standard string match fallback for objective
-    if question.get("question_type") == "objective":
+    # Standard string match fallback ONLY for objective questions that have options
+    options = question.get("options")
+    if question.get("question_type") == "objective" and options and len(options) > 0:
         answer_text = question.get("answer_text", "")
         is_correct = req.user_answer.strip().lower() == answer_text.strip().lower()
         return ExerciseCheckResponse(

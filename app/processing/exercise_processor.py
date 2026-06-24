@@ -326,9 +326,11 @@ Correct Answer: {answer_text}
 User's Answer: {user_answer}
 """
     system_prompt = (
-        "You are grading a student's answer. Compare the User's Answer to the Correct Answer. "
+        "You are grading a student's answer. Do NOT require exact wording. "
+        "Evaluate if the student's answer correctly captures the core meaning or concept of the Correct Answer. "
+        "Be lenient with typos, synonyms, or alternative phrasings as long as the fundamental concept is accurate. "
         "Return your evaluation as a strict JSON object with two keys: "
-        "'is_correct' (boolean) and 'feedback' (string, a brief explanation of why it's correct or incorrect). "
+        "'is_correct' (boolean) and 'feedback' (string, a brief 1-2 sentence explanation). "
         "Do NOT include any markdown formatting, just the raw JSON."
     )
     response = _run_async(
