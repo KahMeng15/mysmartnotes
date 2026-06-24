@@ -427,26 +427,71 @@ def generate_exercise_task(exercise_id: str, user_id: int, req_data: Dict[str, A
         advanced = req_data.get("advanced", False)
         distribution = req_data.get("distribution", {})
         
-        if advanced and distribution:
-            dist_diff = f"{distribution.get('easy', 0)} Easy, {distribution.get('medium', 0)} Medium, {distribution.get('hard', 0)} Hard"
-            dist_len = f"{distribution.get('short', 0)} Short, {distribution.get('medLen', 0)} Medium, {distribution.get('long', 0)} Long"
-            dist_type = f"{distribution.get('typeShort', 0)} Short Answer, {distribution.get('typeLong', 0)} Long Answer, {distribution.get('typeObj', 0)} Objective (Multiple Choice), {distribution.get('typeFill', 0)} Fill in the blank"
+        all_questions_data = []
+        BATCH_SIZE = 20
+        remaining_questions = num_questions
+        
+        rem_dist = dict(distribution) if advanced else {}
+        chunk_index = 0
+        
+        while remaining_questions > 0:
+            chunk_size = min(BATCH_SIZE, remaining_questions)
             
-            prompt = f"""Generate exactly {num_questions} quiz questions based on the following content.
+            if advanced and rem_dist:
+                def get_chunk_dist(keys, size, total):
+                    c_dist = {}
+                    allocated = 0
+                    for k in keys:
+                        amount = min(rem_dist.get(k, 0), int(round((rem_dist.get(k, 0) / max(1, total)) * size)))
+                        c_dist[k] = amount
+                        allocated += amount
+                    
+                    diff = size - allocated
+                    sorted_keys = sorted(keys, key=lambda x: rem_dist.get(x, 0), reverse=True)
+                    while diff != 0:
+                        for k in sorted_keys:
+                            if diff > 0 and rem_dist.get(k, 0) > c_dist[k]:
+                                c_dist[k] += 1
+                                diff -= 1
+                                break
+                            elif diff < 0 and c_dist[k] > 0:
+                                c_dist[k] -= 1
+                                diff += 1
+                                break
+                        else:
+                            break
+                    return c_dist
+                
+                c_diff = get_chunk_dist(['easy', 'medium', 'hard'], chunk_size, remaining_questions)
+                c_len = get_chunk_dist(['short', 'medLen', 'long'], chunk_size, remaining_questions)
+                c_type = get_chunk_dist(['typeShort', 'typeLong', 'typeObj', 'typeFill'], chunk_size, remaining_questions)
+                
+                dist_diff = f"{c_diff.get('easy', 0)} Easy, {c_diff.get('medium', 0)} Medium, {c_diff.get('hard', 0)} Hard"
+                dist_len = f"{c_len.get('short', 0)} Short, {c_len.get('medLen', 0)} Medium, {c_len.get('long', 0)} Long"
+                dist_type = f"{c_type.get('typeShort', 0)} Short Answer, {c_type.get('typeLong', 0)} Long Answer, {c_type.get('typeObj', 0)} Objective (Multiple Choice), {c_type.get('typeFill', 0)} Fill in the blank"
+                
+                prompt = f"""Generate exactly {chunk_size} quiz questions based on the following content.
 
 Target question types distribution: {dist_type}.
 Target question lengths distribution: {dist_len}.
 Target question difficulties distribution: {dist_diff}.
 """
-        else:
-            prompt = f"""Generate exactly {num_questions} quiz questions based on the following content.
+            else:
+                prompt = f"""Generate exactly {chunk_size} quiz questions based on the following content.
 
 The questions MUST be of the following types: {types_str}. 
 Target lengths: {lengths_str}.
 Target difficulties: {diff_str}.
 If "mixed" is specified, provide a relatively even mix of 'objective' (multiple choice), 'subjective' (short answer), and 'fill_in_the_blank'.
 """
-        prompt += f"""
+            if all_questions_data:
+                previous_questions = "\n".join([f"- {q.get('question_text', '').replace('```', '')}" for q in all_questions_data[-50:]])
+                prompt += f"""
+IMPORTANT: You have already generated the following questions in previous batches. DO NOT generate duplicate questions or questions covering the exact same specific concept:
+{previous_questions}
+"""
+
+            prompt += f"""
 Content:
 {resources_text}
 
@@ -459,34 +504,52 @@ Each object must have the following keys:
 
 Respond with ONLY the JSON array.
 """
-        
-        client = AIClient()
-        response = _run_async(
-            client.generate_text,
-            prompt=prompt,
-            system_instruction="You are an expert educational content generator.",
-            max_tokens=8192
-        )
-        
-        try:
-            json_text = response.strip()
-            if json_text.startswith("```json"): json_text = json_text[7:]
-            if json_text.startswith("```"): json_text = json_text[3:]
-            if json_text.endswith("```"): json_text = json_text[:-3]
-            questions_data = json.loads(json_text.strip())
-        except json.JSONDecodeError:
-            raise ValueError("Failed to parse generated questions into JSON format.")
+            
+            client = AIClient()
+            response = _run_async(
+                client.generate_text,
+                prompt=prompt,
+                system_instruction="You are an expert educational content generator.",
+                max_tokens=8192
+            )
+            
+            try:
+                json_text = response.strip()
+                if json_text.startswith("```json"): json_text = json_text[7:]
+                if json_text.startswith("```"): json_text = json_text[3:]
+                if json_text.endswith("```"): json_text = json_text[:-3]
+                questions_data = json.loads(json_text.strip())
+                if isinstance(questions_data, list):
+                    valid_questions = [q for q in questions_data if isinstance(q, dict) and "question_text" in q]
+                    all_questions_data.extend(valid_questions)
+                else:
+                    valid_questions = []
+                
+                if advanced and rem_dist:
+                    for k, v in c_diff.items(): rem_dist[k] = max(0, rem_dist[k] - v)
+                    for k, v in c_len.items(): rem_dist[k] = max(0, rem_dist[k] - v)
+                    for k, v in c_type.items(): rem_dist[k] = max(0, rem_dist[k] - v)
+                    
+            except json.JSONDecodeError:
+                pass
+                
+            remaining_questions -= chunk_size
+            chunk_index += 1
+            progress_callback(40 + int((chunk_index * BATCH_SIZE / num_questions) * 40), f"Generated {len(all_questions_data)}/{num_questions} questions...")
+            
+            if remaining_questions > 0:
+                time.sleep(3)
             
         progress_callback(80, "Saving generated exercise...")
         
         order = 0
-        for q in questions_data:
+        for q in all_questions_data:
             q["original_number"] = str(q.get("original_number", order + 1))
             q["order"] = order
             q["id"] = str(order + 1)
             order += 1
             
-        StorageManager.save_exercise_json(exercise_id, questions_data)
+        StorageManager.save_exercise_json(exercise_id, all_questions_data)
         exercise.content_path = StorageManager._get_exercise_path(exercise_id)
             
         exercise.processing_time_ms = int((time.time() - start_time) * 1000)
@@ -501,5 +564,6 @@ Respond with ONLY the JSON array.
         logger.error(f"Exercise generation failed: {str(e)}")
         if task_id:
             TaskManager._update_db_task(task_id, status="failed", error=str(e))
+        raise
     finally:
         db.close()

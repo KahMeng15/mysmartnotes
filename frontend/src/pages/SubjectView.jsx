@@ -483,7 +483,6 @@ export default function SubjectView() {
   const [editSubjectName, setEditSubjectName] = useState('');
   const [editSubjectDesc, setEditSubjectDesc] = useState('');
   const [editSubjectColor, setEditSubjectColor] = useState('#593C8F');
-
   // Note Action Modals
   const [renameModalOpened, { open: openRenameModal, close: closeRenameModal }] = useDisclosure(false);
   const [deleteNoteModalOpened, { open: openDeleteNoteModal, close: closeDeleteNoteModal }] = useDisclosure(false);
@@ -502,7 +501,13 @@ export default function SubjectView() {
   const [resourceTasks, setResourceTasks] = useState({});
   const [cancelledNoteIds, setCancelledNoteIds] = useState(() => JSON.parse(localStorage.getItem('cancelledNoteIds') || '[]'));
   const [cancelledGeneratedNoteIds, setCancelledGeneratedNoteIds] = useState(() => JSON.parse(localStorage.getItem('cancelledGeneratedNoteIds') || '[]'));
+  
+  const [exerciseTasks, setExerciseTasks] = useState({});
+  const [cancelledExerciseIds, setCancelledExerciseIds] = useState(() => JSON.parse(localStorage.getItem('cancelledExerciseIds') || '[]'));
 
+  useEffect(() => {
+    localStorage.setItem('cancelledExerciseIds', JSON.stringify(cancelledExerciseIds));
+  }, [cancelledExerciseIds]);
   useEffect(() => {
     localStorage.setItem('failedGeneratedNoteIds', JSON.stringify(failedGeneratedNoteIds));
   }, [failedGeneratedNoteIds]);
@@ -709,6 +714,7 @@ export default function SubjectView() {
               }
 
               if (taskData) {
+                setExerciseTasks(prev => ({ ...prev, [ex.id]: taskData.task_id }));
                 if (taskData.progress !== undefined) {
                   setExerciseProgress(prev => ({ ...prev, [ex.id]: taskData.progress }));
                 }
@@ -1250,7 +1256,8 @@ export default function SubjectView() {
               {exercises.map((ex) => {
                 const isProcessed = ex.questions && ex.questions.length > 0;
                 const hasFailed = failedExerciseIds.includes(ex.id);
-                const isProcessing = !isProcessed && !hasFailed;
+                const isCancelled = cancelledExerciseIds.includes(ex.id);
+                const isProcessing = !isProcessed && !hasFailed && !isCancelled;
                 
                 return (
                 <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
@@ -1305,7 +1312,20 @@ export default function SubjectView() {
                           <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRenameExercise(ex)}>Rename</Menu.Item>
                           <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocessExercise(ex)}>Reprocess</Menu.Item>
                           <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalExercise(ex); }}>System Info</Menu.Item>
-                          <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDeleteExercise(ex)}>Delete</Menu.Item>
+                          {(isProcessing || reprocessingExerciseIds.includes(ex.id)) ? (
+                            <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
+                              const taskId = exerciseTasks[ex.id] || `generate_ex_${ex.id}`; // fallback if polling hasn't hit yet
+                              try {
+                                await fetchApi(`/search/tasks/${taskId}/cancel`, { method: 'POST' });
+                                setCancelledExerciseIds(prev => [...prev, ex.id]);
+                                setReprocessingExerciseIds(prev => prev.filter(id => id !== ex.id));
+                              } catch(e) {
+                                alert("Failed to cancel: " + e.message);
+                              }
+                            }}>Cancel Processing</Menu.Item>
+                          ) : (
+                            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDeleteExercise(ex)}>Delete</Menu.Item>
+                          )}
                         </Menu.Dropdown>
                       </Menu>
                     </Group>

@@ -23,8 +23,8 @@ class ExerciseQuestionUpdate(BaseModel):
     explanation: Optional[str] = None
 
 class ExerciseQuestionResponse(ExerciseQuestionBase):
-    id: int
-    exercise_id: str
+    id: str
+    exercise_id: Optional[str] = None
     reference_resource_id: Optional[str] = None
 
     class Config:
