@@ -52,23 +52,65 @@ export default function ExerciseView() {
     }
   }, [mode, id]);
 
+  // Load initial exam state from localStorage if it exists
+  const getInitialExamState = () => {
+    try {
+      const saved = localStorage.getItem(`exercise_exam_${id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.examActive && parsed.savedAt) {
+          const elapsedSeconds = Math.floor((Date.now() - parsed.savedAt) / 1000);
+          const remaining = Math.max(0, parsed.examTimeRemaining - elapsedSeconds);
+          return {
+            ...parsed,
+            examTimeRemaining: remaining,
+            examActive: remaining > 0 ? parsed.examActive : false,
+            examCompleted: remaining <= 0 ? true : parsed.examCompleted
+          };
+        }
+        return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  };
+
+  const initialExamState = getInitialExamState();
+
   // Exam state
   const [examTimerMinutes, setExamTimerMinutes] = useState(15);
-  const [examTimeRemaining, setExamTimeRemaining] = useState(null); // seconds
-  const [examActive, setExamActive] = useState(false);
-  const [examCompleted, setExamCompleted] = useState(false);
-  const [showTimeUpModal, setShowTimeUpModal] = useState(false);
+  const [examTimeRemaining, setExamTimeRemaining] = useState(initialExamState?.examTimeRemaining ?? null); // seconds
+  const [examActive, setExamActive] = useState(initialExamState?.examActive ?? false);
+  const [examCompleted, setExamCompleted] = useState(initialExamState?.examCompleted ?? false);
+  const [showTimeUpModal, setShowTimeUpModal] = useState(initialExamState?.examActive && initialExamState?.examTimeRemaining <= 0);
   const [customMinutes, setCustomMinutes] = useState(5);
   const timerRef = useRef(null);
 
   // User input and feedback state
-  const [userAnswers, setUserAnswers] = useState({});
-  const [gradingResults, setGradingResults] = useState({});
-  const [explanations, setExplanations] = useState({});
+  const [userAnswers, setUserAnswers] = useState(initialExamState?.userAnswers ?? {});
+  const [gradingResults, setGradingResults] = useState(initialExamState?.gradingResults ?? {});
+  const [explanations, setExplanations] = useState(initialExamState?.explanations ?? {});
   const [gradingLoading, setGradingLoading] = useState({});
   const [explainLoading, setExplainLoading] = useState({});
-  const [revealedAnswers, setRevealedAnswers] = useState({});
-  const [showExplanations, setShowExplanations] = useState({});
+  const [revealedAnswers, setRevealedAnswers] = useState(initialExamState?.revealedAnswers ?? {});
+  const [showExplanations, setShowExplanations] = useState(initialExamState?.showExplanations ?? {});
+
+  // Sync state to localStorage
+  useEffect(() => {
+    const stateToSave = {
+      examActive,
+      examCompleted,
+      examTimeRemaining,
+      userAnswers,
+      gradingResults,
+      explanations,
+      revealedAnswers,
+      showExplanations,
+      savedAt: Date.now()
+    };
+    localStorage.setItem(`exercise_exam_${id}`, JSON.stringify(stateToSave));
+  }, [id, examActive, examCompleted, examTimeRemaining, userAnswers, gradingResults, explanations, revealedAnswers, showExplanations]);
 
   // Editing state
   const [editedQuestions, setEditedQuestions] = useState([]);
