@@ -7,7 +7,7 @@ This guide is for developers who want to contribute to MySmartNotes or run it lo
 ## 🏗️ Architecture Overview
 
 The system consists of 5 primary services:
-1.  **Frontend (Nginx):** Serves static files (HTML/JS/CSS) and acts as a reverse proxy for the API.
+1.  **Frontend (React + Vite):** Dev server at `localhost:5173` with `/api` proxied to the API. Production builds are served by Nginx.
 2.  **API (FastAPI):** Handles HTTP requests, authentication, and database operations.
 3.  **Worker (Python):** Processes background tasks like OCR, AI processing, and embedding generation.
 4.  **Database (PostgreSQL):** Persistent storage for application data and the task queue.
@@ -71,30 +71,21 @@ This will start the **API** with hot-reload and the **Worker** as a background p
 
 ## 📜 Logging System
 
-The application uses a granular 15-file logging system. All logs are stored in the `./logs` directory in the project root.
+Logs are stored in `./logs/` via `app/logging_config.py`:
 
 | File | Description |
 | :--- | :--- |
-| `1-Frontend.log` | Nginx access and proxy logs. |
-| `2-All-API.log` | Aggregated logs from all API routers. |
-| `3-Auth-API.log` | Authentication and user management logs. |
-| `4-Notes-API.log` | Document upload and lecture management logs. |
-| ... | ... |
-| `10-Chat-Worker.log` | Background processing for AI chat. |
-| `11-Upload-Worker.log` | Background processing for OCR and file parsing. |
+| `api.log` | All API request logs. |
+| `worker.log` | Background worker logs. |
+| `errors.log` | ERROR-level logs from all sources. |
 
 ---
 
 ## 🧪 Testing
 
-The project uses `pytest` for testing.
-
+No Python test suite exists. Offline extraction test (no server needed):
 ```bash
-# Run all tests
-pytest
-
-# Run tests with coverage
-pytest --cov=app tests/
+python scripts/ProcessingAlgorithmTest/run_smart.py
 ```
 
 ---
@@ -111,7 +102,7 @@ The core logic resides in `app/processing/smart_pipeline.py`.
 - Use `scripts/ProcessingAlgorithmTest/run_smart.py` to test extraction on specific files without booting the whole app.
 
 ### Database Migrations
-We currently use SQLAlchemy's `Base.metadata.create_all()` for automatic schema initialization on startup. For complex migrations, ensure the API container starts first as it handles the `init_db()` call.
+Tables auto-created via `Base.metadata.create_all()` in `init_db()`. Schema changes go in `app/utils/db.py` as new `apply_*_migration()` functions called from `init_db()` — never hand-write SQL migration scripts.
 
 ### AI Configuration & 3-Tier Fallback
 The AI client (`app/processing/ai_client.py`) is designed with a 3-tier fallback hierarchy to ensure robustness:
@@ -119,7 +110,7 @@ The AI client (`app/processing/ai_client.py`) is designed with a 3-tier fallback
 2. **Tier 2 (Secondary)**: Fallback Reasoning LLM (default: `models/gemma-4-26b-a4b-it` via Gemini API).
 3. **Tier 3 (Local Fallback)**: Offline/local model (default: `llama3` or `gemma4:e2b` via Ollama).
 
-For testing LLM interactions, you can use `scripts/test_chat_logic.py` to verify prompt responses and fallback logic.
+For testing LLM extraction behavior offline, use `scripts/ProcessingAlgorithmTest/run_smart.py`.
 
 ---
 

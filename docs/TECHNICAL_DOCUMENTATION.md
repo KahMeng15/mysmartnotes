@@ -26,9 +26,12 @@ MySmartNotes follows a modular, multi-service architecture designed for reliable
 - **AI Integration**: Custom `AIClient` supporting Google Gemini, Hugging Face Inference API, and local Ollama.
 
 ### 2.3 Frontend
-- **Framework**: Vanilla JavaScript, HTML5, and CSS3.
-- **Build System**: Zero-build (no npm/webpack required).
-- **Markdown Rendering**: `marked.js` on the client-side.
+- **Framework**: React 19 + Vite + Mantine UI 9.
+- **Routing**: `react-router-dom` for client-side routing.
+- **Markdown Rendering**: `react-markdown` with `remark-gfm` + `rehype-raw`.
+- **Rich Text**: TipTap editor (Mantine integration) with table support.
+- **Icons**: `@tabler/icons-react`.
+- **Build System**: Vite dev server (hot-reload) at `localhost:5173`, proxies `/api` → API.
 - **Real-time Updates**: WebSockets for live processing progress.
 
 ---
@@ -127,11 +130,10 @@ The middleware logic in `app/main.py` coordinates robust safety controls:
 │   ├── models/             # SQLAlchemy DB models
 │   ├── processing/         # Core extraction & AI logic
 │   ├── routers/            # FastAPI API endpoints
-│   ├── static/             # Frontend assets (HTML, JS, CSS)
 │   ├── utils/              # Utilities (Auth, Tasks, DB)
 │   ├── main.py             # API entry point
-│   ├── worker_main.py      # Background worker entry point
-│   └── nginx.conf          # Nginx configuration
+│   └── worker_main.py      # Background worker entry point
+├── frontend/               # React + Vite + Mantine UI
 ├── data/                   # Persistent storage (Postgres/Uploads)
 ├── docs/                   # Documentation files
 ├── logs/                   # Centralized logging directory

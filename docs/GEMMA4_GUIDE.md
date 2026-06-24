@@ -16,17 +16,17 @@ The following models have been tested and verified to work with the current impl
 To use Gemma 4, update your `.env` file or the Admin Dashboard settings:
 
 ```env
-# Set the provider to gemini
-GLOBAL_AI_PROVIDER=gemini
+# Set the provider to gemini (Tier 1)
+GLOBAL_AI_TIER1_PROVIDER=gemini
 
 # Choose one of the verified models
-GLOBAL_AI_MODEL=models/gemma-4-26b-a4b-it
+GLOBAL_AI_TIER1_MODEL=models/gemma-4-26b-a4b-it
 
 # Ensure your Gemini API Key is set
-GLOBAL_GEMINI_API_KEY=your_api_key_here
+GLOBAL_AI_TIER1_API_KEY=your_api_key_here
 
 # (Optional) Set reasoning depth: low, medium, or high
-GLOBAL_REASONING_LEVEL=medium
+GLOBAL_AI_TIER1_REASONING_LEVEL=medium
 ```
 
 ## 🧠 How Reasoning Works in MySmartNotes
@@ -40,7 +40,7 @@ Gemma 4 outputs its reasoning process using special tokens (e.g., `<|thought|>` 
 *   **Result:** You get a clean, polished answer without the internal "messy" thinking process visible.
 
 ### 3. Increased Timeouts
-Because Gemma 4 "thinks" before it speaks, response times may be longer than standard models (like Gemini 1.5 Flash). The application is configured with a 90-second timeout to accommodate this extra processing time.
+Because Gemma 4 "thinks" before it speaks, response times may be longer than standard models (like Gemini 1.5 Flash). The application is configured with a 240-second timeout to accommodate this extra processing time.
 
 ## 💡 Best Practices
 

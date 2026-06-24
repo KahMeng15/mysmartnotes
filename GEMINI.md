@@ -27,7 +27,7 @@ pip install -r requirements.txt
 
 # 3. Configure environment
 cp .env.example .env
-# Edit .env to add your API keys and set DATABASE_URL=postgresql://mysmartnotes:mysmartnotespassword@localhost:5432/mysmartnotes
+# Edit .env to add your API keys. Do NOT set DATABASE_URL — it's auto-constructed from DB_USER/PASSWORD/HOST/PORT/NAME.
 
 # 4. Run API and Worker
 ./scripts/dev.sh
@@ -42,12 +42,9 @@ docker-compose up -d --build
 - **API Docs**: `http://localhost:8000/docs`
 
 ### Testing
+No Python test suite exists. Offline extraction test:
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app tests/
+python scripts/ProcessingAlgorithmTest/run_smart.py
 ```
 
 ## 🛠️ Development Conventions
@@ -69,7 +66,7 @@ Tasks (OCR, AI generation, Embeddings) are managed via a database-backed queue. 
 - **IP Filtering & Lockdown Mode**: Configurable via the admin dashboard and `IPFilter` model.
 
 ### Logging
-The system uses a granular logging configuration (`app/logging_config.py`) that outputs to 15 different log files in the `./logs` directory, separating concerns by API module and worker type.
+The system writes logs to `./logs/` (3 files: `api.log`, `worker.log`, `errors.log`) via `app/logging_config.py`.
 
 ### UI Development
 The frontend is built with React, Vite, and Mantine UI. It handles its own routing using `react-router-dom` and interacts with the FastAPI backend via REST endpoints.

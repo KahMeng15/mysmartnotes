@@ -43,7 +43,7 @@
 - **Frontend:** React, Vite, Mantine UI, `react-router-dom`.
 - **Backend API:** FastAPI (Python 3.11+).
 - **Background Worker:** Dedicated Python process consuming a database-backed task queue.
-- **Database:** PostgreSQL 15 (managed via SQLAlchemy ORM). Used for relational data and vector storage (likely via `pgvector`).
+- **Database:** PostgreSQL 15 (managed via SQLAlchemy ORM). Used for relational data and vector storage (embeddings stored as JSON in the `lecture_embeddings` table).
 - **Caching/Queue:** Redis (used alongside PostgreSQL for infrastructure).
 
 ### 4.2 System Components

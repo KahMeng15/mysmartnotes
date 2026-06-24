@@ -45,7 +45,7 @@ Models optimized for specific data types or experimental features.
 ## 🛠️ Usage Notes
 - **API Key:** Ensure your `GEMINI_API_KEY` has permissions for the model series.
 - **Experimental Models:** Models marked with `preview` or `experimental` may have lower rate limits or inconsistent uptime.
-- **Thinking Mode:** Gemma 4 models require special handling for their `<|channel|>thought` tokens. See `docs/GEMMA4_SKILL.md` for implementation details.
+- **Thinking Mode:** Gemma 4 models require special handling for their `<|channel|>thought` tokens. See `docs/GEMMA4_GUIDE.md` for implementation details.
 
 ## ⚡ Groq Models (Fast Inference)
 These models run on Groq's LPU architecture, providing extremely fast token generation speeds. Excellent for long context and reasoning tasks.
