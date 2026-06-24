@@ -744,7 +744,7 @@ export default function Dashboard() {
     <Box pt="lg">
       {/* Welcome Section */}
       <Box mb="xl">
-        <Text ff="Instrument Serif, serif" fs="italic" style={{ fontSize: 'clamp(3rem, 12vw, 6rem)', fontWeight: 700, lineHeight: 0.9, color: '#171738', wordBreak: 'break-word' }}>
+        <Text ff="Instrument Serif, serif" fs="italic" style={{ fontSize: 'clamp(3rem, 5vw, 4rem)', fontWeight: 700, lineHeight: 0.9, color: '#171738', wordBreak: 'break-word' }}>
           {greeting}
         </Text>
         <Text c="dimmed" size={{ base: 'sm', md: 'lg' }} mt={4}>
