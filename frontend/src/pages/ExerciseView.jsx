@@ -510,7 +510,7 @@ export default function ExerciseView() {
             <Box px="md">
               <div className="summary-header" style={{ marginBottom: '1.5rem', marginTop: '1.5rem' }}>
                 <Group justify="space-between">
-                  <Title order={1} style={{ marginTop: 0, marginBottom: 0, color: '#171738', fontWeight: 700 }}>
+                  <Title order={1} style={{ marginTop: 0, marginBottom: 0, paddingTop: '2rem', color: '#171738', fontWeight: 700 }}>
                     {exercise.title}
                   </Title>
                 </Group>

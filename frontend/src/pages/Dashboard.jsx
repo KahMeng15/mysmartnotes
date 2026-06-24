@@ -26,9 +26,9 @@ import {
   IconUpload,
   IconBooks,
   IconMessageDots,
-  IconBolt,
-  IconClock as IconTimerFallback,
-  IconPlus,
+  IconFileText,
+  IconBrain,
+  IconNotes,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -37,8 +37,6 @@ const quickActions = [
   { label: 'Upload', icon: IconUpload, color: 'indigo', path: '/upload' },
   { label: 'My Notes', icon: IconBooks, color: 'teal', path: '/mynotes' },
   { label: 'Chat', icon: IconMessageDots, color: 'blue', path: '/chat' },
-  { label: 'Exercises', icon: IconBolt, color: 'pink', path: '/mynotes' },
-  { label: 'Pomodoro', icon: IconTimerFallback, color: 'yellow', path: '/pomodoro' },
 ];
 
 export default function Dashboard() {
@@ -54,24 +52,22 @@ export default function Dashboard() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const userName = user.nickname || user.full_name || user.username || 'Student';
 
-  const [recentNotes, setRecentNotes] = useState([]);
-  const [loadingNotes, setLoadingNotes] = useState(true);
+  const [recentItems, setRecentItems] = useState([]);
+  const [loadingItems, setLoadingItems] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [summaryData, notesData] = await Promise.all([
+        const [summaryData, recentData] = await Promise.all([
           fetchApi('/analytics/dashboard-summary'),
-          fetchApi('/resources')
+          fetchApi('/search/recent')
         ]);
         setSummary(summaryData);
-        // Sort notes by newest first and take top 5
-        const sorted = notesData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
-        setRecentNotes(sorted);
+        setRecentItems(recentData || []);
       } catch (err) {
         console.error("Failed to load dashboard data", err);
       } finally {
-        setLoadingNotes(false);
+        setLoadingItems(false);
       }
     };
     loadData();
@@ -92,7 +88,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <Box>
+    <Box pt="lg">
       {/* Welcome Section */}
       <Box mb="xl">
         <Text ff="Instrument Serif, serif" fs="italic" style={{ fontSize: '4rem', fontWeight: 700, lineHeight: 0.8, color: '#171738' }}>
@@ -162,36 +158,43 @@ export default function Dashboard() {
         ))}
       </SimpleGrid>
 
-      {/* Recent Notes Section */}
-      <Group justify="space-between" mb="md" mt="xl">
-        <Title order={3} fw={600} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>Recent Notes</Title>
-        <Button leftSection={<IconPlus size={16} />} variant="light" onClick={openSubjectModal}>
-          Create Subject
-        </Button>
-      </Group>
+      {/* Recent Items Section */}
+      <Title order={3} mb="md" mt="xl" fw={600} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738' }}>Recent Items</Title>
       
-      {loadingNotes ? (
+      {loadingItems ? (
         <Card withBorder radius="md" padding="xl">
           <Center style={{ height: 150 }}>
             <Stack align="center" spacing="xs">
               <Loader color="blue" type="bars" />
-              <Text c="dimmed">Loading notes...</Text>
+              <Text c="dimmed">Loading recent items...</Text>
             </Stack>
           </Center>
         </Card>
-      ) : recentNotes.length > 0 ? (
+      ) : recentItems.length > 0 ? (
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
-          {recentNotes.map(note => (
-            <Card key={note.id} withBorder radius="md" padding="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/resource/${note.id}`)}>
-              <Text fw={600} mb="xs" c="#171738">{note.title}</Text>
-              <Text size="sm" c="dimmed">Uploaded: {new Date(note.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
-            </Card>
-          ))}
+          {recentItems.slice(0, 9).map(item => {
+            const iconMap = { resource: IconFileText, exercise: IconBrain, note: IconNotes };
+            const Icon = iconMap[item.type] || IconFileText;
+            const pathMap = { resource: '/resource/', exercise: '/exercises/', note: '/note/' };
+            const labelMap = { resource: 'Resource', exercise: 'Exercise', note: 'Note' };
+            return (
+              <Card key={`${item.type}-${item.id}`} withBorder radius="md" padding="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`${pathMap[item.type]}${item.id}`)}>
+                <Group mb="xs">
+                  <Icon size={18} stroke={1.5} />
+                  <Text size="xs" c="dimmed" tt="uppercase" fw={600}>{labelMap[item.type]}</Text>
+                </Group>
+                <Text fw={600} c="#171738" lineClamp={2}>{item.title}</Text>
+                {item.subject_name && (
+                  <Text size="sm" c="dimmed" mt={4}>{item.subject_name}</Text>
+                )}
+              </Card>
+            );
+          })}
         </SimpleGrid>
       ) : (
         <Card withBorder radius="md" padding="xl">
           <Center style={{ height: 150 }}>
-            <Text c="dimmed">No recent notes found.</Text>
+            <Text c="dimmed">No recent items found.</Text>
           </Center>
         </Card>
       )}

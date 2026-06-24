@@ -5,6 +5,28 @@ import { IconTrash, IconEdit, IconUpload, IconPlus, IconFiles, IconDotsVertical,
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 
+const generateContrastingColor = () => {
+  const h = Math.floor(Math.random() * 360) / 360;
+  const s = (55 + Math.floor(Math.random() * 30)) / 100;
+  const l = (35 + Math.floor(Math.random() * 25)) / 100;
+
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h * 6) % 2 - 1));
+  const m = l - c / 2;
+
+  let r = 0, g = 0, b = 0;
+  const hi = Math.floor(h * 6);
+  if (hi === 0) { r = c; g = x; b = 0; }
+  else if (hi === 1) { r = x; g = c; b = 0; }
+  else if (hi === 2) { r = 0; g = c; b = x; }
+  else if (hi === 3) { r = 0; g = x; b = c; }
+  else if (hi === 4) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+
+  const hex = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${hex(r)}${hex(g)}${hex(b)}`;
+};
+
 export default function GroupView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -24,7 +46,7 @@ export default function GroupView() {
   const [deleteSubjectModalOpened, { open: openDeleteSubjectModal, close: closeDeleteSubjectModal }] = useDisclosure(false);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newSubjectDesc, setNewSubjectDesc] = useState('');
-  const [newSubjectColor, setNewSubjectColor] = useState('#593C8F');
+  const [newSubjectColor, setNewSubjectColor] = useState(generateContrastingColor());
   const [editingSubject, setEditingSubject] = useState(null);
   const [subjectToDelete, setSubjectToDelete] = useState(null);
 
@@ -133,7 +155,7 @@ export default function GroupView() {
     setEditingSubject(null);
     setNewSubjectName('');
     setNewSubjectDesc('');
-    setNewSubjectColor('#593C8F');
+    setNewSubjectColor(generateContrastingColor());
     openSubjectModal();
   };
 
@@ -289,7 +311,7 @@ export default function GroupView() {
       </Group>
 
       {filteredSubjects.length > 0 ? (
-        <Stack spacing="sm">
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">
           {filteredSubjects.map((subject) => (
             <Card
               key={subject.id}
@@ -331,7 +353,7 @@ export default function GroupView() {
               </Group>
             </Card>
           ))}
-        </Stack>
+        </SimpleGrid>
       ) : (
         <Center h={200}>
           <Box ta="center">

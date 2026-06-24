@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
 
-from app.models.db import User, Resource, Task
+from app.models.db import User, Resource, Task, Exercise, Note, Subject
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.utils.storage import StorageManager
@@ -339,3 +339,44 @@ async def get_resource_task_status(
             "status": "pending",
             "progress": 0
         }
+
+
+class RecentItem(BaseModel):
+    id: str
+    type: str
+    title: str
+    updated_at: str
+    subject_id: str | None = None
+    subject_name: str | None = None
+
+
+@router.get("/recent", response_model=List[RecentItem])
+def get_recent_items(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get recent items (resources, exercises, notes) for the current user"""
+    resources = db.query(Resource).filter(
+        Resource.user_id == current_user.id
+    ).order_by(Resource.updated_at.desc()).limit(10).all()
+
+    exercises = db.query(Exercise).filter(
+        Exercise.user_id == current_user.id
+    ).order_by(Exercise.updated_at.desc()).limit(10).all()
+
+    notes = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
+        Resource.user_id == current_user.id
+    ).order_by(Note.created_at.desc()).limit(10).all()
+
+    subjects = {s.id: s.name for s in db.query(Subject).filter(Subject.user_id == current_user.id).all()}
+
+    items: list[RecentItem] = []
+
+    for r in resources:
+        items.append(RecentItem(id=r.id, type="resource", title=r.title, updated_at=r.updated_at.isoformat() if r.updated_at else "", subject_id=r.subject_id, subject_name=subjects.get(r.subject_id)))
+
+    for e in exercises:
+        items.append(RecentItem(id=e.id, type="exercise", title=e.title, updated_at=e.updated_at.isoformat() if e.updated_at else "", subject_id=e.subject_id, subject_name=subjects.get(e.subject_id)))
+
+    for n in notes:
+        items.append(RecentItem(id=n.id, type="note", title=n.title, updated_at=n.created_at.isoformat() if n.created_at else "", subject_id=n.resource.subject_id if n.resource else None, subject_name=subjects.get(n.resource.subject_id) if n.resource else None))
+
+    items.sort(key=lambda x: x.updated_at, reverse=True)
+    return items[:20]

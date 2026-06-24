@@ -29,6 +29,25 @@ router = APIRouter(
     responses={401: {"description": "Unauthorized"}}
 )
 
+@router.get("", response_model=List[ExerciseResponse])
+def get_all_exercises(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Get all exercises for the current user"""
+    exercises = db.query(Exercise).filter(
+        Exercise.user_id == current_user.id
+    ).order_by(Exercise.updated_at.desc()).all()
+
+    response_exercises = []
+    for ex in exercises:
+        ex_data = ExerciseResponse.from_orm(ex)
+        params = StorageManager.get_resource_json(ex.id, "parameters")
+        if params:
+            ex_data.parameters = params
+        questions = StorageManager.get_exercise_json(ex.id)
+        if questions:
+            ex_data.questions = questions
+        response_exercises.append(ex_data)
+    return response_exercises
+
 @router.get("/subject/{subject_id}", response_model=List[ExerciseResponse])
 def get_exercises_by_subject(subject_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Get all exercises for a subject"""

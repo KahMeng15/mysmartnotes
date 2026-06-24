@@ -446,7 +446,7 @@ export default function NoteView() {
           z-index: 10;
           border-bottom: 1px solid #eaeaea;
         }
-        .sticky-markdown h1 { top: 0; z-index: 16; font-size: 2.2rem; }
+        .sticky-markdown h1 { top: 0; z-index: 16; font-size: 2.2rem; padding-top: 2rem; }
         .sticky-markdown h2 { top: var(--h2-top, 3.5rem); z-index: 15; font-size: 1.8rem; }
         .sticky-markdown h3 { top: var(--h3-top, 6.5rem); z-index: 14; font-size: 1.5rem; }
         .sticky-markdown h4 { top: var(--h4-top, 9rem); z-index: 13; font-size: 1.25rem; }
