@@ -183,76 +183,74 @@ export default function NoteView() {
 
   useEffect(() => {
     if (!highlightText || loading || !markdownRef.current || isEditing || isRawMode) return;
-    
-    const highlightTimer = setTimeout(() => {
-      const selection = window.getSelection();
-      selection?.removeAllRanges();
-      
-      let cleanSearch = highlightText.replace(/[*_#`~\[\]()]/g, ' ').replace(/\s+/g, ' ').trim();
-      const words = cleanSearch.split(' ').filter(w => w.length > 0);
-      
-      let found = false;
-      let matchedRange = null;
 
-      const windowSize = Math.min(6, words.length);
-      
-      for (let i = 0; i <= words.length - windowSize; i++) {
-         const searchStr = words.slice(i, i + windowSize).join(' ');
-         
-         const selection = window.getSelection();
-         selection?.removeAllRanges();
-         
-         try {
-            const range = document.createRange();
-            range.selectNodeContents(markdownRef.current);
-            range.collapse(true);
-            selection.addRange(range);
-         } catch(e) {}
-         
-         let attempts = 0;
-         while (window.find(searchStr, false, false, true) && attempts < 10) {
-            attempts++;
-            if (selection && selection.rangeCount > 0) {
-              const range = selection.getRangeAt(0);
-              if (markdownRef.current.contains(range.commonAncestorContainer)) {
-                found = true;
-                matchedRange = range;
-                break;
-              }
-            }
-         }
-         
-         if (found) break;
+    const highlightTimer = setTimeout(() => {
+      const root = markdownRef.current;
+      const cleanSearch = highlightText.replace(/[*_#`~\[\]()]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!cleanSearch) return;
+
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+      const textNodes = [];
+      let fullText = '';
+      let node;
+      while ((node = walker.nextNode())) {
+        textNodes.push(node);
+        fullText += node.textContent;
       }
 
-      if (found && matchedRange) {
-         let targetRect = null;
-         try {
-           const mark = document.createElement('mark');
-           mark.style.backgroundColor = '#ffd8a8';
-           mark.style.color = 'inherit';
-           mark.style.borderRadius = '2px';
-           matchedRange.surroundContents(mark);
-           targetRect = mark.getBoundingClientRect();
-           selection.removeAllRanges();
-         } catch(e) {
-           targetRect = matchedRange.getBoundingClientRect();
-         }
+      const matchIdx = fullText.toLowerCase().indexOf(cleanSearch);
+      if (matchIdx === -1) return;
 
-         if (targetRect && viewportRef.current) {
-           const viewportRect = viewportRef.current.getBoundingClientRect();
-           const scrollTop = viewportRef.current.scrollTop + (targetRect.top - viewportRect.top) - (viewportRect.height / 2);
-           
-           viewportRef.current.scrollTo({
-             top: scrollTop,
-             behavior: 'smooth'
-           });
-         }
-      } else {
-         selection?.removeAllRanges();
+      let startNode = null, startOffset = 0, endNode = null, endOffset = 0;
+      let accumulated = 0;
+
+      for (const tn of textNodes) {
+        const len = tn.textContent.length;
+        const nodeEnd = accumulated + len;
+
+        if (startNode === null && matchIdx < nodeEnd) {
+          startNode = tn;
+          startOffset = matchIdx - accumulated;
+        }
+
+        if (endNode === null && matchIdx + cleanSearch.length <= nodeEnd) {
+          endNode = tn;
+          endOffset = matchIdx + cleanSearch.length - accumulated;
+          break;
+        }
+
+        accumulated = nodeEnd;
+      }
+
+      if (!startNode || !endNode) return;
+
+      const range = document.createRange();
+      range.setStart(startNode, startOffset);
+      range.setEnd(endNode, endOffset);
+
+      try {
+        const mark = document.createElement('mark');
+        mark.style.backgroundColor = '#ffd8a8';
+        mark.style.color = 'inherit';
+        mark.style.borderRadius = '2px';
+        mark.style.padding = '0 2px';
+        range.surroundContents(mark);
+      } catch (e) {
+        try {
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+        } catch (e2) {}
+      }
+
+      const targetRect = range.getBoundingClientRect();
+      if (targetRect && targetRect.top && viewportRef.current) {
+        const viewportRect = viewportRef.current.getBoundingClientRect();
+        const scrollTop = viewportRef.current.scrollTop + (targetRect.top - viewportRect.top) - (viewportRect.height / 2);
+        viewportRef.current.scrollTo({ top: scrollTop, behavior: 'smooth' });
       }
     }, 600);
-    
+
     return () => clearTimeout(highlightTimer);
   }, [highlightText, loading, content, isEditing, isRawMode]);
 

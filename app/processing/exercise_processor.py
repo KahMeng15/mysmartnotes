@@ -594,20 +594,6 @@ Respond with ONLY the JSON array.
                     valid_questions = []
                     for q in questions_data:
                         if isinstance(q, dict) and "question_text" in q:
-                            # Map resource_title to reference_resource_id
-                            r_title = q.get("resource_title", "")
-                            if r_title:
-                                r_title_clean = r_title.strip()
-                                # exact match or fallback to substring match
-                                mapped_id = title_to_id.get(r_title_clean)
-                                if not mapped_id:
-                                    for t, r_id in title_to_id.items():
-                                        if t.lower() in r_title_clean.lower() or r_title_clean.lower() in t.lower():
-                                            mapped_id = r_id
-                                            break
-                                if mapped_id:
-                                    q["reference_resource_id"] = mapped_id
-                                q["reference_resource_title"] = r_title_clean
                             valid_questions.append(q)
                     all_questions_data.extend(valid_questions)
                 else:
@@ -628,13 +614,25 @@ Respond with ONLY the JSON array.
             if remaining_questions > 0:
                 time.sleep(3)
             
-        progress_callback(80, "Saving generated exercise...")
+        progress_callback(80, "Mapping references to your resources...")
+        
+        resource_id_to_title = {v: k for k, v in title_to_id.items()}
         
         order = 0
         for q in all_questions_data:
             q["original_number"] = str(q.get("original_number", order + 1))
             q["order"] = order
             q["id"] = str(order + 1)
+            
+            try:
+                chunks = retrieve_relevant_chunks(q.get("question_text", ""), resource_ids, db, top_k=1)
+                if chunks:
+                    q["reference_resource_id"] = chunks[0]["resource_id"]
+                    q["reference_resource_title"] = resource_id_to_title.get(chunks[0]["resource_id"])
+                    q["reference_quote"] = chunks[0].get("text", "")[:300]
+            except Exception as e:
+                logger.warning(f"Embedding lookup failed for question {order}: {e}")
+            
             order += 1
             
         StorageManager.save_exercise_json(exercise_id, all_questions_data)
