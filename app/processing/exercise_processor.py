@@ -142,6 +142,29 @@ def _extract_fallback_questions(raw_text: str) -> List[Dict[str, Any]]:
         i = j if j > i else i + 1
     return extracted
 
+def _extract_title_from_text(raw_text: str) -> str | None:
+    if not raw_text:
+        return None
+    question_words = {"what", "how", "why", "when", "which", "where", "who", "define", "explain", "list", "name", "describe", "is", "are", "does", "do", "can", "would", "could", "should"}
+    lines = raw_text.strip().split("\n")
+    best = None
+    for line in lines:
+        stripped = line.strip().strip("# \t")
+        if not stripped or len(stripped) < 4:
+            continue
+        if stripped.isdigit():
+            continue
+        first_word = stripped.split()[0].lower().strip("()[].,:;!?")
+        if stripped.endswith("?"):
+            continue
+        if first_word in question_words:
+            continue
+        if 10 <= len(stripped) <= 80:
+            best = stripped
+        elif best is None and len(stripped) < 100:
+            best = stripped
+    return best
+
 def process_exercise_task(exercise_id: str, user_id: int, task_id: str = None, **kwargs):
     db = SessionLocal()
     try:
@@ -268,12 +291,29 @@ Respond with ONLY the JSON object.
 
         if not questions_data:
             questions_data = _extract_fallback_questions(text)
+
+        still_has_filename_title = (
+            exercise.file_name and
+            exercise.title == os.path.splitext(exercise.file_name)[0]
+        )
+        if still_has_filename_title:
+            if suggested_title:
+                cleaned = suggested_title.strip().strip("# \t")
+                if cleaned and not cleaned.isdigit() and len(cleaned) >= 3:
+                    exercise.title = cleaned
+            if exercise.title == os.path.splitext(exercise.file_name or "")[0] or len(exercise.title) < 3 or exercise.title.isdigit():
+                extracted = _extract_title_from_text(raw_text)
+                if extracted:
+                    exercise.title = extracted
+            db.commit()
             
         if not questions_data:
             raise ValueError("AI failed to structure the imported content properly.")
 
         normalized_questions = []
         for q_data in questions_data:
+            if not isinstance(q_data, dict):
+                continue
             q_text = str(q_data.get("question_text", "")).strip()
             if not q_text: continue
             q_type = _normalize_type(str(q_data.get("question_type", "subjective")))
@@ -307,9 +347,6 @@ Respond with ONLY the JSON object.
             raise ValueError("No valid questions could be extracted.")
 
         questions_data = normalized_questions
-        
-        if suggested_title and exercise.title == "Uploaded Exercise":
-            exercise.title = suggested_title
 
         progress_callback(80, "Mapping references via embeddings fallback...")
         
@@ -353,6 +390,7 @@ Respond with ONLY the JSON object.
         logger.error(f"Error processing exercise {exercise_id}: {e}", exc_info=True)
         if task_id:
             TaskManager._update_db_task(task_id, status="failed", error=str(e))
+        raise
     finally:
         db.close()
 

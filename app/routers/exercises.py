@@ -113,7 +113,7 @@ def upload_exercise(
         user_id=current_user.id,
         subject_id=subject_id,
         group_id=subject.group_id,
-        title=file.filename or "Uploaded Exercise",
+        title=os.path.splitext(file.filename)[0] if file.filename else "Uploaded Exercise",
         file_path=file_path,
         file_name=file.filename
     )
