@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
 from datetime import datetime
+from app.schemas.schemas import SubjectResponse
 
 class ExerciseQuestionBase(BaseModel):
     question_text: str
@@ -54,6 +55,7 @@ class ExerciseResponse(ExerciseBase):
     created_at: datetime
     updated_at: datetime
     questions: List[ExerciseQuestionResponse] = []
+    subject: Optional[SubjectResponse] = None
 
     class Config:
         from_attributes = True

@@ -105,7 +105,7 @@ function AppLayout({ children }) {
         breakpoint: 'sm',
         collapsed: { mobile: !mobileOpened },
       }}
-      padding={(location.pathname.startsWith('/note/') || location.pathname.startsWith('/resource/') || location.pathname.startsWith('/chat')) ? 0 : "md"}
+      padding={(location.pathname.startsWith('/note/') || location.pathname.startsWith('/resource/') || location.pathname.startsWith('/chat') || location.pathname.startsWith('/exercises/')) ? 0 : "md"}
       bg="#ffffff"
     >
       <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
