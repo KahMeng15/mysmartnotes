@@ -193,7 +193,7 @@ function AppLayout({ children }) {
         </AppShell.Section>
       </AppShell.Navbar>
 
-      <AppShell.Main pb={{ base: 64, sm: 0 }} style={{ display: 'flex', flexDirection: 'column' }}>
+      <AppShell.Main pb={{ base: 64, sm: 0 }} style={{ display: 'flex', flexDirection: 'column', overflow: location.pathname.startsWith('/chat') ? 'hidden' : undefined }}>
         {children}
       </AppShell.Main>
       <AppShell.Footer hiddenFrom="sm" p={0} style={{ borderTop: '1px solid var(--mantine-color-gray-2)' }}>

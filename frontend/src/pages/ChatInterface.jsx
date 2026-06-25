@@ -827,7 +827,7 @@ export default function ChatInterface() {
         </Group>
       </Modal>
 
-    <Flex style={{ flex: 1 }}>
+    <Flex style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
       {/* Sidebar: Conversations */}
       {sidebarOpened && (
         <Box visibleFrom="sm"
@@ -984,7 +984,7 @@ export default function ChatInterface() {
       </Drawer>
 
       {/* Main Chat Area */}
-      <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#fff', position: 'relative' }}>
+      <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0, backgroundColor: '#fff', position: 'relative' }}>
         
         {/* Floating Sidebar Toggle Button */}
         {!sidebarOpened && (
@@ -1012,12 +1012,12 @@ export default function ChatInterface() {
 
         {/* Chat Messages */}
         {loading && messages.length === 0 ? (
-          <Flex flex={1} align="center" justify="center" direction="column">
+          <Flex flex={1} align="center" justify="center" direction="column" style={{ minHeight: 0 }}>
             <Loader color="blue" size="md" type="dots" />
             <Text mt="md" size="sm" c="dimmed">Loading conversation...</Text>
           </Flex>
         ) : messages.length === 0 ? (
-          <Flex flex={1} align="center" justify="center" direction="column" px="md" style={{ opacity: 0.6 }}>
+          <Flex flex={1} align="center" justify="center" direction="column" px="md" style={{ minHeight: 0, opacity: 0.6 }}>
             <IconMessageCircle2 size={60} color="#ccc" style={{ marginBottom: 16 }} />
             <Title order={3} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#666' }}>Ready to dive in?</Title>
             <Text c="dimmed" mt="xs" maw={400} ta="center">
@@ -1025,7 +1025,8 @@ export default function ChatInterface() {
             </Text>
           </Flex>
         ) : (
-          <ScrollArea style={{ flex: 1 }} px="xl" viewportRef={scrollRef}>
+          <Box style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+          <ScrollArea style={{ position: 'absolute', inset: 0 }} px="xl" viewportRef={scrollRef}>
             <Stack spacing="xl" style={{ maxWidth: '800px', margin: '0 auto', padding: '24px 0' }}>
               {messages.map((msg, i) => (
                 <Group key={i} align="flex-start" justify={msg.role === 'user' ? 'flex-end' : 'flex-start'} wrap="nowrap" mt="md">
@@ -1082,6 +1083,7 @@ export default function ChatInterface() {
               )}
             </Stack>
           </ScrollArea>
+          </Box>
         )}
 
         {/* Input & Parameters Area */}
@@ -1155,7 +1157,7 @@ export default function ChatInterface() {
               </Group>
             )}
 
-            {/* Animated Settings/Parameters Configuration */}
+            {/* Animated Settings/Parameters Configuration - Desktop */}
             <Box style={{ 
               maxHeight: settingsOpened ? '800px' : '0', 
               opacity: settingsOpened ? 1 : 0, 
@@ -1184,7 +1186,6 @@ export default function ChatInterface() {
                             component="button"
                             onClick={() => {
                               handleContextTypeChange(value);
-                              // Reset cascading selections when scope changes
                               setSelectedGroupId(null);
                               setSelectedSubjectId(null);
                               setSelectedNoteId(null);
@@ -1193,8 +1194,8 @@ export default function ChatInterface() {
                             color="grape"
                             size="md"
                             fw={600}
-                              style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
-                              leftSection={contextIcons[value]}
+                            style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
+                            leftSection={contextIcons[value]}
                           >
                             {label}
                           </Badge>
@@ -1367,6 +1368,172 @@ export default function ChatInterface() {
                 </Paper>
               )}
             </Box>
+
+            {/* Full-screen Drawer for mobile */}
+            <Drawer
+              opened={settingsOpened}
+              onClose={closeSettings}
+              position="bottom"
+              size="100%"
+              hiddenFrom="sm"
+              zIndex={1000}
+              styles={{
+                header: { padding: '16px 16px 0' },
+                body: { padding: '16px', overflowY: 'auto' },
+                content: { borderRadius: '16px 16px 0 0' }
+              }}
+              title={
+                <Group justify="space-between" style={{ width: '100%' }}>
+                  <Text fw={700} size="lg">Chat Parameters</Text>
+                </Group>
+              }
+            >
+              <Stack spacing="md">
+                {/* Context Selector Options */}
+                <Box>
+                  <Text size="sm" fw={600} mb="xs" c="dimmed">Context Scope</Text>
+                  <Group gap="xs" wrap="wrap">
+                    {[
+                      { value: 'global', label: 'Global' },
+                      { value: 'group', label: 'Group' },
+                      { value: 'subject', label: 'Subject' },
+                      { value: 'note', label: 'Note' }
+                    ].map(({ value, label }) => (
+                      <Badge 
+                        key={value}
+                        component="button"
+                        onClick={() => {
+                          handleContextTypeChange(value);
+                          setSelectedGroupId(null);
+                          setSelectedSubjectId(null);
+                          setSelectedNoteId(null);
+                        }}
+                        variant={contextType === value ? "filled" : "light"}
+                        color="grape"
+                        size="md"
+                        fw={600}
+                        style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
+                        leftSection={contextIcons[value]}
+                      >
+                        {label}
+                      </Badge>
+                    ))}
+                  </Group>
+                  
+                  {/* Cascading Context Dropdowns */}
+                  {contextType !== 'global' && (
+                    <Box style={{ animation: 'fadeIn 0.3s' }} mt="md">
+                      <Stack spacing="sm">
+                        {['group', 'subject', 'note'].includes(contextType) && (
+                          <Select
+                            label="Select Group"
+                            size="sm"
+                            placeholder="Choose a group..."
+                            data={groups.map(g => ({ value: g.id.toString(), label: g.name }))}
+                            value={selectedGroupId}
+                            onChange={(val) => {
+                              setSelectedGroupId(val);
+                              setSelectedSubjectId(null);
+                              setSelectedNoteId(null);
+                              saveSettingsLocally({ selectedGroupId: val, selectedSubjectId: null, selectedNoteId: null });
+                            }}
+                            searchable
+                            maxDropdownHeight={200}
+                          />
+                        )}
+                        
+                        {['subject', 'note'].includes(contextType) && (
+                          <Select
+                            label="Select Subject"
+                            size="sm"
+                            placeholder="Choose a subject..."
+                            data={subjects.filter(s => s.group_id?.toString() === selectedGroupId).map(s => ({ value: s.id.toString(), label: s.name }))}
+                            value={selectedSubjectId}
+                            onChange={(val) => {
+                              setSelectedSubjectId(val);
+                              setSelectedNoteId(null);
+                              saveSettingsLocally({ selectedSubjectId: val, selectedNoteId: null });
+                            }}
+                            searchable
+                            maxDropdownHeight={200}
+                            disabled={!selectedGroupId}
+                          />
+                        )}
+                        
+                        {contextType === 'note' && (
+                          <Select
+                            label="Select Note"
+                            size="sm"
+                            placeholder="Choose a note..."
+                            data={notes.filter(n => n.subject_id?.toString() === selectedSubjectId).map(n => ({ value: n.id.toString(), label: n.title }))}
+                            value={selectedNoteId}
+                            onChange={(val) => {
+                              setSelectedNoteId(val);
+                              saveSettingsLocally({ selectedNoteId: val });
+                            }}
+                            searchable
+                            maxDropdownHeight={200}
+                            disabled={!selectedSubjectId}
+                          />
+                        )}
+                      </Stack>
+                    </Box>
+                  )}
+                </Box>
+                
+                <Divider />
+
+                {/* AI Mode Options */}
+                <Box>
+                  <Text size="sm" fw={600} mb="xs" c="dimmed">AI Mode</Text>
+                  <Group gap="xs" wrap="wrap">
+                    {['quick', 'simple', 'normal', 'elaborate', 'eli5'].map(mode => (
+                      <Badge 
+                        key={mode}
+                        component="button"
+                        onClick={() => handleAiModeChange(mode)}
+                        variant={aiMode === mode ? "filled" : "light"}
+                        color="blue"
+                        size="md"
+                        fw={600}
+                        style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
+                        leftSection={modeIcons[mode]}
+                      >
+                        {modeLabels[mode]}
+                      </Badge>
+                    ))}
+                  </Group>
+                </Box>
+
+                {/* Output Format Options */}
+                <Box>
+                  <Text size="sm" fw={600} mb="xs" c="dimmed">Output Format</Text>
+                  <Group gap="xs" wrap="wrap">
+                    {[
+                      { value: 'sentence', label: 'Sentence' }, 
+                      { value: 'pointform', label: 'Pointform' },
+                      { value: 'numbered_list', label: 'Numbered List' },
+                      { value: 'table', label: 'Table' },
+                      { value: 'mix', label: 'Mix' }
+                    ].map(format => (
+                      <Badge 
+                        key={format.value}
+                        component="button"
+                        onClick={() => handleOutputFormatChange(format.value)}
+                        variant={outputFormat === format.value ? "filled" : "light"}
+                        color="teal"
+                        size="md"
+                        fw={600}
+                        style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
+                        leftSection={formatIcons[format.value]}
+                      >
+                        {format.label}
+                      </Badge>
+                    ))}
+                  </Group>
+                </Box>
+              </Stack>
+            </Drawer>
 
             {/* Chat Input */}
             <TextInput
