@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDisclosure } from '@mantine/hooks';
-import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput, Menu, Code, Drawer } from '@mantine/core';
+import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput, Menu, Code, Drawer, Card, Divider } from '@mantine/core';
 import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu, IconDeviceFloppy, IconPencil, IconX, IconH1, IconH2, IconH3, IconTypography, IconCode, IconEye, IconDownload } from '@tabler/icons-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -89,6 +89,7 @@ export default function SummaryView() {
   const [saveModalOpened, setSaveModalOpened] = useState(false);
   const [cancelModalOpened, setCancelModalOpened] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [coveredResources, setCoveredResources] = useState([]);
 
   const viewportRef = useRef(null);
   const markdownRef = useRef(null);
@@ -174,6 +175,35 @@ export default function SummaryView() {
     };
     init();
   }, [summaryId]);
+
+  useEffect(() => {
+    if (!selectedSummary) return;
+    const loadResources = async () => {
+      const ids = [];
+      if (selectedSummary.resource_ids) {
+        try {
+          const parsed = JSON.parse(selectedSummary.resource_ids);
+          if (Array.isArray(parsed)) ids.push(...parsed);
+        } catch (e) {}
+      }
+      if (ids.length === 0 && selectedSummary.resource_id) {
+        ids.push(selectedSummary.resource_id);
+      }
+      const uniqueIds = [...new Set(ids)];
+      const resources = await Promise.all(
+        uniqueIds.map(async (rid) => {
+          try {
+            const data = await fetchApi(`/resources/${rid}?t=${Date.now()}`);
+            return { id: data.id, title: data.title };
+          } catch (e) {
+            return { id: rid, title: rid };
+          }
+        })
+      );
+      setCoveredResources(resources);
+    };
+    loadResources();
+  }, [selectedSummary]);
 
   const handleRename = (summary, e) => {
     e.stopPropagation();
@@ -930,12 +960,40 @@ export default function SummaryView() {
         <Box w={sidebarOpen ? 280 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
           <Box style={{ flex: 1, overflowY: 'auto' }}>
             <Stack gap={0} align="stretch">
+              {sidebarOpen && isProcessed && !isEditing && (
+                <Box mb="md">
+                  <Title order={5} fw={600} c="dimmed" mb="xs">Note Info</Title>
+                  <Card p="sm" radius="md" withBorder bg="var(--mantine-color-gray-0)">
+                    <Stack gap="xs">
+                      <Box>
+                        <Text size="xs" fw={600} c="dimmed" mb={4}>Resources Covered</Text>
+                        {coveredResources.length > 0 ? (
+                          <Stack gap={4}>
+                            {coveredResources.map((res, idx) => (
+                              <Text
+                                key={idx}
+                                size="xs"
+                                c={res.id ? "blue.6" : "dark"}
+                                style={res.id ? { cursor: 'pointer', textDecoration: 'underline' } : {}}
+                                onClick={() => res.id && navigate(`/resource/${res.id}`)}
+                              >
+                                • {res.title}
+                              </Text>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Text size="xs" c="dimmed" fs="italic">No resources linked</Text>
+                        )}
+                      </Box>
+                    </Stack>
+                  </Card>
+                </Box>
+              )}
+
               {sidebarOpen && <Title order={5} fw={600} c="dimmed" mb="xs">Smart Actions</Title>}
 
               {!isEditing ? (
                 <>
-
-
                   <Tooltip label="Edit" disabled={sidebarOpen} position="left">
                     <MantineNavLink
                       label={sidebarOpen ? "Edit" : ""}
@@ -962,8 +1020,6 @@ export default function SummaryView() {
                         </Menu.Item>
                       </Menu.Dropdown>
                     </Menu>
-
-
                   </>
               ) : (
                 <>
@@ -1053,7 +1109,6 @@ export default function SummaryView() {
                 </>
               )}
 
-
             </Stack>
           </Box>
 
@@ -1139,6 +1194,31 @@ export default function SummaryView() {
                     onClick={() => { closeMobileActions(); setCancelModalOpened(true); }}
                     color="red"
                   />
+                </>
+              )}
+              {!isEditing && isProcessed && (
+                <>
+                  <Divider my="sm" />
+                  <Box px="sm">
+                    <Text size="xs" fw={600} c="dimmed" mb={6}>Resources Covered</Text>
+                    {coveredResources.length > 0 ? (
+                      <Stack gap={4}>
+                        {coveredResources.map((res, idx) => (
+                          <Text
+                            key={idx}
+                            size="xs"
+                            c="blue.6"
+                            style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                            onClick={() => { closeMobileActions(); navigate(`/resource/${res.id}`); }}
+                          >
+                            • {res.title}
+                          </Text>
+                        ))}
+                      </Stack>
+                    ) : (
+                      <Text size="xs" c="dimmed" fs="italic">No resources linked</Text>
+                    )}
+                  </Box>
                 </>
               )}
             </Stack>
