@@ -956,7 +956,7 @@ export default function ChatInterface() {
                       {conv.title}
                     </Text>
                   </Group>
-                  <Menu shadow="md" width={150} position="bottom-end" withinPortal>
+                  <Menu shadow="md" width={150} position="bottom-end" zIndex={1010}>
                     <Menu.Target>
                       <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
                         <IconDotsVertical size={16} />
@@ -1091,13 +1091,13 @@ export default function ChatInterface() {
             {/* Action Pills to toggle settings - Hidden when settings open */}
             {!settingsOpened && (
               <Group justify="space-between" mb="sm" align="center">
-                <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }} hiddenFrom="sm">
+                <Group gap="xs" wrap="wrap" style={{ flex: 1, minWidth: 0 }} hiddenFrom="sm">
                   <Badge 
                     component="button" 
                     onClick={toggleSettings} 
                     variant="light" color="grape" size="sm" tt="capitalize" fw={600}
                     leftSection={contextIcons[contextType]}
-                    style={{ cursor: 'pointer', transition: 'transform 0.1s', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
                   >
                     {getContextPillText()}
                   </Badge>
@@ -1106,7 +1106,7 @@ export default function ChatInterface() {
                     onClick={toggleSettings} 
                     variant="light" color="blue" size="sm" tt="capitalize" fw={600}
                     leftSection={modeIcons[aiMode]}
-                    style={{ cursor: 'pointer', transition: 'transform 0.1s', flex: 1, minWidth: 0 }}
+                    style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
                   >
                     {modeLabels[aiMode]}
                   </Badge>
@@ -1115,7 +1115,7 @@ export default function ChatInterface() {
                     onClick={toggleSettings} 
                     variant="light" color="teal" size="sm" tt="capitalize" fw={600}
                     leftSection={formatIcons[outputFormat]}
-                    style={{ cursor: 'pointer', transition: 'transform 0.1s', flex: 1, minWidth: 0 }}
+                    style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
                   >
                     {formatLabels[outputFormat]}
                   </Badge>
@@ -1173,26 +1173,30 @@ export default function ChatInterface() {
                     <Box>
                       <Text size="sm" fw={600} mb="xs" c="dimmed">Context Scope</Text>
                       <Group gap="xs" wrap="wrap">
-                        {['global', 'group', 'subject', 'note'].map(scope => (
+                        {[
+                          { value: 'global', label: 'Global' },
+                          { value: 'group', label: 'Group' },
+                          { value: 'subject', label: 'Subject' },
+                          { value: 'note', label: 'Note' }
+                        ].map(({ value, label }) => (
                           <Badge 
-                            key={scope}
+                            key={value}
                             component="button"
                             onClick={() => {
-                              handleContextTypeChange(scope);
+                              handleContextTypeChange(value);
                               // Reset cascading selections when scope changes
                               setSelectedGroupId(null);
                               setSelectedSubjectId(null);
                               setSelectedNoteId(null);
                             }}
-                            variant={contextType === scope ? "filled" : "light"}
+                            variant={contextType === value ? "filled" : "light"}
                             color="grape"
                             size="md"
-                            tt="capitalize"
                             fw={600}
-                            style={{ cursor: 'pointer' }}
-                            leftSection={contextIcons[scope]}
+                              style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
+                              leftSection={contextIcons[value]}
                           >
-                            {scope}
+                            {label}
                           </Badge>
                         ))}
                       </Group>
@@ -1273,9 +1277,8 @@ export default function ChatInterface() {
                               variant={aiMode === mode ? "filled" : "light"}
                               color="blue"
                               size="md"
-                              tt="capitalize"
                               fw={600}
-                              style={{ cursor: 'pointer' }}
+                              style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                               leftSection={modeIcons[mode]}
                             >
                               {modeLabels[mode]}
@@ -1302,9 +1305,8 @@ export default function ChatInterface() {
                               variant={outputFormat === format.value ? "filled" : "light"}
                               color="teal"
                               size="md"
-                              tt="capitalize"
                               fw={600}
-                              style={{ cursor: 'pointer' }}
+                              style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                               leftSection={formatIcons[format.value]}
                             >
                               {format.label}
@@ -1325,9 +1327,8 @@ export default function ChatInterface() {
                               variant={aiMode === mode ? "filled" : "light"}
                               color="blue"
                               size="md"
-                              tt="capitalize"
                               fw={600}
-                              style={{ cursor: 'pointer' }}
+                              style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                               leftSection={modeIcons[mode]}
                             >
                               {modeLabels[mode]}
@@ -1352,9 +1353,8 @@ export default function ChatInterface() {
                               variant={outputFormat === format.value ? "filled" : "light"}
                               color="teal"
                               size="md"
-                              tt="capitalize"
                               fw={600}
-                              style={{ cursor: 'pointer' }}
+                              style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                               leftSection={formatIcons[format.value]}
                             >
                               {format.label}
