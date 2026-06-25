@@ -1017,7 +1017,7 @@ export default function ChatInterface() {
             <Text mt="md" size="sm" c="dimmed">Loading conversation...</Text>
           </Flex>
         ) : messages.length === 0 ? (
-          <Flex flex={1} align="center" justify="center" direction="column" style={{ opacity: 0.6 }}>
+          <Flex flex={1} align="center" justify="center" direction="column" px="md" style={{ opacity: 0.6 }}>
             <IconMessageCircle2 size={60} color="#ccc" style={{ marginBottom: 16 }} />
             <Title order={3} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#666' }}>Ready to dive in?</Title>
             <Text c="dimmed" mt="xs" maw={400} ta="center">
