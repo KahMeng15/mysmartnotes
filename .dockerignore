@@ -16,6 +16,7 @@ htmlcov/
 
 # Environment and secrets
 .env
+secrets.env
 *.local
 
 # Application data (should be mounted as volumes)

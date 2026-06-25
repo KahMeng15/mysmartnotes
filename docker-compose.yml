@@ -3,9 +3,9 @@ services:
     image: postgres:15-alpine
     container_name: mysmartnotes_db
     environment:
-      POSTGRES_USER: mysmartnotes
-      POSTGRES_PASSWORD: mysmartnotespassword
-      POSTGRES_DB: mysmartnotes
+      POSTGRES_USER: ${DB_USER:-mysmartnotes}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-mysmartnotes}
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -41,7 +41,7 @@ services:
         - GROUP_ID=${PGID:-568}
     image: ghcr.io/kahmeng15/mysmartnotes:dev
     container_name: mysmartnotes_api
-    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${API_PORT:-8000}"]
     depends_on:
       db:
         condition: service_healthy
@@ -49,18 +49,18 @@ services:
         condition: service_healthy
     env_file:
       - .env
+      - secrets.env
     environment:
-      - PORT=8000
-      - DB_USER=mysmartnotes
-      - DB_PASSWORD=mysmartnotespassword
+      # Override DB_HOST to point at the db container (not localhost)
       - DB_HOST=db
-      - DB_NAME=mysmartnotes
+      # Override Redis URL to point at the redis container
       - REDIS_URL=redis://redis:6379/0
       - USER_ID=${PUID:-568}
       - GROUP_ID=${PGID:-568}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./config:/app/config
     restart: unless-stopped
     networks:
       - mysmartnotes-net
@@ -78,17 +78,16 @@ services:
         condition: service_healthy
     env_file:
       - .env
+      - secrets.env
     environment:
-      - DB_USER=mysmartnotes
-      - DB_PASSWORD=mysmartnotespassword
       - DB_HOST=db
-      - DB_NAME=mysmartnotes
       - REDIS_URL=redis://redis:6379/0
       - USER_ID=${PUID:-568}
       - GROUP_ID=${PGID:-568}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./config:/app/config
     restart: unless-stopped
     networks:
       - mysmartnotes-net
@@ -101,7 +100,7 @@ services:
     depends_on:
       - api
     ports:
-      - "${PORT:-8000}:80"
+      - "${PUBLIC_PORT:-8000}:80"
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
