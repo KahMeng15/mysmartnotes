@@ -827,7 +827,7 @@ export default function ChatInterface() {
         </Group>
       </Modal>
 
-    <Flex style={{ height: '100dvh' }}>
+    <Flex style={{ flex: 1 }}>
       {/* Sidebar: Conversations */}
       {sidebarOpened && (
         <Box visibleFrom="sm"
