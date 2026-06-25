@@ -29,6 +29,7 @@ import {
   IconFiles,
   IconDotsVertical,
   IconCheck,
+  IconChevronLeft,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -219,6 +220,15 @@ export default function NotesManager() {
 
   return (
     <Box>
+      {/* Sticky Header */}
+      <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20, margin: '-16px -16px 20px -16px' }}>
+        <Group>
+          <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
+            <IconChevronLeft size={20} />
+          </ActionIcon>
+        </Group>
+      </Box>
+
       {/* Desktop Header */}
       <Group justify="space-between" mb="lg" wrap="wrap" gap="sm" visibleFrom="sm">
         <Title order={1} fw={800} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738', fontSize: 'clamp(1.5rem, 5vw, 2.5rem)' }}>My Notes</Title>

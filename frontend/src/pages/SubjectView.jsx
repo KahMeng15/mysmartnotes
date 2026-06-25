@@ -1298,11 +1298,12 @@ export default function SubjectView() {
                     padding="md"
                     radius="md"
                     withBorder
-                    style={{ position: 'relative', overflow: 'hidden' }}
+                    style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden' }}
+                    onClick={() => navigate(`/resource/${note.id}`)}
                   >
-                    <Group justify="space-between" wrap="nowrap" align="flex-start">
+                    <Group justify="space-between" wrap="nowrap" align="center">
                       <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/resource/${note.id}`)} lineClamp={2}>
+                        <Text fw={600} size="lg" lineClamp={2}>
                           {note.title}
                         </Text>
                         <Group gap="xs" mt={4}>
@@ -1318,12 +1319,6 @@ export default function SubjectView() {
                       </Box>
 
                       <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                        <Button variant="light" size="sm" onClick={() => navigate(`/resource/${note.id}`)} hiddenFrom="xs" px="xs">
-                          View
-                        </Button>
-                        <Button variant="light" size="sm" onClick={() => navigate(`/resource/${note.id}`)} visibleFrom="xs">
-                          View Resource
-                        </Button>
                         <Menu position="bottom-end" withinPortal>
                           <Menu.Target>
                             <ActionIcon variant="subtle" color="gray">
@@ -1401,10 +1396,10 @@ export default function SubjectView() {
                 const qDifficulties = isProcessed ? [...new Set(ex.questions.map(q => q.difficulty).filter(Boolean))] : [];
                 
                 return (
-                <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
-                  <Group justify="space-between" wrap="nowrap" align="flex-start">
+                <Card key={ex.id} shadow="sm" padding="md" radius="md" withBorder style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden' }} onClick={() => navigate(`/exercises/${ex.id}`)}>
+                  <Group justify="space-between" wrap="nowrap" align="center">
                     <Box style={{ flex: 1, minWidth: 0 }}>
-                      <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/exercises/${ex.id}`)} lineClamp={2}>
+                      <Text fw={600} size="lg" lineClamp={2}>
                         {ex.title}
                       </Text>
                       <Group gap="xs" mt={4}>
@@ -1436,9 +1431,6 @@ export default function SubjectView() {
                       )}
                     </Box>
                     <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                      <Button variant="light" size="sm" onClick={() => navigate(`/exercises/${ex.id}`)}>
-                        View
-                      </Button>
                       <Menu position="bottom-end" withinPortal>
                         <Menu.Target>
                           <ActionIcon variant="subtle" color="gray">
@@ -1511,12 +1503,12 @@ export default function SubjectView() {
                  const inProgressOrPending = !isProcessed && !hasFailed && !isCancelled;
 
                  return (
-                <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder style={{ position: 'relative', overflow: 'hidden' }}>
-                   <Group justify="space-between" wrap="nowrap" align="flex-start">
-                      <Box style={{ flex: 1, minWidth: 0 }}>
-                        <Text fw={600} size="lg" style={{ cursor: 'pointer' }} onClick={() => navigate(`/note/${gn.id}`)} lineClamp={2}>
-                          {displayTitle}
-                        </Text>
+                  <Card key={gn.id} shadow="sm" padding="md" radius="md" withBorder style={{ cursor: 'pointer', position: 'relative', overflow: 'hidden' }} onClick={() => navigate(`/note/${gn.id}`)}>
+                     <Group justify="space-between" wrap="nowrap" align="center">
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                          <Text fw={600} size="lg" lineClamp={2}>
+                            {displayTitle}
+                          </Text>
                         <Group gap="xs" mt={4}>
                           {(isReprocessing || inProgressOrPending || hasFailed || isCancelled) && (
                             <Badge color={(hasFailed || isCancelled) ? "red" : "orange"} variant="light" size="sm">
@@ -1528,11 +1520,8 @@ export default function SubjectView() {
                           </Text>
                         </Group>
                       </Box>
-                      <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                        <Button variant="light" size="sm" onClick={() => navigate(`/note/${gn.id}`)}>
-                          View
-                        </Button>
-                        <Menu position="bottom-end">
+                       <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                         <Menu position="bottom-end">
                           <Menu.Target>
                             <ActionIcon variant="subtle" color="gray">
                               <IconDotsVertical size={20} />

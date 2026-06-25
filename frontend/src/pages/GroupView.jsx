@@ -391,7 +391,7 @@ export default function GroupView() {
               onClick={() => navigate(`/subject/${subject.id}`)}
               style={{ cursor: 'pointer', borderLeft: `4px solid ${subject.color || '#228be6'}`, transition: 'transform 150ms ease', '&:hover': { transform: 'translateX(2px)' } }}
             >
-              <Group justify="space-between" wrap="nowrap">
+              <Group justify="space-between" wrap="nowrap" align="center">
                 <Box style={{ flex: 1 }}>
                   <Text fw={600} size="lg" c="#171738">
                     {subject.name}
@@ -401,11 +401,7 @@ export default function GroupView() {
                   </Text>
                 </Box>
                 
-                <Group gap="xs">
-                  <Button variant="light" size="sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/subject/${subject.id}`); }}>
-                    View Notes
-                  </Button>
-                  <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                     <Menu position="bottom-end" withinPortal>
                       <Menu.Target>
                         <ActionIcon component="div" variant="subtle" color="gray">
@@ -418,7 +414,6 @@ export default function GroupView() {
                       </Menu.Dropdown>
                     </Menu>
                   </div>
-                </Group>
               </Group>
             </Card>
           ))}
