@@ -7,7 +7,7 @@ from app.utils.quotas import ensure_default_tier_configs
 import datetime
 import secrets
 
-from app.models.db import User, SystemSettings, IPFilter, RateLimitConfig, UserLog, Resource, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation, TierConfig, GlobalPrompt, Note
+from app.models.db import User, SystemSettings, IPFilter, RateLimitConfig, UserLog, Resource, Subject, SubjectGroup, ChatMessage, StudySession, UserInvitation, TierConfig, GlobalPrompt, Note, Task, Exercise
 from app.schemas.admin import (
     SystemSettingsSchema, EmailConfigSchema, IPFilterSchema, IPFilterCreate, RateLimitConfigSchema, UserLogSchema, UserAdminResponse, UserActionRequest,
     UserInvitationCreate, UserInvitationResponse, TierConfigSchema, GlobalPromptSchema, GlobalPromptCreate, GlobalPromptUpdate
@@ -19,6 +19,8 @@ from app.utils.email import send_invitation_email
 from app.utils.invitation_utils import build_link_only_email, is_link_only_email
 from app.utils.crypto import encrypt_secret, decrypt_secret
 from app.utils.observability import get_runtime_metrics_snapshot
+from app.utils.tasks import TaskManager
+from app.utils.storage import StorageManager
 from app.config import get_settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -571,4 +573,425 @@ def get_http_status_codes(admin: User = Depends(get_current_admin_user)):
         ],
     }
     return status_codes
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin User Content Viewer — Read-Only + Delete/Reprocess
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _get_target_user(user_id: int, db: Session) -> User:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+# --- Groups ---
+
+@router.get("/users/{user_id}/groups")
+def admin_get_user_groups(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    groups = db.query(SubjectGroup).filter(SubjectGroup.user_id == user_id).all()
+    result = []
+    for g in groups:
+        subjects = db.query(Subject).filter(Subject.group_id == g.id).all()
+        result.append({
+            "id": g.id,
+            "name": g.name,
+            "user_id": g.user_id,
+            "subjects": [{"id": s.id, "name": s.name, "color": s.color} for s in subjects],
+            "created_at": g.created_at.isoformat() if g.created_at else None,
+            "updated_at": g.updated_at.isoformat() if g.updated_at else None,
+        })
+    return result
+
+
+@router.delete("/users/{user_id}/groups/{group_id}")
+def admin_delete_user_group(user_id: int, group_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    group = db.query(SubjectGroup).filter(SubjectGroup.id == group_id, SubjectGroup.user_id == user_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    db.query(Subject).filter(Subject.group_id == group_id).delete()
+    db.delete(group)
+    db.commit()
+    return {"message": "Group deleted"}
+
+
+# --- Subjects ---
+
+@router.get("/users/{user_id}/subjects")
+def admin_get_user_subjects(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    subjects = db.query(Subject).filter(Subject.user_id == user_id).all()
+    return [{
+        "id": s.id,
+        "name": s.name,
+        "description": s.description,
+        "color": s.color,
+        "group_id": s.group_id,
+        "user_id": s.user_id,
+        "resource_count": db.query(func.count(Resource.id)).filter(Resource.subject_id == s.id).scalar() or 0,
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+    } for s in subjects]
+
+
+@router.delete("/users/{user_id}/subjects/{subject_id}")
+def admin_delete_user_subject(user_id: int, subject_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    subject = db.query(Subject).filter(Subject.id == subject_id, Subject.user_id == user_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    resources = db.query(Resource).filter(Resource.subject_id == subject_id).all()
+    for r in resources:
+        if r.file_path:
+            try:
+                os.remove(r.file_path)
+            except Exception:
+                pass
+        StorageManager.delete_resource_files(r.id)
+    db.query(Resource).filter(Resource.subject_id == subject_id).delete()
+    db.delete(subject)
+    db.commit()
+    return {"message": "Subject deleted"}
+
+
+# --- Resources ---
+
+@router.get("/users/{user_id}/resources")
+def admin_get_user_resources(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    resources = db.query(Resource).filter(Resource.user_id == user_id).all()
+    return [{
+        "id": r.id,
+        "title": r.title,
+        "file_name": r.file_name,
+        "file_type": r.file_type,
+        "file_size": r.file_size,
+        "page_count": r.page_count,
+        "subject_id": r.subject_id,
+        "processing_time_ms": r.processing_time_ms,
+        "has_output_pdf": bool(r.output_pdf_path),
+        "notes_count": db.query(func.count(Note.id)).filter(Note.resource_id == r.id).scalar() or 0,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+    } for r in resources]
+
+
+@router.get("/users/{user_id}/resources/{resource_id}")
+def admin_get_user_resource_detail(user_id: int, resource_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    r = db.query(Resource).filter(Resource.id == resource_id, Resource.user_id == user_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    text = StorageManager.get_resource_text(resource_id)
+    structured = StorageManager.get_resource_json(resource_id, "structured")
+    images = StorageManager.get_resource_json(resource_id, "images")
+    timings = StorageManager.get_resource_json(resource_id, "timings")
+    return {
+        "id": r.id,
+        "title": r.title,
+        "file_name": r.file_name,
+        "file_type": r.file_type,
+        "file_size": r.file_size,
+        "page_count": r.page_count,
+        "file_path": r.file_path,
+        "output_pdf_path": r.output_pdf_path,
+        "processing_time_ms": r.processing_time_ms,
+        "subject_id": r.subject_id,
+        "content_length": len(text) if text else 0,
+        "extracted_text": text,
+        "structured_content": structured,
+        "images_metadata": images,
+        "timings": timings,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+    }
+
+
+@router.post("/users/{user_id}/resources/{resource_id}/reprocess")
+def admin_reprocess_resource(user_id: int, resource_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    r = db.query(Resource).filter(Resource.id == resource_id, Resource.user_id == user_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    if not r.file_path or not os.path.exists(r.file_path):
+        raise HTTPException(status_code=400, detail="Original file not found on disk")
+    task_id = f"ocr_{user_id}_{resource_id}_{int(datetime.datetime.utcnow().timestamp())}"
+    TaskManager.submit_task(task_id, "resource_processing", user_id, resource_id=resource_id, file_name=r.file_name)
+    return {"message": "Reprocessing submitted", "task_id": task_id}
+
+
+@router.delete("/users/{user_id}/resources/{resource_id}")
+def admin_delete_user_resource(user_id: int, resource_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    r = db.query(Resource).filter(Resource.id == resource_id, Resource.user_id == user_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    if r.file_path:
+        try:
+            os.remove(r.file_path)
+        except Exception:
+            pass
+    StorageManager.delete_resource_files(r.id)
+    db.delete(r)
+    db.commit()
+    return {"message": "Resource deleted"}
+
+
+# --- Exercises ---
+
+@router.get("/users/{user_id}/exercises")
+def admin_get_user_exercises(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    exercises = db.query(Exercise).filter(Exercise.user_id == user_id).order_by(Exercise.created_at.desc()).all()
+    result = []
+    for ex in exercises:
+        questions = StorageManager.get_exercise_json(ex.id) or []
+        q_count = len(questions) if isinstance(questions, list) else 0
+        params = StorageManager.get_resource_json(ex.id, "parameters")
+        result.append({
+            "id": ex.id,
+            "title": ex.title,
+            "subject_id": ex.subject_id,
+            "group_id": ex.group_id,
+            "resource_id": ex.resource_id,
+            "file_name": ex.file_name,
+            "model": ex.model,
+            "processing_time_ms": ex.processing_time_ms,
+            "question_count": q_count,
+            "has_file": bool(ex.file_path),
+            "has_content": bool(ex.content_path),
+            "parameters": params,
+            "created_at": ex.created_at.isoformat() if ex.created_at else None,
+            "updated_at": ex.updated_at.isoformat() if ex.updated_at else None,
+        })
+    return result
+
+
+@router.get("/users/{user_id}/exercises/{exercise_id}")
+def admin_get_user_exercise_detail(user_id: int, exercise_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    ex = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == user_id).first()
+    if not ex:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+    questions = StorageManager.get_exercise_json(ex.id) or []
+    params = StorageManager.get_resource_json(ex.id, "parameters")
+    return {
+        "id": ex.id,
+        "title": ex.title,
+        "subject_id": ex.subject_id,
+        "group_id": ex.group_id,
+        "resource_id": ex.resource_id,
+        "file_path": ex.file_path,
+        "file_name": ex.file_name,
+        "content_path": ex.content_path,
+        "model": ex.model,
+        "processing_time_ms": ex.processing_time_ms,
+        "questions": questions if isinstance(questions, list) else [],
+        "parameters": params,
+        "created_at": ex.created_at.isoformat() if ex.created_at else None,
+        "updated_at": ex.updated_at.isoformat() if ex.updated_at else None,
+    }
+
+
+@router.post("/users/{user_id}/exercises/{exercise_id}/reprocess")
+def admin_reprocess_exercise(user_id: int, exercise_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    ex = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == user_id).first()
+    if not ex:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+    params = StorageManager.get_resource_json(ex.id, "parameters")
+    if ex.file_path and os.path.exists(ex.file_path):
+        task_id = f"extract_{exercise_id}_{int(datetime.datetime.utcnow().timestamp())}"
+        TaskManager.submit_task(task_id, "exercise_extraction", user_id, exercise_id=exercise_id, title=ex.title)
+    elif params:
+        task_id = f"generate_{exercise_id}_{int(datetime.datetime.utcnow().timestamp())}"
+        TaskManager.submit_task(task_id, "exercise_generation", user_id, exercise_id=exercise_id, req_data=params, title=ex.title)
+    else:
+        raise HTTPException(status_code=400, detail="Cannot reprocess: missing file or generation parameters")
+    return {"message": "Reprocessing submitted", "task_id": task_id}
+
+
+@router.delete("/users/{user_id}/exercises/{exercise_id}")
+def admin_delete_user_exercise(user_id: int, exercise_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    ex = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == user_id).first()
+    if not ex:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+    if ex.file_path:
+        try:
+            os.remove(ex.file_path)
+        except Exception:
+            pass
+    StorageManager.delete_exercise_files(exercise_id)
+    db.delete(ex)
+    db.commit()
+    return {"message": "Exercise deleted"}
+
+
+# --- Notes ---
+
+@router.get("/users/{user_id}/notes")
+def admin_get_user_notes(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    notes = db.query(Note).filter(Note.user_id == user_id).order_by(Note.created_at.desc()).all()
+    return [{
+        "id": n.id,
+        "title": n.title,
+        "version": n.version,
+        "summary_type": n.summary_type,
+        "resource_id": n.resource_id,
+        "mode": n.mode,
+        "output_format": n.output_format,
+        "processing_method": n.processing_method,
+        "model": n.model,
+        "processing_time_ms": n.processing_time_ms,
+        "processing_time": n.processing_time,
+        "is_user_edited": n.is_user_edited,
+        "is_pinned": n.is_pinned,
+        "prompt_name": n.prompt_name,
+        "has_content": bool(StorageManager.get_note_text(n.id)),
+        "file_path": n.file_path,
+        "created_at": n.created_at.isoformat() if n.created_at else None,
+        "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+    } for n in notes]
+
+
+@router.get("/users/{user_id}/notes/{note_id}")
+def admin_get_user_note_detail(user_id: int, note_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    n = db.query(Note).filter(Note.id == note_id, Note.user_id == user_id).first()
+    if not n:
+        raise HTTPException(status_code=404, detail="Note not found")
+    text = StorageManager.get_note_text(note_id)
+    quickread = StorageManager.get_note_text(note_id, is_quickread=True)
+    return {
+        "id": n.id,
+        "title": n.title,
+        "version": n.version,
+        "summary_type": n.summary_type,
+        "resource_id": n.resource_id,
+        "mode": n.mode,
+        "output_format": n.output_format,
+        "processing_method": n.processing_method,
+        "split_level": n.split_level,
+        "model": n.model,
+        "processing_time_ms": n.processing_time_ms,
+        "processing_time": n.processing_time,
+        "is_user_edited": n.is_user_edited,
+        "is_pinned": n.is_pinned,
+        "custom_prompt": n.custom_prompt,
+        "prompt_name": n.prompt_name,
+        "prompt_icon": n.prompt_icon,
+        "resource_ids": n.resource_ids,
+        "exercise_ids": n.exercise_ids,
+        "file_path": n.file_path,
+        "content": text,
+        "quickread": quickread,
+        "content_length": len(text) if text else 0,
+        "created_at": n.created_at.isoformat() if n.created_at else None,
+        "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+    }
+
+
+@router.delete("/users/{user_id}/notes/{note_id}")
+def admin_delete_user_note(user_id: int, note_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    n = db.query(Note).filter(Note.id == note_id, Note.user_id == user_id).first()
+    if not n:
+        raise HTTPException(status_code=404, detail="Note not found")
+    StorageManager.delete_note_files(note_id)
+    db.delete(n)
+    db.commit()
+    return {"message": "Note deleted"}
+
+
+# --- Conversations ---
+
+@router.get("/users/{user_id}/conversations")
+def admin_get_user_conversations(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    convs = db.query(
+        ChatMessage.conversation_id,
+        ChatMessage.conversation_title,
+        func.count(ChatMessage.id).label("message_count"),
+        func.max(ChatMessage.created_at).label("last_message_at"),
+    ).filter(
+        ChatMessage.user_id == user_id,
+        ChatMessage.conversation_id.isnot(None),
+    ).group_by(
+        ChatMessage.conversation_id,
+        ChatMessage.conversation_title,
+    ).order_by(func.max(ChatMessage.created_at).desc()).all()
+
+    return [{
+        "conversation_id": c.conversation_id,
+        "title": c.conversation_title or "Untitled Conversation",
+        "message_count": c.message_count,
+        "last_message_at": c.last_message_at.isoformat() if c.last_message_at else None,
+    } for c in convs]
+
+
+@router.get("/users/{user_id}/conversations/{conversation_id}")
+def admin_get_user_conversation_detail(user_id: int, conversation_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    messages = db.query(ChatMessage).filter(
+        ChatMessage.user_id == user_id,
+        ChatMessage.conversation_id == conversation_id,
+    ).order_by(ChatMessage.created_at.asc()).all()
+
+    return [{
+        "id": m.id,
+        "message": m.message,
+        "response": m.response,
+        "sources": m.sources,
+        "ai_mode": m.ai_mode,
+        "output_format": m.output_format,
+        "ai_model": m.ai_model,
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+        "resource_id": m.resource_id,
+        "subject_id": m.subject_id,
+        "group_id": m.group_id,
+        "is_pinned": m.is_pinned,
+        "is_favourite": m.is_favourite,
+        "rating": m.rating,
+        "rating_comment": m.rating_comment,
+    } for m in messages]
+
+
+# --- Tasks ---
+
+@router.get("/users/{user_id}/tasks")
+def admin_get_user_tasks(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    _get_target_user(user_id, db)
+    tasks = db.query(Task).filter(Task.user_id == user_id).order_by(Task.created_at.desc()).limit(100).all()
+    return [{
+        "id": t.id,
+        "task_id": t.task_id,
+        "task_type": t.task_type,
+        "status": t.status,
+        "progress": t.progress,
+        "error_message": t.error_message,
+        "message": t.message,
+        "is_hung": t.status in ("pending", "running") and t.updated_at and (datetime.datetime.utcnow() - t.updated_at).total_seconds() > 3600,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+    } for t in tasks]
+
+
+@router.post("/tasks/{task_id}/cancel")
+def admin_cancel_task(task_id: str, db: Session = Depends(get_db), admin: User = Depends(get_current_admin_user)):
+    """Cancel a hung or stuck task. Admin override — no user_id check."""
+    task = db.query(Task).filter(Task.task_id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task.status in ("completed", "failed", "cancelled"):
+        raise HTTPException(status_code=400, detail=f"Task already {task.status}")
+    task.status = "cancelled"
+    task.error_message = "Cancelled by admin"
+    task.updated_at = datetime.datetime.utcnow()
+    db.commit()
+    return {"message": "Task cancelled", "task_id": task_id}
 
