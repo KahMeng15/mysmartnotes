@@ -328,34 +328,42 @@ export default function SubjectView() {
       let finalTitle = newNoteTitle.trim();
       if (!finalTitle) {
         let suffix = '';
-        if (selectedResources.length === 1) {
-          const resObj = notes.find(r => r.id === selectedResources[0]);
-          suffix = resObj ? resObj.title : 'Note';
-        } else {
-          const labelSet = new Set();
-          const allNums = new Set();
-          let matchCount = 0;
-          for (const id of selectedResources) {
-            const resObj = notes.find(r => r.id === id);
-            if (!resObj) continue;
-            const match = resObj.title.match(/(Topic|Chapter|Lec|Lecture|Sec|Section)\s*(\d+(?:[-–,\s\d]+)*)/i);
-            if (match) {
-              labelSet.add(match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase());
-              const parsed = parseRanges(match[2]);
-              for (const n of parsed) allNums.add(n);
-              matchCount++;
+        if (selectedResources.length > 0) {
+          if (selectedResources.length === 1) {
+            const resObj = notes.find(r => r.id === selectedResources[0]);
+            suffix = resObj ? resObj.title : 'Note';
+          } else {
+            const labelSet = new Set();
+            const allNums = new Set();
+            let matchCount = 0;
+            for (const id of selectedResources) {
+              const resObj = notes.find(r => r.id === id);
+              if (!resObj) continue;
+              const match = resObj.title.match(/(Topic|Chapter|Lec|Lecture|Sec|Section)\s*(\d+(?:[-–,\s\d]+)*)/i);
+              if (match) {
+                labelSet.add(match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase());
+                const parsed = parseRanges(match[2]);
+                for (const n of parsed) allNums.add(n);
+                matchCount++;
+              }
+            }
+            
+            if (labelSet.size === 1 && matchCount === selectedResources.length) {
+              const label = Array.from(labelSet)[0];
+              const sortedNums = Array.from(allNums).sort((a, b) => a - b);
+              suffix = `${label} ${getRangeString(sortedNums)}`;
+            } else {
+              const resourcesOrdered = selectedResources.map(rid => notes.find(r => r.id === rid)).filter(Boolean);
+              suffix = resourcesOrdered.slice(0, 3).map(r => r.title).join(', ');
+              if (resourcesOrdered.length > 3) suffix += '...';
             }
           }
-          
-          if (labelSet.size === 1 && matchCount === selectedResources.length) {
-            const label = Array.from(labelSet)[0];
-            const sortedNums = Array.from(allNums).sort((a, b) => a - b);
-            suffix = `${label} ${getRangeString(sortedNums)}`;
-          } else {
-            const resourcesOrdered = selectedResources.map(rid => notes.find(r => r.id === rid)).filter(Boolean);
-            suffix = resourcesOrdered.slice(0, 3).map(r => r.title).join(', ');
-            if (resourcesOrdered.length > 3) suffix += '...';
-          }
+        } else if (selectedExerciseNotes.length > 0) {
+          const exercisesOrdered = selectedExerciseNotes.map(eid => exercises.find(e => e.id === eid)).filter(Boolean);
+          suffix = exercisesOrdered.slice(0, 3).map(e => e.title).join(', ');
+          if (exercisesOrdered.length > 3) suffix += '...';
+        } else {
+          suffix = 'Note';
         }
         
         const parameterStr = parameterType === 'single'

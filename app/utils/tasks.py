@@ -312,16 +312,6 @@ class NoteTask:
                                 ex_parts.append(f"Explanation: {explanation}")
                             if ref_quote:
                                 ex_parts.append(f"Reference Quote: {ref_quote}")
-                            
-                            # Also fetch referenced resource text
-                            if ref_resource_id:
-                                ref_text = StorageManager.get_resource_text(ref_resource_id) or ""
-                                if ref_text:
-                                    ref_title = ref_resource_id
-                                    ref_r = db.query(Resource).filter(Resource.id == ref_resource_id).first()
-                                    if ref_r:
-                                        ref_title = ref_r.title
-                                    ex_parts.append(f"--- Referenced Resource: {ref_title} ---\n{ref_text[:2000]}")
                         content_parts.append("\n\n".join(ex_parts))
                 
                 if not title:

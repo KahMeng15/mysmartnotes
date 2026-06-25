@@ -91,6 +91,7 @@ export default function SummaryView() {
   const [saving, setSaving] = useState(false);
   const [coveredResources, setCoveredResources] = useState([]);
   const [coveredExercises, setCoveredExercises] = useState([]);
+  const [exerciseReferencedResources, setExerciseReferencedResources] = useState([]);
 
   const viewportRef = useRef(null);
   const markdownRef = useRef(null);
@@ -168,6 +169,16 @@ export default function SummaryView() {
         if (summaryData.resource_id) {
           const noteData = await fetchApi(`/resources/${summaryData.resource_id}`);
           setNote(noteData);
+        } else if (summaryData.exercise_ids) {
+          try {
+            const exIds = JSON.parse(summaryData.exercise_ids);
+            if (Array.isArray(exIds) && exIds.length > 0) {
+              const exData = await fetchApi(`/exercises/${exIds[0]}?t=${Date.now()}`);
+              if (exData?.subject) {
+                setNote({ subject: exData.subject });
+              }
+            }
+          } catch (e) {}
         }
         setLoading(false);
       } catch (err) {
@@ -182,19 +193,19 @@ export default function SummaryView() {
   useEffect(() => {
     if (!selectedSummary) return;
     const loadResources = async () => {
-      const ids = [];
+      const directIds = new Set();
       if (selectedSummary.resource_ids) {
         try {
           const parsed = JSON.parse(selectedSummary.resource_ids);
-          if (Array.isArray(parsed)) ids.push(...parsed);
+          if (Array.isArray(parsed)) parsed.forEach(id => directIds.add(id));
         } catch (e) {}
       }
-      if (ids.length === 0 && selectedSummary.resource_id) {
-        ids.push(selectedSummary.resource_id);
+      if (directIds.size === 0 && selectedSummary.resource_id) {
+        directIds.add(selectedSummary.resource_id);
       }
-      const uniqueIds = [...new Set(ids)];
-      const resources = await Promise.all(
-        uniqueIds.map(async (rid) => {
+
+      const directResources = await Promise.all(
+        [...directIds].map(async (rid) => {
           try {
             const data = await fetchApi(`/resources/${rid}?t=${Date.now()}`);
             return { id: data.id, title: data.title };
@@ -203,7 +214,48 @@ export default function SummaryView() {
           }
         })
       );
-      setCoveredResources(resources);
+      setCoveredResources(directResources);
+
+      // Collect resource IDs referenced by exercise questions (info only)
+      const exRefIds = new Set();
+      if (selectedSummary.exercise_ids) {
+        try {
+          const exIds = JSON.parse(selectedSummary.exercise_ids);
+          if (Array.isArray(exIds)) {
+            const exData = await Promise.all(
+              exIds.map(async (eid) => {
+                try {
+                  return await fetchApi(`/exercises/${eid}?t=${Date.now()}`);
+                } catch { return null; }
+              })
+            );
+            for (const ex of exData) {
+              if (ex?.questions) {
+                for (const q of ex.questions) {
+                  if (q.reference_resource_id) {
+                    exRefIds.add(q.reference_resource_id);
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Remove any that are already directly covered
+      exRefIds.forEach(id => directIds.has(id) && exRefIds.delete(id));
+
+      const exRefResources = await Promise.all(
+        [...exRefIds].map(async (rid) => {
+          try {
+            const data = await fetchApi(`/resources/${rid}?t=${Date.now()}`);
+            return { id: data.id, title: data.title };
+          } catch (e) {
+            return { id: rid, title: rid };
+          }
+        })
+      );
+      setExerciseReferencedResources(exRefResources);
     };
     loadResources();
 
@@ -1053,6 +1105,24 @@ export default function SummaryView() {
                           </Stack>
                         </Box>
                       )}
+                      {exerciseReferencedResources.length > 0 && (
+                        <Box>
+                          <Text size="xs" fw={600} c="dimmed" mb={4}>Referenced in Exercises</Text>
+                          <Stack gap={4}>
+                            {exerciseReferencedResources.map((res, idx) => (
+                              <Text
+                                key={idx}
+                                size="xs"
+                                c="blue.6"
+                                style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                                onClick={() => res.id && navigate(`/resource/${res.id}`)}
+                              >
+                                • {res.title} <Text component="span" size="xs" c="dimmed">[from exercise]</Text>
+                              </Text>
+                            ))}
+                          </Stack>
+                        </Box>
+                      )}
                     </Stack>
                   </Card>
                 </Box>
@@ -1299,6 +1369,24 @@ export default function SummaryView() {
                               onClick={() => { closeMobileActions(); navigate(`/exercises/${ex.id}`); }}
                             >
                               • {ex.title}
+                            </Text>
+                          ))}
+                        </Stack>
+                      </>
+                    )}
+                    {exerciseReferencedResources.length > 0 && (
+                      <>
+                        <Text size="xs" fw={600} c="dimmed" mb={6} mt="sm">Referenced in Exercises</Text>
+                        <Stack gap={4}>
+                          {exerciseReferencedResources.map((res, idx) => (
+                            <Text
+                              key={idx}
+                              size="xs"
+                              c="blue.6"
+                              style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                              onClick={() => { closeMobileActions(); navigate(`/resource/${res.id}`); }}
+                            >
+                              • {res.title} <Text component="span" size="xs" c="dimmed">[from exercise]</Text>
                             </Text>
                           ))}
                         </Stack>
