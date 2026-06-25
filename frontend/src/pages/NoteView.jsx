@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useDisclosure } from '@mantine/hooks';
 import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu, Divider, Card } from '@mantine/core';
 import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt } from '@tabler/icons-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
@@ -35,6 +36,7 @@ export default function NoteView() {
 
   const [taskStatus, setTaskStatus] = useState(null);
   const [chatOpened, setChatOpened] = useState(false);
+  const [mobileActionsOpened, { open: openMobileActions, close: closeMobileActions }] = useDisclosure(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [saveModalOpened, setSaveModalOpened] = useState(false);
@@ -523,39 +525,26 @@ export default function NoteView() {
 
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
-        <Group justify="space-between" wrap="wrap" gap="xs">
-          <Group wrap="wrap" gap="xs">
+        <Group justify="space-between" wrap="nowrap" gap="xs">
+          <Group wrap="nowrap" gap="xs">
             <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
-            {note?.subject && (
-              <Group gap="xs" ml="xs" wrap="wrap">
-                {note.subject.group && (
-                  <>
-                    <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${note.subject.group.id}`)} style={{ whiteSpace: 'nowrap' }}>{note.subject.group.name}</Text>
-                    <Text size="sm" c="dimmed">/</Text>
-                  </>
-                )}
-                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}`)} style={{ whiteSpace: 'nowrap' }}>{note.subject.name}</Text>
-                <Text size="sm" c="dimmed">/</Text>
-                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}/resource`)} style={{ whiteSpace: 'nowrap' }}>Resource</Text>
-              </Group>
-            )}
             {!isProcessed && (
               <Badge ml="md" color={isFailed ? 'red' : 'orange'} variant="light">
                 {isFailed ? 'Failed' : 'Processing...'}
               </Badge>
             )}
           </Group>
-          {isProcessed && !isEditing && (
-            <Group gap="xs" hiddenFrom="sm">
-              <ActionIcon variant="light" color="blue" size="sm" onClick={startEditing}>
-                <IconPencil size={16} />
-              </ActionIcon>
-              <ActionIcon variant="light" color="gray" size="sm" onClick={handleExportMarkdown}>
-                <IconDownload size={16} />
-              </ActionIcon>
-            </Group>
+          {isProcessed && (
+            <ActionIcon
+              variant="default"
+              size="md"
+              onClick={openMobileActions}
+              hiddenFrom="sm"
+            >
+              <IconLayoutSidebarRightExpand size={20} />
+            </ActionIcon>
           )}
         </Group>
       </Box>
@@ -856,6 +845,135 @@ export default function NoteView() {
           </Box>
         )}
       </Box>
+
+      {/* Mobile Smart Actions Drawer */}
+      <Drawer
+        opened={mobileActionsOpened}
+        onClose={closeMobileActions}
+        title="Smart Actions"
+        padding={0}
+        size="80%"
+        position="right"
+        hiddenFrom="sm"
+        zIndex={1000}
+        styles={{ header: { padding: '16px' } }}
+      >
+        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <ScrollArea style={{ flex: 1 }} px="md">
+            <Stack gap={0} align="stretch" py="sm">
+              {!isEditing ? (
+                <>
+                  <MantineNavLink
+                    label="Edit"
+                    leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); startEditing(); }}
+                  />
+                  <MantineNavLink
+                    label="Create Note"
+                    leftSection={<IconFileText size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); navigate(`/subject/${note.subject.id}?createNote=true&resourceId=${note.id}`); }}
+                  />
+                  <MantineNavLink
+                    label="Create Exercise"
+                    leftSection={<IconBolt size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); navigate(`/subject/${note.subject.id}?createExercise=true&resourceId=${note.id}`); }}
+                  />
+                  <MantineNavLink
+                    label="Quick Chat"
+                    leftSection={<IconMessageChatbot size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); setChatOpened(true); }}
+                  />
+                  <Menu position="right-start" withArrow>
+                    <Menu.Target>
+                      <MantineNavLink
+                        label="Export"
+                        leftSection={<IconDownload size="1.2rem" stroke={1.5} />}
+                      />
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Item leftSection={<IconDownload size="0.9rem" />} onClick={() => { closeMobileActions(); handleExportMarkdown(); }}>
+                        Download as Markdown (.md)
+                      </Menu.Item>
+                      <Menu.Item disabled>
+                        Other formats coming soon...
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                </>
+              ) : (
+                <>
+                  <MantineNavLink
+                    label="Save Changes"
+                    leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); setSaveModalOpened(true); }}
+                    color="blue"
+                    variant="filled"
+                    active
+                  />
+                  <MantineNavLink
+                    label="Cancel Editing"
+                    leftSection={<IconX size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); setCancelModalOpened(true); }}
+                    color="red"
+                  />
+                  <MantineNavLink
+                    label={isRawMode ? "Visual Editor" : "Raw Markdown"}
+                    leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
+                    onClick={handleToggleRaw}
+                  />
+                </>
+              )}
+            </Stack>
+
+            {!isEditing && isProcessed && (
+              <>
+                <Divider my="sm" />
+                <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="xs" px="sm">Related</Text>
+                {loadingRelated ? (
+                  <Center py="sm"><Loader size="sm" /></Center>
+                ) : relatedNotes.length === 0 && relatedExercises.length === 0 ? (
+                  <Text size="xs" c="dimmed" py="sm" px="sm">No related content</Text>
+                ) : (
+                  <Stack gap={4} px="sm">
+                    {relatedNotes.map(rn => (
+                      <Card
+                        key={rn.id}
+                        withBorder
+                        padding="sm"
+                        radius="sm"
+                        style={{ cursor: 'pointer', transition: 'background-color 0.15s' }}
+                        className="related-card"
+                        onClick={() => { closeMobileActions(); navigate(`/note/${rn.id}?resourceId=${rn.resource_id}`); }}
+                      >
+                        <Group gap="xs" wrap="nowrap" align="center">
+                          <Text size="sm" fw={500} lineClamp={1} style={{ flex: 1 }}>{rn.title}</Text>
+                          <Badge size="sm" color="blue" variant="light">Note</Badge>
+                        </Group>
+                      </Card>
+                    ))}
+                    {relatedExercises.map(re => (
+                      <Card
+                        key={re.id}
+                        withBorder
+                        padding="sm"
+                        radius="sm"
+                        style={{ cursor: 'pointer', transition: 'background-color 0.15s' }}
+                        className="related-card"
+                        onClick={() => { closeMobileActions(); navigate(`/exercises/${re.id}`); }}
+                      >
+                        <Group gap="xs" wrap="nowrap" align="center">
+                          <Text size="sm" fw={500} lineClamp={1} style={{ flex: 1 }}>{re.title}</Text>
+                          <Badge size="sm" color="teal" variant="light">Exercise</Badge>
+                        </Group>
+                      </Card>
+                    ))}
+                  </Stack>
+                )}
+              </>
+            )}
+          </ScrollArea>
+        </Box>
+      </Drawer>
 
       {/* Modals */}
       <Modal opened={saveModalOpened} onClose={() => setSaveModalOpened(false)} title="Save Changes" centered withCloseButton={false}>
