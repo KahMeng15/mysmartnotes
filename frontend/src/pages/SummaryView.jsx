@@ -844,81 +844,83 @@ export default function SummaryView() {
                     )}
                   </Group>
                 </Box>
-                {isEditing && isRawMode ? (
-                  <Textarea
-                    ref={textareaRef}
-                    minRows={30}
-                    autosize
-                    value={summaryContent}
-                    onChange={(e) => setSummaryContent(e.currentTarget.value)}
-                    variant="unstyled"
-                    styles={{ input: { fontFamily: 'monospace', fontSize: '14px', lineHeight: 1.6 } }}
-                  />
-                ) : (
-                <Box ref={markdownRef} className="sticky-markdown" style={{ color: '#171738', fontSize: '16px', lineHeight: 1.8 }}>
-                  {isEditing && !isRawMode ? (
-                    <EditorContent editor={editor} />
-                  ) : (() => {
-                    let displayContent = summaryContent || '';
-                    let extractedTitle = selectedSummary?.title || 'Summary';
-                    
-                    const h1Regex = /^\s*#\s+(.+)$/m;
-                    const match = displayContent.match(h1Regex);
-                    if (match) {
-                      extractedTitle = match[1].trim();
-                      displayContent = displayContent.replace(h1Regex, '').trim();
-                    }
+                {(() => {
+                  let displayContent = summaryContent || '';
+                  let extractedTitle = selectedSummary?.title || 'Summary';
 
-                    return (
-                      <>
-                        <div className="summary-header" style={{ marginBottom: '1.5rem' }}>
-                          <Title order={1} style={{ marginTop: 0, marginBottom: 0, color: '#171738', fontWeight: 700 }}>
-                            {extractedTitle}
-                          </Title>
-                        </div>
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            pre(props) {
-                              return <>{props.children}</>;
-                            },
-                            code(props) {
-                              const {children, className, node, ...rest} = props;
-                              const match = /language-(\w+)/.exec(className || '');
-                              const isInline = !match && !String(children).includes('\n');
-                              return !isInline ? (
-                                <SyntaxHighlighter
-                                  {...rest}
-                                  PreTag="div"
-                                  children={String(children).replace(/\n$/, '')}
-                                  language={match ? match[1] : 'text'}
-                                  style={oneLight}
-                                  customStyle={{
-                                    margin: '1rem 0',
-                                    padding: '1rem',
-                                    borderRadius: '6px',
-                                    border: '1px solid #e9ecef',
-                                    backgroundColor: '#f8f9fa',
-                                    fontSize: '0.9em',
-                                    maxWidth: '100%',
-                                    overflowX: 'auto'
-                                  }}
-                                />
-                              ) : (
-                                <code {...rest} className={className}>
-                                  {children}
-                                </code>
-                              );
-                            }
-                          }}
-                        >
-                          {displayContent}
-                        </ReactMarkdown>
-                      </>
-                    );
-                  })()}
-                </Box>
-                )}
+                  const h1Regex = /^\s*#\s+(.+)$/m;
+                  const match = displayContent.match(h1Regex);
+                  if (match) {
+                    extractedTitle = match[1].trim();
+                    displayContent = displayContent.replace(h1Regex, '').trim();
+                  }
+
+                  return (
+                    <>
+                      <div className="summary-header" style={{ marginBottom: '1.5rem' }}>
+                        <Title order={1} style={{ marginTop: 0, marginBottom: 0, color: '#171738', fontWeight: 700 }}>
+                          {extractedTitle}
+                        </Title>
+                      </div>
+                      {isEditing && isRawMode ? (
+                        <Textarea
+                          ref={textareaRef}
+                          minRows={30}
+                          autosize
+                          value={summaryContent}
+                          onChange={(e) => setSummaryContent(e.currentTarget.value)}
+                          variant="unstyled"
+                          styles={{ input: { fontFamily: 'monospace', fontSize: '14px', lineHeight: 1.6 } }}
+                        />
+                      ) : (
+                        <Box ref={markdownRef} className="sticky-markdown" style={{ color: '#171738', fontSize: '16px', lineHeight: 1.8 }}>
+                          {isEditing && !isRawMode ? (
+                            <EditorContent editor={editor} />
+                          ) : (
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                pre(props) {
+                                  return <>{props.children}</>;
+                                },
+                                code(props) {
+                                  const {children, className, node, ...rest} = props;
+                                  const match = /language-(\w+)/.exec(className || '');
+                                  const isInline = !match && !String(children).includes('\n');
+                                  return !isInline ? (
+                                    <SyntaxHighlighter
+                                      {...rest}
+                                      PreTag="div"
+                                      children={String(children).replace(/\n$/, '')}
+                                      language={match ? match[1] : 'text'}
+                                      style={oneLight}
+                                      customStyle={{
+                                        margin: '1rem 0',
+                                        padding: '1rem',
+                                        borderRadius: '6px',
+                                        border: '1px solid #e9ecef',
+                                        backgroundColor: '#f8f9fa',
+                                        fontSize: '0.9em',
+                                        maxWidth: '100%',
+                                        overflowX: 'auto'
+                                      }}
+                                    />
+                                  ) : (
+                                    <code {...rest} className={className}>
+                                      {children}
+                                    </code>
+                                  );
+                                }
+                              }}
+                            >
+                              {displayContent}
+                            </ReactMarkdown>
+                          )}
+                        </Box>
+                      )}
+                    </>
+                  );
+                })()}
               </Box>
             )}
           </Container>
