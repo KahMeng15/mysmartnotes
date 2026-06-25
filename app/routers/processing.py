@@ -1,19 +1,17 @@
 """Smart processing endpoints — font-aware multi-method PDF/PPTX extraction"""
-import os
-import uuid
-import json
+
 import logging
+import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
+from app.models.db import Resource, User
 from app.processing.smart_pipeline import SmartPipeline
-from app.models.db import User, Resource
 from app.utils.auth import get_current_user
 from app.utils.db import get_db
 from app.utils.storage import StorageManager
@@ -25,11 +23,13 @@ router = APIRouter(prefix="/processing", tags=["processing"])
 # Shared pipeline instance (reused across requests)
 _pipeline = None
 
+
 def get_pipeline() -> SmartPipeline:
     """Get or create the shared SmartPipeline instance using global settings."""
     global _pipeline
     if _pipeline is None:
         from app.config import get_settings
+
         settings = get_settings()
         _pipeline = SmartPipeline(
             use_polish=settings.AI_POLISH_ENABLED,
@@ -47,10 +47,10 @@ async def smart_extract(
 ):
     """
     Upload a PDF/PPTX and get clean Markdown back immediately.
-    
+
     This is a standalone endpoint — no authentication required, no database storage.
     Perfect for quick testing and one-off conversions.
-    
+
     Args:
         file: PDF or PPTX file to process
         use_ai: Whether to use AI models (layout detection + table transformer)
@@ -63,7 +63,7 @@ async def smart_extract(
     if ext not in (".pdf", ".pptx"):
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {ext}. Only .pdf and .pptx are supported."
+            detail=f"Unsupported file type: {ext}. Only .pdf and .pptx are supported.",
         )
 
     # Read and save to temp file
@@ -89,25 +89,29 @@ async def smart_extract(
         # Compute stats
         lines = markdown.split("\n")
         headings = len([l for l in lines if l.startswith("#")])
-        list_items = len([l for l in lines if l.strip().startswith("- ") or l.strip().startswith("1. ")])
+        list_items = len(
+            [l for l in lines if l.strip().startswith("- ") or l.strip().startswith("1. ")]
+        )
         table_rows = len([l for l in lines if l.strip().startswith("|")])
 
-        return JSONResponse({
-            "success": True,
-            "filename": file.filename,
-            "markdown": markdown,
-            "stats": {
-                "headings": headings,
-                "list_items": list_items,
-                "table_rows": table_rows,
-                "total_lines": len(lines),
-                "total_chars": len(markdown),
+        return JSONResponse(
+            {
+                "success": True,
+                "filename": file.filename,
+                "markdown": markdown,
+                "stats": {
+                    "headings": headings,
+                    "list_items": list_items,
+                    "table_rows": table_rows,
+                    "total_lines": len(lines),
+                    "total_chars": len(markdown),
+                },
             }
-        })
+        )
 
     except Exception as e:
         logger.error(f"Smart extract failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Processing failed: {e!s}")
     finally:
         # Clean up temp file
         try:
@@ -151,11 +155,11 @@ async def smart_extract_download(
         return Response(
             content=markdown.encode("utf-8"),
             media_type="text/markdown",
-            headers={"Content-Disposition": f'attachment; filename="{md_filename}"'}
+            headers={"Content-Disposition": f'attachment; filename="{md_filename}"'},
         )
     except Exception as e:
         logger.error(f"Smart extract download failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Processing failed: {e!s}")
     finally:
         try:
             os.unlink(tmp_path)
@@ -172,17 +176,18 @@ def reprocess_smart(
 ):
     """
     Reprocess an existing resource using the smart font-aware pipeline.
-    
+
     This replaces the existing OCR-based extraction with the multi-method
     font-aware pipeline that produces cleaner, more accurate Markdown.
-    
+
     The result is stored in the resource's extracted_text file as Markdown,
     and in extracted_content_structured as structured JSON segments.
     """
-    resource = db.query(Resource).filter(
-        Resource.id == resource_id,
-        Resource.user_id == current_user.id
-    ).first()
+    resource = (
+        db.query(Resource)
+        .filter(Resource.id == resource_id, Resource.user_id == current_user.id)
+        .first()
+    )
 
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
@@ -194,8 +199,7 @@ def reprocess_smart(
     file_ext = Path(resource.file_path).suffix.lower()
     if file_ext not in (".pdf", ".pptx"):
         raise HTTPException(
-            status_code=400,
-            detail=f"Smart processing only supports PDF and PPTX (got {file_ext})"
+            status_code=400, detail=f"Smart processing only supports PDF and PPTX (got {file_ext})"
         )
 
     try:
@@ -213,7 +217,7 @@ def reprocess_smart(
         # Update resource record (save to file storage)
         StorageManager.save_resource_text(resource_id, markdown)
         StorageManager.save_resource_json(resource_id, "structured", structured_segments)
-        
+
         resource.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(resource)
@@ -224,25 +228,29 @@ def reprocess_smart(
         list_items = len([l for l in lines if l.strip().startswith("- ")])
         table_rows = len([l for l in lines if l.strip().startswith("|")])
 
-        logger.info(f"Smart reprocess complete: {len(markdown)} chars, "
-                     f"{headings} headings, {list_items} lists, {table_rows} table rows")
+        logger.info(
+            f"Smart reprocess complete: {len(markdown)} chars, "
+            f"{headings} headings, {list_items} lists, {table_rows} table rows"
+        )
 
-        return JSONResponse({
-            "success": True,
-            "resource_id": resource_id,
-            "markdown_length": len(markdown),
-            "stats": {
-                "headings": headings,
-                "list_items": list_items,
-                "table_rows": table_rows,
-                "total_lines": len(lines),
-            },
-            "message": "Resource reprocessed with smart pipeline"
-        })
+        return JSONResponse(
+            {
+                "success": True,
+                "resource_id": resource_id,
+                "markdown_length": len(markdown),
+                "stats": {
+                    "headings": headings,
+                    "list_items": list_items,
+                    "table_rows": table_rows,
+                    "total_lines": len(lines),
+                },
+                "message": "Resource reprocessed with smart pipeline",
+            }
+        )
 
     except Exception as e:
         logger.error(f"Smart reprocess failed for resource {resource_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Smart reprocessing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Smart reprocessing failed: {e!s}")
 
 
 def _markdown_to_segments(markdown: str) -> list:
@@ -251,6 +259,7 @@ def _markdown_to_segments(markdown: str) -> list:
     note view UI (which expects ContentSegment-style JSON objects).
     """
     import re
+
     segments = []
     page = 1
 
@@ -290,12 +299,14 @@ def _markdown_to_segments(markdown: str) -> list:
             content_type = "body"
             content = stripped
 
-        segments.append({
-            "content": content,
-            "type": content_type,
-            "page": page,
-            "confidence": 0.95,
-            "metadata": {"source": "smart_pipeline"}
-        })
+        segments.append(
+            {
+                "content": content,
+                "type": content_type,
+                "page": page,
+                "confidence": 0.95,
+                "metadata": {"source": "smart_pipeline"},
+            }
+        )
 
     return segments

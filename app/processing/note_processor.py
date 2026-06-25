@@ -1,23 +1,24 @@
-import os
-import json
 import logging
+import os
 import time
+from collections.abc import Callable
 from datetime import datetime
-from typing import Optional, Callable, Any
 
-from app.models.db import User, Resource
-from app.utils.db import SessionLocal
-from app.utils.tasks import TaskManager
-from app.utils.storage import StorageManager
-from app.utils.cache import clear_cache_pattern_sync
+from app.models.db import Resource, User
 from app.processing.ocr import OCRProcessor
 from app.processing.smart_pipeline import SmartPipeline
+from app.utils.cache import clear_cache_pattern_sync
+from app.utils.db import SessionLocal
+from app.utils.storage import StorageManager
+from app.utils.tasks import TaskManager
 
 logger = logging.getLogger(__name__)
+
 
 def get_pipeline_for_user(user: User) -> SmartPipeline:
     """Get a SmartPipeline instance with the appropriate settings for this user."""
     from app.config import get_settings
+
     app_settings = get_settings()
 
     # Determine whether we have any AI tier available for the polish pass.
@@ -49,6 +50,7 @@ def get_pipeline_for_user(user: User) -> SmartPipeline:
         gemini_model=gemini_model,
     )
 
+
 def ensure_valid_markdown_result(markdown: str) -> str:
     """
     SmartPipeline returns an error string on failure; treat that as a real failure
@@ -57,13 +59,18 @@ def ensure_valid_markdown_result(markdown: str) -> str:
         raise RuntimeError(markdown)
     return markdown
 
-def extract_markdown_for_user(user: User, file_path: str, progress_callback: Optional[Callable] = None) -> tuple:
+
+def extract_markdown_for_user(
+    user: User, file_path: str, progress_callback: Callable | None = None
+) -> tuple:
     """
     Process a resource with the configured SmartPipeline.
     """
     pipeline = get_pipeline_for_user(user)
     try:
-        markdown = ensure_valid_markdown_result(pipeline.process(file_path, progress_callback=progress_callback))
+        markdown = ensure_valid_markdown_result(
+            pipeline.process(file_path, progress_callback=progress_callback)
+        )
         return markdown, getattr(pipeline, "timings", {})
     except Exception:
         if not getattr(pipeline, "use_polish", False):
@@ -74,14 +81,18 @@ def extract_markdown_for_user(user: User, file_path: str, progress_callback: Opt
             exc_info=True,
         )
         fallback_pipeline = SmartPipeline(use_polish=False)
-        markdown = ensure_valid_markdown_result(fallback_pipeline.process(file_path, progress_callback=progress_callback))
+        markdown = ensure_valid_markdown_result(
+            fallback_pipeline.process(file_path, progress_callback=progress_callback)
+        )
         return markdown, getattr(fallback_pipeline, "timings", {})
+
 
 def markdown_to_segments(markdown: str) -> list:
     """
     Convert Markdown text to structured segments compatible with the existing resource view UI.
     """
     import re
+
     segments = []
     page = 1
 
@@ -121,28 +132,35 @@ def markdown_to_segments(markdown: str) -> list:
             content_type = "body"
             content = stripped
 
-        segments.append({
-            "content": content,
-            "type": content_type,
-            "page": page,
-            "confidence": 0.95,
-            "metadata": {"source": "smart_pipeline"}
-        })
+        segments.append(
+            {
+                "content": content,
+                "type": content_type,
+                "page": page,
+                "confidence": 0.95,
+                "metadata": {"source": "smart_pipeline"},
+            }
+        )
 
     return segments
 
-def process_resource_task(resource_id: str, user_id: int, auto_detect_title: bool = False, **kwargs):
+
+def process_resource_task(
+    resource_id: str, user_id: int, auto_detect_title: bool = False, **kwargs
+):
     """Core logic to process a resource, used by both worker and (optionally) API."""
     task_id = kwargs.get("task_id") or f"ocr_{user_id}_{resource_id}"
-    
+
     db = SessionLocal()
     try:
         resource = db.query(Resource).filter(Resource.id == resource_id).first()
         user = db.query(User).filter(User.id == user_id).first()
-        
+
         if not resource or not user:
             logger.error(f"Processing failed: Resource {resource_id} or User {user_id} not found")
-            TaskManager._update_db_task(task_id, status="failed", error="Resource or User not found")
+            TaskManager._update_db_task(
+                task_id, status="failed", error="Resource or User not found"
+            )
             return {"status": "error", "message": "Resource or User not found"}
 
         def is_cancelled():
@@ -173,46 +191,51 @@ def process_resource_task(resource_id: str, user_id: int, auto_detect_title: boo
         start_time = time.time()
         file_ext = os.path.splitext(file_path)[1].lower()
 
-        if file_ext in ('.pdf', '.pptx'):
+        if file_ext in (".pdf", ".pptx"):
             logger.info(f"Processing resource {resource_id} (SmartPipeline)")
             progress_callback(15, "Initializing AI pipeline...")
-            
+
             # Custom wrapper to pass messages through the pipeline's callback
             def pipeline_callback(p):
                 if is_cancelled():
                     raise InterruptedError("Task cancelled by user")
                 msg = "Extracting text..."
-                if p > 30: msg = "Analyzing document structure..."
-                if p > 60: msg = "Polishing with AI..."
-                if p > 85: msg = "Finalizing content..."
+                if p > 30:
+                    msg = "Analyzing document structure..."
+                if p > 60:
+                    msg = "Polishing with AI..."
+                if p > 85:
+                    msg = "Finalizing content..."
                 progress_callback(p, msg)
 
             try:
-                markdown, timings = extract_markdown_for_user(user, file_path, progress_callback=pipeline_callback)
+                markdown, timings = extract_markdown_for_user(
+                    user, file_path, progress_callback=pipeline_callback
+                )
             except InterruptedError:
                 logger.info(f"Task {task_id} halted during smart pipeline")
                 return {"status": "cancelled"}
 
             structured_segments = markdown_to_segments(markdown)
-            
+
             # Save to file storage
             StorageManager.save_resource_text(resource.id, markdown)
             StorageManager.save_resource_json(resource.id, "structured", structured_segments)
             StorageManager.save_resource_json(resource.id, "timings", timings)
-            
+
             # Auto-title detection from H1
             if auto_detect_title:
-                for line in markdown.split('\n'):
-                    if line.strip().startswith('# '):
+                for line in markdown.split("\n"):
+                    if line.strip().startswith("# "):
                         detected_title = line.strip()[2:].strip()
                         if detected_title:
                             resource.title = detected_title
                             break
-            
+
             resource.processing_time_ms = int((time.time() - start_time) * 1000)
             resource.updated_at = datetime.utcnow()
             db.commit()
-            
+
             # STEP 4: Compute and store embeddings
             if markdown and markdown.strip():
                 if is_cancelled():
@@ -221,11 +244,14 @@ def process_resource_task(resource_id: str, user_id: int, auto_detect_title: boo
                 try:
                     progress_callback(95, "Generating search embeddings...")
                     from app.processing.embeddings import update_resource_embeddings
+
                     update_resource_embeddings(resource.id, markdown, db)
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
-            TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
+            TaskManager._update_db_task(
+                task_id, status="completed", progress=100, message="Completed"
+            )
             logger.info(f"Processing complete for resource {resource_id}")
             clear_cache_pattern_sync(f"cache_resp:/resources*:u{user.id}*")
             return {"status": "success", "resource_id": resource_id}
@@ -233,18 +259,22 @@ def process_resource_task(resource_id: str, user_id: int, auto_detect_title: boo
         else:
             # Fallback to OCR for images
             logger.info(f"Processing resource {resource_id} (OCR Fallback)")
-            if is_cancelled(): return {"status": "cancelled"}
-            
+            if is_cancelled():
+                return {"status": "cancelled"}
+
             progress_callback(20, "OCR: Analyzing image...")
-            ocr_result = OCRProcessor.extract_text(file_path, resource.file_type, note_id=resource_id)
-            
-            if is_cancelled(): return {"status": "cancelled"}
+            ocr_result = OCRProcessor.extract_text(
+                file_path, resource.file_type, note_id=resource_id
+            )
+
+            if is_cancelled():
+                return {"status": "cancelled"}
             progress_callback(80, "Structuring content...")
-            
+
             raw_text = ocr_result.get("raw_text", "")
             structured_content = ocr_result.get("structured_content", [])
             images_data = ocr_result.get("images", [])
-            
+
             # Save to file storage
             StorageManager.save_resource_text(resource.id, raw_text)
             StorageManager.save_resource_json(resource.id, "structured", structured_content)
@@ -253,24 +283,28 @@ def process_resource_task(resource_id: str, user_id: int, auto_detect_title: boo
             resource.processing_time_ms = int((time.time() - start_time) * 1000)
             resource.updated_at = datetime.utcnow()
             db.commit()
-            
+
             if raw_text:
-                if is_cancelled(): return {"status": "cancelled"}
+                if is_cancelled():
+                    return {"status": "cancelled"}
                 try:
                     progress_callback(95, "Generating search embeddings...")
                     from app.processing.embeddings import update_resource_embeddings
+
                     update_resource_embeddings(resource.id, raw_text, db)
                 except Exception as e:
                     logger.error(f"Error updating embeddings: {e}")
 
-            TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
+            TaskManager._update_db_task(
+                task_id, status="completed", progress=100, message="Completed"
+            )
             clear_cache_pattern_sync(f"cache_resp:/resources*:u{user.id}*")
             return {"status": "success", "resource_id": resource_id}
 
     except Exception as e:
         if "Task cancelled by user" in str(e):
-             logger.info(f"Task {task_id} confirmed cancelled")
-             return {"status": "cancelled"}
+            logger.info(f"Task {task_id} confirmed cancelled")
+            return {"status": "cancelled"}
         logger.error(f"Error in processing: {e}", exc_info=True)
         TaskManager._update_db_task(task_id, status="failed", error=str(e))
         return {"status": "error", "message": str(e)}

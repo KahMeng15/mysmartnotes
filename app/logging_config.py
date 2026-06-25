@@ -1,5 +1,5 @@
-import os
 import logging.config
+import os
 
 LOGS_DIR = os.path.join(os.path.dirname(__file__), "..", "logs")
 os.makedirs(LOGS_DIR, exist_ok=True)
@@ -8,9 +8,7 @@ LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "standard": {
-            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-        },
+        "standard": {"format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s"},
     },
     "handlers": {
         "console": {
@@ -78,8 +76,9 @@ LOGGING_CONFIG = {
     "root": {
         "handlers": ["console", "backend_file", "error_file"],
         "level": "INFO",
-    }
+    },
 }
+
 
 def setup_logging():
     logging.config.dictConfig(LOGGING_CONFIG)

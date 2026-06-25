@@ -5,15 +5,15 @@ Processes PDF and PPTX files into clean Markdown using local font-aware
 extraction, heuristic merging, and an optional AI polish pass.
 """
 
+import logging
 import os
 import re
-import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Dict, List, Optional, Callable, Any
 
+from app.config import get_settings
 from app.processing.font_extractor import FontAwareExtractor
 from app.processing.signal_merger import SignalMerger, blocks_to_markdown
-from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -35,23 +35,27 @@ class SmartPipeline:
         self,
         use_layout_detection: bool = False,
         use_table_transformer: bool = False,
-        gemini_api_key: Optional[str] = None,
-        gemini_model: Optional[str] = None,
+        gemini_api_key: str | None = None,
+        gemini_model: str | None = None,
         use_polish: bool = False,
         # Legacy kwargs accepted but ignored
         use_vision: bool = False,
         inter_call_delay_s: float = 0.0,
     ):
-        self.use_polish = use_polish and (bool(gemini_api_key) or bool(settings.GLOBAL_AI_TIER1_API_KEY))
+        self.use_polish = use_polish and (
+            bool(gemini_api_key) or bool(settings.GLOBAL_AI_TIER1_API_KEY)
+        )
         self.gemini_api_key = gemini_api_key
         self.gemini_model = gemini_model or settings.GLOBAL_AI_TIER1_MODEL
         self.font_extractor = FontAwareExtractor()
         self.layout_detector = None  # Legacy: disabled
-        self.table_detector = None   # Legacy: disabled
+        self.table_detector = None  # Legacy: disabled
         self.merger = SignalMerger()
         self.timings = {}
 
-    def process(self, file_path: str, progress_callback: Optional[Callable[[int], None]] = None) -> str:
+    def process(
+        self, file_path: str, progress_callback: Callable[[int], None] | None = None
+    ) -> str:
         """
         Process a PDF or PPTX file and return clean Markdown.
         """
@@ -64,11 +68,12 @@ class SmartPipeline:
 
         markdown = ""
         import time
+
         start_process = time.time()
         self.timings = {}
         try:
             if progress_callback:
-                progress_callback(10) # 10%: Started local process
+                progress_callback(10)  # 10%: Started local process
 
             t0 = time.time()
             markdown = self._local_process(file_path, ext)
@@ -77,19 +82,21 @@ class SmartPipeline:
             # Final AI Polish Pass
             if self.use_polish and markdown:
                 if progress_callback:
-                    progress_callback(30) # 30%: Local done, starting AI
+                    progress_callback(30)  # 30%: Local done, starting AI
                 t1 = time.time()
                 markdown = self._ai_polish(markdown, progress_callback=progress_callback)
                 self.timings["ai_polish_total"] = time.time() - t1
 
             if progress_callback:
-                progress_callback(100) # 100%: All done
+                progress_callback(100)  # 100%: All done
 
             # Quality metrics (final)
             lines = [l for l in markdown.split("\n") if l.strip()]
             headings = len([l for l in lines if l.startswith("#")])
             list_items = len([l for l in lines if l.startswith("- ") or l.startswith("1. ")])
-            logger.info(f"Final Output: {len(lines)} lines, {headings} headings, {list_items} list items")
+            logger.info(
+                f"Final Output: {len(lines)} lines, {headings} headings, {list_items} list items"
+            )
 
             self.timings["total_pipeline"] = time.time() - start_process
             return markdown
@@ -106,11 +113,9 @@ class SmartPipeline:
         else:
             raise ValueError(f"Unsupported file format: {ext}")
 
-
     def _process_pdf(self, pdf_path: str) -> str:
         """Process a PDF file through the pipeline."""
         logger.info(f"Processing PDF: {pdf_path}")
-        import pdfplumber
 
         # Extract tables first (for position tracking)
         logger.info("Extracting tables...")
@@ -120,7 +125,9 @@ class SmartPipeline:
         # Font-aware extraction (primary method)
         logger.info("Extracting text via font-aware method...")
         font_results = self.font_extractor.extract(pdf_path, table_bboxes_per_page={})
-        logger.info(f"  Extracted {sum(len(p['blocks']) for p in font_results)} blocks from {len(font_results)} pages")
+        logger.info(
+            f"  Extracted {sum(len(p['blocks']) for p in font_results)} blocks from {len(font_results)} pages"
+        )
 
         # Merge signals
         logger.info("Merging signals...")
@@ -192,22 +199,22 @@ class SmartPipeline:
         """Apply logical symbol mapping and general text cleanup."""
         if not text:
             return text
-            
+
         # 1. Map legacy symbols to Unicode
         for old, new in self.NORMALIZATION_MAP.items():
             text = text.replace(old, new)
-            
+
         # 2. Fix capitalization in specific terms like "DEFINITION"
         # Only fix if it's the whole word and not an acronym
-        text = re.sub(r'\bDEFINITION\b', 'Definition', text)
-        text = re.sub(r'\bOBJECTIVES\b', 'Objectives', text)
-        
+        text = re.sub(r"\bDEFINITION\b", "Definition", text)
+        text = re.sub(r"\bOBJECTIVES\b", "Objectives", text)
+
         # 3. Detect and fix joined words (CamelCase artifacts that should have space)
         # e.g., "PeradabanAcuan" -> "Peradaban Acuan"
         # STRICTOR: Only split if the first word is 10+ chars and second 4+ chars
         # OR if it's a known non-code context. (Prevents mangling 'GeometricObject', 'printCircle', etc.)
-        text = re.sub(r'([a-z]{10,})([A-Z][a-z]{4,})', r'\1 \2', text)
-        
+        text = re.sub(r"([a-z]{10,})([A-Z][a-z]{4,})", r"\1 \2", text)
+
         return text
 
     def _normalize_slide_title_for_compare(self, text: str) -> str:
@@ -246,7 +253,10 @@ class SmartPipeline:
             return False
         if self._looks_like_code(stripped):
             return False
-        if re.search(r"\b(?:you|we|they|he|she|it)\b", stripped.lower()) and len(stripped.split()) >= 4:
+        if (
+            re.search(r"\b(?:you|we|they|he|she|it)\b", stripped.lower())
+            and len(stripped.split()) >= 4
+        ):
             return False
 
         words = stripped.split()
@@ -255,7 +265,7 @@ class SmartPipeline:
 
         return True
 
-    def _has_substantive_slide_content(self, slide_blocks: List[Dict[str, object]]) -> bool:
+    def _has_substantive_slide_content(self, slide_blocks: list[dict[str, object]]) -> bool:
         """Return True when a slide has real content beyond a bare title or demo artifacts."""
         substantive = 0
         for block in slide_blocks:
@@ -281,8 +291,15 @@ class SmartPipeline:
         if len(stripped.split()) > 6:
             return False
         caption_terms = {
-            "declare", "create", "assign", "change", "reference",
-            "value", "circle", "mycircle", "yourcircle",
+            "declare",
+            "create",
+            "assign",
+            "change",
+            "reference",
+            "value",
+            "circle",
+            "mycircle",
+            "yourcircle",
         }
         words = {w.lower().strip(".,:;()") for w in stripped.split()}
         return bool(words & caption_terms)
@@ -294,7 +311,7 @@ class SmartPipeline:
             cleaned = re.sub(r"^\s*\d+\.\s+", "", cleaned)
         return cleaned
 
-    def _split_mixed_code_and_prose(self, text: str) -> Optional[tuple]:
+    def _split_mixed_code_and_prose(self, text: str) -> tuple | None:
         """
         Split a single PPTX paragraph that contains code followed by explanatory prose.
         Example:
@@ -305,14 +322,25 @@ class SmartPipeline:
             return None
 
         prose_starts = (
-            "An ", "A ", "The ", "For ", "If ", "This ", "That ", "These ", "Those ",
-            "As ", "It ", "More ", "Java ",
+            "An ",
+            "A ",
+            "The ",
+            "For ",
+            "If ",
+            "This ",
+            "That ",
+            "These ",
+            "Those ",
+            "As ",
+            "It ",
+            "More ",
+            "Java ",
         )
 
         matches = list(re.finditer(r";\s+", stripped))
         for match in reversed(matches):
-            code_part = stripped[:match.end() - 1].strip()
-            prose_part = stripped[match.end():].strip()
+            code_part = stripped[: match.end() - 1].strip()
+            prose_part = stripped[match.end() :].strip()
             if not prose_part or not prose_part.startswith(prose_starts):
                 continue
             if not self._looks_like_code(code_part):
@@ -326,7 +354,7 @@ class SmartPipeline:
     def _postprocess_pptx_markdown(self, markdown: str) -> str:
         """Final PPTX-specific cleanup after block emission."""
         lines = markdown.splitlines()
-        cleaned_lines: List[str] = []
+        cleaned_lines: list[str] = []
         i = 0
 
         while i < len(lines):
@@ -335,15 +363,22 @@ class SmartPipeline:
             # Clean the main title by dropping course prefixes before "Topic N" or "Chapter N".
             if i == 0 and line.startswith("# "):
                 title = line[2:].strip()
-                
+
                 if not re.search(r"\b(?:Topic|Chapter)\b", title, flags=re.IGNORECASE):
                     # Search ahead up to 5 lines for a Chapter or Topic designation
                     for j in range(1, min(6, len(lines))):
                         next_line = lines[j].strip()
                         clean_next = re.sub(r"^#+\s*", "", next_line)
-                        if re.search(r"^.*?\b(?:Topic|Chapter)\s+\d+.*$", clean_next, flags=re.IGNORECASE):
+                        if re.search(
+                            r"^.*?\b(?:Topic|Chapter)\s+\d+.*$", clean_next, flags=re.IGNORECASE
+                        ):
                             # Found the real chapter/topic name! Extract and make it the main title.
-                            title = re.sub(r"^.*?\b((?:Topic|Chapter)\s+\d+.*)$", r"\1", clean_next, flags=re.IGNORECASE)
+                            title = re.sub(
+                                r"^.*?\b((?:Topic|Chapter)\s+\d+.*)$",
+                                r"\1",
+                                clean_next,
+                                flags=re.IGNORECASE,
+                            )
                             # Remove that line from the list so we don't duplicate it
                             lines.pop(j)
                             break
@@ -364,7 +399,6 @@ class SmartPipeline:
 
             # Remove consecutive duplicate fenced code blocks, common on trace-animation slides.
             if line.startswith("```"):
-                block_start = i
                 block_lines = [line]
                 i += 1
                 while i < len(lines):
@@ -375,7 +409,11 @@ class SmartPipeline:
                     i += 1
 
                 block_text = "\n".join(block_lines).strip()
-                prev_block = "\n".join(cleaned_lines[-len(block_lines):]).strip() if len(cleaned_lines) >= len(block_lines) else None
+                prev_block = (
+                    "\n".join(cleaned_lines[-len(block_lines) :]).strip()
+                    if len(cleaned_lines) >= len(block_lines)
+                    else None
+                )
                 if prev_block == block_text:
                     continue
 
@@ -397,14 +435,13 @@ class SmartPipeline:
         """
         import re
         # List of common abbreviations to protect (ending with a dot)
-        PROTECT_PATTERNS = r'\b(v|vs|eg|ie|dr|mr|mrs|ms|prof|st|u\.s|p\.m|a\.m|p\.s)\b'
-        
+
         # Insert a space after . , ; : when followed by a letter/digit,
         # but NOT if it looks like a version number (digit.digit) or protected abbr.
         # Negative lookbehind for common abbreviations and negative lookahead for digits (to preserve 1.0)
-        text = re.sub(r'(?<![A-Z])([,;:!])([A-Za-zÀ-ž])', r'\1 \2', text)
+        text = re.sub(r"(?<![A-Z])([,;:!])([A-Za-zÀ-ž])", r"\1 \2", text)
         # For dots, be more careful: only if followed by space or end-of-sentence pattern
-        text = re.sub(r'(?<![A-Z0-9\.])(\.)([A-ZÀ-ž][a-z])', r'\1 \2', text)
+        text = re.sub(r"(?<![A-Z0-9\.])(\.)([A-ZÀ-ž][a-z])", r"\1 \2", text)
         return text
 
     def _normalize_pdf_bullets(self, text: str) -> str:
@@ -413,20 +450,21 @@ class SmartPipeline:
         (e.g. Ø, q, n, v as line-start decorators) into proper Markdown list markers.
         """
         import re
+
         # These chars appear as bullet stand-ins at the start of lines
-        PDF_BULLET_CHARS = r'^[ØqnvlhÂ§ø·]\s+'
-        lines = text.split('\n')
+        PDF_BULLET_CHARS = r"^[ØqnvlhÂ§ø·]\s+"
+        lines = text.split("\n")
         normalized = []
         for line in lines:
             stripped = line.strip()
             if re.match(PDF_BULLET_CHARS, stripped) and len(stripped) > 2:
                 # Convert to a proper list item, preserving indent
                 indent = len(line) - len(line.lstrip())
-                content = re.sub(PDF_BULLET_CHARS, '', stripped).strip()
-                normalized.append(' ' * indent + '- ' + content)
+                content = re.sub(PDF_BULLET_CHARS, "", stripped).strip()
+                normalized.append(" " * indent + "- " + content)
             else:
                 normalized.append(line)
-        return '\n'.join(normalized)
+        return "\n".join(normalized)
 
     def _deduplicate_pdf_blocks(self, markdown: str) -> str:
         """
@@ -437,7 +475,8 @@ class SmartPipeline:
         their words with the table rows above.
         """
         import re
-        lines = markdown.split('\n')
+
+        lines = markdown.split("\n")
         result = []
         # Collect table cell words for deduplication window
         table_words: set = set()
@@ -448,11 +487,11 @@ class SmartPipeline:
             stripped = line.strip()
 
             # Track table regions
-            if stripped.startswith('|'):
+            if stripped.startswith("|"):
                 in_table = True
                 table_end_idx = i
                 # Accumulate all words from table cells
-                cells = re.split(r'\s*\|\s*', stripped)
+                cells = re.split(r"\s*\|\s*", stripped)
                 for cell in cells:
                     table_words.update(cell.lower().split())
                 result.append(line)
@@ -464,22 +503,29 @@ class SmartPipeline:
                 table_words = set()
 
             # Check candidate duplicate line (body text after a table)
-            if in_table and stripped and not stripped.startswith('#') and not stripped.startswith('-'):
+            if (
+                in_table
+                and stripped
+                and not stripped.startswith("#")
+                and not stripped.startswith("-")
+            ):
                 line_words = set(stripped.lower().split())
                 if len(line_words) >= 4 and table_words:
                     overlap = len(line_words & table_words) / len(line_words)
                     if overlap >= 0.75:
-                        logger.debug(f"Dedup: skipping line with {overlap:.0%} table overlap: {stripped[:60]}")
+                        logger.debug(
+                            f"Dedup: skipping line with {overlap:.0%} table overlap: {stripped[:60]}"
+                        )
                         continue  # Drop the duplicate
 
             result.append(line)
 
-        return '\n'.join(result)
+        return "\n".join(result)
 
     def _extract_tables_from_pdf(self, pdf_path: str) -> list:
         """
         Extract tables from PDF and convert to markdown format.
-        
+
         Returns a list of per-page table data:
         [
             [  # Page 1
@@ -491,29 +537,29 @@ class SmartPipeline:
         ]
         """
         import pdfplumber
-        
+
         all_tables = []
-        
+
         try:
             with pdfplumber.open(pdf_path) as pdf:
-                for page_num, page in enumerate(pdf.pages, 1):
+                for _page_num, page in enumerate(pdf.pages, 1):
                     page_tables = []
-                    
+
                     # Extract tables with their bounding boxes
                     raw_tables = page.extract_tables()
                     table_settings = page.find_tables()
-                    
+
                     if not raw_tables:
                         all_tables.append([])
                         continue
-                    
+
                     for idx, table in enumerate(raw_tables):
                         if not table:
                             continue
-                        
+
                         # Convert table to markdown format
                         markdown_table = self._table_to_markdown(table)
-                        
+
                         # Get table Y position from table settings if available
                         y_position = 0
                         if idx < len(table_settings):
@@ -521,18 +567,20 @@ class SmartPipeline:
                             table_rect = table_settings[idx].bbox  # (x0, top, x1, bottom)
                             if table_rect:
                                 y_position = table_rect[1]  # top position
-                        
-                        page_tables.append({
-                            "y_position": y_position,
-                            "markdown": markdown_table,
-                        })
-                    
+
+                        page_tables.append(
+                            {
+                                "y_position": y_position,
+                                "markdown": markdown_table,
+                            }
+                        )
+
                     all_tables.append(page_tables)
         except Exception as e:
             logger.warning(f"Table extraction failed: {e}")
             # Return empty list on failure; document extraction continues
             return []
-        
+
         return all_tables
 
     def _table_to_markdown(self, table: list) -> str:
@@ -564,8 +612,16 @@ class SmartPipeline:
         return "\n".join(markdown_lines)
 
     # Monospace fonts indicate code blocks
-    MONO_FONT_KEYWORDS = ("mono", "courier", "consolas", "lucida console",
-                          "inconsolata", "source code", "fira code", "jetbrains")
+    MONO_FONT_KEYWORDS = (
+        "mono",
+        "courier",
+        "consolas",
+        "lucida console",
+        "inconsolata",
+        "source code",
+        "fira code",
+        "jetbrains",
+    )
 
     def _is_monospace(self, font_name: str) -> bool:
         """Return True if the font name indicates a monospace/code font."""
@@ -574,15 +630,30 @@ class SmartPipeline:
 
     # Shapes whose full text content we should skip entirely
     _SKIP_SHAPE_PATTERNS = (
-        "faculty of", "department of", "university", "room no",
-        "universiti", "jabatan", "fakulti",  # Malaysian university metadata
+        "faculty of",
+        "department of",
+        "university",
+        "room no",
+        "universiti",
+        "jabatan",
+        "fakulti",  # Malaysian university metadata
     )
 
     # Slides whose titles indicate they are low-value and should be skipped
     _SKIP_SLIDE_TITLES = (
-        "outline", "table of contents", "learning outcomes", "objectives",
-        "introduction", "summary", "conclusion", "thank you", "any questions",
-        "recap", "revisions", "references", "bibliography"
+        "outline",
+        "table of contents",
+        "learning outcomes",
+        "objectives",
+        "introduction",
+        "summary",
+        "conclusion",
+        "thank you",
+        "any questions",
+        "recap",
+        "revisions",
+        "references",
+        "bibliography",
     )
 
     def _is_metadata_shape(self, text: str, slide_num: int) -> bool:
@@ -598,13 +669,11 @@ class SmartPipeline:
             from pptx import Presentation
         except ImportError:
             raise ImportError(
-                "python-pptx is required for PPTX processing. "
-                "Install: pip install python-pptx"
+                "python-pptx is required for PPTX processing. Install: pip install python-pptx"
             )
 
         logger.info(f"Processing PPTX: {pptx_path}")
         prs = Presentation(pptx_path)
-        slide_width = prs.slide_width or 1
         slide_height = prs.slide_height or 1
 
         # Compute the presentation's dominant body font size so we can
@@ -652,13 +721,14 @@ class SmartPipeline:
                         yield shape
 
             for shape in _get_text_shapes(slide.shapes):
-
                 # Determine shape-level role
                 shape_role = "body"
                 # shape.top / shape.height can be None on some malformed slides
                 _top = shape.top
                 _height = shape.height
-                shape_top_frac = (_top / slide_height) if (slide_height and _top is not None) else 1.0
+                shape_top_frac = (
+                    (_top / slide_height) if (slide_height and _top is not None) else 1.0
+                )
 
                 if shape.is_placeholder:
                     ph_type = shape.placeholder_format.idx
@@ -670,7 +740,9 @@ class SmartPipeline:
                 else:
                     # Non-placeholder text box: use position heuristic
                     # Top 15% of slide and relatively short shape → likely a title
-                    _h_frac = (_height / slide_height) if (slide_height and _height is not None) else 1.0
+                    _h_frac = (
+                        (_height / slide_height) if (slide_height and _height is not None) else 1.0
+                    )
                     if shape_top_frac < 0.15 and _h_frac < 0.30:
                         shape_role = "title"
 
@@ -719,7 +791,7 @@ class SmartPipeline:
 
                     # Title placeholder: ONLY the first paragraph gets h1.
                     # Subsequent paragraphs in the same shape are sub-content (body/list).
-                    is_title_first_para = (shape_role == "title" and level == 0 and para_idx == 0)
+                    is_title_first_para = shape_role == "title" and level == 0 and para_idx == 0
 
                     if self._is_probable_pptx_noise(text):
                         logger.debug(f"Skip low-value PPTX artifact: '{text.strip()[:60]}'")
@@ -728,16 +800,20 @@ class SmartPipeline:
                     mixed_code_prose = self._split_mixed_code_and_prose(text)
                     if mixed_code_prose:
                         code_text, prose_text = mixed_code_prose
-                        slide_blocks.append({
-                            "type": "code",
-                            "text": code_text,
-                            "indent": level,
-                        })
-                        slide_blocks.append({
-                            "type": "body",
-                            "text": prose_text.lstrip(),
-                            "indent": level,
-                        })
+                        slide_blocks.append(
+                            {
+                                "type": "code",
+                                "text": code_text,
+                                "indent": level,
+                            }
+                        )
+                        slide_blocks.append(
+                            {
+                                "type": "body",
+                                "text": prose_text.lstrip(),
+                                "indent": level,
+                            }
+                        )
                         continue
 
                     if is_code or self._looks_like_code(text):
@@ -745,13 +821,26 @@ class SmartPipeline:
                     elif is_title_first_para:
                         block_type = "h1"
                         text = text.lstrip()
-                    elif not is_long_text and max_size >= h1_threshold and self._is_probable_heading(text):
+                    elif (
+                        not is_long_text
+                        and max_size >= h1_threshold
+                        and self._is_probable_heading(text)
+                    ):
                         block_type = "h1"
                         text = text.lstrip()
-                    elif not is_long_text and max_size >= h2_threshold and self._is_probable_heading(text):
+                    elif (
+                        not is_long_text
+                        and max_size >= h2_threshold
+                        and self._is_probable_heading(text)
+                    ):
                         block_type = "h2"
                         text = text.lstrip()
-                    elif not is_long_text and max_size >= h3_threshold and is_bold and self._is_probable_heading(text):
+                    elif (
+                        not is_long_text
+                        and max_size >= h3_threshold
+                        and is_bold
+                        and self._is_probable_heading(text)
+                    ):
                         block_type = "h3"
                         text = text.lstrip()
                     elif level > 0:
@@ -775,41 +864,54 @@ class SmartPipeline:
                     if is_title_first_para:
                         current_slide_title = text.strip()
 
-                    slide_blocks.append({
-                        "type": block_type,
-                        "text": text,
-                        "indent": level,
-                    })
+                    slide_blocks.append(
+                        {
+                            "type": block_type,
+                            "text": text,
+                            "indent": level,
+                        }
+                    )
 
             # --- Slide-level Filtering ---
             # 1. Skip if the title is in the skip list and there's very little content
             # (Do not skip the first slide, as it contains the main document title)
             title_lower = current_slide_title.lower().strip()
-            if slide_num > 1 and any(kw in title_lower for kw in self._SKIP_SLIDE_TITLES) and len(slide_blocks) <= 5:
+            if (
+                slide_num > 1
+                and any(kw in title_lower for kw in self._SKIP_SLIDE_TITLES)
+                and len(slide_blocks) <= 5
+            ):
                 logger.debug(f"Skip low-value slide {slide_num}: '{current_slide_title}'")
                 continue
 
-            if slide_num > 1 and slide_blocks and not self._has_substantive_slide_content(slide_blocks):
-                logger.debug(f"Skip non-substantive PPTX slide {slide_num}: '{current_slide_title}'")
+            if (
+                slide_num > 1
+                and slide_blocks
+                and not self._has_substantive_slide_content(slide_blocks)
+            ):
+                logger.debug(
+                    f"Skip non-substantive PPTX slide {slide_num}: '{current_slide_title}'"
+                )
                 continue
 
             # 2. Cross-slide title deduplication
             # If this slide's title is identical to the previous slide's title,
             # it's a continuation slide. Remove the title block to prevent duplication.
-            is_continuation = False
             normalized_current_title = self._normalize_slide_title_for_compare(current_slide_title)
             if normalized_current_title and normalized_current_title == last_slide_title:
-                is_continuation = True
                 # Remove the h1 block for this slide
                 slide_blocks = [b for b in slide_blocks if b["type"] != "h1"]
                 logger.debug(f"Slide {slide_num} is a continuation of '{current_slide_title}'")
-            
+
             last_slide_title = normalized_current_title
 
             if slide_blocks:
                 slide_blocks = [
-                    b for b in slide_blocks
-                    if not self._is_trace_caption(current_slide_title, str(b.get("text", "")), str(b.get("type", "body")))
+                    b
+                    for b in slide_blocks
+                    if not self._is_trace_caption(
+                        current_slide_title, str(b.get("text", "")), str(b.get("type", "body"))
+                    )
                 ]
 
             if not slide_blocks:
@@ -835,14 +937,16 @@ class SmartPipeline:
             h23_count = sum(1 for b in slide_blocks if b["type"] in ("h2", "h3"))
             total = len(slide_blocks)
             if total > 0 and h23_count / total > 0.35:
-                logger.debug(f"Slide {slide_num}: h2/h3 inflation ({h23_count}/{total}), demoting to body")
+                logger.debug(
+                    f"Slide {slide_num}: h2/h3 inflation ({h23_count}/{total}), demoting to body"
+                )
                 for b in slide_blocks:
                     if b["type"] in ("h2", "h3"):
                         b["type"] = "body"
 
             # Emit markdown for this slide's blocks
             in_code_block = False
-            for i, block in enumerate(slide_blocks):
+            for _i, block in enumerate(slide_blocks):
                 btype = block["type"]
                 text = block["text"]
                 indent = block.get("indent", 0)
@@ -853,13 +957,18 @@ class SmartPipeline:
                         # Determine language hint
                         text_lower = text.lower()
                         lang = ""
-                        if any(kw in text_lower for kw in ("public", "class", "void", "static", "println", "system.out")):
+                        if any(
+                            kw in text_lower
+                            for kw in ("public", "class", "void", "static", "println", "system.out")
+                        ):
                             lang = "java"
-                        elif any(kw in text_lower for kw in ("def ", "import ", "print(", "if __name__")):
+                        elif any(
+                            kw in text_lower for kw in ("def ", "import ", "print(", "if __name__")
+                        ):
                             lang = "python"
                         elif any(c in text for c in ("→", "∨", "∧", "¬", "↔", "≡")):
                             lang = "logic"
-                        
+
                         md_parts.append(f"```{lang}")
                         in_code_block = True
                     prefix = "    " * indent
@@ -899,29 +1008,44 @@ class SmartPipeline:
         """Return True if text appears to be code even without monospace metadata."""
         if not text or len(text) < 10 or len(text) > 500:
             return False
-            
+
         # Ignore lines that look like markdown headers
         if text.startswith("#"):
             return False
-        
+
         # 1. Check for strong structural code characters (must have multiple types)
         # We look for combinations like (); or {} or []
         has_brackets = "(" in text and ")" in text
         has_braces = "{" in text and "}" in text
         has_terminate = ";" in text
         has_assignment = "=" in text and not text.startswith("=")
-        
+
         # Require serious syntax indicators
         if (has_braces and has_terminate) or (has_brackets and has_terminate and has_assignment):
             return True
 
         # 2. Check for common programming keywords with strict boundary enforcement
         import re
+
         # Specialized keywords that are rarely used in plain note text without code
-        keywords = ("public", "private", "class", "void", "static", "System.out", "println", "import", "def", "return", "function", "const", "let")
-        kw_pattern = r'\b(' + '|'.join(keywords) + r')\b'
+        keywords = (
+            "public",
+            "private",
+            "class",
+            "void",
+            "static",
+            "System.out",
+            "println",
+            "import",
+            "def",
+            "return",
+            "function",
+            "const",
+            "let",
+        )
+        kw_pattern = r"\b(" + "|".join(keywords) + r")\b"
         matches = re.findall(kw_pattern, text)
-        
+
         # If we see keywords like 'class' or 'public' + syntax characters, it's code
         if len(matches) >= 2 and (has_brackets or has_braces or has_terminate):
             return True
@@ -931,12 +1055,24 @@ class SmartPipeline:
         if any(c in text for c in logic_chars) and len(text) < 150:
             # Check for pattern like "p ∧ q"
             # EXCLUDE if it contains common English/Malay words that indicate a sentence
-            common_words = {"denotes", "that", "the", "has", "it", "meaning", "is", "dalam", "yang", "dan", "untuk"}
+            common_words = {
+                "denotes",
+                "that",
+                "the",
+                "has",
+                "it",
+                "meaning",
+                "is",
+                "dalam",
+                "yang",
+                "dan",
+                "untuk",
+            }
             text_lower = text.lower()
             if any(word in text_lower.split() for word in common_words):
                 return False
-                
-            if re.search(r'[pqr]\s*[∧∨→¬]', text) or re.search(r'[¬∧∨→]\s*[pqr]', text):
+
+            if re.search(r"[pqr]\s*[∧∨→¬]", text) or re.search(r"[¬∧∨→]\s*[pqr]", text):
                 return True
 
         return False
@@ -945,9 +1081,11 @@ class SmartPipeline:
     # Reduced to 1500 to minimize "stream failed" errors with slow reasoning models
     _POLISH_CHUNK_SIZE = 1500
 
-    def _ai_polish(self, markdown: str, progress_callback: Optional[Callable[[int], None]] = None) -> str:
+    def _ai_polish(
+        self, markdown: str, progress_callback: Callable[[int], None] | None = None
+    ) -> str:
         """Perform a final formatting-only cleanup pass using AIClient.
-        
+
         Splits the input into manageable chunks to prevent quality degradation
         from long contexts, then reassembles the polished chunks.
         Works with any configured AI provider (Gemini, Groq, Ollama, etc.).
@@ -957,6 +1095,7 @@ class SmartPipeline:
 
         try:
             from app.processing.ai_client import AIClient
+
             # Create a client which will automatically use the 3-tier fallback system
             client = AIClient()
 
@@ -967,7 +1106,7 @@ class SmartPipeline:
                 client.tiers[0].api_key = self.gemini_api_key
                 client.tiers[0].model_name = self.gemini_model
                 client._init_gemini_tier(client.tiers[0])
-            
+
             # Extract the original main title to enforce it later
             original_title = None
             for line in markdown.split("\n"):
@@ -977,22 +1116,28 @@ class SmartPipeline:
 
             chunks = self._split_into_chunks(markdown)
             num_chunks = len(chunks)
-            logger.info(f"Refining output with {self.gemini_model} ({num_chunks} chunk(s), sequential-ish)...")
+            logger.info(
+                f"Refining output with {self.gemini_model} ({num_chunks} chunk(s), sequential-ish)..."
+            )
 
             # ── Parallel chunk processing ──
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-
             # We need an event loop for async generate_text
             import asyncio
-            
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
             # Ensure debug directory exists for streaming chunks
             chunk_debug_dir = Path("scripts/ProcessingAlgorithmTest/output/debug_chunks")
             chunk_debug_dir.mkdir(parents=True, exist_ok=True)
-            
+
             def _run_polish_async(idx, chunk, is_first):
                 import time
+
                 t_chunk_start = time.time()
-                res = asyncio.run(self._polish_chunk(client, idx, chunk, is_first_chunk=is_first, debug_dir=chunk_debug_dir))
+                res = asyncio.run(
+                    self._polish_chunk(
+                        client, idx, chunk, is_first_chunk=is_first, debug_dir=chunk_debug_dir
+                    )
+                )
                 self.timings[f"chunk_{idx}"] = time.time() - t_chunk_start
                 return res
 
@@ -1010,7 +1155,7 @@ class SmartPipeline:
                     try:
                         result = future.result()
                         completed_chunks += 1
-                        
+
                         # Update progress: AI starts at 30%, ends at 95%
                         if progress_callback:
                             ai_progress = 30 + int((completed_chunks / num_chunks) * 65)
@@ -1030,29 +1175,32 @@ class SmartPipeline:
 
             # ── Post-processing: enforce structural rules programmatically ──
             import re
+
             lines = result.split("\n")
             cleaned = []
             seen_h1 = False
             first_heading_seen = False
-            
+
             for line in lines:
                 # If this is the very first heading in the entire document, force it to be H1
-                if not first_heading_seen and re.match(r'^#{1,6}\s+', line):
+                if not first_heading_seen and re.match(r"^#{1,6}\s+", line):
                     if original_title:
                         line = original_title
                     else:
-                        line = re.sub(r'^#{1,6}\s+', '# ', line)
+                        line = re.sub(r"^#{1,6}\s+", "# ", line)
                     first_heading_seen = True
                     seen_h1 = True
                 # Enforce only ONE H1
-                elif re.match(r'^#\s+', line) and not re.match(r'^##', line):
+                elif re.match(r"^#\s+", line) and not re.match(r"^##", line):
                     if seen_h1:
                         # Demote to H2
                         line = "#" + line
                     else:
                         seen_h1 = True
                 # Remove "End of Topic/Chapter" lines
-                if re.match(r'^#{1,3}\s+(End of|end of)\s+(Topic|Chapter|Note)', line, re.IGNORECASE):
+                if re.match(
+                    r"^#{1,3}\s+(End of|end of)\s+(Topic|Chapter|Note)", line, re.IGNORECASE
+                ):
                     continue
                 cleaned.append(line)
 
@@ -1063,13 +1211,14 @@ class SmartPipeline:
 
         return markdown
 
-    def _split_into_chunks(self, markdown: str) -> List[str]:
+    def _split_into_chunks(self, markdown: str) -> list[str]:
         """Split markdown into chunks at heading boundaries to avoid mid-paragraph splits."""
         import re
+
         lines = markdown.split("\n")
-        
-        chunks: List[str] = []
-        current_chunk: List[str] = []
+
+        chunks: list[str] = []
+        current_chunk: list[str] = []
         current_size = 0
 
         for line in lines:
@@ -1077,7 +1226,7 @@ class SmartPipeline:
             current_size += len(line) + 1  # +1 for newline
 
             # Split at heading boundaries when chunk is large enough
-            if current_size >= self._POLISH_CHUNK_SIZE and re.match(r'^#{1,3}\s', line):
+            if current_size >= self._POLISH_CHUNK_SIZE and re.match(r"^#{1,3}\s", line):
                 # The heading line starts a new chunk
                 heading_line = current_chunk.pop()
                 if current_chunk:
@@ -1090,24 +1239,27 @@ class SmartPipeline:
 
         return chunks if chunks else [markdown]
 
-    async def _polish_chunk(self, client, chunk_idx: int, chunk: str, is_first_chunk: bool = False, debug_dir: Optional[Path] = None) -> str:
+    async def _polish_chunk(
+        self,
+        client,
+        chunk_idx: int,
+        chunk: str,
+        is_first_chunk: bool = False,
+        debug_dir: Path | None = None,
+    ) -> str:
         """Polish a single chunk of markdown using the AI model with streaming."""
         if is_first_chunk:
             heading_rule = (
                 "4. ONE H1: Only the main title on the first line must be H1 (# ). All other headings in the input must be H2 (## ) or H3 (### ).\n"
                 "5. DEMOTE HEADINGS: Any subsequent H1 headings (# ) in the input MUST be demoted to H2 (## ) headings."
             )
-            title_instruction = (
-                "TITLE RULE: The first line of your output MUST be a single H1 heading (# ) with the EXACT Topic/Chapter title and number from the slides (e.g., \"# Topic 2 Object-Oriented Modeling\" or \"# Topic 3: Inheritance\"). Ensure you preserve the Topic/Chapter word and its number. Remove only university names, course codes, and noter names."
-            )
+            title_instruction = 'TITLE RULE: The first line of your output MUST be a single H1 heading (# ) with the EXACT Topic/Chapter title and number from the slides (e.g., "# Topic 2 Object-Oriented Modeling" or "# Topic 3: Inheritance"). Ensure you preserve the Topic/Chapter word and its number. Remove only university names, course codes, and noter names.'
         else:
             heading_rule = (
                 "4. NO H1: Do NOT use any H1 (# ) headings in this chunk. Use only H2 (## ) or H3 (### ) for headings.\n"
                 "5. DEMOTE HEADINGS: Any H1 headings (# ) in the input MUST be demoted to H2 (## ) headings."
             )
-            title_instruction = (
-                "HEADING RULE: If the input contains H1 (# ) headings, demote them to H2 (## ) headings. Do NOT prefix normal paragraphs or bullet points with ## or ###. Keep them as plain text."
-            )
+            title_instruction = "HEADING RULE: If the input contains H1 (# ) headings, demote them to H2 (## ) headings. Do NOT prefix normal paragraphs or bullet points with ## or ###. Keep them as plain text."
 
         prompt = f"""Task: Clean and format the following note notes into clean Markdown.
 
@@ -1141,50 +1293,53 @@ INPUT TO PROCESS:
                 "Strictly adhere to the heading rules and keep the exact words from the source text."
             )
             # Use a slightly higher max_tokens to ensure we don't cut off the content
-            async for text_segment in client.stream_text(prompt, max_tokens=3000, system_instruction=system_instruction):
+            async for text_segment in client.stream_text(
+                prompt, max_tokens=3000, system_instruction=system_instruction
+            ):
                 full_text += text_segment
                 if debug_file:
                     with open(debug_file, "a", encoding="utf-8") as f:
                         f.write(text_segment)
                         f.flush()
 
-            if full_text and not full_text.startswith("["): # Check for provider errors
+            if full_text and not full_text.startswith("["):  # Check for provider errors
                 # Clean up the output
                 content = full_text.strip()
-                
+
                 # Split by markers
                 if "===START===" in content:
                     content = content.split("===START===", 1)[-1]
                 if "===END===" in content:
                     content = content.split("===END===")[0]
-                
+
                 content = content.strip()
-                
+
                 # Aggressive line-by-line cleanup to remove leaked reasoning artifacts
                 lines = content.split("\n")
                 cleaned_lines = []
                 REASONING_PATTERNS = [
-                    r'^\s*[\*\-]\s*Rule \d+:',
-                    r'^\s*[\*\-]\s*Segment \d+:',
-                    r'^\s*[\*\-]\s*Main Title \(H1\):',
-                    r'^\s*[\*\-]\s*Potential H\d+',
-                    r'^\s*[\*\-]\s*`# .*` \(Potential H1\)',
-                    r'^\s*Correction on',
-                    r'^\s*Refining the',
-                    r'^\s*Let\'s verify',
-                    r'^\s*Final check',
+                    r"^\s*[\*\-]\s*Rule \d+:",
+                    r"^\s*[\*\-]\s*Segment \d+:",
+                    r"^\s*[\*\-]\s*Main Title \(H1\):",
+                    r"^\s*[\*\-]\s*Potential H\d+",
+                    r"^\s*[\*\-]\s*`# .*` \(Potential H1\)",
+                    r"^\s*Correction on",
+                    r"^\s*Refining the",
+                    r"^\s*Let\'s verify",
+                    r"^\s*Final check",
                 ]
-                
+
                 import re
+
                 for line in lines:
                     if any(re.match(p, line, re.IGNORECASE) for p in REASONING_PATTERNS):
                         continue
                     # Remove markers if they leaked into the line
                     line = line.replace("===START===", "").replace("===END===", "")
                     cleaned_lines.append(line)
-                
+
                 content = "\n".join(cleaned_lines).strip()
-                
+
                 # Final strip of any backtick wrapping (common in AI responses)
                 if content.startswith("```markdown"):
                     content = content[11:].strip()
@@ -1199,8 +1354,7 @@ INPUT TO PROCESS:
 
         return None
 
-    def _compute_stats(self, blocks) -> Dict[str, int]:
-
+    def _compute_stats(self, blocks) -> dict[str, int]:
         """Compute quality metrics for the output."""
         stats = {
             "total_blocks": len(blocks),
@@ -1224,11 +1378,11 @@ INPUT TO PROCESS:
 def process_file(file_path: str, use_ai: bool = True) -> str:
     """
     Convenience function to process a file through the smart pipeline.
-    
+
     Args:
         file_path: Path to PDF or PPTX file
         use_ai: Whether to use AI models (layout detection, table transformer)
-        
+
     Returns:
         Clean Markdown string
     """

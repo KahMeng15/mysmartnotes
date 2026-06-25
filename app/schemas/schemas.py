@@ -1,9 +1,9 @@
 """Request/Response schemas"""
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from datetime import datetime
-from typing import Optional, List, Any, Annotated
-import re
 
+from datetime import datetime
+from typing import Annotated, Any
+
+from pydantic import BaseModel, EmailStr, Field
 
 # Constants for validation
 NICKNAME_REGEX = r"^[a-zA-Z0-9_-]+$"
@@ -16,17 +16,17 @@ FullNameStr = Annotated[str, Field(min_length=2, max_length=100, pattern=FULL_NA
 
 # ========== User Schemas ==========
 class UserBase(BaseModel):
-    username: Optional[str] = None
-    email: Optional[EmailStr] = None
-    full_name: Optional[FullNameStr] = None
-    nickname: Optional[NicknameStr] = None
+    username: str | None = None
+    email: EmailStr | None = None
+    full_name: FullNameStr | None = None
+    nickname: NicknameStr | None = None
 
 
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
     nickname: NicknameStr
-    full_name: Optional[FullNameStr] = None
+    full_name: FullNameStr | None = None
     agree_tos: bool = False
     agree_privacy: bool = False
     agree_fair_use: bool = False
@@ -38,31 +38,31 @@ class UserLogin(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    full_name: Optional[FullNameStr] = None
-    nickname: Optional[NicknameStr] = None
-    ai_provider: Optional[str] = None
-    ai_model: Optional[str] = None
-    ai_base_url: Optional[str] = None
-    ai_api_key: Optional[str] = None # Ignored by backend, but accepted from frontend
-    use_global_ai_config: Optional[bool] = None
-    nav_sidebar_open: Optional[bool] = None
-    action_sidebar_open: Optional[bool] = None
-    sort_preference: Optional[str] = None
-    last_chat_context: Optional[str] = None
-    last_chat_ai_mode: Optional[str] = None
-    last_chat_output_format: Optional[str] = None
+    full_name: FullNameStr | None = None
+    nickname: NicknameStr | None = None
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    ai_base_url: str | None = None
+    ai_api_key: str | None = None  # Ignored by backend, but accepted from frontend
+    use_global_ai_config: bool | None = None
+    nav_sidebar_open: bool | None = None
+    action_sidebar_open: bool | None = None
+    sort_preference: str | None = None
+    last_chat_context: str | None = None
+    last_chat_ai_mode: str | None = None
+    last_chat_output_format: str | None = None
 
 
 class User(UserBase):
     id: int
-    is_active: Optional[bool] = True
+    is_active: bool | None = True
     is_admin: bool = False
     is_approved: bool = True
     is_verified: bool = False
     tier: str = "free"
     ai_provider: str = "gemini"
-    ai_model: Optional[str] = None
-    ai_base_url: Optional[str] = None
+    ai_model: str | None = None
+    ai_base_url: str | None = None
     ai_api_key_configured: bool = False
     use_global_ai_config: bool = True
     nav_sidebar_open: bool = True
@@ -71,8 +71,8 @@ class User(UserBase):
     last_chat_context: str = "global"
     last_chat_ai_mode: str = "elaborate"
     last_chat_output_format: str = "sentence"
-    created_at: Optional[datetime] = None
-    
+    created_at: datetime | None = None
+
     class Config:
         from_attributes = True
 
@@ -85,22 +85,26 @@ class TokenResponse(BaseModel):
 
 # ========== Subject Schemas ==========
 
+
 # ========== Subject Group Schemas ==========
 class SubjectGroupBase(BaseModel):
     name: str
 
+
 class SubjectGroupCreate(SubjectGroupBase):
     pass
 
+
 class SubjectGroupUpdate(BaseModel):
-    name: Optional[str] = None
+    name: str | None = None
+
 
 class SubjectGroup(SubjectGroupBase):
     id: str
     user_id: int
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -108,9 +112,9 @@ class SubjectGroup(SubjectGroupBase):
 # ========== Subject Schemas ==========
 class SubjectBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     color: str = "#3b82f6"
-    group_id: Optional[str] = None
+    group_id: str | None = None
 
 
 class SubjectCreate(SubjectBase):
@@ -118,28 +122,29 @@ class SubjectCreate(SubjectBase):
 
 
 class SubjectUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    color: Optional[str] = None
-    group_id: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    color: str | None = None
+    group_id: str | None = None
 
 
 class Subject(SubjectBase):
     id: str
     user_id: int
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class SubjectResponse(Subject):
     """Response schema for subject endpoints"""
-    group: Optional[SubjectGroup] = None
+
+    group: SubjectGroup | None = None
 
 
 class SubjectGroupResponse(SubjectGroup):
-    subjects: List[SubjectResponse] = []
+    subjects: list[SubjectResponse] = []
 
 
 # ========== Resource Schemas ==========
@@ -160,22 +165,23 @@ class Resource(ResourceBase):
     file_name: str
     user_id: int
     page_count: int = 0
-    extracted_text: Optional[str] = None
-    extracted_content_structured: Optional[str] = None
-    extracted_images_metadata: Optional[str] = None
-    output_pdf_path: Optional[str] = None
-    processing_time_ms: Optional[int] = None
-    timings: Optional[dict] = None
+    extracted_text: str | None = None
+    extracted_content_structured: str | None = None
+    extracted_images_metadata: str | None = None
+    output_pdf_path: str | None = None
+    processing_time_ms: int | None = None
+    timings: dict | None = None
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class ResourceResponse(Resource):
     """Response schema for resource endpoints"""
-    subject: Optional[SubjectResponse] = None
+
+    subject: SubjectResponse | None = None
 
 
 # ========== Note Schemas ==========
@@ -189,29 +195,29 @@ class Note(NoteBase):
     resource_id: str
     file_path: str
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 # ========== Study Session Schemas ==========
 class StudySessionCreate(BaseModel):
-    resource_id: Optional[str] = None
+    resource_id: str | None = None
     session_type: str
     duration_minutes: int
     questions_attempted: int = 0
     questions_correct: int = 0
-    score: Optional[float] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    status: Optional[str] = "completed"
+    score: float | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    status: str | None = "completed"
 
 
 class StudySession(StudySessionCreate):
     id: int
     user_id: int
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -223,9 +229,9 @@ class TaskResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
-    result: Optional[str] = None
-    error_message: Optional[str] = None
-    
+    result: str | None = None
+    error_message: str | None = None
+
     class Config:
         from_attributes = True
 
@@ -239,7 +245,7 @@ class ChatMessage(BaseModel):
 class ChatResponse(BaseModel):
     message: str
     response: str
-    sources: Optional[List[str]] = None
+    sources: list[str] | None = None
 
 
 # ========== Resource Snapshot Schemas ==========
@@ -255,7 +261,7 @@ class ResourceSnapshotResponse(BaseModel):
     name: str
     content: str
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -268,18 +274,18 @@ class ResourceContentUpdate(BaseModel):
 # ========== Export Template Schemas ==========
 class TemplateCreate(BaseModel):
     name: str
-    description: Optional[str] = None
-    config: Optional[Any] = None
+    description: str | None = None
+    config: Any | None = None
 
 
 class TemplateDuplicate(BaseModel):
-    name: Optional[str] = None
+    name: str | None = None
 
 
 class TemplateUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    config: Optional[Any] = None
+    name: str | None = None
+    description: str | None = None
+    config: Any | None = None
 
 
 # ========== User Prompt Schemas ==========
@@ -289,8 +295,8 @@ class UserPromptCreate(BaseModel):
 
 
 class UserPromptUpdate(BaseModel):
-    name: Optional[str] = None
-    content: Optional[str] = None
+    name: str | None = None
+    content: str | None = None
 
 
 class UserPromptResponse(BaseModel):
@@ -300,7 +306,6 @@ class UserPromptResponse(BaseModel):
     content: str
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
-

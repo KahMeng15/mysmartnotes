@@ -1,8 +1,9 @@
-import os
 import json
 import logging
-from typing import Optional, Union, Dict, Any
-from app.utils.cache import get_cache_sync, set_cache_sync, delete_cache_sync
+import os
+from typing import Any
+
+from app.utils.cache import delete_cache_sync, get_cache_sync, set_cache_sync
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,10 @@ os.makedirs(RESOURCES_DIR, exist_ok=True)
 os.makedirs(NOTES_DIR, exist_ok=True)
 os.makedirs(EXERCISES_DIR, exist_ok=True)
 
+
 class StorageManager:
     """Central manager for file-based storage of large text content with Redis caching"""
-    
+
     @staticmethod
     def _get_resource_path(resource_id: str, suffix: str = "", extension: str = "md") -> str:
         filename = f"{resource_id}{suffix}.{extension}"
@@ -48,7 +50,7 @@ class StorageManager:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
             logger.debug(f"Saved resource text to {path}")
-            
+
             # Update cache
             cache_key = f"resource_text:{resource_id}"
             set_cache_sync(cache_key, text)
@@ -56,7 +58,7 @@ class StorageManager:
             logger.error(f"Failed to save resource text for {resource_id}: {e}")
 
     @staticmethod
-    def get_resource_text(resource_id: str) -> Optional[str]:
+    def get_resource_text(resource_id: str) -> str | None:
         """Read extracted text from cache or .md file"""
         cache_key = f"resource_text:{resource_id}"
         cached = get_cache_sync(cache_key)
@@ -68,7 +70,7 @@ class StorageManager:
         if not os.path.exists(path):
             return None
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
                 # Populate cache
                 set_cache_sync(cache_key, content)
@@ -78,7 +80,7 @@ class StorageManager:
             return None
 
     @staticmethod
-    def save_resource_json(resource_id: str, suffix: str, data: Union[Dict, Any]):
+    def save_resource_json(resource_id: str, suffix: str, data: dict | Any):
         """Save structured data (JSON) to a .json file and update cache"""
         if data is None:
             return
@@ -87,7 +89,7 @@ class StorageManager:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False)
             logger.debug(f"Saved resource {suffix} to {path}")
-            
+
             # Update cache
             cache_key = f"resource_json:{resource_id}:{suffix}"
             set_cache_sync(cache_key, data)
@@ -95,7 +97,7 @@ class StorageManager:
             logger.error(f"Failed to save resource {suffix} for {resource_id}: {e}")
 
     @staticmethod
-    def get_resource_json(resource_id: str, suffix: str) -> Optional[Union[Dict, Any]]:
+    def get_resource_json(resource_id: str, suffix: str) -> dict | Any | None:
         """Read structured data (JSON) from cache or .json file"""
         cache_key = f"resource_json:{resource_id}:{suffix}"
         cached = get_cache_sync(cache_key)
@@ -107,7 +109,7 @@ class StorageManager:
         if not os.path.exists(path):
             return None
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
                 # Populate cache
                 set_cache_sync(cache_key, data)
@@ -129,7 +131,7 @@ class StorageManager:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
             logger.debug(f"Saved note {note_id}{suffix} to {path}")
-            
+
             # Update cache
             cache_key = f"note_text:{note_id}{suffix}"
             set_cache_sync(cache_key, text)
@@ -137,7 +139,7 @@ class StorageManager:
             logger.error(f"Failed to save note {note_id}: {e}")
 
     @staticmethod
-    def get_note_text(note_id: str, is_quickread: bool = False) -> Optional[str]:
+    def get_note_text(note_id: str, is_quickread: bool = False) -> str | None:
         """Read note content from cache or .md file"""
         suffix = "_quickread" if is_quickread else ""
         cache_key = f"note_text:{note_id}{suffix}"
@@ -150,7 +152,7 @@ class StorageManager:
         if not os.path.exists(path):
             return None
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
                 # Populate cache
                 set_cache_sync(cache_key, content)
@@ -167,13 +169,21 @@ class StorageManager:
         # List of possible suffixes/extensions
         patterns = [
             (StorageManager._get_resource_path(resource_id), f"resource_text:{resource_id}"),
-            (StorageManager._get_resource_path(resource_id, suffix="_structured", extension="json"), f"resource_json:{resource_id}:structured"),
-            (StorageManager._get_resource_path(resource_id, suffix="_images", extension="json"), f"resource_json:{resource_id}:images")
+            (
+                StorageManager._get_resource_path(
+                    resource_id, suffix="_structured", extension="json"
+                ),
+                f"resource_json:{resource_id}:structured",
+            ),
+            (
+                StorageManager._get_resource_path(resource_id, suffix="_images", extension="json"),
+                f"resource_json:{resource_id}:images",
+            ),
         ]
         for path, cache_key in patterns:
             # Delete cache
             delete_cache_sync(cache_key)
-            
+
             # Delete file
             if os.path.exists(path):
                 try:
@@ -187,12 +197,15 @@ class StorageManager:
         """Delete all files and cache associated with a note ID"""
         patterns = [
             (StorageManager._get_note_path(note_id), f"note_text:{note_id}"),
-            (StorageManager._get_note_path(note_id, suffix="_quickread"), f"note_text:{note_id}_quickread")
+            (
+                StorageManager._get_note_path(note_id, suffix="_quickread"),
+                f"note_text:{note_id}_quickread",
+            ),
         ]
         for path, cache_key in patterns:
             # Delete cache
             delete_cache_sync(cache_key)
-            
+
             # Delete file
             if os.path.exists(path):
                 try:
@@ -202,36 +215,36 @@ class StorageManager:
                     logger.error(f"Failed to delete {path}: {e}")
 
     @staticmethod
-    def save_exercise_json(exercise_id: str, data: Union[Dict, Any], suffix: str = ""):
+    def save_exercise_json(exercise_id: str, data: dict | Any, suffix: str = ""):
         """Save structured JSON data for an exercise (like questions)"""
         path = StorageManager._get_exercise_path(exercise_id, suffix=suffix, extension="json")
         try:
-            with open(path, 'w', encoding='utf-8') as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to write JSON for exercise {exercise_id}: {e}")
             raise e
 
     @staticmethod
-    def get_exercise_json(exercise_id: str, suffix: str = "") -> Optional[Union[Dict, Any]]:
+    def get_exercise_json(exercise_id: str, suffix: str = "") -> dict | Any | None:
         """Retrieve JSON data for an exercise"""
         path = StorageManager._get_exercise_path(exercise_id, suffix=suffix, extension="json")
         if not os.path.exists(path):
             return None
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.error(f"Failed to read JSON for exercise {exercise_id}: {e}")
             return None
-            
+
     @staticmethod
     def delete_exercise_files(exercise_id: str):
         """Delete all generated files associated with an exercise"""
         exercises_dir = EXERCISES_DIR
         if not os.path.exists(exercises_dir):
             return
-            
+
         for filename in os.listdir(exercises_dir):
             if filename.startswith(f"{exercise_id}"):
                 file_path = os.path.join(exercises_dir, filename)

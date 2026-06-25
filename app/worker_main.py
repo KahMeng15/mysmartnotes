@@ -1,21 +1,21 @@
 import asyncio
-import time
-import logging
 import json
+import logging
 import traceback
 from datetime import datetime
 
 from sqlalchemy import func
-from app.models.db import Task, RateLimitConfig
-from app.utils.db import SessionLocal, init_db
-from app.utils.tasks import TaskManager, OCRTask, EmbeddingsTask, NoteTask, ChatTask
 
 from app.logging_config import setup_logging
+from app.models.db import RateLimitConfig, Task
+from app.utils.db import SessionLocal
+from app.utils.tasks import ChatTask, EmbeddingsTask, NoteTask, OCRTask, TaskManager
+
 setup_logging()
 logger = logging.getLogger(__name__)
 
+from app.processing.exercise_processor import generate_exercise_task, process_exercise_task
 from app.processing.note_processor import process_resource_task
-from app.processing.exercise_processor import process_exercise_task, generate_exercise_task
 
 # Registry of supported tasks (can be sync or async)
 TASK_REGISTRY = {
@@ -27,6 +27,7 @@ TASK_REGISTRY = {
     "exercise_extraction": process_exercise_task,
     "exercise_generation": generate_exercise_task,
 }
+
 
 async def process_next_task():
     db = SessionLocal()
@@ -42,15 +43,13 @@ async def process_next_task():
         if max_concurrent > 0:
             # Find users who have already reached their concurrent task limit
             # These are users with >= max_concurrent tasks in 'running' status
-            running_users_subquery = db.query(
-                Task.user_id
-            ).filter(
-                Task.status == "running"
-            ).group_by(
-                Task.user_id
-            ).having(
-                func.count(Task.id) >= max_concurrent
-            ).subquery()
+            running_users_subquery = (
+                db.query(Task.user_id)
+                .filter(Task.status == "running")
+                .group_by(Task.user_id)
+                .having(func.count(Task.id) >= max_concurrent)
+                .subquery()
+            )
 
             pending_query = pending_query.filter(
                 ~Task.user_id.in_(db.query(running_users_subquery.c.user_id))
@@ -88,7 +87,7 @@ async def process_next_task():
             raise ValueError(f"Unknown task type: {task_type}")
 
         TaskManager.update_task_progress(task_id, 10)
-        
+
         # Execute task (handle both sync and async)
         if asyncio.iscoroutinefunction(handler):
             result = await handler(**kwargs)
@@ -103,12 +102,13 @@ async def process_next_task():
     except Exception as e:
         logger.error(f"Task processing failed: {e}")
         logger.error(traceback.format_exc())
-        if 'task_id' in locals():
+        if "task_id" in locals():
             TaskManager._update_db_task(task_id, status="failed", error=str(e), progress=0)
         db.rollback()
         return False
     finally:
         db.close()
+
 
 async def main():
     logger.info("Starting background worker (async mode)...")
@@ -123,6 +123,7 @@ async def main():
         except Exception as e:
             logger.error(f"Worker loop error: {e}")
             await asyncio.sleep(5)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

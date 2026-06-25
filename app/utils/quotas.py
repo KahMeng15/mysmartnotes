@@ -1,11 +1,20 @@
 """Quota and tier limit enforcement utilities"""
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from fastapi import HTTPException, status
+
 from datetime import datetime, timedelta
 
+from fastapi import HTTPException, status
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
 from app.models.db import (
-    User, TierConfig, Resource, Subject, SubjectGroup, ChatMessage, Exercise, Note
+    ChatMessage,
+    Exercise,
+    Note,
+    Resource,
+    Subject,
+    SubjectGroup,
+    TierConfig,
+    User,
 )
 
 DEFAULT_TIER_CONFIGS = {
@@ -21,7 +30,7 @@ DEFAULT_TIER_CONFIGS = {
         "max_notes": -1,
         "conversations_reset_period": None,
         "messages_reset_period": None,
-        "notes_reset_period": None
+        "notes_reset_period": None,
     },
     "free": {
         "display_name": "Free",
@@ -35,7 +44,7 @@ DEFAULT_TIER_CONFIGS = {
         "max_notes": 50,
         "conversations_reset_period": None,
         "messages_reset_period": None,
-        "notes_reset_period": None
+        "notes_reset_period": None,
     },
     "pro": {
         "display_name": "Pro",
@@ -49,7 +58,7 @@ DEFAULT_TIER_CONFIGS = {
         "max_notes": 500,
         "conversations_reset_period": None,
         "messages_reset_period": None,
-        "notes_reset_period": None
+        "notes_reset_period": None,
     },
     "early_tester": {
         "display_name": "Early Tester",
@@ -63,8 +72,8 @@ DEFAULT_TIER_CONFIGS = {
         "max_notes": -1,
         "conversations_reset_period": None,
         "messages_reset_period": None,
-        "notes_reset_period": None
-    }
+        "notes_reset_period": None,
+    },
 }
 
 
@@ -72,7 +81,7 @@ def ensure_default_tier_configs(db: Session):
     existing_ids = {tier.id for tier in db.query(TierConfig).all()}
     missing_tiers = [tier_id for tier_id in DEFAULT_TIER_CONFIGS if tier_id not in existing_ids]
     if not missing_tiers:
-         return
+        return
 
     for tier_id in missing_tiers:
         data = DEFAULT_TIER_CONFIGS[tier_id]
@@ -100,7 +109,7 @@ def ensure_tier_config_exists(tier_id: str, db: Session):
 def get_period_start(reset_period: str) -> datetime:
     """Get the start of the current period based on reset_period type"""
     now = datetime.utcnow()
-    
+
     if reset_period == "week":
         # Monday of current week
         days_since_monday = now.weekday()
@@ -112,7 +121,7 @@ def get_period_start(reset_period: str) -> datetime:
     else:
         # No reset period - return epoch (will count all time)
         period_start = datetime.utcfromtimestamp(0)
-    
+
     return period_start
 
 
@@ -128,85 +137,75 @@ def get_user_tier_config(user: User, db: Session) -> TierConfig:
 
 def get_user_resource_count(user: User, db: Session) -> int:
     """Get the number of resources a user has"""
-    count = db.query(func.count(Resource.id)).filter(
-        Resource.user_id == user.id
-    ).scalar() or 0
+    count = db.query(func.count(Resource.id)).filter(Resource.user_id == user.id).scalar() or 0
     return count
 
 
 def get_user_subject_count(user: User, db: Session) -> int:
     """Get the number of subjects a user has"""
-    count = db.query(func.count(Subject.id)).filter(
-        Subject.user_id == user.id
-    ).scalar() or 0
+    count = db.query(func.count(Subject.id)).filter(Subject.user_id == user.id).scalar() or 0
     return count
 
 
 def get_user_group_count(user: User, db: Session) -> int:
     """Get the number of subject groups a user has"""
-    count = db.query(func.count(SubjectGroup.id)).filter(
-        SubjectGroup.user_id == user.id
-    ).scalar() or 0
+    count = (
+        db.query(func.count(SubjectGroup.id)).filter(SubjectGroup.user_id == user.id).scalar() or 0
+    )
     return count
 
 
-def get_user_conversation_count(user: User, db: Session, reset_period: str = None) -> int:
+def get_user_conversation_count(user: User, db: Session, reset_period: str | None = None) -> int:
     """Get the number of unique conversations a user has (optionally filtered by period)"""
     query = db.query(func.count(ChatMessage.conversation_id.distinct())).filter(
         ChatMessage.user_id == user.id
     )
-    
+
     if reset_period:
         period_start = get_period_start(reset_period)
         query = query.filter(ChatMessage.timestamp >= period_start)
-    
+
     count = query.scalar() or 0
     return count
 
 
-def get_user_message_count(user: User, db: Session, reset_period: str = None) -> int:
+def get_user_message_count(user: User, db: Session, reset_period: str | None = None) -> int:
     """Get the total number of chat messages a user has sent (optionally filtered by period)"""
-    query = db.query(func.count(ChatMessage.id)).filter(
-        ChatMessage.user_id == user.id
-    )
-    
+    query = db.query(func.count(ChatMessage.id)).filter(ChatMessage.user_id == user.id)
+
     if reset_period:
         period_start = get_period_start(reset_period)
         query = query.filter(ChatMessage.timestamp >= period_start)
-    
+
     count = query.scalar() or 0
     return count
 
 
 def get_user_exercise_count(user: User, db: Session) -> int:
     """Get the number of exercises a user has"""
-    count = db.query(func.count(Exercise.id)).filter(
-        Exercise.user_id == user.id
-    ).scalar() or 0
+    count = db.query(func.count(Exercise.id)).filter(Exercise.user_id == user.id).scalar() or 0
     return count
 
 
-def get_user_note_count(user: User, db: Session, reset_period: str = None) -> int:
+def get_user_note_count(user: User, db: Session, reset_period: str | None = None) -> int:
     """Get the number of notes a user has (optionally filtered by period)"""
     query = db.query(func.count(Note.id)).filter(
-        Note.resource_id.in_(
-            db.query(Resource.id).filter(Resource.user_id == user.id)
-        )
+        Note.resource_id.in_(db.query(Resource.id).filter(Resource.user_id == user.id))
     )
-    
+
     if reset_period:
         period_start = get_period_start(reset_period)
         query = query.filter(Note.created_at >= period_start)
-    
+
     count = query.scalar() or 0
     return count
 
 
 def get_user_storage_used_bytes(user: User, db: Session) -> int:
     """Get total storage used by a user in bytes"""
-    total_bytes = db.query(func.sum(Resource.file_size)).filter(
-        Resource.user_id == user.id
-    ).scalar() or 0
+    total_bytes = (
+        db.query(func.sum(Resource.file_size)).filter(Resource.user_id == user.id).scalar() or 0
+    )
     return total_bytes
 
 
@@ -284,11 +283,11 @@ def check_quota_storage(user: User, file_size_bytes: int, db: Session) -> bool:
     tier_config = get_user_tier_config(user, db)
     if tier_config.max_storage_gb == -1:  # Unlimited
         return True
-    
+
     current_usage_gb = get_user_storage_used_gb(user, db)
     max_storage_gb = tier_config.max_storage_gb
     new_usage_gb = current_usage_gb + (file_size_bytes / (1024 * 1024 * 1024))
-    
+
     return new_usage_gb <= max_storage_gb
 
 
@@ -299,7 +298,7 @@ def enforce_quota_resources(user: User, db: Session):
         current = get_user_resource_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Resource quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_resources} resources. You have {current}."
+            detail=f"Resource quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_resources} resources. You have {current}.",
         )
 
 
@@ -310,7 +309,7 @@ def enforce_quota_subjects(user: User, db: Session):
         current = get_user_subject_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Subject quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_subjects} subjects. You have {current}."
+            detail=f"Subject quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_subjects} subjects. You have {current}.",
         )
 
 
@@ -321,7 +320,7 @@ def enforce_quota_groups(user: User, db: Session):
         current = get_user_group_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Group quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_groups} groups. You have {current}."
+            detail=f"Group quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_groups} groups. You have {current}.",
         )
 
 
@@ -332,7 +331,7 @@ def enforce_quota_conversations(user: User, db: Session):
         current = get_user_conversation_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Conversation quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_conversations} conversations. You have {current}."
+            detail=f"Conversation quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_conversations} conversations. You have {current}.",
         )
 
 
@@ -343,7 +342,7 @@ def enforce_quota_messages(user: User, db: Session):
         current = get_user_message_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Message quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_messages} messages. You have {current}."
+            detail=f"Message quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_messages} messages. You have {current}.",
         )
 
 
@@ -354,7 +353,7 @@ def enforce_quota_exercises(user: User, db: Session):
         current = get_user_exercise_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Exercise quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_exercises} exercises. You have {current}."
+            detail=f"Exercise quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_exercises} exercises. You have {current}.",
         )
 
 
@@ -365,7 +364,7 @@ def enforce_quota_notes(user: User, db: Session):
         current = get_user_note_count(user, db)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Note quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_notes} notes. You have {current}."
+            detail=f"Note quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_notes} notes. You have {current}.",
         )
 
 
@@ -377,14 +376,14 @@ def enforce_quota_storage(user: User, file_size_bytes: int, db: Session):
         file_size_gb = file_size_bytes / (1024 * 1024 * 1024)
         raise HTTPException(
             status_code=status.HTTP_413_PAYLOAD_TOO_LARGE,
-            detail=f"Storage quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_storage_gb}GB. You've used {current_gb:.2f}GB and this file is {file_size_gb:.2f}GB."
+            detail=f"Storage quota exceeded. Your {user.tier.upper()} tier allows {tier_config.max_storage_gb}GB. You've used {current_gb:.2f}GB and this file is {file_size_gb:.2f}GB.",
         )
 
 
 def get_user_quota_status(user: User, db: Session) -> dict:
     """Get comprehensive quota status for a user"""
     tier_config = get_user_tier_config(user, db)
-    
+
     return {
         "tier": user.tier,
         "tier_name": tier_config.display_name,
@@ -393,49 +392,51 @@ def get_user_quota_status(user: User, db: Session) -> dict:
                 "used": get_user_resource_count(user, db),
                 "limit": tier_config.max_resources,
                 "unlimited": tier_config.max_resources == -1,
-                "reset_period": None
+                "reset_period": None,
             },
             "subjects": {
                 "used": get_user_subject_count(user, db),
                 "limit": tier_config.max_subjects,
                 "unlimited": tier_config.max_subjects == -1,
-                "reset_period": None
+                "reset_period": None,
             },
             "groups": {
                 "used": get_user_group_count(user, db),
                 "limit": tier_config.max_groups,
                 "unlimited": tier_config.max_groups == -1,
-                "reset_period": None
+                "reset_period": None,
             },
             "conversations": {
-                "used": get_user_conversation_count(user, db, tier_config.conversations_reset_period),
+                "used": get_user_conversation_count(
+                    user, db, tier_config.conversations_reset_period
+                ),
                 "limit": tier_config.max_conversations,
                 "unlimited": tier_config.max_conversations == -1,
-                "reset_period": tier_config.conversations_reset_period
+                "reset_period": tier_config.conversations_reset_period,
             },
             "messages": {
                 "used": get_user_message_count(user, db, tier_config.messages_reset_period),
                 "limit": tier_config.max_messages,
                 "unlimited": tier_config.max_messages == -1,
-                "reset_period": tier_config.messages_reset_period
+                "reset_period": tier_config.messages_reset_period,
             },
             "exercises": {
                 "used": get_user_exercise_count(user, db),
                 "limit": tier_config.max_exercises,
                 "unlimited": tier_config.max_exercises == -1,
-                "reset_period": None
+                "reset_period": None,
             },
             "notes": {
                 "used": get_user_note_count(user, db, tier_config.notes_reset_period),
                 "limit": tier_config.max_notes,
                 "unlimited": tier_config.max_notes == -1,
-                "reset_period": tier_config.notes_reset_period
+                "reset_period": tier_config.notes_reset_period,
             },
             "storage_gb": {
                 "used": round(get_user_storage_used_gb(user, db), 2),
                 "limit": tier_config.max_storage_gb,
                 "unlimited": tier_config.max_storage_gb == -1,
-                "reset_period": None
-            }
-        }
+                "reset_period": None,
+            },
+        },
     }

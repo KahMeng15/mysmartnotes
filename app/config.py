@@ -6,6 +6,7 @@ Loading priority (highest → lowest):
   3. .env          — SMTP, AI tiers, Firebase, DB host/user/port, Redis, HOST, PORT
   4. config/app.config.json — non-sensitive runtime defaults (auto-created if absent)
 """
+
 from __future__ import annotations
 
 import json
@@ -24,8 +25,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Repository root — works whether running from the project root or inside app/
 # ---------------------------------------------------------------------------
-_HERE = Path(__file__).resolve().parent          # app/
-_ROOT = _HERE.parent                              # project root
+_HERE = Path(__file__).resolve().parent  # app/
+_ROOT = _HERE.parent  # project root
 
 _ENV_FILE = _ROOT / ".env"
 _SECRETS_FILE = _ROOT / "secrets.env"
@@ -74,6 +75,7 @@ _CONFIG_DEFAULTS: dict = {
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _ensure_config_file() -> dict:
     """Create config/app.config.json with defaults if it does not exist."""
     _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -107,6 +109,7 @@ def _generate_secrets() -> None:
     if not existing.get("APP_ENCRYPTION_KEY"):
         try:
             from cryptography.fernet import Fernet
+
             fernet_key = Fernet.generate_key().decode()
         except ImportError:
             # Fallback if cryptography isn't installed yet
@@ -156,6 +159,7 @@ _generate_secrets()
 # Settings model
 # ---------------------------------------------------------------------------
 
+
 class Settings(BaseSettings):
     """Application settings.
 
@@ -185,8 +189,8 @@ class Settings(BaseSettings):
 
     # Server
     HOST: str = "0.0.0.0"  # nosec
-    API_PORT: int = 8000       # uvicorn bind port (internal)
-    PUBLIC_PORT: int = 8000    # nginx / host-facing port (external)
+    API_PORT: int = 8000  # uvicorn bind port (internal)
+    PUBLIC_PORT: int = 8000  # nginx / host-facing port (external)
 
     # SMTP
     SMTP_HOST: str = ""
@@ -318,7 +322,7 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Return a cached Settings instance."""
     return Settings()
