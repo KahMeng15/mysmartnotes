@@ -22,6 +22,7 @@ from app.utils.observability import get_runtime_metrics_snapshot
 from app.utils.tasks import TaskManager
 from app.utils.storage import StorageManager
 from app.config import get_settings
+from app.logging_config import LOGS_DIR
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 settings = get_settings()
@@ -484,6 +485,70 @@ def get_user_logs(
         
     logs = query.order_by(desc(UserLog.timestamp)).offset(offset).limit(limit).all()
     return logs
+
+# --- File-based Logs ---
+@router.get("/log-files")
+def list_log_files(admin: User = Depends(get_current_admin_user)):
+    """List all .log files in the logs directory with sizes."""
+    import os
+    files = []
+    log_dir = os.path.normpath(os.path.abspath(LOGS_DIR))
+    if not os.path.isdir(log_dir):
+        return files
+    for f in sorted(os.listdir(log_dir)):
+        if not f.endswith(".log"):
+            continue
+        fpath = os.path.join(log_dir, f)
+        try:
+            size = os.path.getsize(fpath)
+        except OSError:
+            size = 0
+        files.append({"name": f, "size_bytes": size})
+    return files
+
+
+@router.get("/log-files/{filename}")
+def read_log_file(filename: str, limit: int = 200, admin: User = Depends(get_current_admin_user)):
+    """Read the last N lines from a specific log file."""
+    import os
+    import re
+    fpath = os.path.normpath(os.path.join(LOGS_DIR, filename))
+    if not fpath.startswith(os.path.normpath(os.path.abspath(LOGS_DIR))):
+        raise HTTPException(status_code=403, detail="Invalid log file path")
+    if not os.path.exists(fpath):
+        raise HTTPException(status_code=404, detail=f"Log file not found: {filename}")
+    max_bytes = min(max(os.path.getsize(fpath), 1), 5 * 1024 * 1024)
+    lines = []
+    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+        f.seek(0, 2)
+        file_size = f.tell()
+        start = max(0, file_size - max_bytes)
+        f.seek(start)
+        if start > 0:
+            f.readline()
+        all_lines = f.readlines()
+    for raw_line in all_lines[-limit:]:
+        line = raw_line.rstrip("\n\r")
+        m = re.match(
+            r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)\s+\[(\w+)\]\s+([\w\.]+):\s+(.*)',
+            line
+        )
+        if m:
+            lines.append({
+                "timestamp": m.group(1),
+                "level": m.group(2),
+                "logger": m.group(3),
+                "message": m.group(4),
+            })
+        else:
+            lines.append({
+                "timestamp": None,
+                "level": None,
+                "logger": None,
+                "message": line,
+            })
+    return {"filename": filename, "lines": lines, "total_bytes": file_size}
+
 
 # --- Database Inspection ---
 @router.get("/db/tables")

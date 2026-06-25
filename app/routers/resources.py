@@ -1106,12 +1106,12 @@ async def get_resource_processing_logs(
         )
 
     import re
-    log_dir = os.path.join(os.path.dirname(__file__), "..", "..", "logs")
-    log_files = ["api.log", "errors.log"]
+    from app.logging_config import LOGS_DIR
+    log_files = ["backend.log", "errors.log"]
     entries = []
 
     for log_file in log_files:
-        log_path = os.path.join(log_dir, log_file)
+        log_path = os.path.join(LOGS_DIR, log_file)
         if not os.path.exists(log_path):
             continue
         try:

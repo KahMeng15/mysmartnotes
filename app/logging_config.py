@@ -18,15 +18,21 @@ LOGGING_CONFIG = {
             "formatter": "standard",
             "level": "INFO",
         },
-        "api_file": {
+        "backend_file": {
             "class": "logging.FileHandler",
-            "filename": os.path.join(LOGS_DIR, "api.log"),
+            "filename": os.path.join(LOGS_DIR, "backend.log"),
             "formatter": "standard",
             "level": "INFO",
         },
         "worker_file": {
             "class": "logging.FileHandler",
             "filename": os.path.join(LOGS_DIR, "worker.log"),
+            "formatter": "standard",
+            "level": "INFO",
+        },
+        "processing_file": {
+            "class": "logging.FileHandler",
+            "filename": os.path.join(LOGS_DIR, "processing.log"),
             "formatter": "standard",
             "level": "INFO",
         },
@@ -39,7 +45,12 @@ LOGGING_CONFIG = {
     },
     "loggers": {
         "app": {
-            "handlers": ["console", "api_file", "error_file"],
+            "handlers": ["console", "backend_file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "app.processing": {
+            "handlers": ["console", "processing_file", "error_file"],
             "level": "INFO",
             "propagate": False,
         },
@@ -48,19 +59,24 @@ LOGGING_CONFIG = {
             "level": "INFO",
             "propagate": False,
         },
+        "__main__": {
+            "handlers": ["console", "worker_file", "error_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "fastapi": {
-            "handlers": ["console", "api_file", "error_file"],
+            "handlers": ["console", "backend_file", "error_file"],
             "level": "INFO",
             "propagate": False,
         },
         "uvicorn": {
-            "handlers": ["console", "api_file", "error_file"],
+            "handlers": ["console", "backend_file", "error_file"],
             "level": "INFO",
             "propagate": False,
         },
     },
     "root": {
-        "handlers": ["console", "api_file", "error_file"],
+        "handlers": ["console", "backend_file", "error_file"],
         "level": "INFO",
     }
 }

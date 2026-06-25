@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Title, Tabs, Table, Button, Group, Badge, Modal, Select, TextInput, NumberInput, Switch, Stack, Paper, Text, ScrollArea, Box, Radio, Divider, Textarea } from '@mantine/core';
+import { useState, useEffect } from 'react';
+import { Container, Title, Tabs, Table, Button, Group, Badge, Modal, Select, TextInput, NumberInput, Switch, Stack, Paper, Text, ScrollArea, Box, Radio, Divider, Textarea, SimpleGrid, Tooltip } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
 import { fetchApi } from '../lib/api';
-import { IconShieldCheck, IconUsers, IconMail, IconStack2, IconSettings, IconClock, IconServer, IconListDetails, IconDatabase, IconActivity, IconMessages } from '@tabler/icons-react';
+import { IconShieldCheck, IconUsers, IconMail, IconStack2, IconSettings, IconClock, IconServer, IconListDetails, IconDatabase, IconActivity, IconMessages, IconTrash, IconRefresh, IconEye } from '@tabler/icons-react';
 
-// Components for each tab
+const sectionTabsConfig = [
+  { value: 'groups', label: 'Groups' },
+  { value: 'subjects', label: 'Subjects' },
+  { value: 'resources', label: 'Resources' },
+  { value: 'exercises', label: 'Exercises' },
+  { value: 'notes', label: 'Notes' },
+  { value: 'conversations', label: 'Conversations' },
+  { value: 'tasks', label: 'Tasks' },
+];
 
 function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -13,6 +21,7 @@ function AdminUsers() {
   const [tierModalOpen, setTierModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [newTier, setNewTier] = useState('');
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const loadUsers = async () => {
     setLoading(true);
@@ -57,11 +66,9 @@ function AdminUsers() {
 
   return (
     <Stack>
-      <Group justify="space-between">
-        <Title order={3}>Users Management</Title>
-      </Group>
+      <Title order={3}>Users Management</Title>
       <ScrollArea>
-        <Table striped highlightOnHover>
+        <Table striped highlightOnHover horizontalSpacing={isMobile ? 'xs' : 'sm'}>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>ID</Table.Th>
@@ -84,7 +91,7 @@ function AdminUsers() {
                   {u.is_admin && <Text c="grape" size="xs">Admin</Text>}
                 </Table.Td>
                 <Table.Td>
-                  <Group gap="xs" wrap="nowrap">
+                  <Group gap={isMobile ? 4 : 'xs'} wrap="wrap">
                     <Button size="xs" variant="outline" onClick={() => { setSelectedUser(u); setNewTier(u.tier); setTierModalOpen(true); }}>Tier</Button>
                     {u.is_active ? (
                       <Button size="xs" color="red" variant="light" onClick={() => handleAction(u.id, 'deactivate')}>Deactivate</Button>
@@ -99,7 +106,7 @@ function AdminUsers() {
         </Table>
       </ScrollArea>
 
-      <Modal opened={tierModalOpen} onClose={() => setTierModalOpen(false)} title="Change User Tier">
+      <Modal opened={tierModalOpen} onClose={() => setTierModalOpen(false)} title="Change User Tier" fullScreen={isMobile}>
         <Stack>
           <TextInput label="User Email" value={selectedUser?.email || ''} disabled />
           <Select label="New Tier" value={newTier} onChange={setNewTier} data={[
@@ -121,6 +128,7 @@ function AdminInvitations() {
   const [inviteMethod, setInviteMethod] = useState('email');
   const [email, setEmail] = useState('');
   const [tier, setTier] = useState('free');
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const loadInvites = async () => {
     try {
@@ -157,7 +165,7 @@ function AdminInvitations() {
         <Button onClick={() => setModalOpen(true)}>New Invitation</Button>
       </Group>
       <ScrollArea>
-        <Table striped>
+        <Table striped horizontalSpacing={isMobile ? 'xs' : 'sm'}>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Email</Table.Th>
@@ -181,7 +189,7 @@ function AdminInvitations() {
         </Table>
       </ScrollArea>
 
-      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title="Invite User">
+      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title="Invite User" fullScreen={isMobile}>
         <Stack>
           <Radio.Group value={inviteMethod} onChange={setInviteMethod} label="Method">
             <Group>
@@ -207,6 +215,8 @@ function AdminInvitations() {
 
 function AdminTiers() {
   const [tiers, setTiers] = useState([]);
+  const [editValues, setEditValues] = useState({});
+  const isMobile = useMediaQuery('(max-width: 48em)');
   
   const loadTiers = async () => {
     try {
@@ -217,13 +227,30 @@ function AdminTiers() {
   
   useEffect(() => { loadTiers(); }, []);
 
+  const getEdit = (tierId, field) => {
+    const key = `${tierId}_${field}`;
+    if (key in editValues) return editValues[key];
+    const t = tiers.find(t => t.id === tierId);
+    return t ? t[field] : 0;
+  };
+
+  const setEdit = (tierId, field, value) => {
+    setEditValues(prev => ({ ...prev, [`${tierId}_${field}`]: value }));
+  };
+
   const saveTier = async (tierData) => {
+    const payload = { ...tierData };
+    for (const field of ['max_notes', 'max_subjects', 'max_groups', 'max_storage_gb']) {
+      const key = `${tierData.id}_${field}`;
+      if (key in editValues) payload[field] = editValues[key];
+    }
     try {
-      await fetchApi(`/admin/tiers/${tierData.id}`, {
+      await fetchApi(`/admin/tiers/${payload.id}`, {
         method: 'PUT',
-        body: JSON.stringify(tierData)
+        body: JSON.stringify(payload)
       });
       alert('Tier updated!');
+      setEditValues({});
       loadTiers();
     } catch(e) { alert(e.message); }
   };
@@ -234,12 +261,15 @@ function AdminTiers() {
       {tiers.map(t => (
         <Paper key={t.id} p="md" withBorder>
           <Title order={4} mb="md">{t.display_name}</Title>
-          <Group grow align="flex-end">
-            <NumberInput label="Max Notes" value={t.max_notes} onChange={(v) => t.max_notes = v} />
-            <NumberInput label="Max Subjects" value={t.max_subjects} onChange={(v) => t.max_subjects = v} />
-            <NumberInput label="Max Storage (GB)" value={t.max_storage_gb} onChange={(v) => t.max_storage_gb = v} />
-            <Button onClick={() => saveTier(t)}>Save</Button>
-          </Group>
+          <Stack>
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }}>
+              <NumberInput label="Max Notes" value={getEdit(t.id, 'max_notes')} onChange={(v) => setEdit(t.id, 'max_notes', v)} />
+              <NumberInput label="Max Subjects" value={getEdit(t.id, 'max_subjects')} onChange={(v) => setEdit(t.id, 'max_subjects', v)} />
+              <NumberInput label="Max Groups" value={getEdit(t.id, 'max_groups')} onChange={(v) => setEdit(t.id, 'max_groups', v)} />
+              <NumberInput label="Max Storage (GB)" value={getEdit(t.id, 'max_storage_gb')} onChange={(v) => setEdit(t.id, 'max_storage_gb', v)} />
+            </SimpleGrid>
+            <Button onClick={() => saveTier(t)} fullWidth={isMobile}>Save</Button>
+          </Stack>
         </Paper>
       ))}
     </Stack>
@@ -248,6 +278,8 @@ function AdminTiers() {
 
 function AdminSystemSettings() {
   const [s, setS] = useState({});
+  const isMobile = useMediaQuery('(max-width: 48em)');
+
   const loadSettings = async () => {
     try {
       const data = await fetchApi('/admin/system-settings');
@@ -275,7 +307,7 @@ function AdminSystemSettings() {
           <Switch label="Maintenance Mode" checked={s.maintenance_mode || false} onChange={(e) => setS({...s, maintenance_mode: e.currentTarget.checked})} />
           <Select label="Signup Config" value={s.signup_config || 'open'} onChange={(v) => setS({...s, signup_config: v})} data={['open', 'approval', 'invite']} />
           <TextInput label="Domain URL" value={s.domain_url || ''} onChange={(e) => setS({...s, domain_url: e.currentTarget.value})} />
-          <Button onClick={save}>Save Settings</Button>
+          <Button onClick={save} fullWidth={isMobile}>Save Settings</Button>
         </Stack>
       </Paper>
     </Stack>
@@ -284,6 +316,8 @@ function AdminSystemSettings() {
 
 function AdminRateLimits() {
   const [s, setS] = useState({});
+  const isMobile = useMediaQuery('(max-width: 48em)');
+
   const loadSettings = async () => {
     try {
       const data = await fetchApi('/admin/rate-limits');
@@ -307,9 +341,11 @@ function AdminRateLimits() {
       <Title order={3}>Rate Limits</Title>
       <Paper p="md" withBorder>
         <Stack>
-          <NumberInput label="Per User API calls/min" value={s.per_user_api || 0} onChange={(v) => setS({...s, per_user_api: v})} />
-          <NumberInput label="Global API calls/min" value={s.global_api || 0} onChange={(v) => setS({...s, global_api: v})} />
-          <Button onClick={save}>Save Rate Limits</Button>
+          <SimpleGrid cols={{ base: 1, sm: 2 }}>
+            <NumberInput label="Per User API calls/min" value={s.per_user_api || 0} onChange={(v) => setS({...s, per_user_api: v})} />
+            <NumberInput label="Global API calls/min" value={s.global_api || 0} onChange={(v) => setS({...s, global_api: v})} />
+          </SimpleGrid>
+          <Button onClick={save} fullWidth={isMobile}>Save Rate Limits</Button>
         </Stack>
       </Paper>
     </Stack>
@@ -319,6 +355,7 @@ function AdminRateLimits() {
 function AdminEmailConfig() {
   const [s, setS] = useState({});
   const [testEmail, setTestEmail] = useState('');
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => {
     fetchApi('/admin/email-config').then(setS).catch(console.error);
@@ -342,10 +379,8 @@ function AdminEmailConfig() {
           <TextInput label="SMTP Provider" value={s.smtp_provider || ''} disabled />
           <TextInput label="Email Address" value={s.email_address || ''} disabled />
           <Divider />
-          <Group align="flex-end">
-            <TextInput label="Test Email" value={testEmail} onChange={(e) => setTestEmail(e.currentTarget.value)} />
-            <Button onClick={sendTest}>Send Test Email</Button>
-          </Group>
+          <TextInput label="Test Email" value={testEmail} onChange={(e) => setTestEmail(e.currentTarget.value)} />
+          <Button onClick={sendTest} fullWidth={isMobile}>Send Test Email</Button>
         </Stack>
       </Paper>
     </Stack>
@@ -357,6 +392,7 @@ function AdminIpFilters() {
   const [filterType, setFilterType] = useState('blacklist');
   const [ruleType, setRuleType] = useState('country');
   const [value, setValue] = useState('');
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const load = async () => {
     fetchApi('/admin/ip-filters').then(setFilters).catch(console.error);
@@ -384,55 +420,150 @@ function AdminIpFilters() {
     <Stack>
       <Title order={3}>IP Filters</Title>
       <Paper p="md" withBorder>
-        <Group align="flex-end">
-          <Select label="Type" value={filterType} onChange={setFilterType} data={['blacklist', 'whitelist']} />
-          <Select label="Rule" value={ruleType} onChange={setRuleType} data={['country', 'specific_ip']} />
-          <TextInput label="Value" value={value} onChange={(e) => setValue(e.currentTarget.value)} />
-          <Button onClick={add}>Add</Button>
-        </Group>
-        <ScrollArea><Table mt="md">
-          <Table.Thead><Table.Tr><Table.Th>ID</Table.Th><Table.Th>Type</Table.Th><Table.Th>Value</Table.Th><Table.Th>Action</Table.Th></Table.Tr></Table.Thead>
-          <Table.Tbody>
-            {filters.map(f => (
-              <Table.Tr key={f.id}>
-                <Table.Td>{f.id}</Table.Td>
-                <Table.Td>{f.filter_type}</Table.Td>
-                <Table.Td>{f.value}</Table.Td>
-                <Table.Td><Button size="xs" color="red" variant="subtle" onClick={() => remove(f.id)}>Remove</Button></Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table></ScrollArea>
+        <Stack>
+          <SimpleGrid cols={{ base: 1, sm: 3 }}>
+            <Select label="Type" value={filterType} onChange={setFilterType} data={['blacklist', 'whitelist']} />
+            <Select label="Rule" value={ruleType} onChange={setRuleType} data={['country', 'specific_ip']} />
+            <TextInput label="Value" value={value} onChange={(e) => setValue(e.currentTarget.value)} />
+          </SimpleGrid>
+          <Button onClick={add} fullWidth={isMobile}>Add</Button>
+        </Stack>
+        <ScrollArea mt="md">
+          <Table horizontalSpacing={isMobile ? 'xs' : 'sm'}>
+            <Table.Thead><Table.Tr><Table.Th>ID</Table.Th><Table.Th>Type</Table.Th><Table.Th>Value</Table.Th><Table.Th>Action</Table.Th></Table.Tr></Table.Thead>
+            <Table.Tbody>
+              {filters.map(f => (
+                <Table.Tr key={f.id}>
+                  <Table.Td>{f.id}</Table.Td>
+                  <Table.Td>{f.filter_type}</Table.Td>
+                  <Table.Td>{f.value}</Table.Td>
+                  <Table.Td><Button size="xs" color="red" variant="subtle" onClick={() => remove(f.id)}>Remove</Button></Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
       </Paper>
     </Stack>
   );
 }
 
-function AdminSystemLogs() {
+function AdminAuditLogs() {
   const [logs, setLogs] = useState([]);
+  const isMobile = useMediaQuery('(max-width: 48em)');
+
   const load = async () => {
     fetchApi('/admin/logs?limit=50').then(setLogs).catch(console.error);
   };
   useEffect(() => { load(); }, []);
 
   return (
+    <ScrollArea>
+      <Table striped horizontalSpacing={isMobile ? 'xs' : 'sm'}>
+        <Table.Thead><Table.Tr><Table.Th>Time</Table.Th><Table.Th>User</Table.Th><Table.Th>Action</Table.Th><Table.Th>Details</Table.Th></Table.Tr></Table.Thead>
+        <Table.Tbody>
+          {logs.map((l, i) => (
+            <Table.Tr key={i}>
+              <Table.Td style={{ whiteSpace: 'nowrap' }}>{new Date(l.timestamp).toLocaleString()}</Table.Td>
+              <Table.Td>{l.user_id}</Table.Td>
+              <Table.Td>{l.action}</Table.Td>
+              <Table.Td style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.details}</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </ScrollArea>
+  );
+}
+
+function AdminLogFiles() {
+  const [files, setFiles] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [content, setContent] = useState({ lines: [], total_bytes: 0 });
+  const [searchQuery, setSearchQuery] = useState('');
+  const isMobile = useMediaQuery('(max-width: 48em)');
+
+  const loadFiles = async () => {
+    try {
+      const data = await fetchApi('/admin/log-files');
+      setFiles(data);
+      if (data.length > 0) setSelectedFile(data[0].name);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  useEffect(() => { loadFiles(); }, []);
+
+  useEffect(() => {
+    if (!selectedFile) return;
+    setSearchQuery('');
+    fetchApi(`/admin/log-files/${selectedFile}?limit=500`).then(setContent).catch(console.error);
+  }, [selectedFile]);
+
+  const filteredLines = searchQuery
+    ? content.lines.filter(l =>
+        [l.timestamp, l.level, l.logger, l.message].some(v => v && v.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : content.lines;
+
+  return (
+    <Stack>
+      <Group>
+        <Select
+          data={files.map(f => ({ value: f.name, label: `${f.name} (${(f.size_bytes / 1024 / 1024).toFixed(1)} MB)` }))}
+          value={selectedFile}
+          onChange={setSelectedFile}
+          style={{ flex: 1 }}
+          searchable
+        />
+        <Button size="xs" variant="light" onClick={() => setSelectedFile(selectedFile)}>Refresh</Button>
+      </Group>
+      <TextInput
+        placeholder="Search log lines..."
+        value={searchQuery}
+        onChange={e => setSearchQuery(e.currentTarget.value)}
+      />
+      {content.lines.length > 0 && (
+        <Text size="xs" c="dimmed">{searchQuery ? `${filteredLines.length} of ` : ''}Showing last {content.lines.length} lines of {selectedFile} ({(content.total_bytes / 1024 / 1024).toFixed(1)} MB total)</Text>
+      )}
+      <ScrollArea style={{ height: isMobile ? 'calc(100vh - 300px)' : 600 }}>
+        <Box component="pre" style={{ fontSize: 11, lineHeight: 1.5, margin: 0 }}>
+          {filteredLines.map((line, i) => {
+            let color;
+            if (line.level === 'ERROR') color = 'var(--mantine-color-red-6)';
+            else if (line.level === 'WARNING') color = 'var(--mantine-color-yellow-6)';
+            else if (line.level === 'INFO') color = 'var(--mantine-color-green-6)';
+            return (
+              <Box key={i} style={{ color: color || 'inherit' }}>
+                {line.timestamp && <Text span size="xs" c="dimmed" component="span">{line.timestamp} </Text>}
+                {line.level && <Text span size="xs" fw={600} component="span" c={color}>{line.level} </Text>}
+                {line.logger && <Text span size="xs" component="span" c="dimmed">{line.logger}: </Text>}
+                <Text span size="xs" component="span">{line.message}</Text>
+              </Box>
+            );
+          })}
+        </Box>
+      </ScrollArea>
+    </Stack>
+  );
+}
+
+function AdminSystemLogs() {
+  const isMobile = useMediaQuery('(max-width: 48em)');
+
+  return (
     <Stack>
       <Title order={3}>System Logs</Title>
-      <ScrollArea h={500}>
-        <Table striped>
-          <Table.Thead><Table.Tr><Table.Th>Time</Table.Th><Table.Th>User</Table.Th><Table.Th>Action</Table.Th><Table.Th>Details</Table.Th></Table.Tr></Table.Thead>
-          <Table.Tbody>
-            {logs.map((l, i) => (
-              <Table.Tr key={i}>
-                <Table.Td>{new Date(l.timestamp).toLocaleString()}</Table.Td>
-                <Table.Td>{l.user_id}</Table.Td>
-                <Table.Td>{l.action}</Table.Td>
-                <Table.Td>{l.details}</Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      </ScrollArea>
+      <Tabs defaultValue="audit">
+        <Tabs.List>
+          <Tabs.Tab value="audit">Audit Logs</Tabs.Tab>
+          <Tabs.Tab value="files">Log Files</Tabs.Tab>
+        </Tabs.List>
+        <Box mt="md">
+          <Tabs.Panel value="audit"><AdminAuditLogs /></Tabs.Panel>
+          <Tabs.Panel value="files"><AdminLogFiles /></Tabs.Panel>
+        </Box>
+      </Tabs>
     </Stack>
   );
 }
@@ -441,6 +572,7 @@ function AdminDatabase() {
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
   const [data, setData] = useState({ columns: [], data: [] });
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   useEffect(() => {
     fetchApi('/admin/db/tables').then(setTables).catch(console.error);
@@ -457,8 +589,8 @@ function AdminDatabase() {
       <Title order={3}>Database</Title>
       <Select label="Table" data={tables} value={selectedTable} onChange={setSelectedTable} searchable />
       {selectedTable && (
-        <ScrollArea h={500}>
-          <Table striped>
+        <ScrollArea>
+          <Table striped horizontalSpacing={isMobile ? 'xs' : 'sm'}>
             <Table.Thead>
               <Table.Tr>
                 {data.columns.map(c => <Table.Th key={c}>{c}</Table.Th>)}
@@ -467,7 +599,7 @@ function AdminDatabase() {
             <Table.Tbody>
               {data.data.map((row, i) => (
                 <Table.Tr key={i}>
-                  {data.columns.map(c => <Table.Td key={c}>{String(row[c])}</Table.Td>)}
+                  {data.columns.map(c => <Table.Td key={c} style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{String(row[c])}</Table.Td>)}
                 </Table.Tr>
               ))}
             </Table.Tbody>
@@ -479,10 +611,11 @@ function AdminDatabase() {
 }
 
 function AdminDiagnostics() {
+  const isMobile = useMediaQuery('(max-width: 48em)');
   return (
     <Stack>
       <Title order={3}>Diagnostics</Title>
-      <iframe src="/admin/diagnostics" style={{ width: '100%', height: '800px', border: 'none' }} title="Diagnostics" />
+      <iframe src="/admin/diagnostics" style={{ width: '100%', height: isMobile ? '400px' : '800px', border: 'none' }} title="Diagnostics" />
     </Stack>
   );
 }
@@ -493,6 +626,7 @@ function AdminGlobalPrompts() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState(null);
   const [formData, setFormData] = useState({ name: '', content: '', icon: '' });
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
   const loadPrompts = async () => {
     setLoading(true);
@@ -558,7 +692,7 @@ function AdminGlobalPrompts() {
       </Group>
       
       <ScrollArea>
-        <Table striped highlightOnHover>
+        <Table striped highlightOnHover horizontalSpacing={isMobile ? 'xs' : 'sm'}>
           <Table.Thead>
             <Table.Tr>
               <Table.Th>ID</Table.Th>
@@ -576,7 +710,7 @@ function AdminGlobalPrompts() {
                   <Text lineClamp={1} size="sm">{p.content}</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Group gap="xs">
+                  <Group gap="xs" wrap="wrap">
                     <Button size="xs" variant="light" onClick={() => openModal(p)}>Edit</Button>
                     <Button size="xs" color="red" variant="light" onClick={() => handleDelete(p.id)}>Delete</Button>
                   </Group>
@@ -592,7 +726,7 @@ function AdminGlobalPrompts() {
         </Table>
       </ScrollArea>
 
-      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editingPrompt ? "Edit Prompt" : "New Prompt"}>
+      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editingPrompt ? "Edit Prompt" : "New Prompt"} fullScreen={isMobile}>
         <Stack>
           <TextInput
             label="Name"
@@ -629,8 +763,8 @@ function AdminUserContent() {
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [usersLoading, setUsersLoading] = useState(true);
+  const isMobile = useMediaQuery('(max-width: 48em)');
 
-  // Data per section
   const [groups, setGroups] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [resources, setResources] = useState([]);
@@ -639,7 +773,6 @@ function AdminUserContent() {
   const [conversations, setConversations] = useState([]);
   const [tasks, setTasks] = useState([]);
 
-  // Detail modals
   const [detailResource, setDetailResource] = useState(null);
   const [detailExercise, setDetailExercise] = useState(null);
   const [detailNote, setDetailNote] = useState(null);
@@ -679,8 +812,8 @@ function AdminUserContent() {
     if (selectedUserId) loadSection(activeSection);
   }, [selectedUserId, activeSection]);
 
-  const deleteItem = async (section, id, confirmMsg) => {
-    if (!confirm(confirmMsg || `Delete this ${section.slice(0, -1)}?`)) return;
+  const deleteItem = async (section, id) => {
+    if (!confirm(`Delete this ${section.slice(0, -1)}?`)) return;
     try {
       await fetchApi(`/admin/users/${selectedUserId}/${section}/${id}`, { method: 'DELETE' });
       loadSection(activeSection);
@@ -734,7 +867,7 @@ function AdminUserContent() {
 
   const renderTable = (columns, rows, actions) => (
     <ScrollArea>
-      <Table striped highlightOnHover>
+      <Table striped highlightOnHover horizontalSpacing={isMobile ? 'xs' : 'sm'}>
         <Table.Thead>
           <Table.Tr>{columns.map(c => <Table.Th key={c.key}>{c.label}</Table.Th>)}</Table.Tr>
         </Table.Thead>
@@ -742,7 +875,7 @@ function AdminUserContent() {
           {rows.map((row, i) => (
             <Table.Tr key={row.id || i}>
               {columns.map(c => <Table.Td key={c.key}>{c.render ? c.render(row) : row[c.key] ?? '-'}</Table.Td>)}
-              {actions && <Table.Td><Group gap="xs" wrap="nowrap">{actions(row)}</Group></Table.Td>}
+              {actions && <Table.Td><Group gap={4} wrap="wrap">{actions(row)}</Group></Table.Td>}
             </Table.Tr>
           ))}
           {rows.length === 0 && !sectionLoading && (
@@ -753,21 +886,13 @@ function AdminUserContent() {
     </ScrollArea>
   );
 
-  const sectionTabs = [
-    { value: 'groups', label: 'Groups' },
-    { value: 'subjects', label: 'Subjects' },
-    { value: 'resources', label: 'Resources' },
-    { value: 'exercises', label: 'Exercises' },
-    { value: 'notes', label: 'Notes' },
-    { value: 'conversations', label: 'Conversations' },
-    { value: 'tasks', label: 'Tasks' },
-  ];
+  const actionBtn = (label, color, onClick) => (
+    <Button size="xs" color={color} variant={color === 'red' ? 'light' : 'outline'} onClick={onClick}>{label}</Button>
+  );
 
   return (
     <Stack>
-      <Group justify="space-between">
-        <Title order={3}>User Content Viewer</Title>
-      </Group>
+      <Title order={3}>User Content Viewer</Title>
 
       {usersLoading && <Text c="dimmed" size="sm">Loading users...</Text>}
 
@@ -785,7 +910,7 @@ function AdminUserContent() {
         <>
           <Tabs value={activeSection} onChange={setActiveSection}>
             <Tabs.List>
-              {sectionTabs.map(t => <Tabs.Tab key={t.value} value={t.value}>{t.label}</Tabs.Tab>)}
+              {sectionTabsConfig.map(t => <Tabs.Tab key={t.value} value={t.value}>{t.label}</Tabs.Tab>)}
             </Tabs.List>
 
             {sectionLoading && <Text c="dimmed" size="sm" mt="md">Loading...</Text>}
@@ -796,7 +921,7 @@ function AdminUserContent() {
                   {renderTable(
                     [{ key: 'id', label: 'ID' }, { key: 'name', label: 'Name' }, { key: 'subjects', label: 'Subjects', render: (r) => r.subjects?.map(s => s.name).join(', ') || '-' }, { key: 'created_at', label: 'Created' }],
                     groups,
-                    (r) => <Button size="xs" color="red" variant="light" onClick={() => deleteItem('groups', r.id)}>Delete</Button>
+                    (r) => actionBtn('Delete', 'red', () => deleteItem('groups', r.id))
                   )}
                 </Tabs.Panel>
 
@@ -804,7 +929,7 @@ function AdminUserContent() {
                   {renderTable(
                     [{ key: 'id', label: 'ID' }, { key: 'name', label: 'Name' }, { key: 'resource_count', label: 'Resources' }, { key: 'created_at', label: 'Created' }],
                     subjects,
-                    (r) => <Button size="xs" color="red" variant="light" onClick={() => deleteItem('subjects', r.id)}>Delete</Button>
+                    (r) => actionBtn('Delete', 'red', () => deleteItem('subjects', r.id))
                   )}
                 </Tabs.Panel>
 
@@ -812,13 +937,7 @@ function AdminUserContent() {
                   {renderTable(
                     [{ key: 'id', label: 'ID' }, { key: 'title', label: 'Title' }, { key: 'file_type', label: 'Type' }, { key: 'file_size', label: 'Size', render: (r) => r.file_size ? `${(r.file_size / 1024).toFixed(0)}KB` : '-' }, { key: 'page_count', label: 'Pages' }, { key: 'processing_time_ms', label: 'Proc ms' }, { key: 'notes_count', label: 'Notes' }, { key: 'created_at', label: 'Created' }],
                     resources,
-                    (r) => (
-                      <>
-                        <Button size="xs" variant="outline" onClick={() => viewResource(r.id)}>View</Button>
-                        <Button size="xs" variant="light" onClick={() => reprocessItem('resources', r.id)}>Reprocess</Button>
-                        <Button size="xs" color="red" variant="light" onClick={() => deleteItem('resources', r.id)}>Delete</Button>
-                      </>
-                    )
+                    (r) => (<><Tooltip label="View"><Button size="xs" variant="outline" onClick={() => viewResource(r.id)}><IconEye size={14} /></Button></Tooltip><Tooltip label="Reprocess"><Button size="xs" color="blue" variant="light" onClick={() => reprocessItem('resources', r.id)}><IconRefresh size={14} /></Button></Tooltip><Tooltip label="Delete"><Button size="xs" color="red" variant="light" onClick={() => deleteItem('resources', r.id)}><IconTrash size={14} /></Button></Tooltip></>)
                   )}
                 </Tabs.Panel>
 
@@ -826,13 +945,7 @@ function AdminUserContent() {
                   {renderTable(
                     [{ key: 'id', label: 'ID' }, { key: 'title', label: 'Title' }, { key: 'question_count', label: 'Questions' }, { key: 'model', label: 'Model' }, { key: 'created_at', label: 'Created' }],
                     exercises,
-                    (r) => (
-                      <>
-                        <Button size="xs" variant="outline" onClick={() => viewExercise(r.id)}>View</Button>
-                        <Button size="xs" variant="light" onClick={() => reprocessItem('exercises', r.id)}>Reprocess</Button>
-                        <Button size="xs" color="red" variant="light" onClick={() => deleteItem('exercises', r.id)}>Delete</Button>
-                      </>
-                    )
+                    (r) => (<><Tooltip label="View"><Button size="xs" variant="outline" onClick={() => viewExercise(r.id)}><IconEye size={14} /></Button></Tooltip><Tooltip label="Reprocess"><Button size="xs" color="blue" variant="light" onClick={() => reprocessItem('exercises', r.id)}><IconRefresh size={14} /></Button></Tooltip><Tooltip label="Delete"><Button size="xs" color="red" variant="light" onClick={() => deleteItem('exercises', r.id)}><IconTrash size={14} /></Button></Tooltip></>)
                   )}
                 </Tabs.Panel>
 
@@ -840,12 +953,7 @@ function AdminUserContent() {
                   {renderTable(
                     [{ key: 'id', label: 'ID' }, { key: 'title', label: 'Title' }, { key: 'summary_type', label: 'Type' }, { key: 'model', label: 'Model' }, { key: 'processing_time_ms', label: 'Proc ms' }, { key: 'created_at', label: 'Created' }],
                     notes,
-                    (r) => (
-                      <>
-                        <Button size="xs" variant="outline" onClick={() => viewNote(r.id)}>View</Button>
-                        <Button size="xs" color="red" variant="light" onClick={() => deleteItem('notes', r.id)}>Delete</Button>
-                      </>
-                    )
+                    (r) => (<><Tooltip label="View"><Button size="xs" variant="outline" onClick={() => viewNote(r.id)}><IconEye size={14} /></Button></Tooltip><Tooltip label="Delete"><Button size="xs" color="red" variant="light" onClick={() => deleteItem('notes', r.id)}><IconTrash size={14} /></Button></Tooltip></>)
                   )}
                 </Tabs.Panel>
 
@@ -859,7 +967,7 @@ function AdminUserContent() {
 
                 <Tabs.Panel value="tasks" pt="sm">
                   {renderTable(
-                    [{ key: 'task_id', label: 'Task ID' }, { key: 'task_type', label: 'Type' }, { key: 'status', label: 'Status', render: (r) => <Badge color={r.status === 'completed' ? 'green' : r.status === 'failed' ? 'red' : r.status === 'running' ? 'yellow' : r.status === 'cancelled' ? 'gray' : 'blue'}>{r.status}</Badge> }, { key: 'progress', label: 'Progress' }, { key: 'error_message', label: 'Error' }, { key: 'is_hung', label: 'Hung?', render: (r) => r.is_hung ? <Badge color="red">YES</Badge> : <Badge color="green">No</Badge> }, { key: 'updated_at', label: 'Updated' }],
+                    [{ key: 'task_id', label: 'Task ID' }, { key: 'task_type', label: 'Type' }, { key: 'status', label: 'Status', render: (r) => <Badge color={r.status === 'completed' ? 'green' : r.status === 'failed' ? 'red' : r.status === 'running' ? 'yellow' : r.status === 'cancelled' ? 'gray' : 'blue'} size={isMobile ? 'xs' : 'sm'}>{r.status}</Badge> }, { key: 'progress', label: 'Progress' }, { key: 'error_message', label: 'Error' }, { key: 'is_hung', label: 'Hung?', render: (r) => r.is_hung ? <Badge color="red" size={isMobile ? 'xs' : 'sm'}>YES</Badge> : <Badge color="green" size={isMobile ? 'xs' : 'sm'}>No</Badge> }, { key: 'updated_at', label: 'Updated' }],
                     tasks,
                     (r) => r.status === 'pending' || r.status === 'running' ? <Button size="xs" color="red" variant="light" onClick={() => cancelTask(r.task_id)}>Cancel</Button> : null
                   )}
@@ -869,26 +977,28 @@ function AdminUserContent() {
           </Tabs>
 
           {/* Resource Detail Modal */}
-          <Modal opened={!!detailResource} onClose={() => setDetailResource(null)} title={`Resource: ${detailResource?.title || ''}`} size="xl">
+          <Modal opened={!!detailResource} onClose={() => setDetailResource(null)} title={`Resource: ${detailResource?.title || ''}`} size={isMobile ? '100%' : 'xl'} fullScreen={isMobile}>
             {detailResource && (
               <Stack>
-                <Group><Text fw={500}>ID:</Text><Text>{detailResource.id}</Text></Group>
-                <Group><Text fw={500}>Title:</Text><Text>{detailResource.title}</Text></Group>
-                <Group><Text fw={500}>File:</Text><Text>{detailResource.file_name} ({detailResource.file_type})</Text></Group>
-                <Group><Text fw={500}>Size:</Text><Text>{detailResource.file_size ? `${(detailResource.file_size / 1024).toFixed(0)} KB` : '-'}</Text></Group>
-                <Group><Text fw={500}>Pages:</Text><Text>{detailResource.page_count ?? '-'}</Text></Group>
-                <Group><Text fw={500}>Processing Time:</Text><Text>{detailResource.processing_time_ms ? `${detailResource.processing_time_ms}ms` : '-'}</Text></Group>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+                  <Text size="sm"><Text fw={500} component="span">ID:</Text> {detailResource.id}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Title:</Text> {detailResource.title}</Text>
+                  <Text size="sm"><Text fw={500} component="span">File:</Text> {detailResource.file_name} ({detailResource.file_type})</Text>
+                  <Text size="sm"><Text fw={500} component="span">Size:</Text> {detailResource.file_size ? `${(detailResource.file_size / 1024).toFixed(0)} KB` : '-'}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Pages:</Text> {detailResource.page_count ?? '-'}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Processing Time:</Text> {detailResource.processing_time_ms ? `${detailResource.processing_time_ms}ms` : '-'}</Text>
+                </SimpleGrid>
                 {detailResource.timings && (
                   <>
-                    <Text fw={500}>Processing Timings:</Text>
-                    <Paper p="sm" withBorder><Box component="pre" style={{ fontSize: 12, whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify(detailResource.timings, null, 2)}</Box></Paper>
+                    <Text fw={500} size="sm">Processing Timings:</Text>
+                    <Paper p="sm" withBorder><Box component="pre" style={{ fontSize: 11, whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify(detailResource.timings, null, 2)}</Box></Paper>
                   </>
                 )}
                 {detailResource.extracted_text && (
                   <>
-                    <Text fw={500}>Extracted Text ({detailResource.content_length} chars):</Text>
-                    <ScrollArea h={300}>
-                      <Paper p="sm" withBorder><Box component="pre" style={{ fontSize: 12, whiteSpace: 'pre-wrap', margin: 0 }}>{detailResource.extracted_text}</Box></Paper>
+                    <Text fw={500} size="sm">Extracted Text ({detailResource.content_length} chars):</Text>
+                    <ScrollArea style={{ height: isMobile ? 200 : 300 }}>
+                      <Paper p="sm" withBorder><Box component="pre" style={{ fontSize: 11, whiteSpace: 'pre-wrap', margin: 0 }}>{detailResource.extracted_text}</Box></Paper>
                     </ScrollArea>
                   </>
                 )}
@@ -897,16 +1007,18 @@ function AdminUserContent() {
           </Modal>
 
           {/* Exercise Detail Modal */}
-          <Modal opened={!!detailExercise} onClose={() => setDetailExercise(null)} title={`Exercise: ${detailExercise?.title || ''}`} size="xl">
+          <Modal opened={!!detailExercise} onClose={() => setDetailExercise(null)} title={`Exercise: ${detailExercise?.title || ''}`} size={isMobile ? '100%' : 'xl'} fullScreen={isMobile}>
             {detailExercise && (
               <Stack>
-                <Group><Text fw={500}>ID:</Text><Text>{detailExercise.id}</Text></Group>
-                <Group><Text fw={500}>Model:</Text><Text>{detailExercise.model || '-'}</Text></Group>
-                <Group><Text fw={500}>Processing Time:</Text><Text>{detailExercise.processing_time_ms ? `${detailExercise.processing_time_ms}ms` : '-'}</Text></Group>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+                  <Text size="sm"><Text fw={500} component="span">ID:</Text> {detailExercise.id}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Model:</Text> {detailExercise.model || '-'}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Processing:</Text> {detailExercise.processing_time_ms ? `${detailExercise.processing_time_ms}ms` : '-'}</Text>
+                </SimpleGrid>
                 {detailExercise.questions && detailExercise.questions.length > 0 && (
                   <>
-                    <Text fw={500}>Questions ({detailExercise.questions.length}):</Text>
-                    <ScrollArea h={400}>
+                    <Text fw={500} size="sm">Questions ({detailExercise.questions.length}):</Text>
+                    <ScrollArea style={{ height: isMobile ? 300 : 400 }}>
                       {detailExercise.questions.map((q, i) => (
                         <Paper key={q.id || i} p="sm" withBorder mb="xs">
                           <Text size="sm" fw={500}>Q{i + 1}: {q.question_text}</Text>
@@ -922,30 +1034,32 @@ function AdminUserContent() {
           </Modal>
 
           {/* Note Detail Modal */}
-          <Modal opened={!!detailNote} onClose={() => setDetailNote(null)} title={`Note: ${detailNote?.title || ''}`} size="xl">
+          <Modal opened={!!detailNote} onClose={() => setDetailNote(null)} title={`Note: ${detailNote?.title || ''}`} size={isMobile ? '100%' : 'xl'} fullScreen={isMobile}>
             {detailNote && (
               <Stack>
-                <Group><Text fw={500}>ID:</Text><Text>{detailNote.id}</Text></Group>
-                <Group><Text fw={500}>Type:</Text><Text>{detailNote.summary_type}</Text></Group>
-                <Group><Text fw={500}>Mode:</Text><Text>{detailNote.mode || '-'}</Text></Group>
-                <Group><Text fw={500}>Format:</Text><Text>{detailNote.output_format || '-'}</Text></Group>
-                <Group><Text fw={500}>Model:</Text><Text>{detailNote.model || '-'}</Text></Group>
-                <Group><Text fw={500}>Processing Time:</Text><Text>{detailNote.processing_time_ms ? `${detailNote.processing_time_ms}ms` : '-'}</Text></Group>
-                <Group><Text fw={500}>Version:</Text><Text>{detailNote.version}</Text></Group>
-                <Group><Text fw={500}>User Edited:</Text><Badge color={detailNote.is_user_edited ? 'yellow' : 'green'}>{String(detailNote.is_user_edited)}</Badge></Group>
+                <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs">
+                  <Text size="sm"><Text fw={500} component="span">ID:</Text> {detailNote.id}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Type:</Text> {detailNote.summary_type}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Mode:</Text> {detailNote.mode || '-'}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Format:</Text> {detailNote.output_format || '-'}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Model:</Text> {detailNote.model || '-'}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Processing:</Text> {detailNote.processing_time_ms ? `${detailNote.processing_time_ms}ms` : '-'}</Text>
+                  <Text size="sm"><Text fw={500} component="span">Version:</Text> {detailNote.version}</Text>
+                  <Text size="sm"><Text fw={500} component="span">User Edited:</Text> <Badge color={detailNote.is_user_edited ? 'yellow' : 'green'} size={isMobile ? 'xs' : 'sm'}>{String(detailNote.is_user_edited)}</Badge></Text>
+                </SimpleGrid>
                 {detailNote.content && (
                   <>
-                    <Text fw={500}>Content ({detailNote.content_length} chars):</Text>
-                    <ScrollArea h={400}>
-                      <Paper p="sm" withBorder><Box component="pre" style={{ fontSize: 12, whiteSpace: 'pre-wrap', margin: 0 }}>{detailNote.content}</Box></Paper>
+                    <Text fw={500} size="sm">Content ({detailNote.content_length} chars):</Text>
+                    <ScrollArea style={{ height: isMobile ? 250 : 400 }}>
+                      <Paper p="sm" withBorder><Box component="pre" style={{ fontSize: 11, whiteSpace: 'pre-wrap', margin: 0 }}>{detailNote.content}</Box></Paper>
                     </ScrollArea>
                   </>
                 )}
                 {detailNote.quickread && (
                   <>
-                    <Text fw={500}>Quickread:</Text>
-                    <ScrollArea h={200}>
-                      <Paper p="sm" withBorder><Box component="pre" style={{ fontSize: 12, whiteSpace: 'pre-wrap', margin: 0 }}>{detailNote.quickread}</Box></Paper>
+                    <Text fw={500} size="sm">Quickread:</Text>
+                    <ScrollArea style={{ height: isMobile ? 150 : 200 }}>
+                      <Paper p="sm" withBorder><Box component="pre" style={{ fontSize: 11, whiteSpace: 'pre-wrap', margin: 0 }}>{detailNote.quickread}</Box></Paper>
                     </ScrollArea>
                   </>
                 )}
@@ -954,8 +1068,8 @@ function AdminUserContent() {
           </Modal>
 
           {/* Conversation Messages Modal */}
-          <Modal opened={!!detailConversation} onClose={() => { setDetailConversation(null); setDetailConversationMessages([]); }} title={`Conversation: ${detailConversation}`} size="xl">
-            <ScrollArea h={500}>
+          <Modal opened={!!detailConversation} onClose={() => { setDetailConversation(null); setDetailConversationMessages([]); }} title={`Conversation: ${detailConversation}`} size={isMobile ? '100%' : 'xl'} fullScreen={isMobile}>
+            <ScrollArea style={{ height: isMobile ? 'calc(100vh - 200px)' : 500 }}>
               {detailConversationMessages.map((m, i) => (
                 <Paper key={m.id || i} p="sm" withBorder mb="md">
                   <Text size="xs" c="dimmed" mb="xs">{new Date(m.created_at).toLocaleString()} | {m.ai_model || '-'} | Mode: {m.ai_mode || '-'}</Text>
@@ -1008,29 +1122,31 @@ export default function AdminPage() {
   if (!isAdmin) return null;
 
   return (
-    <Container size="xl" mt="xl">
-      <Group mb="lg">
-        <IconShieldCheck size={32} color="purple" />
-        <Title order={2}>Admin Dashboard</Title>
-      </Group>
+    <Container fluid p={0}>
+      <Box px="md" pt="md" pb="xs">
+        <Group mb="md">
+          <IconShieldCheck size={28} color="purple" />
+          <Title order={2}>Admin Dashboard</Title>
+        </Group>
+      </Box>
 
-      <Tabs defaultValue="users" orientation={isMobile ? 'horizontal' : 'vertical'} placement="left">
-        <Tabs.List>
+      <Tabs defaultValue="users" orientation="horizontal">
+        <Tabs.List style={{ flexWrap: 'wrap' }}>
           <Tabs.Tab value="users" leftSection={<IconUsers size={16} />}>Users</Tabs.Tab>
           <Tabs.Tab value="invitations" leftSection={<IconMail size={16} />}>Invitations</Tabs.Tab>
           <Tabs.Tab value="tiers" leftSection={<IconStack2 size={16} />}>Tiers</Tabs.Tab>
-          <Tabs.Tab value="settings" leftSection={<IconSettings size={16} />}>System Settings</Tabs.Tab>
+          <Tabs.Tab value="settings" leftSection={<IconSettings size={16} />}>Settings</Tabs.Tab>
           <Tabs.Tab value="rate-limits" leftSection={<IconClock size={16} />}>Rate Limits</Tabs.Tab>
-          <Tabs.Tab value="email" leftSection={<IconMail size={16} />}>Email Config</Tabs.Tab>
+          <Tabs.Tab value="email" leftSection={<IconMail size={16} />}>Email</Tabs.Tab>
           <Tabs.Tab value="ip" leftSection={<IconServer size={16} />}>IP Filters</Tabs.Tab>
-          <Tabs.Tab value="logs" leftSection={<IconListDetails size={16} />}>System Logs</Tabs.Tab>
+          <Tabs.Tab value="logs" leftSection={<IconListDetails size={16} />}>Logs</Tabs.Tab>
           <Tabs.Tab value="database" leftSection={<IconDatabase size={16} />}>Database</Tabs.Tab>
           <Tabs.Tab value="diagnostics" leftSection={<IconActivity size={16} />}>Diagnostics</Tabs.Tab>
-          <Tabs.Tab value="global-prompts" leftSection={<IconMessages size={16} />}>Global Prompts</Tabs.Tab>
+          <Tabs.Tab value="global-prompts" leftSection={<IconMessages size={16} />}>Prompts</Tabs.Tab>
           <Tabs.Tab value="user-content" leftSection={<IconUsers size={16} />}>User Content</Tabs.Tab>
         </Tabs.List>
 
-        <Box pl={{ base: 0, sm: 'md' }} style={{ flex: 1 }}>
+        <Box px="md" pb="xl">
           <Tabs.Panel value="users"><AdminUsers /></Tabs.Panel>
           <Tabs.Panel value="invitations"><AdminInvitations /></Tabs.Panel>
           <Tabs.Panel value="tiers"><AdminTiers /></Tabs.Panel>
