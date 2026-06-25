@@ -50,17 +50,17 @@ def send_email(
 
 def send_invitation_email(db: Session, recipient_email: str, invitation_link: str) -> bool:
     """Send an invitation email to a new user"""
-    subject = "You're invited to join MySmartNotes!"
+    subject = "You're invited to join VeloNote!"
     body = f"""
     <html>
         <body>
-            <h2>Welcome to MySmartNotes!</h2>
-            <p>You have been invited to join MySmartNotes, your AI-powered study companion.</p>
+            <h2>Welcome to VeloNote!</h2>
+            <p>You have been invited to join VeloNote, your AI-powered study companion.</p>
             <p>Click the link below to create your account and get started:</p>
             <p><a href="{invitation_link}">{invitation_link}</a></p>
             <p>If you didn't expect this invitation, you can safely ignore this email.</p>
             <br>
-            <p>Best regards,<br>The MySmartNotes Team</p>
+            <p>Best regards,<br>The VeloNote Team</p>
         </body>
     </html>
     """

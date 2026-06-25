@@ -22,10 +22,38 @@ jobs:
 
       - name: Create stub env files (compose validation only — no real secrets)
         run: |
-          touch secrets.env
-          echo "DB_PASSWORD=ci-stub" >> secrets.env
-          echo "SECRET_KEY=ci-stub-key-that-is-long-enough-32ch" >> secrets.env
-          echo "APP_ENCRYPTION_KEY=ci-stub-encryption-key" >> secrets.env
+          # Stub .env — matches what operators provide (no secrets here)
+          cat > .env << 'EOF'
+          DB_USER=mysmartnotes
+          DB_HOST=db
+          DB_PORT=5432
+          DB_NAME=mysmartnotes
+          REDIS_URL=redis://redis:6379/0
+          HOST=0.0.0.0
+          API_PORT=8000
+          PUBLIC_PORT=8000
+          ADMIN_EMAIL=
+          SMTP_HOST=
+          SMTP_PORT=587
+          SMTP_USER=
+          SMTP_PASSWORD=
+          SMTP_SENDER_NAME=MySmartNotes
+          SMTP_TLS=True
+          FIREBASE_API_KEY=
+          FIREBASE_AUTH_DOMAIN=
+          FIREBASE_PROJECT_ID=
+          FIREBASE_STORAGE_BUCKET=
+          FIREBASE_MESSAGING_SENDER_ID=
+          FIREBASE_APP_ID=
+          FIREBASE_MEASUREMENT_ID=
+          EOF
+
+          # Stub secrets.env — values are obviously fake CI placeholders
+          cat > secrets.env << 'EOF'
+          DB_PASSWORD=ci-placeholder-not-a-real-password
+          SECRET_KEY=ci-placeholder-not-a-real-jwt-signing-key
+          APP_ENCRYPTION_KEY=ci-placeholder-not-a-real-fernet-key
+          EOF
 
       - name: Validate docker-compose.yml
         run: docker compose -f docker-compose.yml config --quiet

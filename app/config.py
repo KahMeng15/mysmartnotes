@@ -37,7 +37,7 @@ _CONFIG_FILE = _CONFIG_DIR / "app.config.json"
 # ---------------------------------------------------------------------------
 # Hardcoded constants (not configurable via environment)
 # ---------------------------------------------------------------------------
-APP_NAME = "MySmartNotes"
+APP_NAME = "VeloNote"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 ALLOWED_EXTENSIONS = "pdf,pptx,png,jpg,jpeg"
@@ -82,13 +82,13 @@ def _ensure_config_file() -> dict:
     if not _CONFIG_FILE.exists():
         _CONFIG_FILE.write_text(json.dumps(_CONFIG_DEFAULTS, indent=2) + "\n", encoding="utf-8")
         print(
-            f"[mysmartnotes] Created default config file: {_CONFIG_FILE}",
+            f"[velonote] Created default config file: {_CONFIG_FILE}",
             file=sys.stderr,
         )
     try:
         return json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
     except Exception as exc:
-        print(f"[mysmartnotes] WARNING: Could not parse {_CONFIG_FILE}: {exc}", file=sys.stderr)
+        print(f"[velonote] WARNING: Could not parse {_CONFIG_FILE}: {exc}", file=sys.stderr)
         return {}
 
 
@@ -102,7 +102,7 @@ def _generate_secrets() -> None:
         key = secrets.token_hex(32)
         lines_to_append.append(f"SECRET_KEY={key}")
         print(
-            "[mysmartnotes] Generated new SECRET_KEY → secrets.env",
+            "[velonote] Generated new SECRET_KEY → secrets.env",
             file=sys.stderr,
         )
 
@@ -116,7 +116,7 @@ def _generate_secrets() -> None:
             fernet_key = secrets.token_urlsafe(32)
         lines_to_append.append(f"APP_ENCRYPTION_KEY={fernet_key}")
         print(
-            "[mysmartnotes] Generated new APP_ENCRYPTION_KEY → secrets.env",
+            "[velonote] Generated new APP_ENCRYPTION_KEY → secrets.env",
             file=sys.stderr,
         )
 
@@ -124,7 +124,7 @@ def _generate_secrets() -> None:
         db_pass = secrets.token_urlsafe(24)
         lines_to_append.append(f"DB_PASSWORD={db_pass}")
         print(
-            "[mysmartnotes] Generated new DB_PASSWORD → secrets.env",
+            "[velonote] Generated new DB_PASSWORD → secrets.env",
             file=sys.stderr,
         )
 
@@ -172,11 +172,11 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
 
     # Database
-    DB_USER: str = "mysmartnotes"
+    DB_USER: str = "velonote"
     DB_PASSWORD: str = ""
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
-    DB_NAME: str = "mysmartnotes"
+    DB_NAME: str = "velonote"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -197,7 +197,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_SENDER_NAME: str = "MySmartNotes"
+    SMTP_SENDER_NAME: str = "VeloNote"
     SMTP_TLS: bool = True
 
     # Global AI Configuration (3-Tier Fallback)
