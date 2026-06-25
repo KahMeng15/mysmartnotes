@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Center, Loader, SimpleGrid, Modal, TextInput, Textarea, ColorInput, Stack, Menu, Select } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconTrash, IconEdit, IconUpload, IconPlus, IconFiles, IconDotsVertical, IconSearch, IconArrowsSort, IconChevronLeft } from '@tabler/icons-react';
+import { IconTrash, IconEdit, IconUpload, IconPlus, IconFiles, IconDotsVertical, IconSearch, IconArrowsSort, IconChevronLeft, IconCheck } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 
@@ -252,7 +252,8 @@ export default function GroupView() {
         </Group>
       </Box>
 
-      <Group justify="space-between" mb="lg" wrap="wrap" gap="sm">
+      {/* Desktop Header */}
+      <Group justify="space-between" mb="lg" wrap="wrap" gap="sm" visibleFrom="sm">
         <Box>
           <Title order={1} style={{ fontSize: 'clamp(1.3rem, 4vw, 2rem)' }}>{group.name}</Title>
           <Text c="dimmed">{subjects.length} Subjects</Text>
@@ -274,7 +275,8 @@ export default function GroupView() {
         </Group>
       </Group>
 
-      <Group mb="xl" align="flex-end" wrap="wrap" gap="sm">
+      {/* Desktop Controls */}
+      <Group mb="xl" align="flex-end" wrap="wrap" gap="sm" visibleFrom="sm">
         <TextInput
           placeholder="Search subjects..."
           leftSection={<IconSearch size={16} />}
@@ -310,6 +312,72 @@ export default function GroupView() {
           size="sm"
         />
       </Group>
+
+      {/* Mobile Header */}
+      <Box hiddenFrom="sm" mb="lg">
+        <Title order={1} style={{ fontSize: 'clamp(1.8rem, 7vw, 2.8rem)', marginBottom: 16 }}>{group.name}</Title>
+        <Group gap="xs" mb="md" justify="flex-start">
+          <Button leftSection={<IconPlus size={16} />} onClick={handleAddSubjectClick} variant="light" color="blue" size="sm">
+            Create
+          </Button>
+          {id !== 'ungrouped' && (
+            <>
+              <ActionIcon variant="light" color="gray" size="lg" title="Edit Group" onClick={handleEditGroupClick}>
+                <IconEdit size={18} />
+              </ActionIcon>
+              <ActionIcon variant="light" color="red" size="lg" title="Delete Group" onClick={openDeleteGroupModal}>
+                <IconTrash size={18} />
+              </ActionIcon>
+            </>
+          )}
+        </Group>
+        <Group gap="xs" wrap="nowrap">
+          <TextInput
+            placeholder="Search subjects..."
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            style={{ flex: 1 }}
+          />
+          <Menu shadow="md" width={200}>
+            <Menu.Target>
+              <ActionIcon variant="light" color="gray" size="lg">
+                <IconArrowsSort size={18} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {[
+                { value: 'name_asc', label: 'Name (A-Z)' },
+                { value: 'name_desc', label: 'Name (Z-A)' },
+                { value: 'date_desc', label: 'Newest First' },
+                { value: 'date_asc', label: 'Oldest First' },
+              ].map(opt => (
+                <Menu.Item
+                  key={opt.value}
+                  leftSection={sort === opt.value ? <IconCheck size={14} /> : <Box w={14} />}
+                  onClick={async () => {
+                    setSort(opt.value);
+                    localStorage.setItem('smartnotes_sort_pref', opt.value);
+                    try {
+                      await fetchApi('/auth/profile', {
+                        method: 'PUT',
+                        body: JSON.stringify({ sort_preference: opt.value })
+                      });
+                      const user = JSON.parse(localStorage.getItem('user') || '{}');
+                      user.sort_preference = opt.value;
+                      localStorage.setItem('user', JSON.stringify(user));
+                    } catch (e) {
+                      console.error("Failed to update sort preference in DB", e);
+                    }
+                  }}
+                >
+                  {opt.label}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </Box>
 
       {filteredSubjects.length > 0 ? (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="sm">

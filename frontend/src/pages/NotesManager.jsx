@@ -28,6 +28,7 @@ import {
   IconTrash,
   IconFiles,
   IconDotsVertical,
+  IconCheck,
 } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
@@ -218,16 +219,16 @@ export default function NotesManager() {
 
   return (
     <Box>
-      {/* Header */}
-      <Group justify="space-between" mb="lg" wrap="wrap" gap="sm">
+      {/* Desktop Header */}
+      <Group justify="space-between" mb="lg" wrap="wrap" gap="sm" visibleFrom="sm">
         <Title order={1} fw={800} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738', fontSize: 'clamp(1.5rem, 5vw, 2.5rem)' }}>My Notes</Title>
         <Button leftSection={<IconPlus size={16} />} onClick={() => { setNewGroupName(''); openGroupModal(); }} size="sm">
           Create Group
         </Button>
       </Group>
 
-      {/* Controls */}
-      <Group mb="xl" align="flex-end" wrap="wrap" gap="sm">
+      {/* Desktop Controls */}
+      <Group mb="xl" align="flex-end" wrap="wrap" gap="sm" visibleFrom="sm">
         <TextInput
           placeholder="Search groups, subjects..."
           leftSection={<IconSearch size={16} />}
@@ -263,6 +264,62 @@ export default function NotesManager() {
           size="sm"
         />
       </Group>
+
+      {/* Mobile Header */}
+      <Box hiddenFrom="sm" mb="lg">
+        <Title order={1} fw={800} style={{ fontFamily: 'Instrument Sans, sans-serif', color: '#171738', fontSize: 'clamp(1.8rem, 7vw, 2.8rem)', marginBottom: 16 }}>My Notes</Title>
+        <Group gap="xs" mb="md" justify="flex-start">
+          <Button leftSection={<IconPlus size={16} />} onClick={() => { setNewGroupName(''); openGroupModal(); }} size="sm">
+            Create
+          </Button>
+        </Group>
+        <Group gap="xs" wrap="nowrap">
+          <TextInput
+            placeholder="Search groups, subjects..."
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            style={{ flex: 1 }}
+          />
+          <Menu shadow="md" width={200}>
+            <Menu.Target>
+              <ActionIcon variant="light" color="gray" size="lg">
+                <IconArrowsSort size={18} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {[
+                { value: 'name_asc', label: 'Name (A-Z)' },
+                { value: 'name_desc', label: 'Name (Z-A)' },
+                { value: 'date_desc', label: 'Newest First' },
+                { value: 'date_asc', label: 'Oldest First' },
+              ].map(opt => (
+                <Menu.Item
+                  key={opt.value}
+                  leftSection={sort === opt.value ? <IconCheck size={14} /> : <Box w={14} />}
+                  onClick={async () => {
+                    setSort(opt.value);
+                    localStorage.setItem('smartnotes_sort_pref', opt.value);
+                    try {
+                      await fetchApi('/auth/profile', {
+                        method: 'PUT',
+                        body: JSON.stringify({ sort_preference: opt.value })
+                      });
+                      const user = JSON.parse(localStorage.getItem('user') || '{}');
+                      user.sort_preference = opt.value;
+                      localStorage.setItem('user', JSON.stringify(user));
+                    } catch (e) {
+                      console.error("Failed to update sort preference in DB", e);
+                    }
+                  }}
+                >
+                  {opt.label}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </Box>
 
       {/* Groups Grid */}
       {processedGroups.length > 0 ? (

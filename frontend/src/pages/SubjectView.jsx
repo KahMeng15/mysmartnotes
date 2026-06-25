@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress, ScrollArea, Divider, MultiSelect, SegmentedControl, NumberInput, Collapse, Switch, Paper } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit, IconX } from '@tabler/icons-react';
+import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit, IconX, IconCheck } from '@tabler/icons-react';
 import * as TablerIcons from '@tabler/icons-react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi, getAuthToken } from '../lib/api';
@@ -1092,7 +1092,8 @@ export default function SubjectView() {
         </Group>
       </Box>
 
-      <Group justify="space-between" mb="lg" wrap="wrap" gap="sm">
+      {/* Desktop Header */}
+      <Group justify="space-between" mb="lg" wrap="wrap" gap="sm" visibleFrom="sm">
         <Box style={{ minWidth: 200, flex: 1 }}>
           <Title order={1} style={{ fontSize: 'clamp(1.3rem, 4vw, 2rem)' }}>{subject.name}</Title>
           <Text c="dimmed">{subject.description || 'No description'}</Text>
@@ -1140,7 +1141,8 @@ export default function SubjectView() {
         </Group>
       </Group>
 
-      <Group mb="xl" align="flex-end" wrap="wrap" gap="sm">
+      {/* Desktop Controls */}
+      <Group mb="xl" align="flex-end" wrap="wrap" gap="sm" visibleFrom="sm">
         <TextInput
           placeholder="Search notes..."
           leftSection={<IconSearch size={16} />}
@@ -1176,6 +1178,98 @@ export default function SubjectView() {
           size="sm"
         />
       </Group>
+
+      {/* Mobile Header */}
+      <Box hiddenFrom="sm" mb="lg">
+        <Title order={1} style={{ fontSize: 'clamp(1.8rem, 7vw, 2.8rem)', marginBottom: 16 }}>{subject.name}</Title>
+        <Group gap="xs" mb="md" justify="flex-start">
+          <Menu shadow="md" width={200} position="bottom-start">
+            <Menu.Target>
+              <Button variant="light" leftSection={<IconSparkles size={16} />} size="sm">
+                Create
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconFileText size={14} />} onClick={() => setCreateNoteModalOpened(true)}>
+                Study Notes
+              </Menu.Item>
+              <Menu.Item leftSection={<IconBrain size={14} />} onClick={() => setCreateExerciseModalOpened(true)}>
+                Exercise
+              </Menu.Item>
+              <Menu.Item leftSection={<IconLayersLinked size={14} />} onClick={openMergeExerciseModal}>
+                Merge Exercises
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+          <Menu shadow="md" width={200} position="bottom-start">
+            <Menu.Target>
+              <Button leftSection={<IconUpload size={16} />} size="sm">
+                Upload
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item leftSection={<IconFileText size={14} />} onClick={() => navigate(`/upload?subject_id=${subject.id}&type=resource`)}>
+                Resource
+              </Menu.Item>
+              <Menu.Item leftSection={<IconBrain size={14} />} onClick={() => navigate(`/upload?subject_id=${subject.id}&type=exercise`)}>
+                Exercise
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+          <ActionIcon variant="light" color="gray" size="lg" title="Edit Subject" onClick={handleEditSubjectClick}>
+            <IconEdit size={18} />
+          </ActionIcon>
+          <ActionIcon variant="light" color="red" size="lg" title="Delete Subject" onClick={openDeleteSubjectModal}>
+            <IconTrash size={18} />
+          </ActionIcon>
+        </Group>
+        <Group gap="xs" wrap="nowrap">
+          <TextInput
+            placeholder="Search notes..."
+            leftSection={<IconSearch size={16} />}
+            value={search}
+            onChange={(e) => setSearch(e.currentTarget.value)}
+            style={{ flex: 1 }}
+          />
+          <Menu shadow="md" width={200}>
+            <Menu.Target>
+              <ActionIcon variant="light" color="gray" size="lg">
+                <IconArrowsSort size={18} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {[
+                { value: 'name_asc', label: 'Name (A-Z)' },
+                { value: 'name_desc', label: 'Name (Z-A)' },
+                { value: 'date_desc', label: 'Newest First' },
+                { value: 'date_asc', label: 'Oldest First' },
+              ].map(opt => (
+                <Menu.Item
+                  key={opt.value}
+                  leftSection={sort === opt.value ? <IconCheck size={14} /> : <Box w={14} />}
+                  onClick={async () => {
+                    setSort(opt.value);
+                    localStorage.setItem('smartnotes_sort_pref', opt.value);
+                    try {
+                      await fetchApi('/auth/profile', {
+                        method: 'PUT',
+                        body: JSON.stringify({ sort_preference: opt.value })
+                      });
+                      const user = JSON.parse(localStorage.getItem('user') || '{}');
+                      user.sort_preference = opt.value;
+                      localStorage.setItem('user', JSON.stringify(user));
+                    } catch (e) {
+                      console.error("Failed to update sort preference in DB", e);
+                    }
+                  }}
+                >
+                  {opt.label}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </Box>
 
       <Tabs value={activeTab} onChange={handleTabChange} mb="md">
         <Tabs.List>
