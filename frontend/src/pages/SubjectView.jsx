@@ -1321,7 +1321,7 @@ export default function SubjectView() {
                       <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                         <Menu position="bottom-end" withinPortal>
                           <Menu.Target>
-                            <ActionIcon variant="subtle" color="gray">
+                            <ActionIcon variant="subtle" color="gray" onClick={(e) => e.stopPropagation()}>
                               <IconDotsVertical size={16} />
                             </ActionIcon>
                           </Menu.Target>
@@ -1433,7 +1433,7 @@ export default function SubjectView() {
                     <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                       <Menu position="bottom-end" withinPortal>
                         <Menu.Target>
-                          <ActionIcon variant="subtle" color="gray">
+                          <ActionIcon variant="subtle" color="gray" onClick={(e) => e.stopPropagation()}>
                             <IconDotsVertical size={16} />
                           </ActionIcon>
                         </Menu.Target>
@@ -1523,7 +1523,7 @@ export default function SubjectView() {
                        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                          <Menu position="bottom-end">
                           <Menu.Target>
-                            <ActionIcon variant="subtle" color="gray">
+                            <ActionIcon variant="subtle" color="gray" onClick={(e) => e.stopPropagation()}>
                               <IconDotsVertical size={20} />
                             </ActionIcon>
                           </Menu.Target>

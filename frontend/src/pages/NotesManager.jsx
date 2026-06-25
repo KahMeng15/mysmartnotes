@@ -362,7 +362,7 @@ export default function NotesManager() {
                   <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                     <Menu position="bottom-end" withinPortal>
                       <Menu.Target>
-                        <ActionIcon component="div" variant="subtle" color="gray">
+                        <ActionIcon variant="subtle" color="gray" onClick={(e) => e.stopPropagation()}>
                           <IconDotsVertical size={16} />
                         </ActionIcon>
                       </Menu.Target>
