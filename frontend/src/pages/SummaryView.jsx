@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput, Menu, Code } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput, Menu, Code, Drawer } from '@mantine/core';
 import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu, IconDeviceFloppy, IconPencil, IconX, IconH1, IconH2, IconH3, IconCode, IconEye, IconDownload } from '@tabler/icons-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -81,6 +82,7 @@ export default function SummaryView() {
   const [renameInput, setRenameInput] = useState('');
   const [taskStatus, setTaskStatus] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileActionsOpened, { open: openMobileActions, close: closeMobileActions }] = useDisclosure(false);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isRawMode, setIsRawMode] = useState(false);
@@ -729,13 +731,13 @@ export default function SummaryView() {
 
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
-        <Group justify="space-between" wrap="wrap" gap="xs">
-          <Group wrap="wrap" gap="xs">
+        <Group justify="space-between" wrap="nowrap" gap="xs">
+          <Group wrap="nowrap" gap="xs" style={{ overflow: 'hidden', minWidth: 0 }}>
             <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
             {note?.subject && (
-              <Group gap="xs" ml="xs" wrap="wrap">
+              <Group gap="xs" ml="xs" wrap="nowrap" visibleFrom="sm" style={{ overflow: 'hidden', minWidth: 0 }}>
                 {note.subject.group && (
                   <>
                     <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${note.subject.group.id}`)} style={{ whiteSpace: 'nowrap' }}>{note.subject.group.name}</Text>
@@ -748,16 +750,14 @@ export default function SummaryView() {
               </Group>
             )}
           </Group>
-          {!isEditing && (
-            <Group gap="xs" hiddenFrom="sm">
-              <ActionIcon variant="light" color="blue" size="sm" onClick={startEditing}>
-                <IconPencil size={16} />
-              </ActionIcon>
-              <ActionIcon variant="light" color="gray" size="sm" onClick={handleExportMarkdown}>
-                <IconDownload size={16} />
-              </ActionIcon>
-            </Group>
-          )}
+          <ActionIcon
+            variant="default"
+            size="md"
+            onClick={openMobileActions}
+            hiddenFrom="sm"
+          >
+            <IconLayoutSidebarRightExpand size={20} />
+          </ActionIcon>
           {sidebarOpen && (
             <ActionIcon variant="subtle" color="gray" size="sm" onClick={toggleSidebar} visibleFrom="sm">
               {sidebarOpen ? <IconLayoutSidebarRightCollapse size={20} /> : <IconLayoutSidebarRightExpand size={20} />}
@@ -1059,6 +1059,73 @@ export default function SummaryView() {
           </Box>
         </Box>
       </Box>
+
+      {/* Mobile Smart Actions Drawer */}
+      <Drawer
+        opened={mobileActionsOpened}
+        onClose={closeMobileActions}
+        title="Smart Actions"
+        padding={0}
+        size="80%"
+        position="right"
+        hiddenFrom="sm"
+        zIndex={1000}
+        styles={{ header: { padding: '16px' } }}
+      >
+        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <ScrollArea style={{ flex: 1 }} px="md">
+            <Stack gap={0} align="stretch" py="sm">
+              {!isEditing ? (
+                <>
+                  <MantineNavLink
+                    label="Edit"
+                    leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); startEditing(); }}
+                  />
+                  <Menu position="right-start" withArrow>
+                    <Menu.Target>
+                      <MantineNavLink
+                        label="Export"
+                        leftSection={<IconDownload size="1.2rem" stroke={1.5} />}
+                      />
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Item leftSection={<IconDownload size="0.9rem" />} onClick={() => { closeMobileActions(); handleExportMarkdown(); }}>
+                        Download as Markdown (.md)
+                      </Menu.Item>
+                      <Menu.Item disabled>
+                        Other formats coming soon...
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                </>
+              ) : (
+                <>
+                  <MantineNavLink
+                    label="Save Changes"
+                    leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); setSaveModalOpened(true); }}
+                    color="blue"
+                    variant="filled"
+                    active
+                  />
+                  <MantineNavLink
+                    label="Cancel Editing"
+                    leftSection={<IconX size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); setCancelModalOpened(true); }}
+                    color="red"
+                  />
+                  <MantineNavLink
+                    label={isRawMode ? "Visual Editor" : "Raw Markdown"}
+                    leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
+                    onClick={handleToggleRaw}
+                  />
+                </>
+              )}
+            </Stack>
+          </ScrollArea>
+        </Box>
+      </Drawer>
     </Box>
   );
 }

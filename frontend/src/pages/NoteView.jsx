@@ -526,10 +526,23 @@ export default function NoteView() {
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
         <Group justify="space-between" wrap="nowrap" gap="xs">
-          <Group wrap="nowrap" gap="xs">
+          <Group wrap="nowrap" gap="xs" style={{ overflow: 'hidden', minWidth: 0 }}>
             <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
+            {note?.subject && (
+              <Group gap="xs" ml="xs" wrap="nowrap" visibleFrom="sm" style={{ overflow: 'hidden', minWidth: 0 }}>
+                {note.subject.group && (
+                  <>
+                    <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${note.subject.group.id}`)} style={{ whiteSpace: 'nowrap' }}>{note.subject.group.name}</Text>
+                    <Text size="sm" c="dimmed">/</Text>
+                  </>
+                )}
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}`)} style={{ whiteSpace: 'nowrap' }}>{note.subject.name}</Text>
+                <Text size="sm" c="dimmed">/</Text>
+                <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/subject/${note.subject.id}/resource`)} style={{ whiteSpace: 'nowrap' }}>Resource</Text>
+              </Group>
+            )}
             {!isProcessed && (
               <Badge ml="md" color={isFailed ? 'red' : 'orange'} variant="light">
                 {isFailed ? 'Failed' : 'Processing...'}

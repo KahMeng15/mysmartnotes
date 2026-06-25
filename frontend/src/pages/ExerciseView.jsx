@@ -3,7 +3,7 @@ import {
   Box, Title, Text, Group, Card, Button, Stack, Loader, Center, 
   Badge, ActionIcon, Textarea, Collapse, Radio, Paper, Alert, Menu,
   Grid, Select, SegmentedControl, TextInput, Divider, NumberInput, Switch,
-  Container, ScrollArea, Tooltip, NavLink as MantineNavLink, Progress, Modal
+  Container, ScrollArea, Tooltip, NavLink as MantineNavLink, Progress, Modal, Drawer
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -37,6 +37,7 @@ export default function ExerciseView() {
   const [editMode, setEditMode] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileActionsOpened, { open: openMobileActions, close: closeMobileActions }] = useDisclosure(false);
 
   useEffect(() => {
     if (mode && urlToMode[mode]) {
@@ -417,13 +418,13 @@ export default function ExerciseView() {
       `}</style>
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
-        <Group justify="space-between" wrap="wrap" gap="xs">
-          <Group wrap="wrap" gap="xs">
+        <Group justify="space-between" wrap="nowrap" gap="xs">
+          <Group wrap="nowrap" gap="xs" style={{ overflow: 'hidden', minWidth: 0 }}>
             <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
             {exercise?.subject && (
-              <Group gap="xs" ml="xs" wrap="wrap">
+              <Group gap="xs" ml="xs" wrap="nowrap" visibleFrom="sm" style={{ overflow: 'hidden', minWidth: 0 }}>
                 {exercise.subject.group && (
                   <>
                     <Text size="sm" fw={500} c="dimmed" className="clickable-crumb" onClick={() => navigate(`/group/${exercise.subject.group.id}`)} style={{ whiteSpace: 'nowrap' }}>{exercise.subject.group.name}</Text>
@@ -436,28 +437,14 @@ export default function ExerciseView() {
               </Group>
             )}
           </Group>
-          <Group gap="xs" hiddenFrom="sm">
-            {!editMode && (
-              <>
-                <ActionIcon variant="light" color="blue" size="sm" onClick={() => setEditMode(true)} title="Edit Questions">
-                  <IconPencil size={16} />
-                </ActionIcon>
-                <ActionIcon variant="light" color="gray" size="sm" onClick={handleResetExercise} title="Reset Exercise">
-                  <IconRefresh size={16} />
-                </ActionIcon>
-              </>
-            )}
-            {editMode && (
-              <>
-                <ActionIcon variant="light" color="blue" size="sm" onClick={handleSaveEdits} loading={savingEdits} title="Save Changes">
-                  <IconDeviceFloppy size={16} />
-                </ActionIcon>
-                <ActionIcon variant="light" color="red" size="sm" onClick={() => setEditMode(false)} title="Cancel Edit">
-                  <IconX size={16} />
-                </ActionIcon>
-              </>
-            )}
-          </Group>
+          <ActionIcon
+            variant="default"
+            size="md"
+            onClick={openMobileActions}
+            hiddenFrom="sm"
+          >
+            <IconLayoutSidebarRightExpand size={20} />
+          </ActionIcon>
         </Group>
       </Box>
 
@@ -931,7 +918,7 @@ export default function ExerciseView() {
       </Box>
 
         {/* Right Sidebar */}
-        <Box w={sidebarOpen ? 280 : 80} style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
+        <Box w={sidebarOpen ? 280 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
           <Box style={{ flex: 1, overflowY: 'auto' }}>
             <Stack gap={0} align="stretch">
               {sidebarOpen && (
@@ -1177,6 +1164,158 @@ export default function ExerciseView() {
           </Group>
         </Stack>
       </Modal>
+
+      {/* Mobile Smart Actions Drawer */}
+      <Drawer
+        opened={mobileActionsOpened}
+        onClose={closeMobileActions}
+        title="Exercise"
+        padding={0}
+        size="85%"
+        position="right"
+        hiddenFrom="sm"
+        zIndex={1000}
+        styles={{ header: { padding: '16px' } }}
+      >
+        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <ScrollArea style={{ flex: 1 }} px="md">
+            <Stack gap={0} align="stretch" py="sm">
+              {/* Exercise Info */}
+              <Card p="sm" radius="md" withBorder bg="var(--mantine-color-gray-0)" mb="md" mx="sm">
+                <Stack gap="xs">
+                  <Group justify="space-between" wrap="nowrap">
+                    <Text size="xs" fw={600} c="dimmed">Type</Text>
+                    <Badge size="xs" color={isAiGenerated ? 'blue' : 'green'} variant="light">
+                      {isAiGenerated ? 'AI Generated' : 'Imported'}
+                    </Badge>
+                  </Group>
+                  <Box>
+                    <Text size="xs" fw={600} c="dimmed" mb={4}>Resources Covered</Text>
+                    {coveredResources.length > 0 ? (
+                      <Stack gap={4}>
+                        {coveredResources.map((res, idx) => (
+                          <Text key={idx} size="xs" c={res.id ? "blue.6" : "dark"} style={res.id ? { cursor: 'pointer', textDecoration: 'underline' } : {}} onClick={() => res.id && window.open(`/resource/${res.id}`, '_blank')}>
+                            • {res.title}
+                          </Text>
+                        ))}
+                      </Stack>
+                    ) : (
+                      <Text size="xs" c="dimmed" fs="italic">No resources linked</Text>
+                    )}
+                  </Box>
+                  {detectedQuestionTypes.length > 0 && (
+                    <>
+                      <Divider my={4} />
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="xs" fw={600} c="dimmed">Question Types</Text>
+                        <Text size="xs" fw={500} ta="right">{detectedQuestionTypes.join(', ')}</Text>
+                      </Group>
+                    </>
+                  )}
+                  {exercise?.questions?.length > 0 && (
+                    <Group justify="space-between" wrap="nowrap">
+                      <Text size="xs" fw={600} c="dimmed">Questions</Text>
+                      <Text size="xs" fw={500}>{exercise.questions.length}</Text>
+                    </Group>
+                  )}
+                </Stack>
+              </Card>
+
+              {!editMode ? (
+                <>
+                  <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="xs" px="sm">Smart Actions</Text>
+                  <MantineNavLink
+                    label="Edit Questions"
+                    leftSection={<IconPencil size="1.2rem" stroke={1.5} />}
+                    onClick={() => { closeMobileActions(); setEditMode(true); }}
+                  />
+                  <MantineNavLink
+                    label="Reset Exercise"
+                    leftSection={<IconRefresh size="1.2rem" stroke={1.5} color="var(--mantine-color-orange-6)" />}
+                    onClick={() => { closeMobileActions(); handleResetExercise(); }}
+                  />
+                  <Menu position="right-start" withArrow>
+                    <Menu.Target>
+                      <MantineNavLink
+                        label="Export"
+                        leftSection={<IconDownload size="1.2rem" stroke={1.5} />}
+                      />
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Item leftSection={<IconFileTypePdf size={14} color="red" />} onClick={() => { closeMobileActions(); handleExport('pdf'); }}>
+                        Export as PDF
+                      </Menu.Item>
+                      <Menu.Item leftSection={<IconFileTypeDocx size={14} color="blue" />} onClick={() => { closeMobileActions(); handleExport('docx'); }}>
+                        Export as DOCX
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+
+                  <Divider my="sm" mx="sm" />
+                  <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="xs" px="sm">View Mode</Text>
+                  <Box px="sm">
+                    <SegmentedControl
+                      orientation="vertical"
+                      fullWidth
+                      value={viewMode}
+                      onChange={(v) => {
+                        if (v === 'conversation') return;
+                        closeMobileActions();
+                        navigate(`/exercises/${id}/${modeToUrl[v]}`);
+                      }}
+                      data={[
+                        { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEyeOff size={16} stroke={1.5} /><Text size="sm">Hide Answers</Text></Group>, value: 'hide' },
+                        { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEye size={16} stroke={1.5} /><Text size="sm">Show All Answers</Text></Group>, value: 'show' },
+                        { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEdit size={16} stroke={1.5} /><Text size="sm">Interactive</Text></Group>, value: 'interactive' },
+                        { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconClock size={16} stroke={1.5} /><Text size="sm">Exam Mode</Text></Group>, value: 'exam' },
+                        { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconMessageDots size={16} stroke={1.5} /><Text size="sm" c="dimmed">Conversation</Text></Group>, value: 'conversation', disabled: true }
+                      ]}
+                    />
+                  </Box>
+
+                  {viewMode === 'exam' && (
+                    <Box px="sm" mt="md">
+                      <Divider my="sm" />
+                      <Text fw={500} size="sm" mb="xs">Exam Settings</Text>
+                      <NumberInput
+                        label="Time Limit (Minutes)"
+                        value={examTimerMinutes}
+                        onChange={setExamTimerMinutes}
+                        min={1}
+                        max={120}
+                        disabled={examActive}
+                      />
+                      {!examActive ? (
+                        <Button fullWidth mt="md" color="indigo" onClick={() => { closeMobileActions(); handleStartExam(); }}>
+                          Start Exam
+                        </Button>
+                      ) : (
+                        <Button fullWidth mt="md" color="red" variant="light" onClick={() => { setExamActive(false); clearInterval(timerRef.current); }}>
+                          Cancel Exam
+                        </Button>
+                      )}
+                    </Box>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="xs" px="sm">Actions</Text>
+                  <MantineNavLink
+                    label="Save Changes"
+                    leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} color="var(--mantine-color-blue-6)" />}
+                    onClick={() => { closeMobileActions(); handleSaveEdits(); }}
+                  />
+                  <MantineNavLink
+                    label="Cancel Edit"
+                    leftSection={<IconX size="1.2rem" stroke={1.5} color="var(--mantine-color-red-6)" />}
+                    onClick={() => { closeMobileActions(); setEditMode(false); }}
+                  />
+                </>
+              )}
+            </Stack>
+          </ScrollArea>
+        </Box>
+      </Drawer>
     </Box>
   );
 }
