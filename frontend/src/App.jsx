@@ -1,6 +1,7 @@
 import SummaryView from "./pages/SummaryView";
 
 import { useState, useEffect } from 'react';
+import { useMediaQuery } from '@mantine/hooks';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
 import { AppShell, Group, Text, Button, Loader, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification, Stack } from '@mantine/core';
 import { 
@@ -34,6 +35,7 @@ import TaskQueueModal from './components/TaskQueueModal';
 const CAT_BASE = "https://http.cat";
 
 function GlobalToasts() {
+  const isMobile = useMediaQuery('(max-width: 767px)');
   const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ function GlobalToasts() {
 
   return (
     <Portal>
-      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ position: 'fixed', bottom: isMobile ? 80 : 20, right: 20, zIndex: 9999, display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {toasts.map(t => (
           <Notification
             key={t.id}

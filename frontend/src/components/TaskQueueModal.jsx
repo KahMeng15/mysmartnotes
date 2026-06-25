@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Text, Group, Progress, ActionIcon, ScrollArea, Stack, CloseButton, Portal, Loader } from '@mantine/core';
+import { useState, useEffect } from 'react';
+import { useMediaQuery } from '@mantine/hooks';
+import { Card, Text, Group, Progress, ActionIcon, ScrollArea, Stack, CloseButton, Portal, Loader, Center, RingProgress, Paper } from '@mantine/core';
 import { IconX, IconCheck, IconAlertCircle, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 
 export default function TaskQueueModal() {
+  const isMobile = useMediaQuery('(max-width: 767px)');
   const [tasks, setTasks] = useState([]);
   const [dismissedTaskIds, setDismissedTaskIds] = useState(new Set());
   const [isMinimized, setIsMinimized] = useState(false);
@@ -87,9 +89,41 @@ export default function TaskQueueModal() {
     : 0;
   const hasActiveTasks = activeTasksForProgress.length > 0;
 
+  if (isMobile && isMinimized) {
+    return (
+      <Portal>
+        <div
+          style={{ position: 'fixed', bottom: 80, right: 20, zIndex: 100, cursor: 'pointer' }}
+          onClick={() => setIsMinimized(false)}
+        >
+          <Paper shadow="xl" radius="xl" p={2} withBorder bg="white">
+            <RingProgress
+              size={48}
+              thickness={3}
+              roundCaps
+              sections={hasActiveTasks
+                ? [{ value: overallProgress, color: 'blue' }]
+                : [{ value: 100, color: 'green' }]
+              }
+              label={
+                <Center>
+                  {hasActiveTasks ? (
+                    <Text size="xs" fw={700} c="blue">{Math.round(overallProgress)}%</Text>
+                  ) : (
+                    <IconCheck size={18} color="green" />
+                  )}
+                </Center>
+              }
+            />
+          </Paper>
+        </div>
+      </Portal>
+    );
+  }
+
   return (
     <Portal>
-      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 100, width: 350, transition: 'all 0.3s ease' }}>
+      <div style={{ position: 'fixed', bottom: isMobile ? 80 : 20, right: 20, zIndex: 100, width: 350, transition: 'all 0.3s ease' }}>
         <Card shadow="xl" padding="md" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)' }}>
           <Group justify="space-between" mb={(isMinimized && !hasActiveTasks) ? 0 : "sm"}>
             <Text fw={600} size="sm">Tasks ({visibleTasks.length})</Text>
@@ -100,7 +134,7 @@ export default function TaskQueueModal() {
             </Group>
           </Group>
 
-          {isMinimized && hasActiveTasks && (
+          {!isMobile && isMinimized && hasActiveTasks && (
             <Progress 
               value={overallProgress} 
               size="xs" 
