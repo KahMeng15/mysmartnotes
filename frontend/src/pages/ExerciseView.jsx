@@ -406,7 +406,7 @@ export default function ExerciseView() {
   })();
 
   return (
-    <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+    <Box h="100vh" style={{ display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
       <style>{`
         .clickable-crumb {
           cursor: pointer;

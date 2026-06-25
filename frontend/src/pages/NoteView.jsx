@@ -423,7 +423,7 @@ export default function NoteView() {
   };
 
   return (
-    <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
+    <Box h="100vh" style={{ display: 'flex', flexDirection: 'column', overflowX: 'hidden' }}>
       <style>{`
         .sticky-markdown {
           font-family: 'Instrument Sans', sans-serif;
