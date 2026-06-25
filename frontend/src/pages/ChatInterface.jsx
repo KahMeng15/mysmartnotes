@@ -1439,6 +1439,7 @@ export default function ChatInterface() {
                             }}
                             searchable
                             maxDropdownHeight={200}
+                            comboboxProps={{ zIndex: 1200 }}
                           />
                         )}
                         
@@ -1457,6 +1458,7 @@ export default function ChatInterface() {
                             searchable
                             maxDropdownHeight={200}
                             disabled={!selectedGroupId}
+                            comboboxProps={{ zIndex: 1200 }}
                           />
                         )}
                         
@@ -1474,6 +1476,7 @@ export default function ChatInterface() {
                             searchable
                             maxDropdownHeight={200}
                             disabled={!selectedSubjectId}
+                            comboboxProps={{ zIndex: 1200 }}
                           />
                         )}
                       </Stack>
