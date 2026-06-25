@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useDisclosure } from '@mantine/hooks';
 import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu, Divider, Card } from '@mantine/core';
-import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconTypography, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt } from '@tabler/icons-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
@@ -94,6 +94,7 @@ export default function NoteView() {
     if (!isRawMode) {
       if (!editor) return;
       switch(type) {
+        case 'paragraph': editor.chain().focus().setParagraph().run(); break;
         case 'h1': editor.chain().focus().toggleHeading({ level: 1 }).run(); break;
         case 'h2': editor.chain().focus().toggleHeading({ level: 2 }).run(); break;
         case 'h3': editor.chain().focus().toggleHeading({ level: 3 }).run(); break;
@@ -112,6 +113,7 @@ export default function NoteView() {
 
       let inserted = '';
       switch(type) {
+        case 'paragraph': inserted = selected.replace(/^[#\-\*]*\s*/, ''); break;
         case 'h1': inserted = '# ' + selected; break;
         case 'h2': inserted = '## ' + selected; break;
         case 'h3': inserted = '### ' + selected; break;
@@ -527,7 +529,7 @@ export default function NoteView() {
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <Group wrap="nowrap" gap="xs" style={{ overflow: 'hidden', minWidth: 0 }}>
-            <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
+            <ActionIcon variant="subtle" color="gray" onClick={() => isEditing ? setCancelModalOpened(true) : navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
             {note?.subject && (
@@ -593,7 +595,7 @@ export default function NoteView() {
                 </Box>
               </Box>
             ) : (
-              <Box px="md" pb={isEditing ? 150 : 'xl'}>
+              <Box px="md" pb="xl">
                 {isEditing && isRawMode ? (
                   <Textarea
                     ref={textareaRef}
@@ -727,18 +729,25 @@ export default function NoteView() {
                         active
                       />
                     </Tooltip>
-                    <Tooltip label="Cancel Editing" disabled={sidebarOpen} position="left">
-                      <MantineNavLink
-                        label={sidebarOpen ? "Cancel Editing" : ""}
-                        leftSection={<IconX size="1.2rem" stroke={1.5} />}
-                        onClick={() => setCancelModalOpened(true)}
-                        color="red"
-                      />
-                    </Tooltip>
-
-
-                  </>
-                )}
+                  <Tooltip label="Cancel Editing" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Cancel Editing" : ""}
+                      leftSection={<IconX size="1.2rem" stroke={1.5} />}
+                      onClick={() => setCancelModalOpened(true)}
+                      color="red"
+                    />
+                  </Tooltip>
+                  {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Formatting</Text></Box>}
+                  <Tooltip label="Paragraph" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Paragraph" : ""}
+                      leftSection={<IconTypography size="1.2rem" stroke={1.5} />}
+                      onClick={() => handleFormat('paragraph')}
+                      active={!isRawMode && editor?.isActive('paragraph')}
+                    />
+                  </Tooltip>
+                </>
+              )}
               </Stack>
 
               {sidebarOpen && !isEditing && isProcessed && (
@@ -798,12 +807,12 @@ export default function NoteView() {
             </Box>
           </Box>
         )}
-      </Box>
+        </Box>
 
-      {/* Mobile Editing Bottom Toolbar */}
       {isEditing && (
-        <Box hiddenFrom="sm" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', borderTop: '1px solid var(--mantine-color-gray-2)', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px', paddingBottom: 'env(safe-area-inset-bottom, 0px)', boxShadow: '0 -2px 8px rgba(0,0,0,0.06)' }}>
+        <Box hiddenFrom="sm" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 56, zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderTop: '1px solid var(--mantine-color-gray-2)', boxShadow: '0 -2px 8px rgba(0,0,0,0.06)' }}>
           <Group gap={4} justify="center" wrap="nowrap">
+            <ActionIcon variant={!isRawMode && editor?.isActive('paragraph') ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('paragraph') ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('paragraph')}><IconTypography size={18} /></ActionIcon>
             <ActionIcon variant={!isRawMode && editor?.isActive('heading', { level: 1 }) ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('heading', { level: 1 }) ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('h1')}><IconH1 size={18} /></ActionIcon>
             <ActionIcon variant={!isRawMode && editor?.isActive('heading', { level: 2 }) ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('heading', { level: 2 }) ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('h2')}><IconH2 size={18} /></ActionIcon>
             <ActionIcon variant={!isRawMode && editor?.isActive('heading', { level: 3 }) ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('heading', { level: 3 }) ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('h3')}><IconH3 size={18} /></ActionIcon>

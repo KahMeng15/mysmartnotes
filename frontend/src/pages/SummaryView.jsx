@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDisclosure } from '@mantine/hooks';
 import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput, Menu, Code, Drawer } from '@mantine/core';
-import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu, IconDeviceFloppy, IconPencil, IconX, IconH1, IconH2, IconH3, IconCode, IconEye, IconDownload } from '@tabler/icons-react';
+import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu, IconDeviceFloppy, IconPencil, IconX, IconH1, IconH2, IconH3, IconTypography, IconCode, IconEye, IconDownload } from '@tabler/icons-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
@@ -453,6 +453,7 @@ export default function SummaryView() {
     if (!isRawMode) {
       if (!editor) return;
       switch(type) {
+        case 'paragraph': editor.chain().focus().setParagraph().run(); break;
         case 'h1': editor.chain().focus().toggleHeading({ level: 1 }).run(); break;
         case 'h2': editor.chain().focus().toggleHeading({ level: 2 }).run(); break;
         case 'h3': editor.chain().focus().toggleHeading({ level: 3 }).run(); break;
@@ -471,6 +472,7 @@ export default function SummaryView() {
 
       let inserted = '';
       switch(type) {
+        case 'paragraph': inserted = selected.replace(/^[#\-\*]*\s*/, ''); break;
         case 'h1': inserted = '# ' + selected; break;
         case 'h2': inserted = '## ' + selected; break;
         case 'h3': inserted = '### ' + selected; break;
@@ -733,7 +735,7 @@ export default function SummaryView() {
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <Group wrap="nowrap" gap="xs" style={{ overflow: 'hidden', minWidth: 0 }}>
-            <ActionIcon variant="subtle" color="gray" onClick={() => navigate(-1)}>
+            <ActionIcon variant="subtle" color="gray" onClick={() => isEditing ? setCancelModalOpened(true) : navigate(-1)}>
               <IconChevronLeft size={20} />
             </ActionIcon>
             {note?.subject && (
@@ -773,7 +775,7 @@ export default function SummaryView() {
           style={{ flex: 1, backgroundColor: '#fff' }} 
           p={0}
         >
-          <Container size="md" p={0} pt={0} pb={isEditing ? 150 : 'xl'}>
+          <Container size="md" p={0} pt={0} pb="xl">
             {loading ? (
               <Center h="50vh"><Loader size="lg" /></Center>
             ) : error ? (
@@ -982,6 +984,15 @@ export default function SummaryView() {
                       color="red"
                     />
                   </Tooltip>
+                  {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Formatting</Text></Box>}
+                  <Tooltip label="Paragraph" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Paragraph" : ""}
+                      leftSection={<IconTypography size="1.2rem" stroke={1.5} />}
+                      onClick={() => handleFormat('paragraph')}
+                      active={!isRawMode && editor?.isActive('paragraph')}
+                    />
+                  </Tooltip>
                 </>
               )}
 
@@ -997,12 +1008,11 @@ export default function SummaryView() {
             </Tooltip>
           </Box>
         </Box>
-      </Box>
 
-      {/* Mobile Editing Bottom Toolbar */}
       {isEditing && (
-        <Box hiddenFrom="sm" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', borderTop: '1px solid var(--mantine-color-gray-2)', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px', paddingBottom: 'env(safe-area-inset-bottom, 0px)', boxShadow: '0 -2px 8px rgba(0,0,0,0.06)' }}>
+        <Box hiddenFrom="sm" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 56, zIndex: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', borderTop: '1px solid var(--mantine-color-gray-2)', boxShadow: '0 -2px 8px rgba(0,0,0,0.06)' }}>
           <Group gap={4} justify="center" wrap="nowrap">
+            <ActionIcon variant={!isRawMode && editor?.isActive('paragraph') ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('paragraph') ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('paragraph')}><IconTypography size={18} /></ActionIcon>
             <ActionIcon variant={!isRawMode && editor?.isActive('heading', { level: 1 }) ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('heading', { level: 1 }) ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('h1')}><IconH1 size={18} /></ActionIcon>
             <ActionIcon variant={!isRawMode && editor?.isActive('heading', { level: 2 }) ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('heading', { level: 2 }) ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('h2')}><IconH2 size={18} /></ActionIcon>
             <ActionIcon variant={!isRawMode && editor?.isActive('heading', { level: 3 }) ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('heading', { level: 3 }) ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('h3')}><IconH3 size={18} /></ActionIcon>
@@ -1078,6 +1088,7 @@ export default function SummaryView() {
           </ScrollArea>
         </Box>
       </Drawer>
+      </Box>
     </Box>
   );
 }
