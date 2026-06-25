@@ -746,6 +746,61 @@ export default function NoteView() {
                       active={!isRawMode && editor?.isActive('paragraph')}
                     />
                   </Tooltip>
+                  <Tooltip label="Heading 1" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Heading 1" : ""}
+                      leftSection={<IconH1 size="1.2rem" stroke={1.5} />}
+                      onClick={() => handleFormat('h1')}
+                      active={!isRawMode && editor?.isActive('heading', { level: 1 })}
+                    />
+                  </Tooltip>
+                  <Tooltip label="Heading 2" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Heading 2" : ""}
+                      leftSection={<IconH2 size="1.2rem" stroke={1.5} />}
+                      onClick={() => handleFormat('h2')}
+                      active={!isRawMode && editor?.isActive('heading', { level: 2 })}
+                    />
+                  </Tooltip>
+                  <Tooltip label="Heading 3" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Heading 3" : ""}
+                      leftSection={<IconH3 size="1.2rem" stroke={1.5} />}
+                      onClick={() => handleFormat('h3')}
+                      active={!isRawMode && editor?.isActive('heading', { level: 3 })}
+                    />
+                  </Tooltip>
+                  <Tooltip label="Bullet List" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Bullet List" : ""}
+                      leftSection={<IconList size="1.2rem" stroke={1.5} />}
+                      onClick={() => handleFormat('bullet')}
+                      active={!isRawMode && editor?.isActive('bulletList')}
+                    />
+                  </Tooltip>
+                  <Tooltip label="Ordered List" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Ordered List" : ""}
+                      leftSection={<IconListNumbers size="1.2rem" stroke={1.5} />}
+                      onClick={() => handleFormat('ordered')}
+                      active={!isRawMode && editor?.isActive('orderedList')}
+                    />
+                  </Tooltip>
+                  <Tooltip label="Table" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Table" : ""}
+                      leftSection={<IconTable size="1.2rem" stroke={1.5} />}
+                      onClick={() => handleFormat('table')}
+                    />
+                  </Tooltip>
+                  <Tooltip label="Raw Mode" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? (isRawMode ? "Visual Mode" : "Raw Mode") : ""}
+                      leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
+                      onClick={handleToggleRaw}
+                      active={isRawMode}
+                    />
+                  </Tooltip>
                 </>
               )}
               </Stack>
