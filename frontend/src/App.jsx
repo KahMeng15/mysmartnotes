@@ -40,15 +40,18 @@ function GlobalToasts() {
 
   useEffect(() => {
     const handleError = (e) => {
-      const id = Date.now() + Math.random();
       const detail = e.detail || {};
       const message = typeof detail === 'string' ? detail : (detail.message || 'An error occurred');
       const status = detail.status || null;
       const catUrl = detail.catUrl || (status ? `${CAT_BASE}/${status}` : null);
-      setToasts(prev => [...prev, { id, message, status, catUrl }]);
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== id));
-      }, 6000);
+      setToasts(prev => {
+        if (prev.some(t => t.message === message && t.status === status)) return prev;
+        const id = Date.now() + Math.random();
+        setTimeout(() => {
+          setToasts(p => p.filter(t => t.id !== id));
+        }, 6000);
+        return [...prev, { id, message, status, catUrl }];
+      });
     };
     window.addEventListener('apiError', handleError);
     return () => window.removeEventListener('apiError', handleError);
