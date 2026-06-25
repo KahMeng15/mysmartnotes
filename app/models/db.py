@@ -155,7 +155,8 @@ class Note(Base):
     
     id = Column(String(16), primary_key=True)
     version = Column(Integer, nullable=False, default=1)  # v1, v2, etc. per resource
-    resource_id = Column(String(16), ForeignKey("resources.id"), nullable=False, index=True)
+    resource_id = Column(String(16), ForeignKey("resources.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     summary_type = Column(String(50))  # cheatsheet, exercise, summary
     title = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
@@ -173,6 +174,7 @@ class Note(Base):
     is_pinned = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     resource_ids = Column(Text, nullable=True)
+    exercise_ids = Column(Text, nullable=True)
     
     # Relationships
     resource = relationship("Resource", back_populates="notes")

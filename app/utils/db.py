@@ -118,6 +118,7 @@ def init_db():
         apply_postgresql_user_security_migrations()
         apply_content_dissociation_migrations()
         apply_note_resource_ids_migration()
+        apply_note_exercise_ids_migration()
     except Exception as e:
         logger.error(f"Failed to apply PostgreSQL migrations: {e}")
 
@@ -334,6 +335,54 @@ def apply_note_resource_ids_migration():
                 logger.info("resource_ids column already exists in notes table")
     except Exception as e:
         logger.error(f"Failed to add resource_ids column: {e}", exc_info=True)
+
+
+def apply_note_exercise_ids_migration():
+    """Add exercise_ids and user_id columns to notes table, and make resource_id nullable"""
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            # Add exercise_ids column
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'notes' AND column_name = 'exercise_ids'"
+            ))
+            if not result.fetchone():
+                conn.execute(text(
+                    "ALTER TABLE notes ADD COLUMN exercise_ids TEXT"
+                ))
+                logger.info("Added exercise_ids column to notes table")
+            else:
+                logger.info("exercise_ids column already exists in notes table")
+
+            # Add user_id column
+            result = conn.execute(text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'notes' AND column_name = 'user_id'"
+            ))
+            if not result.fetchone():
+                conn.execute(text(
+                    "ALTER TABLE notes ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"
+                ))
+                logger.info("Added user_id column to notes table")
+            else:
+                logger.info("user_id column already exists in notes table")
+
+            # Make resource_id nullable (in case it wasn't)
+            result = conn.execute(text(
+                "SELECT is_nullable FROM information_schema.columns "
+                "WHERE table_name = 'notes' AND column_name = 'resource_id'"
+            ))
+            if result:
+                row = result.fetchone()
+                if row and row[0] == 'NO':
+                    conn.execute(text(
+                        'ALTER TABLE notes ALTER COLUMN resource_id DROP NOT NULL'
+                    ))
+                    logger.info("Made resource_id nullable in notes table")
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to add exercise_ids/user_id columns: {e}", exc_info=True)
 
 
 def drop_all_tables():

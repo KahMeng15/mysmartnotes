@@ -120,6 +120,7 @@ export default function SubjectView() {
   const [activeTab, setActiveTab] = useState(tab || 'resource');
 
   const [selectedResources, setSelectedResources] = useState([]);
+  const [selectedExerciseNotes, setSelectedExerciseNotes] = useState([]);
   const [createNoteModalOpened, setCreateNoteModalOpened] = useState(false);
   
   const [createExerciseModalOpened, setCreateExerciseModalOpened] = useState(false);
@@ -286,11 +287,12 @@ export default function SubjectView() {
   };
 
   const handleCreateNotes = async () => {
-    if (selectedResources.length === 0) return;
+    if (selectedResources.length === 0 && selectedExerciseNotes.length === 0) return;
     setGeneratingCombinedNote(true);
     try {
       let bodyData = {
         resource_ids: selectedResources,
+        exercise_ids: selectedExerciseNotes.length > 0 ? selectedExerciseNotes : undefined,
       };
       
       let finalPromptName = null;
@@ -394,6 +396,7 @@ export default function SubjectView() {
       
       setCreateNoteModalOpened(false);
       setSelectedResources([]);
+      setSelectedExerciseNotes([]);
       setNewNoteTitle('');
     } catch (e) {
       alert("Failed to create notes: " + e.message);
@@ -1786,7 +1789,19 @@ export default function SubjectView() {
               }}
               searchable
               clearable
-              required
+            />
+
+            <MultiSelect
+              label="Select Exercises"
+              description="Choose exercises to include as source content for your note."
+              placeholder="Pick exercises to include"
+              data={exercises
+                .filter(ex => ex.questions && ex.questions.length > 0)
+                .map(ex => ({ value: ex.id, label: ex.title }))}
+              value={selectedExerciseNotes}
+              onChange={setSelectedExerciseNotes}
+              searchable
+              clearable
             />
 
             <TextInput
@@ -1938,7 +1953,7 @@ export default function SubjectView() {
 
             <Group justify="flex-end" mt="md">
               <Button variant="default" onClick={() => setCreateNoteModalOpened(false)}>Cancel</Button>
-              <Button type="submit" loading={generatingCombinedNote} disabled={selectedResources.length === 0 || (parameterType === 'single' && !selectedPromptId)} leftSection={<IconSparkles size={16} />}>Create</Button>
+              <Button type="submit" loading={generatingCombinedNote} disabled={(selectedResources.length === 0 && selectedExerciseNotes.length === 0) || (parameterType === 'single' && !selectedPromptId)} leftSection={<IconSparkles size={16} />}>Create</Button>
             </Group>
           </Stack>
         </form>
@@ -2171,6 +2186,12 @@ export default function SubjectView() {
           <Text size="sm"><b>Created:</b> {infoModalSummary?.created_at}</Text>
           <Text size="sm"><b>Mode:</b> {infoModalSummary?.mode}</Text>
           <Text size="sm"><b>Format:</b> {infoModalSummary?.output_format}</Text>
+          {infoModalSummary?.resource_ids && (() => {
+            try { const ids = JSON.parse(infoModalSummary.resource_ids); return Array.isArray(ids) && ids.length > 0 ? <Text size="sm"><b>Source Resources:</b> {ids.length}</Text> : null; } catch { return null; }
+          })()}
+          {infoModalSummary?.exercise_ids && (() => {
+            try { const ids = JSON.parse(infoModalSummary.exercise_ids); return Array.isArray(ids) && ids.length > 0 ? <Text size="sm"><b>Source Exercises:</b> {ids.length}</Text> : null; } catch { return null; }
+          })()}
           {infoModalSummary?.processing_time_ms && (
             <Text size="sm"><b>Processing Time:</b> {(infoModalSummary.processing_time_ms / 1000).toFixed(2)}s</Text>
           )}

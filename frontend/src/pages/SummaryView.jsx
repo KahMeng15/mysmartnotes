@@ -90,6 +90,7 @@ export default function SummaryView() {
   const [cancelModalOpened, setCancelModalOpened] = useState(false);
   const [saving, setSaving] = useState(false);
   const [coveredResources, setCoveredResources] = useState([]);
+  const [coveredExercises, setCoveredExercises] = useState([]);
 
   const viewportRef = useRef(null);
   const markdownRef = useRef(null);
@@ -164,8 +165,10 @@ export default function SummaryView() {
         setSelectedSummary(summaryData);
         setSummaryContent(summaryData.content);
         
-        const noteData = await fetchApi(`/resources/${summaryData.resource_id}`);
-        setNote(noteData);
+        if (summaryData.resource_id) {
+          const noteData = await fetchApi(`/resources/${summaryData.resource_id}`);
+          setNote(noteData);
+        }
         setLoading(false);
       } catch (err) {
         console.error("Failed to load data", err);
@@ -203,6 +206,31 @@ export default function SummaryView() {
       setCoveredResources(resources);
     };
     loadResources();
+
+    const loadExercises = async () => {
+      if (!selectedSummary.exercise_ids) {
+        setCoveredExercises([]);
+        return;
+      }
+      let exIds = [];
+      try {
+        const parsed = JSON.parse(selectedSummary.exercise_ids);
+        if (Array.isArray(parsed)) exIds = parsed;
+      } catch (e) {}
+      const uniqueIds = [...new Set(exIds)];
+      const exercises = await Promise.all(
+        uniqueIds.map(async (eid) => {
+          try {
+            const data = await fetchApi(`/exercises/${eid}?t=${Date.now()}`);
+            return { id: data.id, title: data.title };
+          } catch (e) {
+            return { id: eid, title: eid };
+          }
+        })
+      );
+      setCoveredExercises(exercises);
+    };
+    loadExercises();
   }, [selectedSummary]);
 
   const handleRename = (summary, e) => {
@@ -744,6 +772,28 @@ export default function SummaryView() {
               </>
             )}
             
+            {infoModalSummary.resource_ids && (() => {
+              try {
+                const ids = JSON.parse(infoModalSummary.resource_ids);
+                return Array.isArray(ids) && ids.length > 0 ? (
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>Source Resources</Text>
+                    <Text size="sm">{ids.length} resource{ids.length !== 1 ? 's' : ''}</Text>
+                  </Group>
+                ) : null;
+              } catch { return null; }
+            })()}
+            {infoModalSummary.exercise_ids && (() => {
+              try {
+                const ids = JSON.parse(infoModalSummary.exercise_ids);
+                return Array.isArray(ids) && ids.length > 0 ? (
+                  <Group justify="space-between">
+                    <Text size="sm" fw={500}>Source Exercises</Text>
+                    <Text size="sm">{ids.length} exercise{ids.length !== 1 ? 's' : ''}</Text>
+                  </Group>
+                ) : null;
+              } catch { return null; }
+            })()}
             <Group justify="space-between">
               <Text size="sm" fw={500}>AI Model</Text>
               <Text size="sm" c="dimmed">{infoModalSummary.model || 'Unknown'}</Text>
@@ -985,6 +1035,24 @@ export default function SummaryView() {
                           <Text size="xs" c="dimmed" fs="italic">No resources linked</Text>
                         )}
                       </Box>
+                      {coveredExercises.length > 0 && (
+                        <Box>
+                          <Text size="xs" fw={600} c="dimmed" mb={4}>Exercises Covered</Text>
+                          <Stack gap={4}>
+                            {coveredExercises.map((ex, idx) => (
+                              <Text
+                                key={idx}
+                                size="xs"
+                                c="blue.6"
+                                style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                                onClick={() => ex.id && navigate(`/exercises/${ex.id}`)}
+                              >
+                                • {ex.title}
+                              </Text>
+                            ))}
+                          </Stack>
+                        </Box>
+                      )}
                     </Stack>
                   </Card>
                 </Box>
@@ -1217,6 +1285,24 @@ export default function SummaryView() {
                       </Stack>
                     ) : (
                       <Text size="xs" c="dimmed" fs="italic">No resources linked</Text>
+                    )}
+                    {coveredExercises.length > 0 && (
+                      <>
+                        <Text size="xs" fw={600} c="dimmed" mb={6} mt="sm">Exercises Covered</Text>
+                        <Stack gap={4}>
+                          {coveredExercises.map((ex, idx) => (
+                            <Text
+                              key={idx}
+                              size="xs"
+                              c="blue.6"
+                              style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                              onClick={() => { closeMobileActions(); navigate(`/exercises/${ex.id}`); }}
+                            >
+                              • {ex.title}
+                            </Text>
+                          ))}
+                        </Stack>
+                      </>
                     )}
                   </Box>
                 </>

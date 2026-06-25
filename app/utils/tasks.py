@@ -255,7 +255,7 @@ class NoteTask:
     @staticmethod
     async def generate(**kwargs) -> dict:
         from app.processing.ai_client import AIClient
-        from app.models.db import User, Resource, Note
+        from app.models.db import User, Resource, Note, Exercise
         from app.utils.storage import StorageManager
         from app.utils.db import generate_random_id
         from sqlalchemy import func
@@ -277,27 +277,71 @@ class NoteTask:
             
             title = kwargs.get("title")
             resource_ids = kwargs.get("resource_ids")
+            exercise_ids = kwargs.get("exercise_ids")
+            
+            content_parts = []
+            
+            # Gather resource content
             if resource_ids:
-                content_parts = []
                 for rid in resource_ids:
                     r = db.query(Resource).filter(Resource.id == rid).first()
                     r_text = StorageManager.get_resource_text(rid) or ""
                     if r_text:
                         content_parts.append(f"--- Document: {r.title} ---\n{r_text}")
-                resource_content = "\n\n".join(content_parts)
+            
+            # Gather exercise content
+            if exercise_ids:
+                for eid in exercise_ids:
+                    ex = db.query(Exercise).filter(Exercise.id == eid).first()
+                    if not ex:
+                        continue
+                    ex_questions = StorageManager.get_exercise_json(eid) or []
+                    if isinstance(ex_questions, list) and len(ex_questions) > 0:
+                        ex_parts = [f"--- Exercise: {ex.title} ---"]
+                        for i, q in enumerate(ex_questions, 1):
+                            q_text = q.get("question_text", "") or ""
+                            a_text = q.get("answer_text", "") or ""
+                            explanation = q.get("explanation", "") or ""
+                            ref_quote = q.get("reference_quote", "") or ""
+                            ref_resource_id = q.get("reference_resource_id") or ""
+                            
+                            ex_parts.append(f"Question {i}: {q_text}")
+                            if a_text:
+                                ex_parts.append(f"Answer: {a_text}")
+                            if explanation:
+                                ex_parts.append(f"Explanation: {explanation}")
+                            if ref_quote:
+                                ex_parts.append(f"Reference Quote: {ref_quote}")
+                            
+                            # Also fetch referenced resource text
+                            if ref_resource_id:
+                                ref_text = StorageManager.get_resource_text(ref_resource_id) or ""
+                                if ref_text:
+                                    ref_title = ref_resource_id
+                                    ref_r = db.query(Resource).filter(Resource.id == ref_resource_id).first()
+                                    if ref_r:
+                                        ref_title = ref_r.title
+                                    ex_parts.append(f"--- Referenced Resource: {ref_title} ---\n{ref_text[:2000]}")
+                        content_parts.append("\n\n".join(ex_parts))
                 
                 if not title:
-                    resources = db.query(Resource).filter(Resource.id.in_(resource_ids)).all()
-                    res_dict = {r.id: r for r in resources}
-                    resources_ordered = [res_dict[rid] for rid in resource_ids if rid in res_dict]
-                    title = "Combined Note: " + ", ".join([r.title for r in resources_ordered[:3]])
-                    if len(resources_ordered) > 3:
+                    exercises = db.query(Exercise).filter(Exercise.id.in_(exercise_ids)).all()
+                    ex_dict = {e.id: e for e in exercises}
+                    exercises_ordered = [ex_dict[eid] for eid in exercise_ids if eid in ex_dict]
+                    title = "Exercise Notes: " + ", ".join([e.title for e in exercises_ordered[:3]])
+                    if len(exercises_ordered) > 3:
                         title += "..."
-            else:
+            
+            # If still no resources or exercises, fall back to single resource
+            if not content_parts and resource_id:
                 resource = db.query(Resource).filter(Resource.id == resource_id).first()
-                resource_content = StorageManager.get_resource_text(resource_id) or ""
-                if not title:
+                r_text = StorageManager.get_resource_text(resource_id) or ""
+                if r_text:
+                    content_parts.append(f"--- Document: {resource.title} ---\n{r_text}")
+                if not title and resource:
                     title = resource.title
+            
+            resource_content = "\n\n".join(content_parts) if content_parts else ""
 
             ai_client = AIClient(user, db=db)
             
@@ -309,7 +353,7 @@ class NoteTask:
                     msg = message
                     if not msg:
                         msg = "Generating note..."
-                        if percent > 20: msg = "Analyzing resource content..."
+                        if percent > 20: msg = "Analyzing content..."
                         if percent > 50: msg = "Drafting sections..."
                         if percent > 80: msg = "Finalizing note..."
                     TaskManager.update_task_progress(task_id, percent, message=msg, intermediate_result=intermediate_result)
@@ -331,29 +375,34 @@ class NoteTask:
             if doc_id:
                 doc = db.query(Note).filter(Note.id == doc_id).first()
             
+            import json
+            e_ids = kwargs.get("exercise_ids")
+            
             if doc:
                 doc.title = title
-                doc.file_path = f"note_{resource_id}_{doc.version}.md"
+                doc.file_path = f"note_{resource_id or 'ex'}_{doc.version}.md"
                 doc.processing_time = processing_time
                 doc.processing_time_ms = int(processing_time * 1000)
                 doc.model = f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize()
+                if e_ids:
+                    doc.exercise_ids = json.dumps(e_ids)
             else:
                 if not doc_id:
                     doc_id = generate_random_id(db, Note)
                 max_version = db.query(func.max(Note.version)).filter(
                     Note.resource_id == resource_id
-                ).scalar() or 0
+                ).scalar() or 0 if resource_id else 0
                 next_version = max_version + 1
-                import json
                 r_ids = kwargs.get("resource_ids")
                 
                 doc = Note(
                     id=doc_id,
                     version=next_version,
                     resource_id=resource_id,
+                    user_id=user_id,
                     title=title,
                     summary_type="summary",
-                    file_path=f"note_{resource_id}_{next_version}.md",
+                    file_path=f"note_{resource_id or 'ex'}_{next_version}.md",
                     mode=mode,
                     output_format=output_format,
                     processing_method=processing_method,
@@ -364,7 +413,8 @@ class NoteTask:
                     processing_time=processing_time,
                     processing_time_ms=int(processing_time * 1000),
                     model=f"{ai_client.provider.capitalize()} ({ai_client.ai_model_name})" if ai_client.ai_model_name else ai_client.provider.capitalize(),
-                    resource_ids=json.dumps(r_ids) if r_ids and len(r_ids) > 1 else None
+                    resource_ids=json.dumps(r_ids) if r_ids and len(r_ids) > 1 else None,
+                    exercise_ids=json.dumps(e_ids) if e_ids else None,
                 )
                 db.add(doc)
             db.commit()

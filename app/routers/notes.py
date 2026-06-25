@@ -9,7 +9,7 @@ import logging
 import random
 import string
 
-from app.models.db import User, Resource, Note
+from app.models.db import User, Resource, Note, Exercise
 from app.utils.auth import get_current_user
 from app.utils.db import get_db, generate_random_id
 from app.utils.tasks import TaskManager
@@ -40,6 +40,7 @@ def format_timestamp(dt: Optional[datetime]) -> str:
 class NoteRequest(BaseModel):
     resource_id: Optional[str] = None
     resource_ids: Optional[List[str]] = None
+    exercise_ids: Optional[List[str]] = None
     mode: str = "elaborate"  # quick, simple, elaborate, eli5
     output_format: str = "sentence"  # sentence, pointform, numbered_list, table
     processing_method: str = "whole"  # whole, section
@@ -72,6 +73,7 @@ class NoteResponse(BaseModel):
     custom_prompt: Optional[str] = None
     prompt_name: Optional[str] = None
     prompt_icon: Optional[str] = None
+    exercise_ids: Optional[List[str]] = None
 
 
 class CheatsheetRequest(BaseModel):
@@ -90,7 +92,7 @@ class CheatsheetResponse(BaseModel):
 class NoteItemResponse(BaseModel):
     id: str
     version: int
-    resource_id: str
+    resource_id: Optional[str] = None
     note_id: Optional[str] = None
     title: str
     summary_type: str
@@ -110,10 +112,7 @@ class NoteItemResponse(BaseModel):
     prompt_name: Optional[str] = None
     prompt_icon: Optional[str] = None
     resource_ids: Optional[str] = None  # JSON string of all resource IDs for merged notes
-
-
-
-
+    exercise_ids: Optional[str] = None  # JSON string of all exercise IDs for exercise-based notes
 @router.post("/summary", response_model=dict)
 async def generate_note_endpoint(
     request: NoteRequest,
@@ -129,29 +128,46 @@ async def generate_note_endpoint(
     r_ids = request.resource_ids if request.resource_ids else []
     if not r_ids and request.resource_id:
         r_ids = [request.resource_id]
+    
+    e_ids = request.exercise_ids if request.exercise_ids else []
         
-    if not r_ids:
+    if not r_ids and not e_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Either resource_id or resource_ids must be provided"
+            detail="At least one resource or exercise must be provided"
         )
+    
+    primary_resource_id = r_ids[0] if r_ids else None
+    
+    # Verify resources belong to user
+    resources = []
+    if r_ids:
+        resources = db.query(Resource).filter(
+            Resource.id.in_(r_ids),
+            Resource.user_id == current_user.id
+        ).all()
         
-    primary_resource_id = r_ids[0]
-    
-    # Verify all notes belong to user
-    resources = db.query(Resource).filter(
-        Resource.id.in_(r_ids),
-        Resource.user_id == current_user.id
-    ).all()
-    
-    if len(resources) != len(r_ids):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="One or more resources not found"
-        )
+        if len(resources) != len(r_ids):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="One or more resources not found"
+            )
 
-    # Check for existing summary (unless forced, and only for single resource to avoid combined note cache clashes)
-    if len(r_ids) == 1 and not request.force_regenerate and not request.custom_prompt:
+    # Verify exercises belong to user
+    if e_ids:
+        exercises = db.query(Exercise).filter(
+            Exercise.id.in_(e_ids),
+            Exercise.user_id == current_user.id
+        ).all()
+        
+        if len(exercises) != len(e_ids):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="One or more exercises not found"
+            )
+
+    # Check for existing summary (only for single resource without exercises, to avoid cache clashes)
+    if len(r_ids) == 1 and not e_ids and not request.force_regenerate and not request.custom_prompt:
         existing_summary = db.query(Note).filter(
             Note.resource_id == primary_resource_id,
             Note.summary_type == "summary",
@@ -184,7 +200,8 @@ async def generate_note_endpoint(
                 "custom_prompt": existing_summary.custom_prompt,
                 "prompt_name": existing_summary.prompt_name,
                 "prompt_icon": existing_summary.prompt_icon,
-                "status": "completed"
+                "status": "completed",
+                "exercise_ids": existing_summary.exercise_ids,
             }
     # If forcing regeneration, we simply bypass the cache check and generate a new one.
 
@@ -192,20 +209,28 @@ async def generate_note_endpoint(
     from app.utils.db import generate_random_id
     from sqlalchemy import func
     doc_id = generate_random_id(db, Note)
-    task_id = f"summary_{current_user.id}_{primary_resource_id}_{int(time.time())}"
+    task_id = f"summary_{current_user.id}_{primary_resource_id or 'ex'}_{int(time.time())}"
     
     note_title = request.title
     if not note_title:
-        if len(r_ids) > 1:
-            note_title = "Combined Note: " + ", ".join([r.title for r in resources[:3]])
-            if len(resources) > 3:
+        if r_ids and e_ids:
+            note_title = "Combined Note (Resources + Exercises)"
+        elif r_ids:
+            if len(r_ids) > 1:
+                note_title = "Combined Note: " + ", ".join([r.title for r in resources[:3]])
+                if len(resources) > 3:
+                    note_title += "..."
+            else:
+                note_title = resources[0].title
+        elif e_ids:
+            ex_titles = [ex.title for ex in exercises]
+            note_title = "Exercise Notes: " + ", ".join(ex_titles[:3])
+            if len(ex_titles) > 3:
                 note_title += "..."
-        else:
-            note_title = resources[0].title
 
     max_version = db.query(func.max(Note.version)).filter(
         Note.resource_id == primary_resource_id
-    ).scalar() or 0
+    ).scalar() or 0 if primary_resource_id else 0
     next_version = max_version + 1
 
     import json
@@ -213,6 +238,7 @@ async def generate_note_endpoint(
         id=doc_id,
         version=next_version,
         resource_id=primary_resource_id,
+        user_id=current_user.id,
         title=note_title,
         summary_type="summary",
         file_path="",
@@ -225,6 +251,7 @@ async def generate_note_endpoint(
         prompt_icon=request.prompt_icon,
         processing_time_ms=0,
         resource_ids=json.dumps(r_ids) if len(r_ids) > 1 else None,
+        exercise_ids=json.dumps(e_ids) if e_ids else None,
     )
     db.add(doc)
     db.commit()
@@ -235,6 +262,7 @@ async def generate_note_endpoint(
         current_user.id, 
         resource_id=primary_resource_id,
         resource_ids=r_ids,
+        exercise_ids=e_ids,
         note_id=doc_id,
         title=note_title,
         mode=request.mode,
@@ -374,15 +402,13 @@ async def update_generated_note(
     db: Session = Depends(get_db)
 ):
     """Update a generated summary (e.g. summary edit)"""
-    doc = db.query(Note).filter(Note.id == note_id).first()
+    doc = db.query(Note).outerjoin(Resource, Note.resource_id == Resource.id).filter(
+        Note.id == note_id,
+        (Resource.user_id == current_user.id) | (Note.user_id == current_user.id)
+    ).first()
     
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-        
-    # Verify ownership through resource
-    note = db.query(Resource).filter(Resource.id == doc.resource_id, Resource.user_id == current_user.id).first()
-    if not note:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this summary")
         
     # Save to storage
     StorageManager.save_note_text(doc.id, request.content)
@@ -403,7 +429,7 @@ async def update_generated_note(
     return NoteItemResponse(
         id=doc.id,
         version=doc.version,
-        resource_id=doc.resource_id,
+        resource_id=doc.resource_id or "",
         note_id=doc.resource_id,
         title=doc.title,
         summary_type=doc.summary_type,
@@ -418,7 +444,8 @@ async def update_generated_note(
         processing_time=doc.processing_time,
         processing_time_ms=doc.processing_time_ms,
         model=doc.model,
-        is_user_edited=doc.is_user_edited
+        is_user_edited=doc.is_user_edited,
+        exercise_ids=doc.exercise_ids
     )
 
 @router.get("", response_model=List[NoteItemResponse])
@@ -430,8 +457,8 @@ async def list_notes(
     db: Session = Depends(get_db)
 ):
     """List all generated summaries for current user"""
-    query = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
-        Resource.user_id == current_user.id
+    query = db.query(Note).outerjoin(Resource, Note.resource_id == Resource.id).filter(
+        (Resource.user_id == current_user.id) | (Note.user_id == current_user.id)
     )
     
     if subject_id:
@@ -460,7 +487,8 @@ async def list_notes(
             is_user_edited=d.is_user_edited or False,
             prompt_name=d.prompt_name,
             prompt_icon=d.prompt_icon,
-            resource_ids=d.resource_ids
+            resource_ids=d.resource_ids,
+            exercise_ids=d.exercise_ids
         )
         for d in summaries
     ]
@@ -475,8 +503,8 @@ async def get_note(
     db: Session = Depends(get_db)
 ):
     """Get a specific generated summary by ID or version (if resource_id provided)"""
-    query = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
-        Resource.user_id == current_user.id
+    query = db.query(Note).outerjoin(Resource, Note.resource_id == Resource.id).filter(
+        (Resource.user_id == current_user.id) | (Note.user_id == current_user.id)
     )
     
     if resource_id and note_id.startswith('v'):
@@ -518,7 +546,8 @@ async def get_note(
         is_user_edited=summary.is_user_edited or False,
         prompt_name=summary.prompt_name,
         prompt_icon=summary.prompt_icon,
-        resource_ids=summary.resource_ids
+        resource_ids=summary.resource_ids,
+        exercise_ids=summary.exercise_ids
     )
 
 
@@ -529,9 +558,9 @@ async def delete_note(
     db: Session = Depends(get_db)
 ):
     """Delete a generated summary"""
-    summary = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
+    summary = db.query(Note).outerjoin(Resource, Note.resource_id == Resource.id).filter(
         Note.id == note_id,
-        Resource.user_id == current_user.id
+        (Resource.user_id == current_user.id) | (Note.user_id == current_user.id)
     ).first()
 
     if not summary:
@@ -560,9 +589,9 @@ async def rename_note(
     db: Session = Depends(get_db)
 ):
     """Rename a generated summary"""
-    summary = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
+    summary = db.query(Note).outerjoin(Resource, Note.resource_id == Resource.id).filter(
         Note.id == note_id,
-        Resource.user_id == current_user.id
+        (Resource.user_id == current_user.id) | (Note.user_id == current_user.id)
     ).first()
 
     if not summary:
@@ -588,9 +617,9 @@ async def toggle_pin_note(
     db: Session = Depends(get_db)
 ):
     """Toggle pin status of a summary"""
-    summary = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
+    summary = db.query(Note).outerjoin(Resource, Note.resource_id == Resource.id).filter(
         Note.id == note_id,
-        Resource.user_id == current_user.id
+        (Resource.user_id == current_user.id) | (Note.user_id == current_user.id)
     ).first()
 
     if not summary:
@@ -623,15 +652,15 @@ async def export_note(
     from app.processing.text_processor import ContentSegment, ContentType
     
     # 1. Verify existence and ownership
-    doc = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
+    doc = db.query(Note).outerjoin(Resource, Note.resource_id == Resource.id).filter(
         Note.id == note_id,
-        Resource.user_id == current_user.id
+        (Resource.user_id == current_user.id) | (Note.user_id == current_user.id)
     ).first()
     
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
         
-    note = db.query(Resource).filter(Resource.id == doc.resource_id).first()
+    note = db.query(Resource).filter(Resource.id == doc.resource_id).first() if doc.resource_id else None
     
     # 2. Extract options
     export_format = body.get("format", "pdf").lower()
@@ -738,9 +767,9 @@ async def download_note_export(
     
     try:
         # Verify export summary exists and user owns the parent note
-        export_doc = db.query(Note).join(Resource, Note.resource_id == Resource.id).filter(
+        export_doc = db.query(Note).outerjoin(Resource, Note.resource_id == Resource.id).filter(
             Note.id == export_id,
-            Resource.user_id == current_user.id
+            (Resource.user_id == current_user.id) | (Note.user_id == current_user.id)
         ).first()
         
         if not export_doc:
