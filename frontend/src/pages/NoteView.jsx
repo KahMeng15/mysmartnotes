@@ -593,7 +593,7 @@ export default function NoteView() {
                 </Box>
               </Box>
             ) : (
-              <Box px="md" pb="xl">
+              <Box px="md" pb={isEditing ? 150 : 'xl'}>
                 {isEditing && isRawMode ? (
                   <Textarea
                     ref={textareaRef}
@@ -736,66 +736,7 @@ export default function NoteView() {
                       />
                     </Tooltip>
 
-                    <Tooltip label={isRawMode ? "Visual Editor" : "Raw Markdown"} disabled={sidebarOpen} position="left">
-                      <MantineNavLink
-                        label={sidebarOpen ? (isRawMode ? "Visual Editor" : "Raw Markdown") : ""}
-                        leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
-                        onClick={handleToggleRaw}
-                      />
-                    </Tooltip>
 
-                    {(editor || isRawMode) && (
-                      <>
-                        {sidebarOpen && <Box mt="md" mb="xs" px="sm"><Text size="xs" fw={600} c="dimmed" tt="uppercase">Formatting</Text></Box>}
-                        <Tooltip label="Heading 1" disabled={sidebarOpen} position="left">
-                          <MantineNavLink
-                            label={sidebarOpen ? "Heading 1" : ""}
-                            leftSection={<IconH1 size="1.2rem" stroke={1.5} />}
-                            onClick={() => handleFormat('h1')}
-                            active={!isRawMode && editor?.isActive('heading', { level: 1 })}
-                          />
-                        </Tooltip>
-                        <Tooltip label="Heading 2" disabled={sidebarOpen} position="left">
-                          <MantineNavLink
-                            label={sidebarOpen ? "Heading 2" : ""}
-                            leftSection={<IconH2 size="1.2rem" stroke={1.5} />}
-                            onClick={() => handleFormat('h2')}
-                            active={!isRawMode && editor?.isActive('heading', { level: 2 })}
-                          />
-                        </Tooltip>
-                        <Tooltip label="Heading 3" disabled={sidebarOpen} position="left">
-                          <MantineNavLink
-                            label={sidebarOpen ? "Heading 3" : ""}
-                            leftSection={<IconH3 size="1.2rem" stroke={1.5} />}
-                            onClick={() => handleFormat('h3')}
-                            active={!isRawMode && editor?.isActive('heading', { level: 3 })}
-                          />
-                        </Tooltip>
-                        <Tooltip label="Bullet List" disabled={sidebarOpen} position="left">
-                          <MantineNavLink
-                            label={sidebarOpen ? "Bullet List" : ""}
-                            leftSection={<IconList size="1.2rem" stroke={1.5} />}
-                            onClick={() => handleFormat('bullet')}
-                            active={!isRawMode && editor?.isActive('bulletList')}
-                          />
-                        </Tooltip>
-                        <Tooltip label="Numbered List" disabled={sidebarOpen} position="left">
-                          <MantineNavLink
-                            label={sidebarOpen ? "Numbered List" : ""}
-                            leftSection={<IconListNumbers size="1.2rem" stroke={1.5} />}
-                            onClick={() => handleFormat('ordered')}
-                            active={!isRawMode && editor?.isActive('orderedList')}
-                          />
-                        </Tooltip>
-                        <Tooltip label="Insert Table" disabled={sidebarOpen} position="left">
-                          <MantineNavLink
-                            label={sidebarOpen ? "Insert Table" : ""}
-                            leftSection={<IconTable size="1.2rem" stroke={1.5} />}
-                            onClick={() => handleFormat('table')}
-                          />
-                        </Tooltip>
-                      </>
-                    )}
                   </>
                 )}
               </Stack>
@@ -858,6 +799,24 @@ export default function NoteView() {
           </Box>
         )}
       </Box>
+
+      {/* Mobile Editing Bottom Toolbar */}
+      {isEditing && (
+        <Box hiddenFrom="sm" style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, backgroundColor: '#fff', borderTop: '1px solid var(--mantine-color-gray-2)', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px', paddingBottom: 'env(safe-area-inset-bottom, 0px)', boxShadow: '0 -2px 8px rgba(0,0,0,0.06)' }}>
+          <Group gap={4} justify="center" wrap="nowrap">
+            <ActionIcon variant={!isRawMode && editor?.isActive('heading', { level: 1 }) ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('heading', { level: 1 }) ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('h1')}><IconH1 size={18} /></ActionIcon>
+            <ActionIcon variant={!isRawMode && editor?.isActive('heading', { level: 2 }) ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('heading', { level: 2 }) ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('h2')}><IconH2 size={18} /></ActionIcon>
+            <ActionIcon variant={!isRawMode && editor?.isActive('heading', { level: 3 }) ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('heading', { level: 3 }) ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('h3')}><IconH3 size={18} /></ActionIcon>
+            <ActionIcon variant={!isRawMode && editor?.isActive('bulletList') ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('bulletList') ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('bullet')}><IconList size={18} /></ActionIcon>
+            <ActionIcon variant={!isRawMode && editor?.isActive('orderedList') ? 'light' : 'subtle'} color={!isRawMode && editor?.isActive('orderedList') ? 'blue' : 'gray'} size="md" onClick={() => handleFormat('ordered')}><IconListNumbers size={18} /></ActionIcon>
+            <ActionIcon variant="subtle" color="gray" size="md" onClick={() => handleFormat('table')}><IconTable size={18} /></ActionIcon>
+            <ActionIcon variant={isRawMode ? 'light' : 'subtle'} color={isRawMode ? 'blue' : 'gray'} size="md" onClick={handleToggleRaw}>{isRawMode ? <IconEye size={18} /> : <IconCode size={18} />}</ActionIcon>
+            <Box w={2} />
+            <ActionIcon variant="filled" color="blue" size="md" onClick={() => setSaveModalOpened(true)}><IconDeviceFloppy size={18} /></ActionIcon>
+            <ActionIcon variant="outline" color="red" size="md" onClick={() => setCancelModalOpened(true)}><IconX size={18} /></ActionIcon>
+          </Group>
+        </Box>
+      )}
 
       {/* Mobile Smart Actions Drawer */}
       <Drawer
@@ -928,11 +887,6 @@ export default function NoteView() {
                     leftSection={<IconX size="1.2rem" stroke={1.5} />}
                     onClick={() => { closeMobileActions(); setCancelModalOpened(true); }}
                     color="red"
-                  />
-                  <MantineNavLink
-                    label={isRawMode ? "Visual Editor" : "Raw Markdown"}
-                    leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
-                    onClick={handleToggleRaw}
                   />
                 </>
               )}
