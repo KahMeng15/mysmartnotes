@@ -1092,36 +1092,40 @@ export default function ChatInterface() {
             
             {/* Action Pills to toggle settings - Hidden when settings open */}
             {!settingsOpened && (
-              <Group justify="space-between" mb="sm" align="center">
-                <Group gap="xs" wrap="wrap" style={{ flex: 1, minWidth: 0 }} hiddenFrom="sm">
-                  <Badge 
-                    component="button" 
-                    onClick={toggleSettings} 
-                    variant="light" color="grape" size="sm" tt="capitalize" fw={600}
-                    leftSection={contextIcons[contextType]}
-                    style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
-                  >
-                    {getContextPillText()}
-                  </Badge>
-                  <Badge 
-                    component="button" 
-                    onClick={toggleSettings} 
-                    variant="light" color="blue" size="sm" tt="capitalize" fw={600}
-                    leftSection={modeIcons[aiMode]}
-                    style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
-                  >
-                    {modeLabels[aiMode]}
-                  </Badge>
-                  <Badge 
-                    component="button" 
-                    onClick={toggleSettings} 
-                    variant="light" color="teal" size="sm" tt="capitalize" fw={600}
-                    leftSection={formatIcons[outputFormat]}
-                    style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
-                  >
-                    {formatLabels[outputFormat]}
-                  </Badge>
-                </Group>
+              <Group justify="space-between" mb="sm" align="flex-start">
+                <Box style={{ flex: 1, minWidth: 0 }} hiddenFrom="sm">
+                  <Stack gap={4}>
+                    <Badge 
+                      component="button" 
+                      onClick={toggleSettings} 
+                      variant="light" color="grape" size="sm" tt="capitalize" fw={600}
+                      leftSection={contextIcons[contextType]}
+                      style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible', alignSelf: 'flex-start' }}
+                    >
+                      {getContextPillText()}
+                    </Badge>
+                    <Group gap="xs">
+                      <Badge 
+                        component="button" 
+                        onClick={toggleSettings} 
+                        variant="light" color="blue" size="sm" tt="capitalize" fw={600}
+                        leftSection={modeIcons[aiMode]}
+                        style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
+                      >
+                        {modeLabels[aiMode]}
+                      </Badge>
+                      <Badge 
+                        component="button" 
+                        onClick={toggleSettings} 
+                        variant="light" color="teal" size="sm" tt="capitalize" fw={600}
+                        leftSection={formatIcons[outputFormat]}
+                        style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
+                      >
+                        {formatLabels[outputFormat]}
+                      </Badge>
+                    </Group>
+                  </Stack>
+                </Box>
                 <Group gap="xs" wrap="wrap" visibleFrom="sm">
                   <Badge 
                     component="button" 
