@@ -668,13 +668,13 @@ export default function SubjectView() {
 
   // Process task updates from shared TaskContext
   const { tasks } = useTaskContext();
-  const prevTasksRef = useRef([]);
+  const knownTaskStatusRef = useRef({});
 
   useEffect(() => {
-    if (tasks === prevTasksRef.current) return;
-    prevTasksRef.current = tasks;
-
     for (const t of tasks) {
+      const prevStatus = knownTaskStatusRef.current[t.task_id];
+      if (prevStatus === t.status) continue;
+      knownTaskStatusRef.current[t.task_id] = t.status;
       const kwargs = t.input_data?.kwargs || {};
       const task_type = t.task_type;
       const status = t.status;

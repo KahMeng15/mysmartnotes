@@ -183,11 +183,13 @@ function AppLayout({ children }) {
       >
         <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
         <Group justify={navOpen ? "space-between" : "center"} mb="xl" style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
-          <Group gap="sm" wrap="nowrap" style={{ display: navOpen ? 'flex' : 'none' }}>
+          <Group gap="sm" wrap="nowrap">
             <img src="/velonote.svg" height={28} alt="velonote" />
-            <Text size="xl" fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
-              velonote
-            </Text>
+            {navOpen && (
+              <Text size="xl" fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
+                velonote
+              </Text>
+            )}
           </Group>
 
         </Group>

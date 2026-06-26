@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
-import { Card, Text, Group, Progress, ActionIcon, ScrollArea, Stack, CloseButton, Portal, Center, RingProgress, Paper } from '@mantine/core';
+import { Card, Text, Group, Progress, ActionIcon, ScrollArea, Stack, CloseButton, Portal, Center, RingProgress, Paper, Loader } from '@mantine/core';
 import { IconX, IconCheck, IconAlertCircle, IconChevronUp, IconChevronDown } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
@@ -37,7 +37,8 @@ export default function TaskQueueModal() {
   const getTaskIcon = (status) => {
     if (status === 'completed') return <IconCheck size={16} color="green" />;
     if (status === 'failed') return <IconAlertCircle size={16} color="red" />;
-    return <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#fcc419' }} />;
+    if (status === 'pending') return <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#fcc419' }} />;
+    return <Loader size={14} color="blue" />;
   };
 
   const activeTasksForProgress = visibleTasks.filter(t => t.status === 'pending' || t.status === 'processing' || t.status === 'running');
