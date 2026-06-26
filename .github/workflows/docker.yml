@@ -126,7 +126,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          dockerfile: app/Dockerfile.nginx
+          file: app/Dockerfile.nginx
           push: true
           tags: ${{ steps.meta-nginx.outputs.tags }}
           labels: ${{ steps.meta-nginx.outputs.labels }}
