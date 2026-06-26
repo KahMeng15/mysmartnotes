@@ -1,5 +1,5 @@
 {
-  "_comment": "Non-sensitive runtime configuration for MySmartNotes. This file is auto-created on first startup with defaults if absent. Environment variables always override values here.",
+  "_comment": "Non-sensitive runtime configuration for velonote. This file is auto-created on first startup with defaults if absent. Environment variables always override values here.",
   "ENVIRONMENT": "production",
   "DEBUG": false,
   "LOG_LEVEL": "INFO",

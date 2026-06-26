@@ -1465,7 +1465,7 @@ async def download_data(
 
     # Use headers to force file download in browser
     headers = {
-        "Content-Disposition": f"attachment; filename=mysmartnotes_export_{current_user.username}.json"
+        "Content-Disposition": f"attachment; filename=velonote_export_{current_user.username}.json"
     }
     return JSONResponse(content=data, headers=headers)
 

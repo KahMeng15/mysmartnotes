@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# MySmartNotes Local Development Script
+# velonote Local Development Script
 # This starts the API, the Worker, and the React Frontend in parallel.
 
 # 1. Ensure logs directory exists

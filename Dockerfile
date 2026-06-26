@@ -25,8 +25,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # --- Stage 2: Runtime ---
 FROM python:3.11-slim-bookworm
 
-LABEL org.opencontainers.image.source="https://github.com/kahmeng15/mysmartnotes"
-LABEL org.opencontainers.image.description="MySmartNotes - AI-Powered Study Companion"
+LABEL org.opencontainers.image.source="https://github.com/kahmeng15/velonote"
+LABEL org.opencontainers.image.description="velonote - AI-Powered Study Companion"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Set environment variables

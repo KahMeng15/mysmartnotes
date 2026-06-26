@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide is for developers who want to contribute to MySmartNotes or run it locally for development purposes. The application has been refactored into a **Multi-Container Architecture** to improve scalability and maintainability.
+This guide is for developers who want to contribute to velonote or run it locally for development purposes. The application has been refactored into a **Multi-Container Architecture** to improve scalability and maintainability.
 
 ---
 
@@ -25,8 +25,8 @@ The easiest way to get started is using the pre-configured development Docker st
 ### 2. Setup
 ```bash
 # Clone the repository
-git clone <repo-url> mysmartnotes
-cd mysmartnotes
+git clone <repo-url> velonote
+cd velonote
 
 # Create a .env file from the example
 cp .env.example .env

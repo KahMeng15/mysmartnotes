@@ -1,7 +1,7 @@
-# MySmartNotes Technical Documentation
+# velonote Technical Documentation
 
 ## 1. Introduction
-MySmartNotes is an AI-powered study companion designed to convert lecture materials (PDF, PPTX, images) into structured, searchable, and interactive study notes. It provides students and small study groups with tools for semantic Q&A, quiz generation, and progress tracking.
+velonote is an AI-powered study companion designed to convert lecture materials (PDF, PPTX, images) into structured, searchable, and interactive study notes. It provides students and small study groups with tools for semantic Q&A, quiz generation, and progress tracking.
 
 The project is built with a focus on **scalability, reliability, and privacy**, using a **multi-container architecture** to separate API concerns from resource-intensive background processing.
 
@@ -9,7 +9,7 @@ The project is built with a focus on **scalability, reliability, and privacy**, 
 
 ## 2. Architecture & Tech Stack
 
-MySmartNotes follows a modular, multi-service architecture designed for reliable performance.
+velonote follows a modular, multi-service architecture designed for reliable performance.
 
 ### 2.1 Services
 - **Frontend (Nginx)**: Serves static assets and acts as a reverse proxy for the API.
@@ -75,7 +75,7 @@ The extraction pipeline is designed to preserve the semantic structure of lectur
 4. **AI Polish**: (Optional) Refines formatting and ensures logical consistency.
 
 ### 4.2 Semantic Search & RAG
-MySmartNotes implements a "Zero-Config RAG" system:
+velonote implements a "Zero-Config RAG" system:
 
 1. **Chunking**: Extracted text is split into ~500-character chunks.
 2. **Embedding**: Chunks are converted into 384-dimensional vectors using `sentence-transformers` on the Worker.

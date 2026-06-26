@@ -24,10 +24,10 @@ jobs:
         run: |
           # Stub .env — matches what operators provide (no secrets here)
           cat > .env << 'EOF'
-          DB_USER=mysmartnotes
+          DB_USER=velonote
           DB_HOST=db
           DB_PORT=5432
-          DB_NAME=mysmartnotes
+          DB_NAME=velonote
           REDIS_URL=redis://redis:6379/0
           HOST=0.0.0.0
           API_PORT=8000
@@ -37,7 +37,7 @@ jobs:
           SMTP_PORT=587
           SMTP_USER=
           SMTP_PASSWORD=
-          SMTP_SENDER_NAME=MySmartNotes
+          SMTP_SENDER_NAME=velonote
           SMTP_TLS=True
           FIREBASE_API_KEY=
           FIREBASE_AUTH_DOMAIN=
@@ -94,7 +94,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/kahmeng15/mysmartnotes
+          images: ghcr.io/kahmeng15/velonote
           tags: |
             # branch=main → :latest
             type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
@@ -134,9 +134,9 @@ jobs:
         id: tag
         run: |
           if [ "${{ github.ref_name }}" = "main" ]; then
-            echo "image=ghcr.io/kahmeng15/mysmartnotes:latest" >> $GITHUB_OUTPUT
+            echo "image=ghcr.io/kahmeng15/velonote:latest" >> $GITHUB_OUTPUT
           else
-            echo "image=ghcr.io/kahmeng15/mysmartnotes:dev" >> $GITHUB_OUTPUT
+            echo "image=ghcr.io/kahmeng15/velonote:dev" >> $GITHUB_OUTPUT
           fi
 
       - name: Log in to GHCR

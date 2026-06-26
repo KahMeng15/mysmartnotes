@@ -1,17 +1,17 @@
 services:
   db:
     image: postgres:15-alpine
-    container_name: mysmartnotes_db
+    container_name: velonote_db
     environment:
-      POSTGRES_USER: ${DB_USER:-mysmartnotes}
+      POSTGRES_USER: ${DB_USER:-velonote}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-mysmartnotes}
+      POSTGRES_DB: ${DB_NAME:-velonote}
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     networks:
-      - mysmartnotes-net
+      - velonote-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 10s
@@ -20,12 +20,12 @@ services:
 
   redis:
     image: redis:alpine
-    container_name: mysmartnotes_redis
+    container_name: velonote_redis
     restart: unless-stopped
     ports:
       - "6379:6379"
     networks:
-      - mysmartnotes-net
+      - velonote-net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -39,8 +39,8 @@ services:
       args:
         - USER_ID=${PUID:-568}
         - GROUP_ID=${PGID:-568}
-    image: ghcr.io/kahmeng15/mysmartnotes:dev
-    container_name: mysmartnotes_api
+    image: ghcr.io/kahmeng15/velonote:dev
+    container_name: velonote_api
     command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${API_PORT:-8000}"]
     depends_on:
       db:
@@ -63,13 +63,13 @@ services:
       - ./config:/app/config
     restart: unless-stopped
     networks:
-      - mysmartnotes-net
+      - velonote-net
 
   worker:
     platform: linux/amd64
     build: .
-    image: ghcr.io/kahmeng15/mysmartnotes:dev
-    container_name: mysmartnotes_worker
+    image: ghcr.io/kahmeng15/velonote:dev
+    container_name: velonote_worker
     command: ["python", "-m", "app.worker_main"]
     depends_on:
       db:
@@ -90,13 +90,13 @@ services:
       - ./config:/app/config
     restart: unless-stopped
     networks:
-      - mysmartnotes-net
+      - velonote-net
 
   nginx:
     build:
       context: ./app
       dockerfile: Dockerfile.nginx
-    container_name: mysmartnotes_frontend
+    container_name: velonote_frontend
     depends_on:
       - api
     ports:
@@ -105,11 +105,11 @@ services:
       - ./logs:/app/logs
     restart: unless-stopped
     networks:
-      - mysmartnotes-net
+      - velonote-net
 
 volumes:
   db_data:
 
 networks:
-  mysmartnotes-net:
+  velonote-net:
     driver: bridge

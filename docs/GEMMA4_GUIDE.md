@@ -1,6 +1,6 @@
 # Gemma 4 Reasoning Models Integration
 
-This document summarizes the findings and provides a guide on how to use the **Gemma 4** reasoning models within MySmartNotes.
+This document summarizes the findings and provides a guide on how to use the **Gemma 4** reasoning models within velonote.
 
 ## 🚀 Overview
 Gemma 4 is a reasoning-centric model series from Google. Unlike standard models, Gemma 4 performs internal "thinking" before producing a final answer. This makes it ideal for complex study materials, difficult problem-solving, and deep logical analysis.
@@ -29,14 +29,14 @@ GLOBAL_AI_TIER1_API_KEY=your_api_key_here
 GLOBAL_AI_TIER1_REASONING_LEVEL=medium
 ```
 
-## 🧠 How Reasoning Works in MySmartNotes
+## 🧠 How Reasoning Works in velonote
 
 ### 1. Reasoning Depth Injection
 The `AIClient` automatically detects when a Gemma 4 model is in use and injects the `REASONING DEPTH` instruction into your prompts. This guides the model's internal "thinking" process.
 
 ### 2. Automatic Filtering
 Gemma 4 outputs its reasoning process using special tokens (e.g., `<|thought|>` or `<|channel|>thought`). 
-**MySmartNotes is equipped with a filtering layer** in `app/processing/ai_client.py` that identifies these tokens and strips them out before the response reaches the UI. 
+**velonote is equipped with a filtering layer** in `app/processing/ai_client.py` that identifies these tokens and strips them out before the response reaches the UI. 
 *   **Result:** You get a clean, polished answer without the internal "messy" thinking process visible.
 
 ### 3. Increased Timeouts

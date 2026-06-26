@@ -1,7 +1,7 @@
-# Product Requirements Document (PRD): MySmartNotes
+# Product Requirements Document (PRD): velonote
 
 ## 1. Product Overview
-**MySmartNotes** is a multi-container, AI-powered study companion web application. Its primary goal is to convert unstructured or semi-structured lecture materials (such as PDFs, PowerPoint presentations, and images) into structured, AI-enhanced study notes. By utilizing a sophisticated data processing pipeline to extract clean markdown, MySmartNotes unlocks advanced learning capabilities including Retrieval-Augmented Generation (RAG)-based chat, automated quiz generation, and personalized progress tracking.
+**velonote** is a multi-container, AI-powered study companion web application. Its primary goal is to convert unstructured or semi-structured lecture materials (such as PDFs, PowerPoint presentations, and images) into structured, AI-enhanced study notes. By utilizing a sophisticated data processing pipeline to extract clean markdown, velonote unlocks advanced learning capabilities including Retrieval-Augmented Generation (RAG)-based chat, automated quiz generation, and personalized progress tracking.
 
 ## 2. Target Audience
 - **Students (High School, University, Graduate):** Needs to process massive amounts of lecture slides and reading materials efficiently.

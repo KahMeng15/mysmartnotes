@@ -6,7 +6,7 @@ set -e
 USER_ID=${USER_ID:-568}
 GROUP_ID=${GROUP_ID:-568}
 
-echo "Starting MySmartNotes Entrypoint..."
+echo "Starting velonote Entrypoint..."
 echo "Container running as UID: $(id -u), GID: $(id -g)"
 
 # Ensure required directories exist on the host-mounted volumes

@@ -15,7 +15,6 @@ import {
   IconChartBar,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
-  IconBook2,
   IconShieldCheck
 } from '@tabler/icons-react';
 import Login from './pages/Login';
@@ -136,9 +135,9 @@ function AppLayout({ children }) {
       <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
         <Group justify={navOpen ? "space-between" : "center"} mb="xl" style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
           <Group gap="sm" wrap="nowrap" style={{ display: navOpen ? 'flex' : 'none' }}>
-            <IconBook2 size={28} color="#171738" />
+            <img src="/velonote.svg" height={28} alt="velonote" />
             <Text size="xl" fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>
-              MySmartNotes
+              velonote
             </Text>
           </Group>
 

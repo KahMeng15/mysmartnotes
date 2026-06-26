@@ -1,29 +1,29 @@
 services:
   db:
     image: postgres:15-alpine
-    container_name: mysmartnotes_db_dev
+    container_name: velonote_db_dev
     environment:
-      POSTGRES_USER: ${DB_USER:-mysmartnotes}
+      POSTGRES_USER: ${DB_USER:-velonote}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-mysmartnotes}
+      POSTGRES_DB: ${DB_NAME:-velonote}
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     networks:
-      - mysmartnotes-net-dev
+      - velonote-net-dev
     ports:
       - "5432:5432" # Expose for local development access
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mysmartnotes}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-velonote}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:alpine
-    container_name: mysmartnotes_redis_dev
+    container_name: velonote_redis_dev
     restart: unless-stopped
     networks:
-      - mysmartnotes-net-dev
+      - velonote-net-dev
     ports:
       - "6379:6379"
     healthcheck:
@@ -34,7 +34,7 @@ services:
 
   api:
     build: .
-    container_name: mysmartnotes_api_dev
+    container_name: velonote_api_dev
     command: python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${API_PORT:-8000} --reload
     depends_on:
       db:
@@ -51,11 +51,11 @@ services:
       - .:/app  # Mount entire workspace for live-reload
     restart: unless-stopped
     networks:
-      - mysmartnotes-net-dev
+      - velonote-net-dev
 
   worker:
     build: .
-    container_name: mysmartnotes_worker_dev
+    container_name: velonote_worker_dev
     command: python -m watchfiles 'python -m app.worker_main' .
     depends_on:
       db:
@@ -72,11 +72,11 @@ services:
       - .:/app  # Mount entire workspace for live-reload
     restart: unless-stopped
     networks:
-      - mysmartnotes-net-dev
+      - velonote-net-dev
 
   nginx:
     image: nginx:alpine
-    container_name: mysmartnotes_frontend_dev
+    container_name: velonote_frontend_dev
     depends_on:
       - api
     ports:
@@ -87,8 +87,8 @@ services:
       - ./logs:/app/logs
     restart: unless-stopped
     networks:
-      - mysmartnotes-net-dev
+      - velonote-net-dev
 
 networks:
-  mysmartnotes-net-dev:
+  velonote-net-dev:
     driver: bridge

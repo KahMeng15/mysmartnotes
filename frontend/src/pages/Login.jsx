@@ -14,7 +14,7 @@ import {
   Alert,
   Divider,
 } from '@mantine/core';
-import { IconBrandGoogle, IconCheck, IconAlertCircle } from '@tabler/icons-react';
+import { IconCheck, IconAlertCircle } from '@tabler/icons-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi, setAuthToken } from '../lib/api';
 
@@ -294,6 +294,15 @@ export default function Login() {
     </Box>
   );
 
+  const GoogleIcon = () => (
+    <svg viewBox="0 0 24 24" width={20} height={20} xmlns="http://www.w3.org/2000/svg">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+    </svg>
+  );
+
   return (
     <Flex h="100vh" bg="#fff" p={0}>
 
@@ -301,7 +310,7 @@ export default function Login() {
       <Box
         visibleFrom="md"
         style={{
-          width: '58%',
+          width: '50%',
           background: 'linear-gradient(160deg, #171738 0%, #593C8F 55%, #8EF9F3 100%)',
           margin: '1.5rem',
           borderRadius: '1rem',
@@ -315,17 +324,17 @@ export default function Login() {
       >
         <Box style={{ maxWidth: '90%', display: 'flex', flexDirection: 'column' }}>
           <Group align="flex-start" wrap="nowrap" gap="sm" mb="lg">
-            <Text ff="Instrument Serif, serif" c="rgba(255, 255, 255, 0.4)" style={{ fontSize: '5rem', lineHeight: 0.8, marginTop: '5px' }}>
+            <Text ff="Instrument Serif, serif" c="rgba(255, 255, 255, 0.4)" style={{ fontSize: '3.5rem', lineHeight: 0.8, marginTop: '3px' }}>
               "
             </Text>
-            <Text ff="Instrument Serif, serif" fs="italic" c="#fff" style={{ fontSize: '4.5rem', lineHeight: 0.9, flex: 1 }}>
+            <Text ff="Instrument Serif, serif" fs="italic" c="#fff" style={{ fontSize: '3rem', lineHeight: 0.9, flex: 1 }}>
               {quote.text}
             </Text>
-            <Text ff="Instrument Serif, serif" c="rgba(255, 255, 255, 0.4)" style={{ fontSize: '5rem', lineHeight: 0.8, alignSelf: 'flex-end', marginBottom: '-15px' }}>
+            <Text ff="Instrument Serif, serif" c="rgba(255, 255, 255, 0.4)" style={{ fontSize: '3.5rem', lineHeight: 0.8, alignSelf: 'flex-end', marginBottom: '-10px' }}>
               "
             </Text>
           </Group>
-          <Text ff="Instrument Sans, sans-serif" c="#fff" fw={500} style={{ fontSize: '2rem', alignSelf: 'flex-end', opacity: 0.9 }}>
+          <Text ff="Instrument Sans, sans-serif" c="#fff" fw={500} style={{ fontSize: '1.5rem', alignSelf: 'flex-end', opacity: 0.9 }}>
             {quote.author}
           </Text>
         </Box>
@@ -344,9 +353,12 @@ export default function Login() {
           }}
         >
           <Box style={{ width: '100%', maxWidth: '420px', margin: '0 auto' }}>
-            <Title order={1} mb={40} fw={800} style={{ fontSize: 'clamp(2rem, 10vw, 3rem)', lineHeight: 1.1, color: '#171738' }}>
-              my<br />smart<br />notes
-            </Title>
+            <Box mb={40}>
+              <img src="/velonote.svg" height={48} alt="velonote" style={{ display: 'block' }} />
+              <Text fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif', fontSize: 'clamp(1.5rem, 6vw, 2.5rem)' }}>
+                velonote
+              </Text>
+            </Box>
 
           {/* Global alerts */}
           {success && (
@@ -396,7 +408,7 @@ export default function Login() {
                 size="md"
                 variant="outline"
                 color="gray"
-                leftSection={<IconBrandGoogle size={20} />}
+                leftSection={<GoogleIcon />}
                 style={{ color: '#171738', borderColor: '#ccc' }}
                 loading={loading}
                 type="button"
@@ -428,7 +440,7 @@ export default function Login() {
                 size="md"
                 variant="outline"
                 color="gray"
-                leftSection={<IconBrandGoogle size={20} />}
+                leftSection={<GoogleIcon />}
                 mb="md"
                 style={{ color: '#171738', borderColor: '#ccc' }}
                 loading={loading}

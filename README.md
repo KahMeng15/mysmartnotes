@@ -1,4 +1,4 @@
-# MySmartNotes – Smart AI-Powered Study Companion
+# velonote – AI-Powered Study Companion
 
 A scalable, AI-powered study companion that intelligently converts lecture slides (PDF/PPTX) into structured study materials. Featuring a **Multi-Container Architecture**, it extracts clean markdown with properly formatted tables, provides RAG-based chat, generates quizzes, and organizes your learning journey. Perfect for personal use or small study groups.
 
@@ -23,7 +23,7 @@ A scalable, AI-powered study companion that intelligently converts lecture slide
 
 ## 🏗️ Architecture
 
-MySmartNotes uses a **Multi-Container Architecture** to ensure reliable background processing and high availability.
+velonote uses a **Multi-Container Architecture** to ensure reliable background processing and high availability.
 
 **Stack:**
 - **Frontend**: React (Vite) + Mantine UI (served via Nginx in production)
@@ -36,13 +36,13 @@ MySmartNotes uses a **Multi-Container Architecture** to ensure reliable backgrou
 
 ## 🚀 Quick Start (Docker Compose)
 
-The recommended way to run MySmartNotes is using Docker Compose.
+The recommended way to run velonote is using Docker Compose.
 
 ### 1. Setup
 ```bash
 # Clone repository
-git clone https://github.com/KahMeng15/mysmartnotes.git mysmartnotes
-cd mysmartnotes
+git clone https://github.com/KahMeng15/velonote.git velonote
+cd velonote
 
 # Copy environment template and configure
 cp .env.example .env
@@ -53,11 +53,11 @@ Configure the following core options in your `.env` file:
 * **Database Configuration**:
   The application automatically constructs the connection string from individual variables. **Do not use a raw `DATABASE_URL` variable**, as the settings validator ignores it in favor of:
   ```env
-  DB_USER=mysmartnotes
-  DB_PASSWORD=mysmartnotespassword
+  DB_USER=velonote
+  DB_PASSWORD=velonotepassword
   DB_HOST=localhost # Use 'db' if running inside Docker Compose
   DB_PORT=5432
-  DB_NAME=mysmartnotes
+  DB_NAME=velonote
   ```
 * **Global 3-Tier AI Fallback**:
   Configure the three tiers of AI models to ensure uninterrupted processing in case of rate limits or provider failures. Gemma-4 reasoning models are supported and configured by default:

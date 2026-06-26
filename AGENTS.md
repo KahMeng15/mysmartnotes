@@ -1,4 +1,4 @@
-# MySmartNotes — Agent Instructions
+# velonote — Agent Instructions
 
 ## Architecture
 

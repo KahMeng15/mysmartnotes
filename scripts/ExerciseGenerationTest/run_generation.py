@@ -15,7 +15,7 @@ db = SessionLocal()
 file_id = f"ex_{secrets.token_hex(4)}"
 original_ex_id = "ex_c6212e8d"
 
-file_path = "/Users/kahmeng/Documents/GitHub/mysmartnotes/app/data/user_2/ex_c6212e8d.pdf"
+file_path = "/Users/kahmeng/Documents/GitHub/velonote/app/data/user_2/ex_c6212e8d.pdf"
 
 exercise = Exercise(
     id=file_id,

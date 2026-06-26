@@ -1,7 +1,7 @@
-# MySmartNotes - AI-Powered Study Companion
+# velonote - AI-Powered Study Companion
 
 ## 📖 Project Overview
-MySmartNotes is a multi-container web application designed to convert lecture materials (PDF, PPTX, images) into structured, AI-enhanced study notes. It utilizes a sophisticated processing pipeline to extract clean markdown, which then enables features like RAG-based chat, quiz generation, and progress tracking.
+velonote is a multi-container web application designed to convert lecture materials (PDF, PPTX, images) into structured, AI-enhanced study notes. It utilizes a sophisticated processing pipeline to extract clean markdown, which then enables features like RAG-based chat, quiz generation, and progress tracking.
 
 ### Architecture & Tech Stack
 - **Backend**: FastAPI (Python 3.11+)

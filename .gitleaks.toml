@@ -1,7 +1,7 @@
 # Gitleaks configuration
 # https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
 
-title = "MySmartNotes Gitleaks Config"
+title = "velonote Gitleaks Config"
 
 [extend]
 # Extend the default ruleset

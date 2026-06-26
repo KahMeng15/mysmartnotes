@@ -197,12 +197,12 @@ def test_email_config(
         )
 
     # Send test email
-    test_subject = "MySmartNotes Email Configuration Test"
+    test_subject = "velonote Email Configuration Test"
     test_body = f"""
     <html>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             <h2 style="color: #3b82f6;">Email Configuration Test</h2>
-            <p>This is a test email from MySmartNotes to verify your SMTP configuration is working correctly.</p>
+            <p>This is a test email from velonote to verify your SMTP configuration is working correctly.</p>
             <div style="background-color: #f0f9ff; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; margin: 20px 0;">
                 <p style="margin: 0;"><strong>✓ Good news!</strong> Your email configuration is working properly.</p>
             </div>
