@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useMediaQuery } from '@mantine/hooks';
 import {
   TextInput,
   PasswordInput,
@@ -303,6 +304,11 @@ export default function Login() {
     </svg>
   );
 
+  const wide = useMediaQuery('(min-width: 1500px)');
+  const qFont = wide ? '4.5rem' : '3rem';
+  const mFont = wide ? '5rem' : '3.5rem';
+  const aFont = wide ? '2rem' : '1.5rem';
+
   return (
     <Flex h="100vh" bg="#fff" p={0}>
 
@@ -324,17 +330,17 @@ export default function Login() {
       >
         <Box style={{ maxWidth: '90%', display: 'flex', flexDirection: 'column' }}>
           <Group align="flex-start" wrap="nowrap" gap="sm" mb="lg">
-            <Text ff="Instrument Serif, serif" c="rgba(255, 255, 255, 0.4)" style={{ fontSize: '3.5rem', lineHeight: 0.8, marginTop: '3px' }}>
+            <Text ff="Instrument Serif, serif" c="rgba(255, 255, 255, 0.4)" style={{ fontSize: mFont, lineHeight: 0.8, marginTop: '3px' }}>
               "
             </Text>
-            <Text ff="Instrument Serif, serif" fs="italic" c="#fff" style={{ fontSize: '3rem', lineHeight: 0.9, flex: 1 }}>
+            <Text ff="Instrument Serif, serif" fs="italic" c="#fff" style={{ fontSize: qFont, lineHeight: 0.9, flex: 1 }}>
               {quote.text}
             </Text>
-            <Text ff="Instrument Serif, serif" c="rgba(255, 255, 255, 0.4)" style={{ fontSize: '3.5rem', lineHeight: 0.8, alignSelf: 'flex-end', marginBottom: '-10px' }}>
+            <Text ff="Instrument Serif, serif" c="rgba(255, 255, 255, 0.4)" style={{ fontSize: mFont, lineHeight: 0.8, alignSelf: 'flex-end', marginBottom: '-10px' }}>
               "
             </Text>
           </Group>
-          <Text ff="Instrument Sans, sans-serif" c="#fff" fw={500} style={{ fontSize: '1.5rem', alignSelf: 'flex-end', opacity: 0.9 }}>
+          <Text ff="Instrument Sans, sans-serif" c="#fff" fw={500} style={{ fontSize: aFont, alignSelf: 'flex-end', opacity: 0.9 }}>
             {quote.author}
           </Text>
         </Box>
