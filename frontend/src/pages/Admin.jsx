@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Container, Title, Tabs, Table, Button, Group, Badge, Modal, Select, TextInput, NumberInput, Switch, Stack, Paper, Text, ScrollArea, Box, Radio, Divider, Textarea, SimpleGrid, Tooltip } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
-import { fetchApi } from '../lib/api';
+import { fetchApi, notifyTaskStarted } from '../lib/api';
 import { IconShieldCheck, IconUsers, IconMail, IconStack2, IconSettings, IconClock, IconServer, IconListDetails, IconDatabase, IconActivity, IconMessages, IconTrash, IconRefresh, IconEye } from '@tabler/icons-react';
 
 const sectionTabsConfig = [
@@ -824,6 +824,7 @@ function AdminUserContent() {
     if (!confirm(`Reprocess this ${section.slice(0, -1)}?`)) return;
     try {
       const res = await fetchApi(`/admin/users/${selectedUserId}/${section}/${id}/reprocess`, { method: 'POST' });
+      notifyTaskStarted();
       alert(`Reprocessing submitted. Task ID: ${res.task_id}`);
     } catch (e) { alert(e.message); }
   };

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal, Tabs, Paper, Text, Stack, TextInput, Select, MultiSelect, NumberInput, Button, Textarea, FileInput, Checkbox, Group } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconBolt, IconFileImport } from '@tabler/icons-react';
-import { fetchApi } from '../lib/api';
+import { fetchApi, notifyTaskStarted } from '../lib/api';
 
 export default function GenerateQuizModal({ opened, onClose, onSuccess, initialQuizGroupId = null }) {
   const [groups, setGroups] = useState([]);
@@ -137,6 +137,7 @@ export default function GenerateQuizModal({ opened, onClose, onSuccess, initialQ
           quiz_group_id: selectedQuizGroup || null
         })
       });
+      notifyTaskStarted();
 
       const pendingQuiz = { 
         id: response.quiz_id || response.task_id, 

@@ -125,6 +125,12 @@ def init_db():
     except Exception as e:
         logger.error(f"Failed to apply PostgreSQL migrations: {e}")
 
+    # Recover tasks stuck in "running" status from a previous server crash
+    try:
+        apply_stuck_tasks_recovery()
+    except Exception as e:
+        logger.error(f"Failed to recover stuck tasks: {e}")
+
     logger.info("Database initialized successfully")
 
 
@@ -492,6 +498,34 @@ def apply_note_exercise_ids_migration():
             conn.commit()
     except Exception as e:
         logger.error(f"Failed to add exercise_ids/user_id columns: {e}", exc_info=True)
+
+
+def apply_stuck_tasks_recovery():
+    """
+    Reset tasks stuck in 'running' status back to 'pending' so they can be
+    picked up by the worker again after a server crash.
+    """
+    from app.models.db import Task
+
+    try:
+        db = SessionLocal()
+        try:
+            stuck = db.query(Task).filter(Task.status == "running").all()
+            if stuck:
+                logger.warning(
+                    f"Found {len(stuck)} task(s) stuck in 'running' status "
+                    f"(likely from a prior crash). Resetting to 'pending'."
+                )
+                for task in stuck:
+                    task.status = "pending"
+                    task.error_message = "Recovered from stuck state (server restart)"
+                db.commit()
+            else:
+                logger.info("No stuck tasks found")
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to recover stuck tasks: {e}", exc_info=True)
 
 
 def drop_all_tables():

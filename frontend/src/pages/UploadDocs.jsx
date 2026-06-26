@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Box, Title, Text, Select, Button, Stack, Group, Progress, SimpleGrid, Card, SegmentedControl } from '@mantine/core';
 import { IconUpload, IconFile, IconX } from '@tabler/icons-react';
 import { Dropzone, PDF_MIME_TYPE, IMAGE_MIME_TYPE, MS_POWERPOINT_MIME_TYPE } from '@mantine/dropzone';
-import { fetchApi } from '../lib/api';
+import { fetchApi, notifyTaskStarted } from '../lib/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function UploadDocs() {
@@ -92,6 +92,7 @@ export default function UploadDocs() {
             method: 'POST',
             body: formData,
           });
+          notifyTaskStarted();
           if (res && res.id) exerciseIds.push(res.id);
           setProgress(Math.round(20 + (80 * (i + 1) / files.length)));
         }
@@ -114,6 +115,7 @@ export default function UploadDocs() {
           method: 'POST',
           body: formData,
         });
+        notifyTaskStarted();
 
         setProgress(100);
         setTimeout(() => {

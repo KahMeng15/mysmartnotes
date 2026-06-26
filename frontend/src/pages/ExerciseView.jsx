@@ -9,6 +9,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
 import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
+import { useTaskContext } from '../lib/TaskContext';
 
 export default function ExerciseView() {
   const { id, mode } = useParams();
@@ -119,10 +120,12 @@ export default function ExerciseView() {
 
   // Processing state
   const [processingStatus, setProcessingStatus] = useState(null);
+  const { tasks } = useTaskContext();
+  const pollRef = useRef(null);
 
+  // Fetch exercise data and check for existing task on mount (one-time, no polling)
   useEffect(() => {
     let active = true;
-    let pollInterval = null;
 
     const fetchExercise = async () => {
       try {
@@ -133,38 +136,47 @@ export default function ExerciseView() {
         setLoading(false);
 
         if (!data.questions || data.questions.length === 0) {
-          // Polling for progress
-          const checkStatus = async () => {
-            try {
-              let taskData = await fetchApi(`/search/tasks/extract_${id}`).catch(() => null);
-              if (!taskData) {
-                taskData = await fetchApi(`/search/tasks/generate_${id}`).catch(() => null);
-              }
-              if (!active) return;
-              if (taskData) {
-                setProcessingStatus({
-                  status: taskData.status,
-                  progress: taskData.progress,
-                  message: taskData.message
-                });
-                if (taskData.status === 'completed') {
-                  if (pollInterval) clearInterval(pollInterval);
-                  const refreshed = await fetchApi(`/exercises/${id}`);
-                  if (!active) return;
-                  setExercise(refreshed);
-                  setEditedQuestions(JSON.parse(JSON.stringify(refreshed.questions || [])));
-                } else if (taskData.status === 'failed' || taskData.status === 'cancelled') {
-                  if (pollInterval) clearInterval(pollInterval);
+          // One-time check for existing task
+          let taskData = await fetchApi(`/search/tasks/extract_${id}`).catch(() => null);
+          if (!taskData) {
+            taskData = await fetchApi(`/search/tasks/generate_${id}`).catch(() => null);
+          }
+          if (!active) return;
+          if (taskData) {
+            setProcessingStatus({
+              status: taskData.status,
+              progress: taskData.progress,
+              message: taskData.message
+            });
+            // Only start polling if task is still active
+            if (taskData.status === 'pending' || taskData.status === 'processing' || taskData.status === 'running') {
+              pollRef.current = setInterval(async () => {
+                let updated = await fetchApi(`/search/tasks/extract_${id}`).catch(() => null);
+                if (!updated) {
+                  updated = await fetchApi(`/search/tasks/generate_${id}`).catch(() => null);
                 }
-              } else {
-                setProcessingStatus({ status: 'failed', message: 'Task not found or failed.' });
-                if (pollInterval) clearInterval(pollInterval);
-              }
-            } catch (e) {}
-          };
-          
-          checkStatus();
-          pollInterval = setInterval(checkStatus, 3000);
+                if (!active) return;
+                if (updated) {
+                  setProcessingStatus({
+                    status: updated.status,
+                    progress: updated.progress,
+                    message: updated.message
+                  });
+                  if (updated.status === 'completed') {
+                    clearInterval(pollRef.current);
+                    pollRef.current = null;
+                    const refreshed = await fetchApi(`/exercises/${id}`);
+                    if (!active) return;
+                    setExercise(refreshed);
+                    setEditedQuestions(JSON.parse(JSON.stringify(refreshed.questions || [])));
+                  } else if (updated.status === 'failed' || updated.status === 'cancelled') {
+                    clearInterval(pollRef.current);
+                    pollRef.current = null;
+                  }
+                }
+              }, 3000);
+            }
+          }
         }
       } catch (err) {
         if (!active) return;
@@ -178,9 +190,38 @@ export default function ExerciseView() {
 
     return () => {
       active = false;
-      if (pollInterval) clearInterval(pollInterval);
+      if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [id]);
+
+  // Watch TaskContext for task updates (catches tasks started after initial load)
+  useEffect(() => {
+    if (!exercise || !id) return;
+    if (exercise.questions && exercise.questions.length > 0) return;
+
+    const exerciseTask = tasks.find(t => {
+      const kwargs = t.input_data?.kwargs || {};
+      return (
+        (t.task_type === 'exercise_extraction' || t.task_type === 'exercise_generation') &&
+        t.task_id === `extract_${id}`
+      );
+    });
+
+    if (!exerciseTask) return;
+
+    setProcessingStatus({
+      status: exerciseTask.status,
+      progress: exerciseTask.progress,
+      message: exerciseTask.message
+    });
+
+    if (exerciseTask.status === 'completed') {
+      fetchApi(`/exercises/${id}`).then(data => {
+        setExercise(data);
+        setEditedQuestions(JSON.parse(JSON.stringify(data.questions || [])));
+      });
+    }
+  }, [tasks, exercise, id]);
 
   useEffect(() => {
     if (examActive && examTimeRemaining !== null) {
@@ -552,9 +593,9 @@ export default function ExerciseView() {
                   ) : (
                     <Card withBorder padding="xl" shadow="sm">
                       <Stack align="center" spacing="md">
-                        <Loader size="lg" color="blue" />
-                        <Title order={3}>Generating Exercise...</Title>
-                        <Text c="dimmed">Please wait while we prepare your exercise.</Text>
+                        <IconBook size={48} color="gray" />
+                        <Title order={3}>No Questions Yet</Title>
+                        <Text c="dimmed">This exercise has no questions. Generate questions from the subject view or upload a resource with questions.</Text>
                       </Stack>
                     </Card>
                   )}

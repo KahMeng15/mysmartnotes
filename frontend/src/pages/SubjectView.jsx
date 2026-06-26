@@ -4,7 +4,7 @@ import { useDisclosure } from '@mantine/hooks';
 import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit, IconX, IconCheck, IconCopy } from '@tabler/icons-react';
 import * as TablerIcons from '@tabler/icons-react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { fetchApi, getAuthToken } from '../lib/api';
+import { fetchApi, getAuthToken, notifyTaskStarted } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 import { formatParams } from '../lib/formatters';
 
@@ -280,6 +280,7 @@ export default function SubjectView() {
           }
         })
       });
+      notifyTaskStarted();
       setCreateExerciseModalOpened(false);
       setExerciseTitle('');
       setExerciseScope([]);
@@ -385,6 +386,7 @@ export default function SubjectView() {
         method: 'POST',
         body: JSON.stringify(bodyData)
       });
+      notifyTaskStarted();
       
       if (res && res.task_id) {
         setPendingSummaryTasks(prev => ({ ...prev, [res.note_id]: res.task_id }));
@@ -882,6 +884,7 @@ export default function SubjectView() {
       const res = await fetchApi(`/resources/${noteIdToReprocess}/reprocess`, {
         method: 'POST'
       });
+      notifyTaskStarted();
       // The API returns the updated note
       setNotes(prevNotes => prevNotes.map(l => l.id === noteIdToReprocess ? res : l));
     } catch (err) {
@@ -983,6 +986,7 @@ export default function SubjectView() {
       await fetchApi(`/exercises/${exId}/reprocess`, {
         method: 'POST'
       });
+      notifyTaskStarted();
     } catch (err) {
       alert("Failed to reprocess exercise: " + err.message);
       setReprocessingExerciseIds(prev => prev.filter(id => id !== exId));
@@ -1346,7 +1350,12 @@ export default function SubjectView() {
                 const isProcessed = ex.questions && ex.questions.length > 0;
                 const hasFailed = failedExerciseIds.includes(ex.id);
                 const isCancelled = cancelledExerciseIds.includes(ex.id);
-                const isProcessing = !isProcessed && !hasFailed && !isCancelled;
+                const hasActiveTask = tasks.some(t =>
+                    (t.task_type === 'exercise_extraction' || t.task_type === 'exercise_generation') &&
+                    (t.task_id === `extract_${ex.id}` || t.task_id === `generate_${ex.id}`) &&
+                    (t.status === 'pending' || t.status === 'processing' || t.status === 'running')
+                );
+                const isProcessing = !isProcessed && !hasFailed && !isCancelled && hasActiveTask;
                 const qTypes = isProcessed ? [...new Set(ex.questions.map(q => q.question_type).filter(Boolean))] : [];
                 const qDifficulties = isProcessed ? [...new Set(ex.questions.map(q => q.difficulty).filter(Boolean))] : [];
                 
@@ -1399,7 +1408,15 @@ export default function SubjectView() {
                           <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalExercise(ex); }}>System Info</Menu.Item>
                           {(isProcessing || reprocessingExerciseIds.includes(ex.id)) ? (
                             <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
-                              const taskId = exerciseTasks[ex.id] || `generate_${ex.id}`; // fallback if polling hasn't hit yet
+                              const cancelTask = tasks.find(t =>
+                                (t.task_type === 'exercise_extraction' || t.task_type === 'exercise_generation') &&
+                                (t.task_id === `extract_${ex.id}` || t.task_id === `generate_${ex.id}`)
+                              );
+                              const taskId = exerciseTasks[ex.id] || cancelTask?.task_id;
+                              if (!taskId) {
+                                alert("No active task found to cancel");
+                                return;
+                              }
                               try {
                                 await fetchApi(`/search/tasks/${taskId}/cancel`, { method: 'POST' });
                                 setCancelledExerciseIds(prev => [...prev, ex.id]);

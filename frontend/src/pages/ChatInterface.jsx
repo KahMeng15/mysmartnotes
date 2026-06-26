@@ -10,7 +10,7 @@ import {
   IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand
 } from '@tabler/icons-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchApi } from '../lib/api';
+import { fetchApi, notifyTaskStarted } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -657,6 +657,7 @@ export default function ChatInterface() {
       if (response.task_id) {
         setCurrentTaskId(response.task_id);
         setTaskStatus({ status: 'pending', progress_message: 'Initializing search...' });
+        notifyTaskStarted();
       } else {
         if (!currentConversationId && response.conversation_id) {
           setCurrentConversationId(response.conversation_id);
