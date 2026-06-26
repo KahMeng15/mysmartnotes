@@ -1511,3 +1511,4 @@ frontend_old/node_modules/tapable/lib/util-browser.js
 frontend_old/node_modules/type-check/lib/check.js
 frontend_old/node_modules/type-check/lib/index.js
 frontend_old/node_modules/type-check/lib/parse-type.js
+docker-test-env/*
