@@ -36,7 +36,7 @@ services:
       retries: 5
 
   api:
-    build: .
+    image: ghcr.io/kahmeng15/velonote:dev
     container_name: velonote_api_dev
     command: python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${API_PORT:-8000} --reload
     depends_on:
@@ -57,7 +57,7 @@ services:
       - velonote-net-dev
 
   worker:
-    build: .
+    image: ghcr.io/kahmeng15/velonote:dev
     container_name: velonote_worker_dev
     command: python -m watchfiles 'python -m app.worker_main' .
     depends_on:
@@ -78,15 +78,13 @@ services:
       - velonote-net-dev
 
   nginx:
-    image: nginx:alpine
+    image: ghcr.io/kahmeng15/velonote-nginx:dev
     container_name: velonote_frontend_dev
     depends_on:
       - api
     ports:
       - "${PUBLIC_PORT:-8000}:80"
     volumes:
-      - ./app/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./app/static:/app/static:ro
       - ./logs:/app/logs
     restart: unless-stopped
     networks:
