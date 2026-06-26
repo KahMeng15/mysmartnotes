@@ -60,6 +60,7 @@ const formatDate = (dateString) => {
 
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
+import { useTaskContext } from '../lib/TaskContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -321,40 +322,26 @@ export default function SummaryView() {
     }
   };
 
+  // Track note generation task via shared TaskContext
+  const { tasks } = useTaskContext();
+
   useEffect(() => {
     if (!selectedSummary) return;
     const isProcessedCheck = (selectedSummary.processing_time_ms != null && selectedSummary.processing_time_ms > 0) || 
                              (selectedSummary.file_path != null && selectedSummary.file_path !== '');
     if (isProcessedCheck) return;
 
-    let interval;
-    const pollTask = async () => {
-      try {
-        const activeTasksData = await fetchApi('/search/tasks/active');
-        if (activeTasksData && activeTasksData.tasks) {
-          const task = activeTasksData.tasks.find(t => t.task_type === 'note_generation' && t.input_data?.kwargs?.note_id === summaryId);
-          if (task) {
-            setTaskStatus(task);
-            if (task.status === 'completed') {
-              const data = await fetchApi(`/notes/${summaryId}`);
-              setSelectedSummary(data);
-              setSummaryContent(data.content || '');
-              clearInterval(interval);
-            } else if (task.status === 'failed') {
-              clearInterval(interval);
-            }
-          }
-        }
-      } catch (e) {
-        console.error("Failed to poll task status", e);
+    const task = tasks.find(t => t.task_type === 'note_generation' && t.input_data?.kwargs?.note_id === summaryId);
+    if (task) {
+      setTaskStatus(task);
+      if (task.status === 'completed') {
+        fetchApi(`/notes/${summaryId}`).then(data => {
+          setSelectedSummary(data);
+          setSummaryContent(data.content || '');
+        });
       }
-    };
-
-    pollTask();
-    interval = setInterval(pollTask, 2000);
-
-    return () => clearInterval(interval);
-  }, [summaryId, selectedSummary?.processing_time_ms, selectedSummary?.file_path]);
+    }
+  }, [tasks, summaryId, selectedSummary]);
 
   const handlePin = async (summary, e) => {
     e.stopPropagation();

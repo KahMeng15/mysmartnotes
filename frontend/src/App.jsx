@@ -30,6 +30,7 @@ import GroupView from './pages/GroupView';
 import AdminPage from './pages/Admin';
 import { fetchApi } from './lib/api';
 import TaskQueueModal from './components/TaskQueueModal';
+import { TaskProvider } from './lib/TaskContext';
 
 const CAT_BASE = "https://http.cat";
 
@@ -319,7 +320,8 @@ function NotFound() {
 function App() {
   return (
     <Router>
-      <AppLayout>
+      <TaskProvider>
+        <AppLayout>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
@@ -340,6 +342,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>
+      </TaskProvider>
     </Router>
   );
 }

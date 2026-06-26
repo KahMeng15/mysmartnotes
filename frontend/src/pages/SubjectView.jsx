@@ -5,7 +5,7 @@ import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile
 import * as TablerIcons from '@tabler/icons-react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi, getAuthToken } from '../lib/api';
-
+import { useTaskContext } from '../lib/TaskContext';
 import { formatParams } from '../lib/formatters';
 
 const MODE_ICONS = {
@@ -618,6 +618,7 @@ export default function SubjectView() {
                   initialNoteProgress[noteId] = t.progress;
                 }
                 setResourceTasks(prev => ({ ...prev, [noteId]: t.task_id }));
+                setNoteTaskStatus(prev => ({ ...prev, [noteId]: t.status }));
               }
             }
           });
@@ -662,107 +663,90 @@ export default function SubjectView() {
   }, [loading, subject, searchParams, id]);
 
   const [noteProgress, setNoteProgress] = useState({});
+  const [noteTaskStatus, setNoteTaskStatus] = useState({});
   const [failedNoteIds, setFailedNoteIds] = useState([]);
 
-  // Poll /search/tasks/active every 5s — single batch call, stops when no pending tasks
+  // Process task updates from shared TaskContext
+  const { tasks } = useTaskContext();
+  const prevTasksRef = useRef([]);
+
   useEffect(() => {
-    let pollTimer;
+    if (tasks === prevTasksRef.current) return;
+    prevTasksRef.current = tasks;
 
-    const poll = async () => {
-      try {
-        const result = await fetchApi('/search/tasks/active');
-        if (!result?.tasks) return;
+    for (const t of tasks) {
+      const kwargs = t.input_data?.kwargs || {};
+      const task_type = t.task_type;
+      const status = t.status;
 
-        for (const t of result.tasks) {
-          const kwargs = t.input_data?.kwargs || {};
-          const task_type = t.task_type;
-          const status = t.status;
-
-          if (task_type === 'resource_processing') {
-            const rid = kwargs.resource_id;
-            if (!rid) continue;
-            if (t.progress !== undefined) {
-              setNoteProgress(prev => ({ ...prev, [rid]: t.progress }));
-            }
-            if (t.task_id) {
-              setResourceTasks(prev => ({ ...prev, [rid]: t.task_id }));
-            }
-            if (status === 'completed') {
-              setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
-              fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
-                if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
-              });
-            } else if (status === 'failed') {
-              setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
-              if (t.error === 'Cancelled by user') {
-                setCancelledNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
-              } else {
-                setFailedNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
-              }
-              fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
-                if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
-              });
-            }
-          }
-
-          if (task_type === 'exercise_extraction' || task_type === 'exercise_generation') {
-            const eid = kwargs.exercise_id;
-            if (!eid) continue;
-            if (t.progress !== undefined) {
-              setExerciseProgress(prev => ({ ...prev, [eid]: t.progress }));
-            }
-            if (t.task_id) {
-              setExerciseTasks(prev => ({ ...prev, [eid]: t.task_id }));
-            }
-            if (status === 'completed') {
-              setCompletedExerciseIds(prev => prev.includes(eid) ? prev : [...prev, eid]);
-              setExerciseProgress(prev => { const n = { ...prev }; delete n[eid]; return n; });
-              if (subjectRef.current?.id) {
-                fetchApi(`/exercises/subject/${subjectRef.current.id}`).then(data => setExercises(data || []));
-              }
-            } else if (status === 'failed' || status === 'cancelled') {
-              setFailedExerciseIds(prev => prev.includes(eid) ? prev : [...prev, eid]);
-            }
-          }
-
-          if (task_type === 'note_generation') {
-            const nid = kwargs.note_id;
-            if (!nid) continue;
-            if (t.progress !== undefined) {
-              setGeneratedNoteProgress(prev => ({ ...prev, [nid]: t.progress }));
-            }
-            if (status === 'completed') {
-              fetchApi(`/notes/${nid}?t=${Date.now()}`).then(refreshed => {
-                if (refreshed) setGeneratedNotes(prev => prev.map(item => item.id === nid ? refreshed : item));
-              });
-              setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
-              setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
-            } else if (status === 'failed') {
-              setFailedGeneratedNoteIds(prev => prev.includes(nid) ? prev : [...prev, nid]);
-              setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
-              setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
-            }
-          }
+      if (task_type === 'resource_processing') {
+        const rid = kwargs.resource_id;
+        if (!rid) continue;
+        if (t.progress !== undefined) {
+          setNoteProgress(prev => ({ ...prev, [rid]: t.progress }));
         }
-
-        // Stop polling once no tasks are pending/processing/running
-        const hasPending = result.tasks.some(t =>
-          ['pending', 'processing', 'running'].includes(t.status)
-        );
-        if (!hasPending && pollTimer) {
-          clearInterval(pollTimer);
-          pollTimer = null;
+        if (t.task_id) {
+          setResourceTasks(prev => ({ ...prev, [rid]: t.task_id }));
         }
-      } catch {}
-    };
+        setNoteTaskStatus(prev => ({ ...prev, [rid]: status }));
+        if (status === 'completed') {
+          setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
+          fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
+            if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
+          });
+        } else if (status === 'failed') {
+          setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
+          if (t.error === 'Cancelled by user') {
+            setCancelledNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
+          } else {
+            setFailedNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
+          }
+          fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
+            if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
+          });
+        }
+      }
 
-    poll();
-    pollTimer = setInterval(poll, 5000);
+      if (task_type === 'exercise_extraction' || task_type === 'exercise_generation') {
+        const eid = kwargs.exercise_id;
+        if (!eid) continue;
+        if (t.progress !== undefined) {
+          setExerciseProgress(prev => ({ ...prev, [eid]: t.progress }));
+        }
+        if (t.task_id) {
+          setExerciseTasks(prev => ({ ...prev, [eid]: t.task_id }));
+        }
+        if (status === 'completed') {
+          setCompletedExerciseIds(prev => prev.includes(eid) ? prev : [...prev, eid]);
+          setExerciseProgress(prev => { const n = { ...prev }; delete n[eid]; return n; });
+          if (subjectRef.current?.id) {
+            fetchApi(`/exercises/subject/${subjectRef.current.id}`).then(data => setExercises(data || []));
+          }
+        } else if (status === 'failed' || status === 'cancelled') {
+          setFailedExerciseIds(prev => prev.includes(eid) ? prev : [...prev, eid]);
+        }
+      }
 
-    return () => {
-      if (pollTimer) clearInterval(pollTimer);
-    };
-  }, []);
+      if (task_type === 'note_generation') {
+        const nid = kwargs.note_id;
+        if (!nid) continue;
+        if (t.progress !== undefined) {
+          setGeneratedNoteProgress(prev => ({ ...prev, [nid]: t.progress }));
+        }
+        if (status === 'completed') {
+          fetchApi(`/notes/${nid}?t=${Date.now()}`).then(refreshed => {
+            if (refreshed) setGeneratedNotes(prev => prev.map(item => item.id === nid ? refreshed : item));
+          });
+          setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
+          setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
+        } else if (status === 'failed') {
+          setFailedGeneratedNoteIds(prev => prev.includes(nid) ? prev : [...prev, nid]);
+          setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
+          setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
+        }
+      }
+    }
+  }, [tasks]);
 
   const handleEditSubjectClick = () => {
     setEditSubjectName(subject.name);
@@ -1252,7 +1236,7 @@ export default function SubjectView() {
                         <Group gap="xs" mt={4}>
                           {(isReprocessing || !isProcessed || isCancelled) && (
                             <Badge color={(hasFailed || isCancelled) ? "red" : "orange"} variant="light" size="sm">
-                              {isCancelled ? 'Cancelled' : hasFailed ? 'Failed' : isReprocessing ? 'Reprocessing...' : 'Processing...'}
+                              {isCancelled ? 'Cancelled' : hasFailed ? 'Failed' : isReprocessing && noteTaskStatus[note.id] === 'pending' ? 'In queue' : isReprocessing ? 'Reprocessing...' : 'Processing...'}
                             </Badge>
                           )}
                           <Text size="xs" c="dimmed">
