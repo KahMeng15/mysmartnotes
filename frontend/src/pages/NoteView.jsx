@@ -562,11 +562,6 @@ export default function NoteView() {
             </ActionIcon>
           )}
         </Group>
-        {note?.title && (
-          <Text fw={700} size="xl" lineClamp={1} mt={2} px={4}>
-            {note.title}
-          </Text>
-        )}
       </Box>
 
       {/* Main Area with Sidebar */}

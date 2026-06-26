@@ -64,3 +64,11 @@ Startup blocks if: `SECRET_KEY < 32 chars`, `DATABASE_URL` not PostgreSQL, or CO
 - **Pipeline singleton:** `app/routers/processing.py → _pipeline` (module-level, reused across requests)
 - **Startup bootstrap:** Admin user from `ADMIN_EMAIL` env var, `SystemSettings` row, export template seeding — all in `main.py` lifespan
 - **Migrations:** Add to `app/utils/db.py` as new `apply_*_migration()` functions called from `init_db()` — never hand-write SQL migration scripts
+
+## Session Log
+
+### 2026-06-26 — Fix infinite API refetch loop in ExerciseView TaskContext watcher
+
+**Problem:** When reprocessing an exercise, `ExerciseView.jsx` spammed `GET /exercises/{id}` in an infinite loop. The TaskContext watcher had `[tasks, exercise, id]` as deps — every poll cycle (3s) where a **completed** task matched the exercise, it called `fetchApi()` → `setExercise(data)` (new object ref) → `exercise` changed → effect re-ran → refetch → infinite loop.
+
+**Fix:** Added `prevExerciseTaskStatus` ref (`ExerciseView.jsx:124`) to track the last known task status. The refetch on completion now only fires on transition from an active status (pending/processing/running) → `completed`, not when the task is already `completed`. At `ExerciseView.jsx:172`.

@@ -1285,11 +1285,11 @@ export default function SubjectView() {
                             </ActionIcon>
                           </Menu.Target>
                           <Menu.Dropdown>
-                            <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRename(note)}>Rename</Menu.Item>
-                            <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocess(note)}>Reprocess</Menu.Item>
+                            <Menu.Item leftSection={<IconPencil size={14} />} onClick={(e) => { e.stopPropagation(); openRename(note); }}>Rename</Menu.Item>
+                            <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); openReprocess(note); }}>Reprocess</Menu.Item>
                             <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalNote(note); }}>System Info</Menu.Item>
                             {(isReprocessing || (!isProcessed && !hasFailed && !isCancelled)) ? (
-                              <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
+                              <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={(e) => { e.stopPropagation(); (async () => {
                                 const taskId = resourceTasks[note.id];
                                 if (!taskId) {
                                   alert("Task ID not found, please wait a moment and try again.");
@@ -1302,9 +1302,9 @@ export default function SubjectView() {
                                 } catch(e) {
                                   alert("Failed to cancel: " + e.message);
                                 }
-                              }}>Cancel Processing</Menu.Item>
+                              })(); }}>Cancel Processing</Menu.Item>
                             ) : (
-                              <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDelete(note)}>Delete</Menu.Item>
+                              <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); openDelete(note); }}>Delete</Menu.Item>
                             )}
                           </Menu.Dropdown>
                         </Menu>
