@@ -294,6 +294,7 @@ async def csrf_protection_middleware(request: Request, call_next):
         "/auth/google-login",
         "/auth/google-complete",
         "/auth/register",
+        "/auth/resend-verification",
         "/auth/password-reset-request",
         "/auth/password-reset",
         "/auth/logout",

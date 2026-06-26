@@ -31,7 +31,12 @@ export default function LegalDoc() {
       })
       .then(data => {
         let html = data.content || '';
+        html = html.replace(/<link[^>]*>/g, '');
         html = html.replace(/<button class="close-button".*?<\/button>/, '');
+        html = html.replace(/<\/?html[^>]*>/g, '');
+        html = html.replace(/<\/?head[^>]*>/g, '');
+        html = html.replace(/<\/?body[^>]*>/g, '');
+        html = html.replace(/<!DOCTYPE[^>]*>/i, '');
         setContent(html);
       })
       .catch(e => setError(e.message))

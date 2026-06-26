@@ -56,6 +56,7 @@ export default function Login() {
   // Login state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [resending, setResending] = useState(false);
 
   // Register state
   const [regNickname, setRegNickname] = useState('');
@@ -123,6 +124,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -139,10 +141,32 @@ export default function Login() {
     }
   };
 
+  const isVerificationError = error && error.toLowerCase().includes('not verified');
+
+  const handleResendVerification = async (emailAddr) => {
+    setResending(true);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailAddr }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed to resend');
+      setError(null);
+      setSuccess('Verification email sent! Check your inbox (and spam folder).');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setResending(false);
+    }
+  };
+
   // ── GOOGLE SIGN-IN ─────────────────────────────────────────────────────────
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const auth = await getFirebaseAuth();
       const provider = new GoogleAuthProvider();
@@ -185,6 +209,7 @@ export default function Login() {
     }
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const res = await fetch('/api/auth/google-complete', {
         method: 'POST',
@@ -217,6 +242,7 @@ export default function Login() {
     }
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -238,8 +264,8 @@ export default function Login() {
           : data.detail || 'Registration failed';
         throw new Error(msg);
       }
-      setSuccess('Account created! Please check your email to verify your address before logging in.');
-      switchPanel('login');
+      setError(null);
+      setPanel('registration-done');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -252,6 +278,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const res = await fetch('/api/auth/password-reset-request', {
         method: 'POST',
@@ -260,8 +287,9 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Request failed');
-      setSuccess('If that email is registered, a reset link has been sent.');
-      switchPanel('login');
+      setSuccess('If that email is registered, a reset link has been sent. Check your spam folder if you don\'t see it.');
+      setError(null);
+      setPanel('login');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -372,7 +400,7 @@ export default function Login() {
               {success}
             </Alert>
           )}
-          {error && (
+          {error && !isVerificationError && (
             <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" withCloseButton onClose={() => setError(null)}>
               {error}
             </Alert>
@@ -381,6 +409,18 @@ export default function Login() {
           {/* ── LOGIN ── */}
           {panel === 'login' && (
             <form onSubmit={handleLogin}>
+              {isVerificationError && (
+                <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" withCloseButton onClose={() => setError(null)}>
+                  {resending ? (
+                    <>Sending verification email…</>
+                  ) : (
+                    <>Your email has not been verified yet. Please check your inbox (and spam folder) or{' '}
+                      <Anchor component="button" type="button" c="red" onClick={() => handleResendVerification(email)}>
+                        resend the verification email
+                      </Anchor>.</>
+                  )}
+                </Alert>
+              )}
               <Stack gap="md">
                 <TextInput
                   id="login-email"
@@ -514,6 +554,32 @@ export default function Login() {
                 </Anchor>
               </Group>
             </form>
+          )}
+
+          {/* ── REGISTRATION DONE ── */}
+          {panel === 'registration-done' && (
+            <Box py={40}>
+              <Title order={2} mb="md" c="#171738">Account created!</Title>
+              <Text size="md" c="dimmed" mb="xs">
+                We've sent a verification email to <strong>{regEmail}</strong>.
+              </Text>
+              <Text size="md" c="dimmed" mb="xl">
+                Please check your inbox (and spam folder) and click the link to verify your account before logging in.
+              </Text>
+              <Button fullWidth size="md" style={{ backgroundColor: '#171738' }} onClick={() => switchPanel('login')}>
+                Continue to Login
+              </Button>
+              <Text size="sm" c="dimmed" mt="md">
+                Didn't receive the email?{' '}
+                {resending ? (
+                  'Sending…'
+                ) : (
+                  <Anchor component="button" type="button" size="sm" onClick={() => handleResendVerification(regEmail)}>
+                    Resend verification email
+                  </Anchor>
+                )}
+              </Text>
+            </Box>
           )}
 
           {/* ── GOOGLE COMPLETE PROFILE ── */}

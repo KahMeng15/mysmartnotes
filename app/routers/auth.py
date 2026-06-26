@@ -414,7 +414,9 @@ def register(
         verify_link = f"{domain.rstrip('/')}/login?verify_token={verification_token.token}"
 
         # Send verification email
-        send_verification_email(db, user.email, verify_link)
+        email_sent = send_verification_email(db, user.email, verify_link)
+        if not email_sent:
+            logger.warning(f"Failed to send verification email to {user.email}")
 
     if invitation:
         invitation.is_used = True
@@ -1357,7 +1359,7 @@ async def request_password_change(
     db.commit()
 
     return {
-        "message": "Confirmation code sent to your email. Please check your email and enter the code in the next 1 hour.",
+        "message": "Confirmation code sent to your email. Please check your email (and spam folder) and enter the code in the next 1 hour.",
         "email_masked": f"{current_user.email[:2]}***@{current_user.email.split('@')[1]}",
     }
 
@@ -1777,7 +1779,10 @@ def resend_verification(
     verify_link = f"{domain.rstrip('/')}/login?verify_token={verification_token.token}"
 
     # Send email
-    send_verification_email(db, user.email, verify_link)
+    email_sent = send_verification_email(db, user.email, verify_link)
+    if not email_sent:
+        logger.warning(f"Failed to resend verification email to {user.email}")
+        return {"message": "Warning: Unable to send verification email. Please check server email configuration and try again later."}
 
     # Log action
     ip_address = request.client.host if request.client else None
@@ -1792,7 +1797,7 @@ def resend_verification(
     )
     db.commit()
 
-    return {"message": "A new verification link has been sent to your email."}
+    return {"message": "A new verification link has been sent to your email. Check your spam folder if you don't see it."}
 
 
 # --- Google Account Linking ---
