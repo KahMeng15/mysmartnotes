@@ -260,9 +260,9 @@ async def get_task_status(task_id: str, current_user: User = Depends(get_current
 
 
 @router.get("/task")
-async def get_task_status(
-    resource_id: str = None,
-    exercise_id: str = None,
+async def get_resource_or_exercise_task_status(
+    resource_id: str | None = None,
+    exercise_id: str | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
