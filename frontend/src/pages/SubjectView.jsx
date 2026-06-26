@@ -1488,9 +1488,9 @@ export default function SubjectView() {
                               {isCancelled ? 'Cancelled' : hasFailed ? 'Failed' : isReprocessing ? 'Regenerating...' : 'Generating...'}
                             </Badge>
                           )}
-                          <Text size="xs" c="dimmed">
-                             Generated on {formatNoteDate(gn.created_at)}
-                          </Text>
+                           <Text size="xs" c="dimmed">
+                              {formatNoteDate(gn.created_at)}
+                           </Text>
                         </Group>
                       </Box>
                        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
