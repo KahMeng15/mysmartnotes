@@ -72,3 +72,27 @@ Startup blocks if: `SECRET_KEY < 32 chars`, `DATABASE_URL` not PostgreSQL, or CO
 **Problem:** When reprocessing an exercise, `ExerciseView.jsx` spammed `GET /exercises/{id}` in an infinite loop. The TaskContext watcher had `[tasks, exercise, id]` as deps — every poll cycle (3s) where a **completed** task matched the exercise, it called `fetchApi()` → `setExercise(data)` (new object ref) → `exercise` changed → effect re-ran → refetch → infinite loop.
 
 **Fix:** Added `prevExerciseTaskStatus` ref (`ExerciseView.jsx:124`) to track the last known task status. The refetch on completion now only fires on transition from an active status (pending/processing/running) → `completed`, not when the task is already `completed`. At `ExerciseView.jsx:172`.
+
+### 2026-06-26 — Fix event propagation in SubjectView resource 3-dot menu
+
+**Problem:** In the Resource tab of `SubjectView.jsx`, clicking menu items (Reprocess, Rename, Cancel Processing, Delete) in the `Menu.Dropdown` triggered the note card's `onClick` handler, navigating to the resource instead of opening the confirmation modal. The `Menu.Item` handlers were missing `e.stopPropagation()`.
+
+**Fix:** Added `e.stopPropagation()` to all four `Menu.Item` click handlers in the note card's dropdown menu (`SubjectView.jsx:1288-1308`).
+
+### 2026-06-26 — Remove filename from NoteView sticky header
+
+**Problem:** `NoteView.jsx` displayed `note.title` (the filename) as a large bold text below the breadcrumb row in the sticky header, making it redundant and visually noisy.
+
+**Fix:** Removed the title rendering block from the sticky header (`NoteView.jsx:565-569`).
+
+### 2026-06-26 — Align ExerciseView processing screen with NoteView
+
+**Problem:** The ExerciseView processing screen used a `Card` with `Loader` and different styling, unlike NoteView's centered `IconRobot` + progress layout.
+
+**Fix:** Replaced ExerciseView's `taskActive` and `taskFailed` blocks (`ExerciseView.jsx:536-561`) to match NoteView's exact layout: `Box mt={100} ta="center"`, `IconRobot` (active) / `IconAlertCircle` (failed), same title/text/progress styling. Added `IconRobot`/`IconAlertCircle` to imports.
+
+### 2026-06-26 — Hide sidebar during processing in ExerciseView
+
+**Problem:** The right sidebar (exercise info, smart actions, export) was visible during processing, cluttering the view.
+
+**Fix:** Wrapped the sidebar `Box` in `{!taskActive && (...)}` (`ExerciseView.jsx:931-1111`) to hide it while a task is active.

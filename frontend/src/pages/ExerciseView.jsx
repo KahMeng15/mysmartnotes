@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 
@@ -525,6 +525,7 @@ export default function ExerciseView() {
           >
           <Container size="md" p={0} pt={0} pb="xl">
             <Box px="md">
+              {!taskActive && (
               <div className="summary-header" style={{ marginBottom: '1.5rem', marginTop: '1.5rem' }}>
                 <Group justify="space-between">
                   <Title order={1} style={{ marginTop: 0, marginBottom: 0, paddingTop: '2rem', color: '#171738', fontWeight: 700 }}>
@@ -532,32 +533,29 @@ export default function ExerciseView() {
                   </Title>
                 </Group>
               </div>
+              )}
 
               {taskActive && (
-                <Box mb="xl">
-                  <Card withBorder padding="xl" shadow="sm">
-                    <Stack align="center" spacing="md">
-                      <Loader size="lg" color="blue" />
-                      <Title order={3}>Generating Exercise...</Title>
-                      <Text c="dimmed">{processingStatus.message || "Please wait while we process your exercise."}</Text>
-                      <Box w="100%" mt="md">
-                        <Progress value={processingStatus.progress || 10} animated size="xl" radius="xl" />
-                        <Text ta="center" mt="xs" size="sm" c="dimmed">{processingStatus.progress || 10}%</Text>
-                      </Box>
-                    </Stack>
-                  </Card>
+                <Box mt={100} ta="center">
+                  <IconRobot size={64} color="var(--mantine-color-blue-6)" stroke={1.5} style={{ opacity: 0.8 }} />
+                  <Title order={2} mt="xl" mb="sm" fw={800} c="#171738">Generating Exercise...</Title>
+                  <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                    Our AI is generating questions based on your resources. This usually takes a few seconds.
+                  </Text>
+                  <Box maw={400} mx="auto">
+                    <Progress value={processingStatus.progress || 10} animated striped color="blue" size="xl" radius="xl" />
+                    <Text size="sm" c="dimmed" mt="xs" ta="right">{processingStatus.progress || 10}%</Text>
+                  </Box>
                 </Box>
               )}
 
               {taskFailed && (
-                <Box mb="xl">
-                  <Card withBorder padding="xl" shadow="sm">
-                    <Stack align="center" spacing="md">
-                      <IconX size={48} color="red" />
-                      <Title order={3} c="red">Processing {processingStatus.status}</Title>
-                      <Text>{processingStatus.message || "An error occurred during generation."}</Text>
-                    </Stack>
-                  </Card>
+                <Box mt={100} ta="center">
+                  <IconAlertCircle size={64} color="var(--mantine-color-red-6)" stroke={1.5} />
+                  <Title order={2} mt="xl" mb="sm" fw={800} c="red">Processing Failed</Title>
+                  <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
+                    {processingStatus.message || 'An unexpected error occurred while generating this exercise.'}
+                  </Text>
                 </Box>
               )}
 
@@ -932,6 +930,7 @@ export default function ExerciseView() {
       </Box>
 
         {/* Right Sidebar */}
+        {!taskActive && (
         <Box w={sidebarOpen ? 280 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
           <Box style={{ flex: 1, overflowY: 'auto' }}>
             <Stack gap={0} align="stretch">
@@ -1111,6 +1110,7 @@ export default function ExerciseView() {
             </Tooltip>
           </Box>
         </Box>
+        )}
       </Box>
 
       <Modal
