@@ -122,6 +122,7 @@ def init_db():
         apply_content_dissociation_migrations()
         apply_note_resource_ids_migration()
         apply_note_exercise_ids_migration()
+        apply_backup_settings_migration()
     except Exception as e:
         logger.error(f"Failed to apply PostgreSQL migrations: {e}")
 
@@ -533,3 +534,32 @@ def drop_all_tables():
     logger.warning("Dropping all database tables...")
     Base.metadata.drop_all(bind=engine)
     logger.warning("All tables dropped")
+
+
+def apply_backup_settings_migration():
+    """Add backup settings columns to system_settings table"""
+    from sqlalchemy import text
+
+    try:
+        with engine.connect() as conn:
+            for col in ("backup_enabled", "backup_retention_days"):
+                result = conn.execute(
+                    text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_name = 'system_settings' AND column_name = :col"
+                    ),
+                    {"col": col},
+                )
+                if not result.fetchone():
+                    if col == "backup_enabled":
+                        conn.execute(
+                            text("ALTER TABLE system_settings ADD COLUMN backup_enabled BOOLEAN DEFAULT TRUE")
+                        )
+                    else:
+                        conn.execute(
+                            text("ALTER TABLE system_settings ADD COLUMN backup_retention_days INTEGER DEFAULT 7")
+                        )
+                    logger.info(f"Added {col} column to system_settings table")
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to apply backup settings migration: {e}", exc_info=True)

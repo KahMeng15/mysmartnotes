@@ -307,6 +307,14 @@ function AdminSystemSettings() {
           <Switch label="Maintenance Mode" checked={s.maintenance_mode || false} onChange={(e) => setS({...s, maintenance_mode: e.currentTarget.checked})} />
           <Select label="Signup Config" value={s.signup_config || 'open'} onChange={(v) => setS({...s, signup_config: v})} data={['open', 'approval', 'invite']} />
           <TextInput label="Domain URL" value={s.domain_url || ''} onChange={(e) => setS({...s, domain_url: e.currentTarget.value})} />
+        </Stack>
+      </Paper>
+
+      <Paper p="md" withBorder>
+        <Stack>
+          <Title order={4}>Database Backups</Title>
+          <Switch label="Enable automatic backups" checked={s.backup_enabled !== false} onChange={(e) => setS({...s, backup_enabled: e.currentTarget.checked})} />
+          <NumberInput label="Retention (days)" value={s.backup_retention_days || 7} min={1} max={365} onChange={(v) => setS({...s, backup_retention_days: v})} />
           <Button onClick={save} fullWidth={isMobile}>Save Settings</Button>
         </Stack>
       </Paper>

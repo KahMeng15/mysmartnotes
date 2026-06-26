@@ -18,6 +18,38 @@ services:
       timeout: 5s
       retries: 5
 
+  db-backup:
+    image: postgres:15-alpine
+    container_name: velonote_db_backup
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          export PGPASSWORD="$$DB_PASSWORD"
+          RETENTION=$$(psql -Atc "SELECT backup_retention_days FROM system_settings LIMIT 1" 2>/dev/null || echo 7)
+          RETENTION=$${RETENTION:-7}
+          TS=$$(date +%Y%m%d_%H%M%S)
+          pg_dump > "/backups/backup_$$TS.sql" 2>/dev/null
+          find /backups -name "backup_*.sql" -mtime "+$$RETENTION" -delete 2>/dev/null
+          sleep 86400
+        done
+    env_file:
+      - .env
+      - secrets.env
+    environment:
+      - PGHOST=db
+      - PGUSER=${DB_USER:-velonote}
+      - PGDATABASE=${DB_NAME:-velonote}
+    volumes:
+      - ./backups/postgres:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - velonote-net
+
   redis:
     image: redis:alpine
     container_name: velonote_redis

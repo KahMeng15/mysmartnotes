@@ -92,21 +92,28 @@ docker-compose up -d
 - **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Redis Cache**: In-memory cache for sessions, tokens, and database requests.
 - **Logs**: View via `docker-compose logs -f` or in the `./logs` directory.
+- **Backups**: Automatic daily PostgreSQL backups to `./backups/postgres/` (see below).
 
-### PostgreSQL Permission Fix (Linux / TrueNAS)
+### Database Backups
 
-PostgreSQL runs as UID 999 inside the container. On some Linux hosts (especially **TrueNAS** with ZFS), bind-mounted directories have permission issues. The compose file uses a **Docker named volume** (`pgdata`) instead of a bind mount to avoid this.
+A `db-backup` sidecar container runs automatically and:
 
-If you previously ran with a bind mount and have a `./data/postgres` directory, remove it before starting:
+- **Daily**: Runs `pg_dump` once every 24 hours
+- **Retention**: Keeps backups for 7 days by default (configurable via Admin Panel → System Settings → `backup_retention_days`)
+- **Storage**: Writes to `./backups/postgres/` on the host — inspectable and restorable
 
+**Restore from a backup:**
 ```bash
-# Remove old bind-mount data (back it up first if needed!)
-sudo rm -rf ./data/postgres
-
-# Start fresh
 docker compose down
+docker run --rm -v velonote_pgdata:/var/lib/postgresql/data -v $(pwd)/backups/postgres:/backups alpine sh -c "rm -rf /var/lib/postgresql/data/* && pg_restore -d postgres /backups/backup_20260626_120000.sql"
 docker compose up -d
 ```
+
+**Disable backups** from the Admin Panel, or set `backup_enabled` to `false`.
+
+### PostgreSQL Note
+
+The database uses a **Docker named volume** (`pgdata`) to avoid filesystem permission issues on Linux/TrueNAS. The data is not directly visible on the host, but backups are written to `./backups/postgres/` for easy access.
 
 ---
 

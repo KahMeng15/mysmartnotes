@@ -20,6 +20,8 @@ class SystemSettingsSchema(BaseModel):
     session_reset_on_activity: bool = True
     max_exercise_questions: int = 500
     unnecessary_logins_enabled: bool = False
+    backup_enabled: bool = True
+    backup_retention_days: int = 7
 
     class Config:
         from_attributes = True

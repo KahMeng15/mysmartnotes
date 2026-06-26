@@ -74,6 +74,8 @@ def _prepare_system_settings_response(settings: SystemSettings) -> dict:
         "session_reset_on_activity": settings.session_reset_on_activity,
         "max_exercise_questions": settings.max_exercise_questions,
         "unnecessary_logins_enabled": settings.unnecessary_logins_enabled,
+        "backup_enabled": settings.backup_enabled,
+        "backup_retention_days": settings.backup_retention_days,
     }
 
 

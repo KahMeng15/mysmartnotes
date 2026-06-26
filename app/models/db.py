@@ -433,6 +433,10 @@ class SystemSettings(Base):
     max_exercise_questions = Column(Integer, default=500)
     unnecessary_logins_enabled = Column(Boolean, default=False)
 
+    # Backup Settings
+    backup_enabled = Column(Boolean, default=True)
+    backup_retention_days = Column(Integer, default=7)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
