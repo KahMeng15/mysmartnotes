@@ -28,6 +28,7 @@ import NoteView from './pages/NoteView';
 import Settings from './pages/Settings';
 import GroupView from './pages/GroupView';
 import AdminPage from './pages/Admin';
+import LegalDoc from './pages/LegalDoc';
 import { fetchApi } from './lib/api';
 import TaskQueueModal from './components/TaskQueueModal';
 import { TaskProvider } from './lib/TaskContext';
@@ -322,29 +323,34 @@ function NotFound() {
 function App() {
   return (
     <Router>
-      <TaskProvider>
-        <AppLayout>
-        <Routes>
-          <Route path="/" element={<RootRedirect />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/mynotes" element={<NotesManager />} />
-          <Route path="/upload" element={<UploadDocs />} />
-          <Route path="/chat" element={<ChatInterface />} />
-          <Route path="/chat/:cvid" element={<ChatInterface />} />
-          <Route path="/exercises/:id" element={<ExerciseView />} />
-          <Route path="/exercises/:id/:mode" element={<ExerciseView />} />
-          <Route path="/group/:id" element={<GroupView />} />
-          <Route path="/subject/:id" element={<SubjectView />} />
-          <Route path="/subject/:id/:tab" element={<SubjectView />} />
-          <Route path="/resource/:id" element={<NoteView />} />
-          <Route path="/note/:summaryId" element={<SummaryView />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </AppLayout>
-      </TaskProvider>
+      <Routes>
+        <Route path="/docs/:doc" element={<LegalDoc />} />
+        <Route path="/*" element={
+          <TaskProvider>
+            <AppLayout>
+              <Routes>
+                <Route path="/" element={<RootRedirect />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/mynotes" element={<NotesManager />} />
+                <Route path="/upload" element={<UploadDocs />} />
+                <Route path="/chat" element={<ChatInterface />} />
+                <Route path="/chat/:cvid" element={<ChatInterface />} />
+                <Route path="/exercises/:id" element={<ExerciseView />} />
+                <Route path="/exercises/:id/:mode" element={<ExerciseView />} />
+                <Route path="/group/:id" element={<GroupView />} />
+                <Route path="/subject/:id" element={<SubjectView />} />
+                <Route path="/subject/:id/:tab" element={<SubjectView />} />
+                <Route path="/resource/:id" element={<NoteView />} />
+                <Route path="/note/:summaryId" element={<SummaryView />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/admin" element={<AdminPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AppLayout>
+          </TaskProvider>
+        } />
+      </Routes>
     </Router>
   );
 }

@@ -277,19 +277,19 @@ export default function Login() {
           id={`${prefix}agree-tos`}
           checked={agreeTos}
           onChange={(e) => setAgreeTos(e.currentTarget.checked)}
-          label={<Anchor href="#" size="sm">Terms of Service</Anchor>}
+          label={<Anchor href="/docs/termsofservice" target="_blank" size="sm">Terms of Service</Anchor>}
         />
         <Checkbox
           id={`${prefix}agree-privacy`}
           checked={agreePrivacy}
           onChange={(e) => setAgreePrivacy(e.currentTarget.checked)}
-          label={<Anchor href="#" size="sm">Privacy Policy</Anchor>}
+          label={<Anchor href="/docs/privacypolicy" target="_blank" size="sm">Privacy Policy</Anchor>}
         />
         <Checkbox
           id={`${prefix}agree-fair-use`}
           checked={agreeFairUse}
           onChange={(e) => setAgreeFairUse(e.currentTarget.checked)}
-          label={<Anchor href="#" size="sm">Fair Use Policy</Anchor>}
+          label={<Anchor href="/docs/fairuse" target="_blank" size="sm">Fair Use Policy</Anchor>}
         />
       </Stack>
     </Box>
