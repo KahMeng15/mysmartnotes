@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Box, Title, Text, Group, Card, Button, Badge, ActionIcon, Menu, Center, Loader, Stack, Modal, TextInput, Textarea, ColorInput, Select, Code, Anchor, Tabs, Checkbox, Progress, ScrollArea, Divider, MultiSelect, SegmentedControl, NumberInput, Collapse, Switch, Paper } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit, IconX, IconCheck } from '@tabler/icons-react';
+import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile, IconChevronLeft, IconSearch, IconArrowsSort, IconInfoCircle, IconRefresh, IconClipboardList, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconFileText, IconList, IconListNumbers, IconTable, IconLayersLinked, IconCpu, IconBinaryTree, IconPlus, IconUser, IconUserEdit, IconX, IconCheck, IconCopy } from '@tabler/icons-react';
 import * as TablerIcons from '@tabler/icons-react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi, getAuthToken } from '../lib/api';
@@ -247,16 +247,19 @@ export default function SubjectView() {
 
   const handleCreateExercise = async () => {
     if (exerciseScope.length === 0) {
-      alert("Please select at least one resource.");
+      alert("Please select at least one resource or exercise.");
       return;
     }
     setGeneratingExercise(true);
     try {
+      const resource_ids = exerciseScope.filter(id => !id.startsWith('ex_'));
+      const exercise_ids = exerciseScope.filter(id => id.startsWith('ex_'));
       await fetchApi('/exercises/generate', {
         method: 'POST',
         body: JSON.stringify({
           subject_id: subject.id,
-          resource_ids: exerciseScope,
+          resource_ids,
+          exercise_ids,
           title: exerciseTitle,
           question_types: exerciseQuestionTypes,
           lengths: exerciseLengths,
@@ -903,6 +906,31 @@ export default function SubjectView() {
     openReprocessExerciseModal();
   };
 
+  const openCreateSimilarExercise = (ex) => {
+    setExerciseScope([ex.id]);
+    if (ex.parameters) {
+      setExerciseQuestionTypes(ex.parameters.question_types || ["Short answer", "Long answer", "Objective", "Fill in the blank"]);
+      setExerciseLengths(ex.parameters.lengths || ["Short", "Medium", "Long"]);
+      setExerciseDifficulties(ex.parameters.difficulties || ["Easy", "Medium", "Hard"]);
+      setExerciseNumQuestions(ex.parameters.num_questions || ex.questions?.length || 10);
+    } else if (ex.questions && ex.questions.length > 0) {
+      const qTypes = [...new Set(ex.questions.map(q => q.question_type).filter(Boolean))];
+      const qDiffs = [...new Set(ex.questions.map(q => q.difficulty).filter(Boolean))];
+      setExerciseQuestionTypes(qTypes.length > 0 ? qTypes.map(t => t.charAt(0).toUpperCase() + t.replace(/_/g, ' ').slice(1)) : ["Short answer", "Long answer", "Objective", "Fill in the blank"]);
+      setExerciseLengths(["Short", "Medium", "Long"]);
+      setExerciseDifficulties(qDiffs.length > 0 ? qDiffs : ["Easy", "Medium", "Hard"]);
+      setExerciseNumQuestions(ex.questions.length);
+    } else {
+      setExerciseQuestionTypes(["Short answer", "Long answer", "Objective", "Fill in the blank"]);
+      setExerciseLengths(["Short", "Medium", "Long"]);
+      setExerciseDifficulties(["Easy", "Medium", "Hard"]);
+      setExerciseNumQuestions(10);
+    }
+    setExerciseTitle(`Similar ${ex.title}`);
+    setExerciseAdvanced(false);
+    setCreateExerciseModalOpened(true);
+  };
+
   const handleRenameExercise = async () => {
     if (!newExerciseTitle.trim() || !editingExercise) return;
     setSubmitting(true);
@@ -1366,6 +1394,7 @@ export default function SubjectView() {
                         </Menu.Target>
                         <Menu.Dropdown>
                           <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRenameExercise(ex)}>Rename</Menu.Item>
+                          <Menu.Item leftSection={<IconCopy size={14} />} onClick={(e) => { e.stopPropagation(); openCreateSimilarExercise(ex); }}>Create Similar</Menu.Item>
                           <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocessExercise(ex)}>Reprocess</Menu.Item>
                           <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalExercise(ex); }}>System Info</Menu.Item>
                           {(isProcessing || reprocessingExerciseIds.includes(ex.id)) ? (
@@ -1569,7 +1598,7 @@ export default function SubjectView() {
       <Modal opened={createExerciseModalOpened} onClose={() => setCreateExerciseModalOpened(false)} title="Create Exercise" centered size="lg">
         <form onSubmit={(e) => { e.preventDefault(); handleCreateExercise(); }}>
           <Stack gap="md">
-            <Text size="sm">Select resources and configure parameters to generate an exercise using AI.</Text>
+            <Text size="sm">Select resources or existing exercises and configure parameters to generate an exercise using AI.</Text>
             
             <TextInput
               label="Exercise Title (Optional)"
@@ -1579,24 +1608,30 @@ export default function SubjectView() {
             />
             
             <MultiSelect
-              label="Scope (Select Resources)"
-              description="Choose which resources to base the exercise on."
-              placeholder="Pick files"
+              label="Scope (Select Resources or Exercises)"
+              description="Choose resources and/or existing exercises to base the new exercise on."
+              placeholder="Pick files or exercises"
               data={[
                 { value: 'all', label: 'All Resources (Select/Deselect All)' },
-                ...sortedProcessableNotes.map(n => ({ value: n.id, label: n.title }))
+                ...sortedProcessableNotes.map(n => ({ value: n.id, label: n.title })),
+                { value: '---', label: '────────── Exercises ──────────', disabled: true },
+                ...exercises.filter(ex => ex.questions && ex.questions.length > 0).map(ex => ({ value: ex.id, label: ex.title })),
               ]}
               value={exerciseScope}
               onChange={(values) => {
-                if (values.includes('all')) {
+                const filtered = values.filter(v => v !== 'all' && v !== '---');
+                const allSelected = values.includes('all');
+                const exerciseIds = exerciseScope.filter(id => id.startsWith('ex_'));
+                if (allSelected) {
                   const processableIds = sortedProcessableNotes.map(n => n.id);
-                  if (exerciseScope.length === processableIds.length) {
-                    setExerciseScope([]);
+                  const allResourcesSelected = processableIds.every(id => exerciseScope.includes(id));
+                  if (allResourcesSelected) {
+                    setExerciseScope(exerciseIds);
                   } else {
-                    setExerciseScope(processableIds);
+                    setExerciseScope([...processableIds, ...exerciseIds]);
                   }
                 } else {
-                  setExerciseScope(values);
+                  setExerciseScope(filtered);
                 }
               }}
               searchable

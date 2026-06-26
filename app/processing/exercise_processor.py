@@ -574,6 +574,7 @@ def generate_exercise_task(
         start_time = time.time()
 
         resource_ids = req_data.get("resource_ids", [])
+        exercise_ids = req_data.get("exercise_ids", [])
         resources_text = ""
         title_to_id = {}
         for r_id in resource_ids:
@@ -583,6 +584,20 @@ def generate_exercise_task(
                 if r_text:
                     title_to_id[r.title.strip()] = r.id
                     resources_text += f"\n--- {r.title} ---\n{r_text}\n"
+
+        for ex_id in exercise_ids:
+            ex = db.query(Exercise).filter(Exercise.id == ex_id, Exercise.user_id == user_id).first()
+            if ex:
+                questions = StorageManager.get_exercise_json(ex.id)
+                if questions:
+                    ex_text = ""
+                    for q in questions:
+                        q_text = q.get("question_text", "")
+                        a_text = q.get("answer_text", "")
+                        ex_text += f"Q: {q_text}\nA: {a_text}\n\n"
+                    resources_text += f"\n--- Existing Exercise: {ex.title} ---\n{ex_text}\n"
+
+        has_exercise_content = len(exercise_ids) > 0
 
         if not resources_text.strip():
             raise ValueError("No content found in the selected resources.")
@@ -668,6 +683,11 @@ Target lengths: {lengths_str}.
 Target difficulties: {diff_str}.
 If "mixed" is specified, provide a relatively even mix of 'objective' (multiple choice), 'subjective' (short answer), and 'fill_in_the_blank'.
 """
+            if has_exercise_content:
+                prompt += """
+IMPORTANT: The content above includes existing exercise questions and answers. You MUST generate DIFFERENT questions on the same topics — do NOT simply rephrase the existing questions. Create new questions that test understanding of the same core concepts but from different angles, using different wording, different examples, and different specific details. The result should be a fresh set of questions that cover similar material but are clearly distinct from the provided ones.
+"""
+
             if all_questions_data:
                 previous_questions = "\n".join(
                     [
@@ -747,7 +767,18 @@ Respond with ONLY the JSON array.
 
         progress_callback(80, "Mapping references to your resources...")
 
+        lookup_resource_ids = resource_ids[:]
         resource_id_to_title = {v: k for k, v in title_to_id.items()}
+
+        if not lookup_resource_ids:
+            subject_resources = (
+                db.query(Resource.id, Resource.title)
+                .filter(Resource.subject_id == exercise.subject_id, Resource.user_id == user_id)
+                .all()
+            )
+            lookup_resource_ids = [r.id for r in subject_resources]
+            for r_id, r_title in subject_resources:
+                resource_id_to_title[r_id] = r_title
 
         order = 0
         for q in all_questions_data:
@@ -757,7 +788,7 @@ Respond with ONLY the JSON array.
 
             try:
                 chunks = retrieve_relevant_chunks(
-                    q.get("question_text", ""), resource_ids, db, top_k=1
+                    q.get("question_text", ""), lookup_resource_ids, db, top_k=1
                 )
                 if chunks:
                     q["reference_resource_id"] = chunks[0]["resource_id"]
