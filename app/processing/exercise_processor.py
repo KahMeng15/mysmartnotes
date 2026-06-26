@@ -586,7 +586,9 @@ def generate_exercise_task(
                     resources_text += f"\n--- {r.title} ---\n{r_text}\n"
 
         for ex_id in exercise_ids:
-            ex = db.query(Exercise).filter(Exercise.id == ex_id, Exercise.user_id == user_id).first()
+            ex = (
+                db.query(Exercise).filter(Exercise.id == ex_id, Exercise.user_id == user_id).first()
+            )
             if ex:
                 questions = StorageManager.get_exercise_json(ex.id)
                 if questions:
