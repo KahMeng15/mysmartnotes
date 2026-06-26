@@ -88,7 +88,7 @@ services:
       - velonote-net
 
   nginx:
-    image: ghcr.io/kahmeng15/velonote-nginx:latest
+    image: ghcr.io/kahmeng15/velonote:nginx-latest
     container_name: velonote_frontend
     depends_on:
       - api

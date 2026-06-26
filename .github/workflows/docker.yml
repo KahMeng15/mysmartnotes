@@ -116,11 +116,11 @@ jobs:
         id: meta-nginx
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/kahmeng15/velonote-nginx
+          images: ghcr.io/kahmeng15/velonote
           tags: |
-            type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
-            type=raw,value=dev,enable=${{ github.ref_name == 'dev' }}
-            type=sha,prefix=,format=short
+            type=raw,value=nginx-latest,enable=${{ github.ref_name == 'main' }}
+            type=raw,value=nginx-dev,enable=${{ github.ref_name == 'dev' }}
+            type=sha,prefix=nginx-,format=short
 
       - name: Build and push nginx
         uses: docker/build-push-action@v6

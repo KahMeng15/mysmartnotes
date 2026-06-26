@@ -78,7 +78,7 @@ services:
       - velonote-net-dev
 
   nginx:
-    image: ghcr.io/kahmeng15/velonote-nginx:dev
+    image: ghcr.io/kahmeng15/velonote:nginx-dev
     container_name: velonote_frontend_dev
     depends_on:
       - api
