@@ -1367,9 +1367,9 @@ export default function SubjectView() {
                         {ex.title}
                       </Text>
                       <Group gap="xs" mt={4}>
-                        {(isProcessing || hasFailed) && (
+                        {(isProcessing || hasFailed || reprocessingExerciseIds.includes(ex.id)) && (
                           <Badge color={hasFailed ? "red" : "orange"} variant="light" size="sm">
-                            {hasFailed ? 'Failed' : 'Processing...'}
+                            {hasFailed ? 'Failed' : reprocessingExerciseIds.includes(ex.id) ? 'Reprocessing...' : 'Processing...'}
                           </Badge>
                         )}
                         <Text size="xs" c="dimmed">
@@ -1433,7 +1433,7 @@ export default function SubjectView() {
                     </Group>
                   </Group>
                   {/* Progress bar for exercise processing */}
-                  {(reprocessingExerciseIds.includes(ex.id) || (typeof exerciseProgress[ex.id] === 'number' && !completedExerciseIds.includes(ex.id))) && !(ex.questions && ex.questions.length > 0) && (
+                  {(reprocessingExerciseIds.includes(ex.id) || (typeof exerciseProgress[ex.id] === 'number' && !completedExerciseIds.includes(ex.id))) && (
                     <Progress
                       value={exerciseProgress[ex.id] || undefined}
                       animated={true}

@@ -260,15 +260,31 @@ async def get_task_status(task_id: str, current_user: User = Depends(get_current
 
 
 @router.get("/task")
-async def get_resource_task_status(
-    resource_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+async def get_task_status(
+    resource_id: str = None,
+    exercise_id: str = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Get status of OCR task for a resource"""
+    """Get status of a background processing task for a resource or exercise.
+    Never 404s — returns a sensible default status instead."""
     import logging
 
     logger = logging.getLogger(__name__)
 
-    # Verify resource belongs to user
+    if resource_id:
+        return _get_resource_task_status(resource_id, current_user, db, logger)
+    elif exercise_id:
+        return _get_exercise_task_status(exercise_id, current_user, db, logger)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide either resource_id or exercise_id",
+        )
+
+
+def _get_resource_task_status(resource_id: str, current_user, db, logger):
+    """Get status of OCR task for a resource (extracted for reuse)"""
     resource = (
         db.query(Resource)
         .filter(Resource.id == resource_id, Resource.user_id == current_user.id)
@@ -279,7 +295,6 @@ async def get_resource_task_status(
         logger.warning(f"Resource {resource_id} not found for user {current_user.id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
 
-    # Try to find the latest OCR task by resource_id pattern (ocr_<user_id>_<resource_id>_<hash>)
     task_id_pattern = f"ocr_{current_user.id}_{resource_id}%"
     db_task = (
         db.query(Task)
@@ -289,27 +304,56 @@ async def get_resource_task_status(
     )
 
     if db_task:
-        status_info = {
+        return {
             "task_id": db_task.task_id,
             "status": db_task.status,
             "progress": db_task.progress or 0,
             "updated_at": db_task.updated_at.isoformat() if db_task.updated_at else None,
             "error": db_task.error_message,
         }
-        logger.info(f"Returning DB task status: {status_info}")
-        return status_info
 
-    # No active task
     has_text = bool(StorageManager.get_resource_text(resource.id))
-    logger.info(f"No active task. Resource extracted_text: {'EXISTS' if has_text else 'NULL'}")
     if has_text:
-        # Text exists, extraction is complete
-        logger.info("Text exists, returning completed status")
         return {"task_id": None, "status": "completed", "progress": 100}
     else:
-        # No text and no active task - return pending status (not completed!)
-        logger.warning("No text and no active task! Returning pending status to retry")
         return {"task_id": None, "status": "pending", "progress": 0}
+
+
+def _get_exercise_task_status(exercise_id: str, current_user, db, logger):
+    """Get status of extraction/generation task for an exercise. Never 404s."""
+    exercise = (
+        db.query(Exercise)
+        .filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id)
+        .first()
+    )
+
+    if not exercise:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise not found")
+
+    for prefix in ("extract_", "generate_"):
+        db_task = (
+            db.query(Task)
+            .filter(
+                Task.user_id == current_user.id,
+                Task.task_id == f"{prefix}{exercise_id}",
+            )
+            .order_by(Task.updated_at.desc())
+            .first()
+        )
+        if db_task:
+            return {
+                "task_id": db_task.task_id,
+                "status": db_task.status,
+                "progress": db_task.progress or 0,
+                "updated_at": db_task.updated_at.isoformat() if db_task.updated_at else None,
+                "error": db_task.error_message,
+            }
+
+    has_questions = bool(exercise.content_path)
+    if has_questions:
+        return {"task_id": None, "status": "completed", "progress": 100}
+    else:
+        return {"task_id": None, "status": None, "progress": 0}
 
 
 class RecentItem(BaseModel):

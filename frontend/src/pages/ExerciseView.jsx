@@ -121,9 +121,8 @@ export default function ExerciseView() {
   // Processing state
   const [processingStatus, setProcessingStatus] = useState(null);
   const { tasks } = useTaskContext();
-  const pollRef = useRef(null);
 
-  // Fetch exercise data and check for existing task on mount (one-time, no polling)
+  // Fetch exercise data and check for existing task on mount (one-time, no 404s)
   useEffect(() => {
     let active = true;
 
@@ -135,48 +134,14 @@ export default function ExerciseView() {
         setEditedQuestions(JSON.parse(JSON.stringify(data.questions || [])));
         setLoading(false);
 
-        if (!data.questions || data.questions.length === 0) {
-          // One-time check for existing task
-          let taskData = await fetchApi(`/search/tasks/extract_${id}`).catch(() => null);
-          if (!taskData) {
-            taskData = await fetchApi(`/search/tasks/generate_${id}`).catch(() => null);
-          }
-          if (!active) return;
-          if (taskData) {
-            setProcessingStatus({
-              status: taskData.status,
-              progress: taskData.progress,
-              message: taskData.message
-            });
-            // Only start polling if task is still active
-            if (taskData.status === 'pending' || taskData.status === 'processing' || taskData.status === 'running') {
-              pollRef.current = setInterval(async () => {
-                let updated = await fetchApi(`/search/tasks/extract_${id}`).catch(() => null);
-                if (!updated) {
-                  updated = await fetchApi(`/search/tasks/generate_${id}`).catch(() => null);
-                }
-                if (!active) return;
-                if (updated) {
-                  setProcessingStatus({
-                    status: updated.status,
-                    progress: updated.progress,
-                    message: updated.message
-                  });
-                  if (updated.status === 'completed') {
-                    clearInterval(pollRef.current);
-                    pollRef.current = null;
-                    const refreshed = await fetchApi(`/exercises/${id}`);
-                    if (!active) return;
-                    setExercise(refreshed);
-                    setEditedQuestions(JSON.parse(JSON.stringify(refreshed.questions || [])));
-                  } else if (updated.status === 'failed' || updated.status === 'cancelled') {
-                    clearInterval(pollRef.current);
-                    pollRef.current = null;
-                  }
-                }
-              }, 3000);
-            }
-          }
+        const taskData = await fetchApi(`/search/task?exercise_id=${id}`).catch(() => null);
+        if (!active) return;
+        if (taskData && taskData.status && taskData.status !== 'completed') {
+          setProcessingStatus({
+            status: taskData.status,
+            progress: taskData.progress,
+            message: taskData.message
+          });
         }
       } catch (err) {
         if (!active) return;
@@ -188,24 +153,17 @@ export default function ExerciseView() {
 
     fetchExercise();
 
-    return () => {
-      active = false;
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    return () => { active = false; };
   }, [id]);
 
-  // Watch TaskContext for task updates (catches tasks started after initial load)
+  // Watch TaskContext for task updates (replaces polling)
   useEffect(() => {
     if (!exercise || !id) return;
-    if (exercise.questions && exercise.questions.length > 0) return;
 
-    const exerciseTask = tasks.find(t => {
-      const kwargs = t.input_data?.kwargs || {};
-      return (
-        (t.task_type === 'exercise_extraction' || t.task_type === 'exercise_generation') &&
-        t.task_id === `extract_${id}`
-      );
-    });
+    const exerciseTask = tasks.find(t =>
+      (t.task_type === 'exercise_extraction' || t.task_type === 'exercise_generation') &&
+      (t.task_id === `extract_${id}` || t.task_id === `generate_${id}`)
+    );
 
     if (!exerciseTask) return;
 
@@ -424,6 +382,10 @@ export default function ExerciseView() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const taskActive = processingStatus && (processingStatus.status === 'pending' || processingStatus.status === 'processing' || processingStatus.status === 'running');
+  const taskFailed = processingStatus && (processingStatus.status === 'failed' || processingStatus.status === 'cancelled');
+  const hasQuestions = exercise?.questions?.length > 0;
+
   const isAiGenerated = !!exercise?.parameters;
   const coveredResources = (() => {
     if (!exercise || !exercise.questions) return [];
@@ -566,42 +528,47 @@ export default function ExerciseView() {
                 </Group>
               </div>
 
-              {(!exercise.questions || exercise.questions.length === 0) && (
+              {taskActive && (
                 <Box mb="xl">
-                  {processingStatus ? (
-                    <Card withBorder padding="xl" shadow="sm">
-                      <Stack align="center" spacing="md">
-                        {processingStatus.status === 'failed' || processingStatus.status === 'cancelled' ? (
-                          <>
-                            <IconX size={48} color="red" />
-                            <Title order={3} c="red">Processing {processingStatus.status}</Title>
-                            <Text>{processingStatus.message || "An error occurred during generation."}</Text>
-                          </>
-                        ) : (
-                          <>
-                            <Loader size="lg" color="blue" />
-                            <Title order={3}>Generating Exercise...</Title>
-                            <Text c="dimmed">{processingStatus.message || "Please wait while we process your exercise."}</Text>
-                            <Box w="100%" mt="md">
-                              <Progress value={processingStatus.progress || 10} animated size="xl" radius="xl" />
-                              <Text ta="center" mt="xs" size="sm" c="dimmed">{processingStatus.progress || 10}%</Text>
-                            </Box>
-                          </>
-                        )}
-                      </Stack>
-                    </Card>
-                  ) : (
-                    <Card withBorder padding="xl" shadow="sm">
-                      <Stack align="center" spacing="md">
-                        <IconBook size={48} color="gray" />
-                        <Title order={3}>No Questions Yet</Title>
-                        <Text c="dimmed">This exercise has no questions. Generate questions from the subject view or upload a resource with questions.</Text>
-                      </Stack>
-                    </Card>
-                  )}
+                  <Card withBorder padding="xl" shadow="sm">
+                    <Stack align="center" spacing="md">
+                      <Loader size="lg" color="blue" />
+                      <Title order={3}>Generating Exercise...</Title>
+                      <Text c="dimmed">{processingStatus.message || "Please wait while we process your exercise."}</Text>
+                      <Box w="100%" mt="md">
+                        <Progress value={processingStatus.progress || 10} animated size="xl" radius="xl" />
+                        <Text ta="center" mt="xs" size="sm" c="dimmed">{processingStatus.progress || 10}%</Text>
+                      </Box>
+                    </Stack>
+                  </Card>
                 </Box>
               )}
 
+              {taskFailed && (
+                <Box mb="xl">
+                  <Card withBorder padding="xl" shadow="sm">
+                    <Stack align="center" spacing="md">
+                      <IconX size={48} color="red" />
+                      <Title order={3} c="red">Processing {processingStatus.status}</Title>
+                      <Text>{processingStatus.message || "An error occurred during generation."}</Text>
+                    </Stack>
+                  </Card>
+                </Box>
+              )}
+
+              {!hasQuestions && !taskActive && !taskFailed && (
+                <Box mb="xl">
+                  <Card withBorder padding="xl" shadow="sm">
+                    <Stack align="center" spacing="md">
+                      <IconBook size={48} color="gray" />
+                      <Title order={3}>No Questions Yet</Title>
+                      <Text c="dimmed">This exercise has no questions. Generate questions from the subject view or upload a resource with questions.</Text>
+                    </Stack>
+                  </Card>
+                </Box>
+              )}
+
+              {!taskActive && (
                 <Stack 
                   spacing="xl"
                   style={{ 
@@ -953,6 +920,7 @@ export default function ExerciseView() {
                   </Button>
                 )}
               </Stack>
+            )}
             </Box>
           </Container>
         </ScrollArea>
