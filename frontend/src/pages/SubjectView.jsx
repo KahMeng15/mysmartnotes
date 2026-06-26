@@ -1402,9 +1402,9 @@ export default function SubjectView() {
                           </ActionIcon>
                         </Menu.Target>
                         <Menu.Dropdown>
-                          <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => openRenameExercise(ex)}>Rename</Menu.Item>
+                          <Menu.Item leftSection={<IconPencil size={14} />} onClick={(e) => { e.stopPropagation(); openRenameExercise(ex); }}>Rename</Menu.Item>
                           <Menu.Item leftSection={<IconCopy size={14} />} onClick={(e) => { e.stopPropagation(); openCreateSimilarExercise(ex); }}>Create Similar</Menu.Item>
-                          <Menu.Item leftSection={<IconRefresh size={14} />} onClick={() => openReprocessExercise(ex)}>Reprocess</Menu.Item>
+                          <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); openReprocessExercise(ex); }}>Reprocess</Menu.Item>
                           <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalExercise(ex); }}>System Info</Menu.Item>
                           {(isProcessing || reprocessingExerciseIds.includes(ex.id)) ? (
                             <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
