@@ -9,12 +9,18 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    logLevel: 'warn',
     server: {
+      hmr: { log: false },
       proxy: {
         '/api': {
           target: apiUrl,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, '')
+        },
+        '/ws': {
+          target: apiUrl,
+          ws: true,
         }
       }
     }

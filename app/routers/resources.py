@@ -34,7 +34,7 @@ from app.utils.cache import cache_response, clear_cache_pattern_sync
 from app.utils.db import generate_random_id, get_db
 from app.utils.quotas import enforce_quota_resources, enforce_quota_storage
 from app.utils.storage import StorageManager
-from app.utils.tasks import TaskManager
+from app.utils.tasks import TaskManager, _serialize_result
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +85,7 @@ def _rebuild_resource_content(
 
     # Initialize or update Task status to processing
     task_id = f"ocr_{current_user.id}_{note.id}"
+    input_data = _serialize_result({"kwargs": {"resource_id": note.id}})
     db_task = db.query(Task).filter(Task.task_id == task_id).first()
     if not db_task:
         db_task = Task(
@@ -93,6 +94,7 @@ def _rebuild_resource_content(
             task_type="resource_processing",
             status="processing",
             progress=10,
+            input_data=input_data,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
         )
@@ -101,6 +103,7 @@ def _rebuild_resource_content(
         db_task.status = "processing"
         db_task.progress = 10
         db_task.error_message = None
+        db_task.input_data = input_data
         db_task.updated_at = datetime.utcnow()
     db.commit()
 
@@ -112,9 +115,11 @@ def _rebuild_resource_content(
 
         if file_ext in (".pdf", ".pptx"):
             logger.info(f"Rebuilding note {note.id} with SmartPipeline from scratch")
+            TaskManager.update_task_progress(task_id, 15, "Extracting with AI pipeline...")
             raw_text, timings = extract_markdown_for_user(current_user, note.file_path)
             StorageManager.save_resource_json(note.id, "timings", timings)
             structured_content = markdown_to_segments(raw_text)
+            TaskManager.update_task_progress(task_id, 60, "Saving extracted content...")
 
             images_data = []
             if file_ext == ".pdf":
@@ -133,12 +138,14 @@ def _rebuild_resource_content(
 
         else:
             logger.info(f"Rebuilding note {note.id} with OCR fallback")
+            TaskManager.update_task_progress(task_id, 15, "Running OCR...")
             ocr_result = OCRProcessor.extract_text(
                 note.file_path, note.file_type, resource_id=note.id, use_v2=use_v2
             )
             raw_text = ocr_result.get("raw_text", "")
             structured_content = ocr_result.get("structured_content", [])
             images_data = ocr_result.get("images", [])
+            TaskManager.update_task_progress(task_id, 60, "Saving extracted content...")
 
             # Save to file storage
             StorageManager.save_resource_text(note.id, raw_text)
@@ -164,6 +171,7 @@ def _rebuild_resource_content(
 
         if raw_text and raw_text.strip():
             try:
+                TaskManager.update_task_progress(task_id, 90, "Generating search embeddings...")
                 from app.processing.embeddings import update_resource_embeddings
 
                 update_resource_embeddings(note.id, raw_text, db)
@@ -179,10 +187,7 @@ def _rebuild_resource_content(
         )
 
         # Mark Task complete
-        db_task.status = "completed"
-        db_task.progress = 100
-        db_task.updated_at = datetime.utcnow()
-        db.commit()
+        TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
 
         return note
     except Exception as e:

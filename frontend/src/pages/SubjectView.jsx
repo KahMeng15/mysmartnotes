@@ -5,7 +5,7 @@ import { IconDotsVertical, IconTrash, IconPencil, IconUpload, IconEdit, IconFile
 import * as TablerIcons from '@tabler/icons-react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi, getAuthToken } from '../lib/api';
-import { subscribeTaskUpdates } from '../lib/taskWebSocket';
+
 import { formatParams } from '../lib/formatters';
 
 const MODE_ICONS = {
@@ -664,81 +664,104 @@ export default function SubjectView() {
   const [noteProgress, setNoteProgress] = useState({});
   const [failedNoteIds, setFailedNoteIds] = useState([]);
 
-  // WebSocket + backup polling for processing status
+  // Poll /search/tasks/active every 5s — single batch call, stops when no pending tasks
   useEffect(() => {
-    const handleTaskUpdate = (data) => {
-      const { task_type, status, progress, error, task_id, resource_id, exercise_id, note_id } = data;
+    let pollTimer;
 
-      if (task_type === 'resource_processing') {
-        const rid = resource_id;
-        if (!rid) return;
-        if (progress !== undefined) {
-          setNoteProgress(prev => ({ ...prev, [rid]: progress }));
-        }
-        if (task_id) {
-          setResourceTasks(prev => ({ ...prev, [rid]: task_id }));
-        }
-        if (status === 'completed') {
-          setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
-          fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
-            if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
-          });
-        } else if (status === 'failed') {
-          setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
-          if (error === 'Cancelled by user') {
-            setCancelledNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
-          } else {
-            setFailedNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
+    const poll = async () => {
+      try {
+        const result = await fetchApi('/search/tasks/active');
+        if (!result?.tasks) return;
+
+        for (const t of result.tasks) {
+          const kwargs = t.input_data?.kwargs || {};
+          const task_type = t.task_type;
+          const status = t.status;
+
+          if (task_type === 'resource_processing') {
+            const rid = kwargs.resource_id;
+            if (!rid) continue;
+            if (t.progress !== undefined) {
+              setNoteProgress(prev => ({ ...prev, [rid]: t.progress }));
+            }
+            if (t.task_id) {
+              setResourceTasks(prev => ({ ...prev, [rid]: t.task_id }));
+            }
+            if (status === 'completed') {
+              setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
+              fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
+                if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
+              });
+            } else if (status === 'failed') {
+              setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
+              if (t.error === 'Cancelled by user') {
+                setCancelledNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
+              } else {
+                setFailedNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
+              }
+              fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
+                if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
+              });
+            }
           }
-          fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
-            if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
-          });
-        }
-      }
 
-      if (task_type === 'exercise_extraction' || task_type === 'exercise_generation') {
-        const eid = exercise_id;
-        if (!eid) return;
-        if (progress !== undefined) {
-          setExerciseProgress(prev => ({ ...prev, [eid]: progress }));
-        }
-        if (task_id) {
-          setExerciseTasks(prev => ({ ...prev, [eid]: task_id }));
-        }
-        if (status === 'completed') {
-          setCompletedExerciseIds(prev => prev.includes(eid) ? prev : [...prev, eid]);
-          setExerciseProgress(prev => { const n = { ...prev }; delete n[eid]; return n; });
-          if (subjectRef.current?.id) {
-            fetchApi(`/exercises/subject/${subjectRef.current.id}`).then(data => setExercises(data || []));
+          if (task_type === 'exercise_extraction' || task_type === 'exercise_generation') {
+            const eid = kwargs.exercise_id;
+            if (!eid) continue;
+            if (t.progress !== undefined) {
+              setExerciseProgress(prev => ({ ...prev, [eid]: t.progress }));
+            }
+            if (t.task_id) {
+              setExerciseTasks(prev => ({ ...prev, [eid]: t.task_id }));
+            }
+            if (status === 'completed') {
+              setCompletedExerciseIds(prev => prev.includes(eid) ? prev : [...prev, eid]);
+              setExerciseProgress(prev => { const n = { ...prev }; delete n[eid]; return n; });
+              if (subjectRef.current?.id) {
+                fetchApi(`/exercises/subject/${subjectRef.current.id}`).then(data => setExercises(data || []));
+              }
+            } else if (status === 'failed' || status === 'cancelled') {
+              setFailedExerciseIds(prev => prev.includes(eid) ? prev : [...prev, eid]);
+            }
           }
-        } else if (status === 'failed' || status === 'cancelled') {
-          setFailedExerciseIds(prev => prev.includes(eid) ? prev : [...prev, eid]);
-        }
-      }
 
-      if (task_type === 'note_generation') {
-        const nid = note_id;
-        if (!nid) return;
-        if (progress !== undefined) {
-          setGeneratedNoteProgress(prev => ({ ...prev, [nid]: progress }));
+          if (task_type === 'note_generation') {
+            const nid = kwargs.note_id;
+            if (!nid) continue;
+            if (t.progress !== undefined) {
+              setGeneratedNoteProgress(prev => ({ ...prev, [nid]: t.progress }));
+            }
+            if (status === 'completed') {
+              fetchApi(`/notes/${nid}?t=${Date.now()}`).then(refreshed => {
+                if (refreshed) setGeneratedNotes(prev => prev.map(item => item.id === nid ? refreshed : item));
+              });
+              setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
+              setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
+            } else if (status === 'failed') {
+              setFailedGeneratedNoteIds(prev => prev.includes(nid) ? prev : [...prev, nid]);
+              setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
+              setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
+            }
+          }
         }
-        if (status === 'completed') {
-          fetchApi(`/notes/${nid}?t=${Date.now()}`).then(refreshed => {
-            if (refreshed) setGeneratedNotes(prev => prev.map(item => item.id === nid ? refreshed : item));
-          });
-          setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
-          setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
-        } else if (status === 'failed') {
-          setFailedGeneratedNoteIds(prev => prev.includes(nid) ? prev : [...prev, nid]);
-          setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
-          setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
+
+        // Stop polling once no tasks are pending/processing/running
+        const hasPending = result.tasks.some(t =>
+          ['pending', 'processing', 'running'].includes(t.status)
+        );
+        if (!hasPending && pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
         }
-      }
+      } catch {}
     };
 
-    const unsub = subscribeTaskUpdates(handleTaskUpdate);
+    poll();
+    pollTimer = setInterval(poll, 5000);
 
-    return () => unsub();
+    return () => {
+      if (pollTimer) clearInterval(pollTimer);
+    };
   }, []);
 
   const handleEditSubjectClick = () => {
