@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-velonote}
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     networks:
       - velonote-net-dev
     ports:
@@ -89,6 +89,9 @@ services:
     restart: unless-stopped
     networks:
       - velonote-net-dev
+
+volumes:
+  pgdata:
 
 networks:
   velonote-net-dev:

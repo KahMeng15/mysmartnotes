@@ -93,6 +93,21 @@ docker-compose up -d
 - **Redis Cache**: In-memory cache for sessions, tokens, and database requests.
 - **Logs**: View via `docker-compose logs -f` or in the `./logs` directory.
 
+### PostgreSQL Permission Fix (Linux / TrueNAS)
+
+PostgreSQL runs as UID 999 inside the container. On some Linux hosts (especially **TrueNAS** with ZFS), bind-mounted directories have permission issues. The compose file uses a **Docker named volume** (`pgdata`) instead of a bind mount to avoid this.
+
+If you previously ran with a bind mount and have a `./data/postgres` directory, remove it before starting:
+
+```bash
+# Remove old bind-mount data (back it up first if needed!)
+sudo rm -rf ./data/postgres
+
+# Start fresh
+docker compose down
+docker compose up -d
+```
+
 ---
 
 ### Option 2: Python (Local Development)
