@@ -95,11 +95,25 @@ function GlobalAlert() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
+    const checkMaintenance = async () => {
+      try {
+        const res = await fetch('/api/auth/public-settings', { signal: controller.signal });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.maintenance_mode) {
+            window.location.href = '/login';
+            return;
+          }
+        }
+      } catch (e) {}
+      setAlert({ type: 'api', message: 'Cannot connect to the application server.', detail: 'Please check that the server is running and try again.' });
+    };
+
     fetch('/api/health', { signal: controller.signal })
       .then(res => {
         clearTimeout(timeoutId);
         if (!res.ok) {
-          setAlert({ type: 'api', message: 'Cannot connect to the application server.', detail: 'Please check that the server is running and try again.' });
+          checkMaintenance();
           return;
         }
         return res.json().then(data => {
@@ -110,7 +124,7 @@ function GlobalAlert() {
       })
       .catch(() => {
         clearTimeout(timeoutId);
-        setAlert({ type: 'api', message: 'Cannot connect to the server.', detail: 'Please check that the application server is running and try again.' });
+        checkMaintenance();
       });
 
     return () => clearTimeout(timeoutId);
@@ -166,7 +180,7 @@ function AppLayout({ children }) {
     }
   };
 
-  if (location.pathname === '/login' || location.pathname === '/') {
+  if (location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/') {
     return <><GlobalAlert />{children}</>;
   }
 
@@ -331,6 +345,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<RootRedirect />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Login />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/mynotes" element={<NotesManager />} />
                 <Route path="/upload" element={<UploadDocs />} />

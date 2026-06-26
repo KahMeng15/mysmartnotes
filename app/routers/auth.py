@@ -281,6 +281,21 @@ def get_public_settings(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/invitation/{token}")
+def get_invitation(token: str, db: Session = Depends(get_db)):
+    """Return invitation details for a valid token (public, no auth required)"""
+    invite = (
+        db.query(UserInvitation)
+        .filter(UserInvitation.token == token, not UserInvitation.is_used)
+        .first()
+    )
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invalid or expired invitation token.")
+    if invite.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=404, detail="Invitation token has expired.")
+    return {"email": None if is_link_only_email(invite.email) else invite.email, "tier": invite.tier}
+
+
 @router.post("/register", response_model=UserSchema)
 def register(
     user_data: UserCreate, request: Request, token: str | None = None, db: Session = Depends(get_db)

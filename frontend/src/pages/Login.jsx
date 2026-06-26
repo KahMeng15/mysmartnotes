@@ -76,10 +76,38 @@ export default function Login() {
   const [googleFullName, setGoogleFullName] = useState('');
   const [googleAgreeTos, setGoogleAgreeTos] = useState(false);
   const [googleAgreePrivacy, setGoogleAgreePrivacy] = useState(false);
-  const [googleAgreeFairUse, setGoogleAgreeFairUse] = useState(false);
+  const [googleFairUse, setGoogleAgreeFairUse] = useState(false);
+
+  // Public settings
+  const [signupConfig, setSignupConfig] = useState('open');
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+
+  // Invitation token from URL
+  const [invitationToken, setInvitationToken] = useState(null);
+  const [invitedEmail, setInvitedEmail] = useState('');
+
+  useEffect(() => {
+    const inviteToken = searchParams.get('token');
+    if (inviteToken) {
+      setInvitationToken(inviteToken);
+      fetch(`/api/auth/invitation/${encodeURIComponent(inviteToken)}`)
+        .then(r => { if (r.ok) return r.json(); throw new Error(); })
+        .then(data => {
+          if (data.email) setInvitedEmail(data.email);
+          setPanel('register');
+        })
+        .catch(() => setError('Invalid or expired invitation link.'));
+    }
+  }, []);
 
   useEffect(() => {
     setQuote(quotes[Math.floor(Math.random() * quotes.length)]);
+    fetch('/api/auth/public-settings').then(r => r.json()).then(data => {
+      if (data) {
+        setSignupConfig(data.signup_config || 'open');
+        setMaintenanceMode(data.maintenance_mode || false);
+      }
+    }).catch(() => {});
 
     // Auto-handle email verification token in URL
     const verifyToken = searchParams.get('verify_token');
@@ -244,7 +272,8 @@ export default function Login() {
     setError(null);
     setSuccess(null);
     try {
-      const res = await fetch('/api/auth/register', {
+      const url = invitationToken ? `/api/auth/register?token=${encodeURIComponent(invitationToken)}` : '/api/auth/register';
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -409,6 +438,16 @@ export default function Login() {
           {/* ── LOGIN ── */}
           {panel === 'login' && (
             <form onSubmit={handleLogin}>
+              {maintenanceMode && (
+                <Alert icon={<IconAlertCircle size={16} />} color="yellow" mb="md">
+                  🔧 Maintenance in progress, brb
+                </Alert>
+              )}
+              {signupConfig === 'approval' && !maintenanceMode && (
+                <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
+                  Account registration requires approval from an administrator.
+                </Alert>
+              )}
               {isVerificationError && (
                 <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" withCloseButton onClose={() => setError(null)}>
                   {resending ? (
@@ -446,28 +485,35 @@ export default function Login() {
                 Log In
               </Button>
 
-              <Divider label="or" labelPosition="center" my="md" />
+              {!maintenanceMode && (
+                <>
+                  <Divider label="or" labelPosition="center" my="md" />
 
-              <Button
-                id="btn-google-login"
-                fullWidth
-                size="md"
-                variant="outline"
-                color="gray"
-                leftSection={<GoogleIcon />}
-                style={{ color: '#171738', borderColor: '#ccc' }}
-                loading={loading}
-                type="button"
-                onClick={handleGoogleSignIn}
-              >
-                Continue with Google
-              </Button>
+                  <Button
+                    id="btn-google-login"
+                    fullWidth
+                    size="md"
+                    variant="outline"
+                    color="gray"
+                    leftSection={<GoogleIcon />}
+                    style={{ color: '#171738', borderColor: '#ccc' }}
+                    loading={loading}
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                  >
+                    Continue with Google
+                  </Button>
+                </>
+              )}
 
               <Group mt="lg" gap="xs">
-                <Text size="sm" c="dimmed">Don't have an account?</Text>
-                <Anchor component="button" type="button" size="sm" fw={600} onClick={() => switchPanel('register')}>
-                  Sign up
-                </Anchor>
+                {signupConfig === 'invite' ? (
+                  <Text size="sm" c="dimmed">Invite only system, contact the system administrator to sign up and use this app.</Text>
+                ) : maintenanceMode ? null : (
+                  <Anchor component="button" type="button" size="sm" fw={600} onClick={() => switchPanel('register')}>
+                    Sign up
+                  </Anchor>
+                )}
               </Group>
               <Group mt={5}>
                 <Anchor component="button" type="button" size="sm" c="blue" onClick={() => switchPanel('forgot')}>
@@ -479,7 +525,23 @@ export default function Login() {
 
           {/* ── REGISTER ── */}
           {panel === 'register' && (
+            signupConfig === 'invite' && !invitationToken ? (
+              <Box py={40}>
+                <Title order={2} mb="md" c="#171738">Registration is invite-only</Title>
+                <Text size="md" c="dimmed" mb="xl">
+                  New account registration is currently restricted to invited users only. Contact an administrator to request an invitation.
+                </Text>
+                <Button fullWidth size="md" style={{ backgroundColor: '#171738' }} onClick={() => switchPanel('login')}>
+                  Back to Login
+                </Button>
+              </Box>
+            ) : (
             <form onSubmit={handleRegister}>
+              {signupConfig === 'approval' && (
+                <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
+                  After verifying your email, your account will need to be approved by an administrator before you can log in.
+                </Alert>
+              )}
               <Button
                 id="btn-google-signup"
                 fullWidth
@@ -522,7 +584,8 @@ export default function Login() {
                   label="Email"
                   placeholder="you@email.com"
                   size="md"
-                  value={regEmail}
+                  value={invitedEmail || regEmail}
+                  disabled={!!invitedEmail}
                   onChange={(e) => setRegEmail(e.currentTarget.value)}
                 />
                 <PasswordInput
@@ -554,18 +617,35 @@ export default function Login() {
                 </Anchor>
               </Group>
             </form>
+            )
           )}
 
           {/* ── REGISTRATION DONE ── */}
           {panel === 'registration-done' && (
             <Box py={40}>
               <Title order={2} mb="md" c="#171738">Account created!</Title>
-              <Text size="md" c="dimmed" mb="xs">
-                We've sent a verification email to <strong>{regEmail}</strong>.
-              </Text>
-              <Text size="md" c="dimmed" mb="xl">
-                Please check your inbox (and spam folder) and click the link to verify your account before logging in.
-              </Text>
+              {signupConfig === 'approval' ? (
+                <>
+                  <Text size="md" c="dimmed" mb="xs">
+                    We've sent a verification email to <strong>{regEmail}</strong>.
+                  </Text>
+                  <Text size="md" c="dimmed" mb="xs">
+                    ✅ Please verify your email using the link sent to your inbox.
+                  </Text>
+                  <Text size="md" c="dimmed" mb="xl">
+                    After verification, your account will be reviewed by an administrator. You'll receive an email once your account is approved.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text size="md" c="dimmed" mb="xs">
+                    We've sent a verification email to <strong>{regEmail}</strong>.
+                  </Text>
+                  <Text size="md" c="dimmed" mb="xl">
+                    Please check your inbox (and spam folder) and click the link to verify your account before logging in.
+                  </Text>
+                </>
+              )}
               <Button fullWidth size="md" style={{ backgroundColor: '#171738' }} onClick={() => switchPanel('login')}>
                 Continue to Login
               </Button>

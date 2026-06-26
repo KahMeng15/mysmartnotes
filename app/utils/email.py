@@ -158,6 +158,25 @@ def send_welcome_email(db: Session, recipient_email: str, full_name: str) -> boo
     return send_email(db, recipient_email, subject, body, is_html=True)
 
 
+def send_account_approved_email(db: Session, recipient_email: str, full_name: str, login_url: str = "http://localhost:8000/login") -> bool:
+    """Send an email notification when an admin approves a user's account"""
+    subject = "Your velonote account has been approved!"
+    body = f"""
+    <html>
+        <body>
+            <h2>Welcome to velonote, {full_name}!</h2>
+            <p>Good news! Your account has been approved by an administrator.</p>
+            <p>You can now log in and start using velonote, your AI-powered study companion.</p>
+            <p><a href="{login_url}" style="display: inline-block; padding: 12px 24px; background-color: #10b981; color: white; text-decoration: none; border-radius: 6px; font-weight: 600;">Log In</a></p>
+            <p>If you have any questions or need support, feel free to contact us through the app.</p>
+            <br>
+            <p>Best regards,<br>The velonote Team</p>
+        </body>
+    </html>
+    """
+    return send_email(db, recipient_email, subject, body, is_html=True)
+
+
 def send_password_changed_notification_email(db: Session, recipient_email: str) -> bool:
     """Send a notification email when a user's password has been successfully changed"""
     subject = "Security Alert: Your password was changed - velonote"

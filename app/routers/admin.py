@@ -15,6 +15,7 @@ from app.models.db import (
     GlobalPrompt,
     IPFilter,
     Note,
+    PasswordResetToken,
     RateLimitConfig,
     Resource,
     StudySession,
@@ -47,7 +48,7 @@ from app.schemas.admin import (
 from app.utils.auth import hash_password, validate_password_complexity
 from app.utils.cache import clear_cache_pattern_sync
 from app.utils.db import get_db
-from app.utils.email import send_invitation_email
+from app.utils.email import send_account_approved_email, send_invitation_email, send_password_reset_email
 from app.utils.invitation_utils import build_link_only_email, is_link_only_email
 from app.utils.observability import get_runtime_metrics_snapshot
 from app.utils.quotas import ensure_default_tier_configs
@@ -77,6 +78,17 @@ def _prepare_system_settings_response(settings: SystemSettings) -> dict:
         "backup_enabled": settings.backup_enabled,
         "backup_retention_days": settings.backup_retention_days,
     }
+
+
+def _get_domain(sys_settings: SystemSettings | None) -> str:
+    domain = (
+        sys_settings.domain_url
+        if sys_settings and sys_settings.domain_url
+        else "http://localhost:8000"
+    )
+    if not domain.startswith("http"):
+        domain = f"http://{domain}"
+    return domain.rstrip("/")
 
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)):
@@ -499,6 +511,38 @@ def user_action(
         user.tier = request.value
     elif request.action == "admin":
         user.is_admin = request.value.lower() == "true" if request.value else True
+    elif request.action == "approve":
+        user.is_approved = True
+        user.is_active = True
+        sys_settings = db.query(SystemSettings).first()
+        domain = _get_domain(sys_settings)
+        login_url = f"{domain}/login"
+        send_account_approved_email(db, user.email, user.full_name or user.nickname, login_url)
+    elif request.action == "send_reset_link":
+        reset_token = PasswordResetToken(
+            user_id=user.id,
+            email=user.email,
+            token=secrets.token_urlsafe(32),
+            expires_at=datetime.datetime.utcnow() + datetime.timedelta(hours=24),
+        )
+        db.add(reset_token)
+        db.flush()
+        sys_settings = db.query(SystemSettings).first()
+        domain = _get_domain(sys_settings)
+        reset_link = f"{domain}/login?reset_token={reset_token.token}"
+        email_sent = send_password_reset_email(db, user.email, reset_link)
+        if not email_sent:
+            raise HTTPException(status_code=500, detail="Failed to send password reset email. Check SMTP configuration.")
+    elif request.action == "change_email":
+        if not request.value:
+            raise HTTPException(status_code=400, detail="New email address required")
+        new_email = request.value.lower().strip()
+        existing = db.query(User).filter(func.lower(User.email) == new_email, User.id != user.id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already in use by another user")
+        user.email = new_email
+        user.username = new_email
+        user.is_verified = False
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
 
@@ -602,6 +646,22 @@ def get_invitations(db: Session = Depends(get_db), admin: User = Depends(get_cur
         results.append(resp)
 
     return results
+
+
+@router.delete("/invitations/{token}")
+def revoke_invitation(
+    token: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user),
+):
+    invite = db.query(UserInvitation).filter(UserInvitation.token == token).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    if invite.is_used:
+        raise HTTPException(status_code=400, detail="Cannot revoke a used invitation")
+    db.delete(invite)
+    db.commit()
+    return {"message": "Invitation revoked"}
 
 
 # --- User Logs ---

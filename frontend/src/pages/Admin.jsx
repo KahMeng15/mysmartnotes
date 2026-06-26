@@ -3,7 +3,7 @@ import { Container, Title, Tabs, Table, Button, Group, Badge, Modal, Select, Tex
 import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
 import { fetchApi, notifyTaskStarted } from '../lib/api';
-import { IconShieldCheck, IconUsers, IconMail, IconStack2, IconSettings, IconClock, IconServer, IconListDetails, IconDatabase, IconActivity, IconMessages, IconTrash, IconRefresh, IconEye } from '@tabler/icons-react';
+import { IconShieldCheck, IconUsers, IconMail, IconStack2, IconSettings, IconClock, IconServer, IconListDetails, IconDatabase, IconActivity, IconMessages, IconTrash, IconRefresh, IconEye, IconUserCheck } from '@tabler/icons-react';
 
 const sectionTabsConfig = [
   { value: 'groups', label: 'Groups' },
@@ -19,8 +19,12 @@ function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tierModalOpen, setTierModalOpen] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [newTier, setNewTier] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [resetting, setResetting] = useState(null);
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   const loadUsers = async () => {
@@ -38,7 +42,6 @@ function AdminUsers() {
   useEffect(() => { loadUsers(); }, []);
 
   const handleAction = async (userId, action, value = null) => {
-    if (action === 'reset_password' && !value) return;
     try {
       await fetchApi('/admin/users/action', {
         method: 'POST',
@@ -58,6 +61,51 @@ function AdminUsers() {
         body: JSON.stringify({ user_id: selectedUser.id, action: 'tier', value: newTier })
       });
       setTierModalOpen(false);
+      loadUsers();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleSendResetLink = async (user) => {
+    if (!confirm(`Send password reset email to ${user.email}?`)) return;
+    setResetting(user.id);
+    try {
+      await fetchApi('/admin/users/action', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: user.id, action: 'send_reset_link' })
+      });
+      alert(`Reset link sent to ${user.email}`);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setResetting(null);
+    }
+  };
+
+  const handleEmailChange = async () => {
+    if (!newEmail || !selectedUser) return;
+    try {
+      await fetchApi('/admin/users/action', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: selectedUser.id, action: 'change_email', value: newEmail })
+      });
+      setEmailModalOpen(false);
+      setNewEmail('');
+      loadUsers();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedUser) return;
+    try {
+      await fetchApi('/admin/users/action', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: selectedUser.id, action: 'delete' })
+      });
+      setDeleteModalOpen(false);
       loadUsers();
     } catch (e) {
       alert(e.message);
@@ -89,6 +137,7 @@ function AdminUsers() {
                 <Table.Td>
                   {u.is_active ? <Text c="green" size="sm">Active</Text> : <Text c="red" size="sm">Inactive</Text>}
                   {u.is_admin && <Text c="grape" size="xs">Admin</Text>}
+                  {!u.is_approved && <Badge color="yellow" size="sm" mt={2}>Pending</Badge>}
                 </Table.Td>
                 <Table.Td>
                   <Group gap={isMobile ? 4 : 'xs'} wrap="wrap">
@@ -98,6 +147,9 @@ function AdminUsers() {
                     ) : (
                       <Button size="xs" color="green" variant="light" onClick={() => handleAction(u.id, 'activate')}>Activate</Button>
                     )}
+                    <Button size="xs" variant="light" loading={resetting === u.id} onClick={() => handleSendResetLink(u)}>Reset Pwd</Button>
+                    <Button size="xs" variant="light" onClick={() => { setSelectedUser(u); setNewEmail(''); setEmailModalOpen(true); }}>Email</Button>
+                    <Button size="xs" color="red" variant="subtle" onClick={() => { setSelectedUser(u); setDeleteModalOpen(true); }}>Delete</Button>
                   </Group>
                 </Table.Td>
               </Table.Tr>
@@ -118,6 +170,119 @@ function AdminUsers() {
           <Button onClick={handleTierChange}>Update Tier</Button>
         </Stack>
       </Modal>
+
+      <Modal opened={emailModalOpen} onClose={() => setEmailModalOpen(false)} title="Change Email Address" fullScreen={isMobile}>
+        <Stack>
+          <TextInput label="Current Email" value={selectedUser?.email || ''} disabled />
+          <TextInput
+            label="New Email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.currentTarget.value)}
+            placeholder="new@email.com"
+            required
+          />
+          <Button onClick={handleEmailChange}>Update Email</Button>
+        </Stack>
+      </Modal>
+
+      <Modal opened={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Delete User Account" fullScreen={isMobile}>
+        <Stack>
+          <Text size="sm" c="red" fw={600}>This action cannot be undone.</Text>
+          <TextInput label="User Email" value={selectedUser?.email || ''} disabled />
+          <Text size="sm" c="dimmed">This will permanently delete the user account and all associated data.</Text>
+          <Group>
+            <Button color="gray" variant="outline" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>
+            <Button color="red" onClick={handleDelete}>Delete Account</Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </Stack>
+  );
+}
+
+function AdminPendingApprovals() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [approving, setApproving] = useState(null);
+  const isMobile = useMediaQuery('(max-width: 48em)');
+
+  const loadPending = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchApi('/admin/users');
+      setUsers(data.filter(u => !u.is_approved));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadPending(); }, []);
+
+  const handleApprove = async (userId) => {
+    setApproving(userId);
+    try {
+      await fetchApi('/admin/users/action', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, action: 'approve' })
+      });
+      loadPending();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  return (
+    <Stack>
+      <Title order={3}>Pending Approvals</Title>
+      {loading ? (
+        <Text c="dimmed" size="sm">Loading...</Text>
+      ) : users.length === 0 ? (
+        <Text c="dimmed" size="sm">No pending approval requests.</Text>
+      ) : (
+        <ScrollArea>
+          <Table striped highlightOnHover horizontalSpacing={isMobile ? 'xs' : 'sm'}>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>ID</Table.Th>
+                <Table.Th>Email</Table.Th>
+                <Table.Th>Name</Table.Th>
+                <Table.Th>Nickname</Table.Th>
+                <Table.Th>Verified</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {users.map(u => (
+                <Table.Tr key={u.id}>
+                  <Table.Td>{u.id}</Table.Td>
+                  <Table.Td>{u.email}</Table.Td>
+                  <Table.Td>{u.full_name || '-'}</Table.Td>
+                  <Table.Td>{u.nickname || '-'}</Table.Td>
+                  <Table.Td>
+                    <Badge color={u.is_verified ? 'green' : 'yellow'} size="sm">
+                      {u.is_verified ? 'Verified' : 'Not verified'}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Button
+                      size="xs"
+                      color="green"
+                      loading={approving === u.id}
+                      onClick={() => handleApprove(u.id)}
+                    >
+                      Approve
+                    </Button>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
+      )}
     </Stack>
   );
 }
@@ -141,6 +306,8 @@ function AdminInvitations() {
 
   useEffect(() => { loadInvites(); }, []);
 
+  const [revoking, setRevoking] = useState(null);
+
   const sendInvite = async () => {
     try {
       const sendEmail = inviteMethod === 'email';
@@ -150,11 +317,28 @@ function AdminInvitations() {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      alert(`Invitation Link: ${res.invitation_link}`);
+      if (sendEmail) {
+        alert(`Invitation email sent to ${email}`);
+      } else {
+        alert(`Invitation Link: ${res.invitation_link}`);
+      }
       setModalOpen(false);
       loadInvites();
     } catch (e) {
       alert(e.message);
+    }
+  };
+
+  const handleRevoke = async (token) => {
+    if (!confirm('Revoke this invitation? It will no longer be usable.')) return;
+    setRevoking(token);
+    try {
+      await fetchApi(`/admin/invitations/${token}`, { method: 'DELETE' });
+      loadInvites();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setRevoking(null);
     }
   };
 
@@ -173,6 +357,7 @@ function AdminInvitations() {
               <Table.Th>Token</Table.Th>
               <Table.Th>Tier</Table.Th>
               <Table.Th>Status</Table.Th>
+              <Table.Th>Actions</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -183,6 +368,11 @@ function AdminInvitations() {
                 <Table.Td>{i.token.substring(0, 8)}...</Table.Td>
                 <Table.Td>{i.tier}</Table.Td>
                 <Table.Td>{i.is_used ? 'Used' : 'Pending'}</Table.Td>
+                <Table.Td>
+                  {!i.is_used && (
+                    <Button size="xs" color="red" variant="subtle" loading={revoking === i.token} onClick={() => handleRevoke(i.token)}>Revoke</Button>
+                  )}
+                </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
@@ -1142,6 +1332,7 @@ export default function AdminPage() {
       <Tabs defaultValue="users" orientation="horizontal">
         <Tabs.List style={{ flexWrap: 'wrap' }}>
           <Tabs.Tab value="users" leftSection={<IconUsers size={16} />}>Users</Tabs.Tab>
+          <Tabs.Tab value="pending-approvals" leftSection={<IconUserCheck size={16} />}>Pending Approvals</Tabs.Tab>
           <Tabs.Tab value="invitations" leftSection={<IconMail size={16} />}>Invitations</Tabs.Tab>
           <Tabs.Tab value="tiers" leftSection={<IconStack2 size={16} />}>Tiers</Tabs.Tab>
           <Tabs.Tab value="settings" leftSection={<IconSettings size={16} />}>Settings</Tabs.Tab>
@@ -1157,6 +1348,7 @@ export default function AdminPage() {
 
         <Box px="md" pb="xl">
           <Tabs.Panel value="users"><AdminUsers /></Tabs.Panel>
+          <Tabs.Panel value="pending-approvals"><AdminPendingApprovals /></Tabs.Panel>
           <Tabs.Panel value="invitations"><AdminInvitations /></Tabs.Panel>
           <Tabs.Panel value="tiers"><AdminTiers /></Tabs.Panel>
           <Tabs.Panel value="settings"><AdminSystemSettings /></Tabs.Panel>

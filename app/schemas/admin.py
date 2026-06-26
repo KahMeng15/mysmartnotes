@@ -58,10 +58,10 @@ class UserInvitationCreate(BaseModel):
     send_email: bool = True
 
     @model_validator(mode="after")
-    def ensure_email_when_sending(cls, values):
-        if values.send_email and not values.email:
+    def ensure_email_when_sending(self):
+        if self.send_email and not self.email:
             raise ValueError("Email is required when sending an invitation email.")
-        return values
+        return self
 
 
 class UserInvitationResponse(BaseModel):

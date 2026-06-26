@@ -75,6 +75,22 @@ export async function fetchApi(endpoint, options = {}) {
     throw new Error('Unauthorized');
   }
 
+  if (response.status === 503) {
+    let errorMsg = 'Service unavailable';
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        errorMsg = errorData.detail || errorMsg;
+      }
+    } catch (e) {}
+    // Maintenance mode: redirect to /login without clearing token
+    if (errorMsg.toLowerCase().includes('maintenance')) {
+      window.location.href = '/login';
+      throw new Error(errorMsg);
+    }
+  }
+
   if (!response.ok) {
     let errorMsg = 'An error occurred';
     let catUrl = null;
