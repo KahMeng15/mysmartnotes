@@ -45,6 +45,7 @@ from app.schemas.admin import (
     UserLogSchema,
 )
 from app.utils.auth import hash_password, validate_password_complexity
+from app.utils.cache import clear_cache_pattern_sync
 from app.utils.db import get_db
 from app.utils.email import send_invitation_email
 from app.utils.invitation_utils import build_link_only_email, is_link_only_email
@@ -865,6 +866,8 @@ def admin_delete_user_group(
     db.query(Subject).filter(Subject.group_id == group_id).delete()
     db.delete(group)
     db.commit()
+    clear_cache_pattern_sync(f"cache_resp:/groups*:u{user_id}*")
+    clear_cache_pattern_sync(f"cache_resp:/subjects*:u{user_id}*")
     return {"message": "Group deleted"}
 
 
@@ -918,6 +921,8 @@ def admin_delete_user_subject(
     db.query(Resource).filter(Resource.subject_id == subject_id).delete()
     db.delete(subject)
     db.commit()
+    clear_cache_pattern_sync(f"cache_resp:/subjects*:u{user_id}*")
+    clear_cache_pattern_sync(f"cache_resp:/resources*:u{user_id}*")
     return {"message": "Subject deleted"}
 
 
@@ -1025,6 +1030,8 @@ def admin_delete_user_resource(
     StorageManager.delete_resource_files(r.id)
     db.delete(r)
     db.commit()
+    # Invalidate the target user's resource cache
+    clear_cache_pattern_sync(f"cache_resp:/resources*:u{user_id}*")
     return {"message": "Resource deleted"}
 
 
@@ -1245,6 +1252,7 @@ def admin_delete_user_note(
     StorageManager.delete_note_files(note_id)
     db.delete(n)
     db.commit()
+    clear_cache_pattern_sync(f"cache_resp:/notes*:u{user_id}*")
     return {"message": "Note deleted"}
 
 
