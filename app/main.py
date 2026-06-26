@@ -497,7 +497,7 @@ app.include_router(ws.router)
 app.include_router(exercises.router)
 
 # Serve generated files (images, PDFs, etc.)
-generated_dir = os.path.join(os.path.dirname(__file__), "generated")
+generated_dir = os.path.join(os.path.dirname(__file__), "..", "data", "generated")
 if os.path.exists(generated_dir):
     try:
         app.mount("/generated", StaticFiles(directory=generated_dir), name="generated")
@@ -506,7 +506,7 @@ if os.path.exists(generated_dir):
         logger.warning(f"Could not mount generated files: {e}")
 
 # Serve output files (extracted images)
-output_dir = os.path.join(os.path.dirname(__file__), "output")
+output_dir = os.path.join(os.path.dirname(__file__), "..", "data", "output")
 if not os.path.exists(output_dir):
     os.makedirs(output_dir, exist_ok=True)
 

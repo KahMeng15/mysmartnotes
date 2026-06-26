@@ -64,7 +64,7 @@ ARG GROUP_ID=568
 # Create non-root user and setup directories
 RUN groupadd --gid ${GROUP_ID} appgroup \
     && useradd --create-home --shell /usr/sbin/nologin --uid ${USER_ID} --gid ${GROUP_ID} appuser \
-    && mkdir -p /app/data /app/generated /app/output /app/uploads /app/logs \
+    && mkdir -p /app/data /app/logs \
     && chown -R appuser:appgroup /app
 
 # Prepare entrypoint script

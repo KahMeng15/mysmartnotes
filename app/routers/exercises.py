@@ -166,7 +166,7 @@ def upload_exercise(
     file_id = generate_random_id(db, Exercise)
     ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
     user_dir = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "data", f"user_{current_user.id}"
+        os.path.dirname(__file__), "..", "..", "data", f"user_{current_user.id}"
     )
     os.makedirs(user_dir, exist_ok=True)
     file_path = os.path.join(user_dir, f"{file_id}{ext}")
