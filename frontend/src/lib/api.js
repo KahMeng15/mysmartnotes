@@ -60,7 +60,11 @@ export async function fetchApi(endpoint, options = {}) {
   try {
     response = await fetch(`${API_BASE}${endpoint}`, fetchOptions);
   } catch (err) {
-    window.dispatchEvent(new CustomEvent('service_unreachable', { detail: { source: 'api' } }));
+    if (!options.quietFail) {
+      window.dispatchEvent(new CustomEvent('apiError', {
+        detail: { message: 'Could not connect to the server. The application or database may be down.', status: 0 }
+      }));
+    }
     throw new Error('Service unreachable');
   }
 

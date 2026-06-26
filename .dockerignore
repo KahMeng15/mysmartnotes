@@ -37,6 +37,11 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
+# Node.js dependencies (massive, cause chown disk exhaustion)
+**/node_modules/
+frontend/node_modules/
+.kilo/node_modules/
+
 # Ignore logs
 logs/
 *.log

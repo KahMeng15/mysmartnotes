@@ -94,8 +94,8 @@ services:
 
   nginx:
     build:
-      context: ./app
-      dockerfile: Dockerfile.nginx
+      context: .
+      dockerfile: app/Dockerfile.nginx
     container_name: velonote_frontend
     depends_on:
       - api

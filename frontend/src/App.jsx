@@ -3,7 +3,7 @@ import SummaryView from "./pages/SummaryView";
 import { useState, useEffect } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
 import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, Navigate } from 'react-router-dom';
-import { AppShell, Group, Text, Button, Loader, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification, Stack } from '@mantine/core';
+import { AppShell, Group, Text, Button, NavLink as MantineNavLink, ScrollArea, ActionIcon, Center, Tooltip, Avatar, Menu, UnstyledButton, Portal, Notification, Stack, Alert } from '@mantine/core';
 import { 
   IconDashboard, 
   IconLogin, 
@@ -86,6 +86,52 @@ function GlobalToasts() {
   );
 }
 
+function GlobalAlert() {
+  const [alert, setAlert] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    fetch('/api/health', { signal: controller.signal })
+      .then(res => {
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          setAlert({ type: 'api', message: 'Cannot connect to the application server.', detail: 'Please check that the server is running and try again.' });
+          return;
+        }
+        return res.json().then(data => {
+          if (data?.database === 'down') {
+            setAlert({ type: 'database', message: 'The database server is not responding.', detail: 'The app cannot access the database. Some features will be unavailable until this is resolved.' });
+          }
+        });
+      })
+      .catch(() => {
+        clearTimeout(timeoutId);
+        setAlert({ type: 'api', message: 'Cannot connect to the server.', detail: 'Please check that the application server is running and try again.' });
+      });
+
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  if (!alert) return null;
+
+  return (
+    <Alert
+      color="orange"
+      title={alert.type === 'database' ? 'Database Unreachable' : 'Server Unreachable'}
+      withCloseButton
+      closeButtonLabel="Dismiss"
+      onClose={() => setAlert(null)}
+      styles={{ root: { borderRadius: 0 } }}
+      style={{ position: 'sticky', top: 0, zIndex: 1000 }}
+    >
+      <Text size="sm">{alert.message}</Text>
+      {alert.detail && <Text size="xs" mt={4} c="dimmed">{alert.detail}</Text>}
+    </Alert>
+  );
+}
+
 function AppLayout({ children }) {
   const [navOpen, setNavOpen] = useState(true);
   const [user, setUser] = useState(null);
@@ -94,7 +140,7 @@ function AppLayout({ children }) {
   useEffect(() => {
     // Only fetch if logged in
     if (localStorage.getItem('token')) {
-      fetchApi('/auth/me').then(data => {
+      fetchApi('/auth/me', { quietFail: true }).then(data => {
         if (data) {
           setUser(data);
           if (data.nav_sidebar_open !== undefined) {
@@ -119,20 +165,22 @@ function AppLayout({ children }) {
   };
 
   if (location.pathname === '/login' || location.pathname === '/') {
-    return <>{children}</>;
+    return <><GlobalAlert />{children}</>;
   }
 
   return (
-    <AppShell
-      navbar={{
-        width: navOpen ? 250 : 80,
-        breakpoint: 'sm',
-        collapsed: { mobile: true },
-      }}
-      padding={(location.pathname.startsWith('/note/') || location.pathname.startsWith('/resource/') || location.pathname.startsWith('/chat') || location.pathname.startsWith('/exercises/')) ? 0 : 'md'}
-      bg="#ffffff"
-    >
-      <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
+    <>
+      <GlobalAlert />
+      <AppShell
+        navbar={{
+          width: navOpen ? 250 : 80,
+          breakpoint: 'sm',
+          collapsed: { mobile: true },
+        }}
+        padding={(location.pathname.startsWith('/note/') || location.pathname.startsWith('/resource/') || location.pathname.startsWith('/chat') || location.pathname.startsWith('/exercises/')) ? 0 : 'md'}
+        bg="#ffffff"
+      >
+        <AppShell.Navbar p="md" bg="#ffffff" style={{ borderRight: '1px solid #eaeaea', transition: 'width 0.2s ease' }}>
         <Group justify={navOpen ? "space-between" : "center"} mb="xl" style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
           <Group gap="sm" wrap="nowrap" style={{ display: navOpen ? 'flex' : 'none' }}>
             <img src="/velonote.svg" height={28} alt="velonote" />
@@ -247,6 +295,7 @@ function AppLayout({ children }) {
       <GlobalToasts />
       <TaskQueueModal />
     </AppShell>
+    </>
   );
 }
 
@@ -267,87 +316,9 @@ function NotFound() {
   );
 }
 
-function ServiceUnavailable({ message }) {
-  return (
-    <Center style={{ height: '100vh', flexDirection: 'column', gap: 24, padding: 24 }}>
-      <img src="https://http.cat/503" alt="503" style={{ height: 260, borderRadius: 12 }} />
-      <Text size="xl" fw={600} c="dimmed" ta="center">{message}</Text>
-      <Text size="sm" c="gray.5" ta="center">Please try again later.</Text>
-      <Button onClick={() => window.location.reload()} variant="light" mt="md">
-        Retry
-      </Button>
-    </Center>
-  );
-}
-
-/** Checks /health. Returns true if healthy, dispatches service_unreachable event on failure. */
-async function checkHealth() {
-  try {
-    const res = await fetch('/api/health');
-    if (!res.ok) {
-      window.dispatchEvent(new CustomEvent('service_unreachable', { detail: { source: 'api' } }));
-      return false;
-    }
-    const data = await res.json();
-    if (data?.database === 'down') {
-      window.dispatchEvent(new CustomEvent('service_unreachable', { detail: { source: 'database' } }));
-      return false;
-    }
-    if (data?.status !== 'healthy') {
-      window.dispatchEvent(new CustomEvent('service_unreachable', { detail: { source: 'api' } }));
-      return false;
-    }
-    return true;
-  } catch {
-    window.dispatchEvent(new CustomEvent('service_unreachable', { detail: { source: 'api' } }));
-    return false;
-  }
-}
-
-/** Inside Router — checks health on every route change. */
-function ServiceGuard({ setBootStatus }) {
-  const location = useLocation();
-
-  useEffect(() => {
-    checkHealth().then(() => {});
-  }, [location.pathname]);
-
-  return null;
-}
-
 function App() {
-  const [bootStatus, setBootStatus] = useState('loading');
-  const [failureSource, setFailureSource] = useState('api');
-
-  useEffect(() => {
-    checkHealth().then((healthy) => {
-      if (healthy) setBootStatus('ok');
-    });
-  }, []);
-
-  useEffect(() => {
-    const handler = (e) => {
-      setFailureSource(e.detail?.source || 'api');
-      setBootStatus('down');
-    };
-    window.addEventListener('service_unreachable', handler);
-    return () => window.removeEventListener('service_unreachable', handler);
-  }, []);
-
-  if (bootStatus === 'loading') {
-    return <Center h="100vh"><Loader size="lg" /></Center>;
-  }
-
-  if (bootStatus === 'down') {
-    const msg = failureSource === 'database'
-      ? 'Database is not responding — the database server may be down.'
-      : 'API is not reachable — the application server may be down.';
-    return <ServiceUnavailable message={msg} />;
-  }
-
   return (
     <Router>
-      <ServiceGuard />
       <AppLayout>
         <Routes>
           <Route path="/" element={<RootRedirect />} />
