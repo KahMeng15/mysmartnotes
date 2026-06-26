@@ -109,14 +109,23 @@ class TaskManager:
             # Publish WebSocket update
             from app.utils.websocket import manager
 
+            task_type = db_task.task_type or ""
+            input_kwargs = {}
+            if isinstance(db_task.input_data, dict):
+                input_kwargs = db_task.input_data.get("kwargs", {})
+
             payload = {
                 "task_id": task_id,
+                "task_type": task_type,
                 "status": db_task.status,
                 "result": result if status == "completed" else None,
                 "error": error if status == "failed" else None,
                 "progress": db_task.progress or 0,
-                "message": message,  # Pass current step message to UI
+                "message": message,
                 "intermediate_result": intermediate_result,
+                "resource_id": input_kwargs.get("resource_id"),
+                "exercise_id": input_kwargs.get("exercise_id"),
+                "note_id": input_kwargs.get("note_id"),
             }
             manager.publish_update(db_task.user_id, payload)
 
