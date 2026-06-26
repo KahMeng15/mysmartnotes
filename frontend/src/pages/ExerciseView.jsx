@@ -121,6 +121,7 @@ export default function ExerciseView() {
   // Processing state
   const [processingStatus, setProcessingStatus] = useState(null);
   const { tasks } = useTaskContext();
+  const prevExerciseTaskStatus = useRef(null);
 
   // Fetch exercise data and check for existing task on mount (one-time, no 404s)
   useEffect(() => {
@@ -167,13 +168,17 @@ export default function ExerciseView() {
 
     if (!exerciseTask) return;
 
+    const prevStatus = prevExerciseTaskStatus.current;
+    prevExerciseTaskStatus.current = exerciseTask.status;
+
     setProcessingStatus({
       status: exerciseTask.status,
       progress: exerciseTask.progress,
       message: exerciseTask.message
     });
 
-    if (exerciseTask.status === 'completed') {
+    // Only refetch on transition TO completed (avoids infinite refetch loop)
+    if (exerciseTask.status === 'completed' && prevStatus !== 'completed') {
       fetchApi(`/exercises/${id}`).then(data => {
         setExercise(data);
         setEditedQuestions(JSON.parse(JSON.stringify(data.questions || [])));
