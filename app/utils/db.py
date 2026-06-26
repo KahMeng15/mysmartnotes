@@ -553,11 +553,15 @@ def apply_backup_settings_migration():
                 if not result.fetchone():
                     if col == "backup_enabled":
                         conn.execute(
-                            text("ALTER TABLE system_settings ADD COLUMN backup_enabled BOOLEAN DEFAULT TRUE")
+                            text(
+                                "ALTER TABLE system_settings ADD COLUMN backup_enabled BOOLEAN DEFAULT TRUE"
+                            )
                         )
                     else:
                         conn.execute(
-                            text("ALTER TABLE system_settings ADD COLUMN backup_retention_days INTEGER DEFAULT 7")
+                            text(
+                                "ALTER TABLE system_settings ADD COLUMN backup_retention_days INTEGER DEFAULT 7"
+                            )
                         )
                     logger.info(f"Added {col} column to system_settings table")
             conn.commit()
