@@ -147,6 +147,9 @@ function AdminUsers() {
                     ) : (
                       <Button size="xs" color="green" variant="light" onClick={() => handleAction(u.id, 'activate')}>Activate</Button>
                     )}
+                    {u.is_approved ? (
+                      <Button size="xs" color="yellow" variant="light" onClick={() => handleAction(u.id, 'unapprove')}>Unapprove</Button>
+                    ) : null}
                     <Button size="xs" variant="light" loading={resetting === u.id} onClick={() => handleSendResetLink(u)}>Reset Pwd</Button>
                     <Button size="xs" variant="light" onClick={() => { setSelectedUser(u); setNewEmail(''); setEmailModalOpen(true); }}>Email</Button>
                     <Button size="xs" color="red" variant="subtle" onClick={() => { setSelectedUser(u); setDeleteModalOpen(true); }}>Delete</Button>

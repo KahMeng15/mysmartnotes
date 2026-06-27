@@ -519,6 +519,8 @@ def user_action(
         domain = _get_domain(sys_settings)
         login_url = f"{domain}/login"
         send_account_approved_email(db, user.email, user.full_name or user.nickname, login_url)
+    elif request.action == "unapprove":
+        user.is_approved = False
     elif request.action == "send_reset_link":
         reset_token = PasswordResetToken(
             user_id=user.id,

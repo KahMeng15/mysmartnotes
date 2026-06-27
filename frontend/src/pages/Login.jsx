@@ -66,6 +66,7 @@ export default function Login() {
   const [agreeTos, setAgreeTos] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeFairUse, setAgreeFairUse] = useState(false);
+  const [googleApprovalSignup, setGoogleApprovalSignup] = useState(false);
 
   // Forgot password state
   const [forgotEmail, setForgotEmail] = useState('');
@@ -264,7 +265,13 @@ export default function Login() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Profile completion failed');
-      await handleAuthSuccess(data);
+      if (data.pending_approval) {
+        setSearchParams({}, { replace: true });
+        setGoogleApprovalSignup(true);
+        setPanel('registration-done');
+      } else {
+        await handleAuthSuccess(data);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -642,17 +649,25 @@ export default function Login() {
             <Box py={40}>
               <Title order={2} mb="md" c="#171738">Account created!</Title>
               {signupConfig === 'approval' ? (
-                <>
-                  <Text size="md" c="dimmed" mb="xs">
-                    We've sent a verification email to <strong>{invitedEmail || regEmail}</strong>.
-                  </Text>
-                  <Text size="md" c="dimmed" mb="xs">
-                    Please verify your email using the link sent to your inbox.
-                  </Text>
-                  <Text size="md" c="dimmed" mb="xl">
-                    After verification, your account will be reviewed by an administrator. You'll receive an email once your account is approved.
-                  </Text>
-                </>
+                googleApprovalSignup ? (
+                  <>
+                    <Text size="md" c="dimmed" mb="xl">
+                      Your account has been created and is pending administrator approval. We'll notify you once it is ready.
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text size="md" c="dimmed" mb="xs">
+                      We've sent a verification email to <strong>{invitedEmail || regEmail}</strong>.
+                    </Text>
+                    <Text size="md" c="dimmed" mb="xs">
+                      Please verify your email using the link sent to your inbox.
+                    </Text>
+                    <Text size="md" c="dimmed" mb="xl">
+                      After verification, your account will be reviewed by an administrator. You'll receive an email once your account is approved.
+                    </Text>
+                  </>
+                )
               ) : (
                 <>
                   <Text size="md" c="dimmed" mb="xs">
@@ -666,6 +681,7 @@ export default function Login() {
               <Button fullWidth size="md" style={{ backgroundColor: '#171738' }} onClick={() => switchPanel('login')}>
                 Continue to Login
               </Button>
+              {!googleApprovalSignup && (
               <Text size="sm" c="dimmed" mt="md">
                 Didn't receive the email?{' '}
                 {resending ? (
@@ -676,6 +692,7 @@ export default function Login() {
                   </Anchor>
                 )}
               </Text>
+              )}
             </Box>
           )}
 
