@@ -138,6 +138,7 @@ function AdminUsers() {
                   {u.is_active ? <Text c="green" size="sm">Active</Text> : <Text c="red" size="sm">Inactive</Text>}
                   {u.is_admin && <Text c="grape" size="xs">Admin</Text>}
                   {!u.is_approved && <Badge color="yellow" size="sm" mt={2}>Pending</Badge>}
+                  {u.google_oauth_id && <Badge color="blue" size="sm" mt={2} variant="outline">Google</Badge>}
                 </Table.Td>
                 <Table.Td>
                   <Group gap={isMobile ? 4 : 'xs'} wrap="wrap">

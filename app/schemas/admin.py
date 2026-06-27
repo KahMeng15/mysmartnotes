@@ -148,6 +148,7 @@ class UserAdminResponse(User):
     full_name: str | None = None
     nickname: str | None = None
     # Extending User with extra stats
+    google_oauth_id: str | None = None
     notes_count: int = 0
     subjects_count: int = 0
     groups_count: int = 0
