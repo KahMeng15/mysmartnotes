@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Paper, Tabs, TextInput, PasswordInput, Textarea, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader, ActionIcon, Table, Modal, ScrollArea } from '@mantine/core';
+import { Box, Title, Paper, TextInput, PasswordInput, Textarea, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader, ActionIcon, Table, Modal, ScrollArea, Notification } from '@mantine/core';
 import { IconEdit, IconTrash, IconPlus, IconSparkles, IconAlertCircle } from '@tabler/icons-react';
-import { useMediaQuery } from '@mantine/hooks';
 import { fetchApi } from '../lib/api';
 
 export default function Settings() {
-  const isMobile = useMediaQuery('(max-width: 48em)');
-  const [activeTab, setActiveTab] = useState('profile');
   
   const [profile, setProfile] = useState({ nickname: '', full_name: '', email: '' });
   const [quotas, setQuotas] = useState(null);
@@ -56,6 +53,13 @@ export default function Settings() {
     };
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (message) {
+      const t = setTimeout(() => setMessage(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [message]);
 
   const handleProfileUpdate = async () => {
     setSaving(true);
@@ -211,260 +215,263 @@ export default function Settings() {
   }
 
   return (
-    <Box maw={1200}>
+    <Box maw={1400}>
       <Title order={2} mb="xl">Account Settings</Title>
 
-      <Tabs value={activeTab} onChange={setActiveTab} orientation={isMobile ? 'horizontal' : 'vertical'} variant="pills">
-        <Tabs.List mr={isMobile ? 0 : 'xl'} style={{ minWidth: isMobile ? undefined : 200 }}>
-          <Tabs.Tab value="profile" ta="left">Profile</Tabs.Tab>
-          <Tabs.Tab value="account" ta="left">Account & Security</Tabs.Tab>
-          <Tabs.Tab value="prompts" ta="left">Prompt Templates</Tabs.Tab>
-          <Tabs.Tab value="usage" ta="left">Usage & Quotas</Tabs.Tab>
-        </Tabs.List>
+      {message && (
+        <Box style={{ position: 'fixed', top: 20, right: 20, zIndex: 1000 }}>
+          <Notification
+            withBorder
+            withCloseButton
+            onClose={() => setMessage(null)}
+            color={message.type === 'error' ? 'red' : 'teal'}
+            title={message.type === 'error' ? 'Error' : 'Success'}
+          >
+            {message.text}
+          </Notification>
+        </Box>
+      )}
 
-        <Tabs.Panel value="profile">
-          <Paper withBorder p="xl" radius="md">
-            <Title order={4} mb="md">Public Profile</Title>
-            {message && <Text color={message.type === 'error' ? 'red' : 'teal'} mb="md">{message.text}</Text>}
-            <Stack>
-              <TextInput 
-                label="Nickname" 
-                value={profile.nickname} 
-                onChange={(e) => setProfile({...profile, nickname: e.currentTarget.value})} 
-              />
-              <TextInput 
-                label="Full Name" 
-                value={profile.full_name} 
-                onChange={(e) => setProfile({...profile, full_name: e.currentTarget.value})} 
-              />
-              
-              <Group justify="flex-end" mt="md">
-                <Button onClick={handleProfileUpdate} loading={saving}>Save Changes</Button>
-              </Group>
-            </Stack>
-          </Paper>
-        </Tabs.Panel>
-
-        <Tabs.Panel value="account">
-          <Paper withBorder p="xl" radius="md">
-            <Title order={4} mb="md">Change Password</Title>
-            {message && <Text color={message.type === 'error' ? 'red' : 'teal'} mb="md">{message.text}</Text>}
-            <Stack>
-              <PasswordInput
-                label="Current Password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.currentTarget.value)}
-              />
-              <PasswordInput
-                label="New Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.currentTarget.value)}
-              />
-              <Group justify="flex-end" mt="md">
-                <Button
-                  variant="light"
-                  onClick={handlePasswordRequest}
-                  loading={changingPassword}
-                  disabled={!currentPassword || !newPassword}
-                >
-                  Change Password
-                </Button>
-              </Group>
-            </Stack>
-
-            <Divider my="xl" />
-
-            <Title order={4} mb="md">Email Address</Title>
-            <Text size="sm" c="dimmed" mb="md">
-              Current email: <b>{profile.email}</b>
-            </Text>
-            <Stack>
-              <TextInput
-                label="New Email"
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.currentTarget.value)}
-                placeholder="your@newemail.com"
-              />
-              <PasswordInput
-                label="Confirm with Password"
-                value={emailPassword}
-                onChange={(e) => setEmailPassword(e.currentTarget.value)}
-              />
-              <Group justify="flex-end" mt="md">
-                <Button
-                  variant="light"
-                  onClick={handleChangeEmail}
-                  loading={changingEmail}
-                  disabled={!newEmail || !emailPassword}
-                >
-                  Change Email
-                </Button>
-              </Group>
-            </Stack>
-
-            <Divider my="xl" />
-
-            <Title order={4} mb="md" c="red">Danger Zone</Title>
-            <Group gap="xs" mb="md">
-              <IconAlertCircle size={20} color="var(--mantine-color-red-6)" />
-              <Text size="sm" c="dimmed">
-                Once you delete your account, there is no going back. Please be certain.
-              </Text>
+      <Box
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))',
+          gap: 'var(--mantine-spacing-md)',
+          alignItems: 'start',
+        }}
+      >
+        <Paper withBorder p="xl" radius="md">
+          <Title order={4} mb="md">Public Profile</Title>
+          <Stack>
+            <TextInput 
+              label="Nickname" 
+              value={profile.nickname} 
+              onChange={(e) => setProfile({...profile, nickname: e.currentTarget.value})} 
+            />
+            <TextInput 
+              label="Full Name" 
+              value={profile.full_name} 
+              onChange={(e) => setProfile({...profile, full_name: e.currentTarget.value})} 
+            />
+            <Group justify="flex-end" mt="md">
+              <Button onClick={handleProfileUpdate} loading={saving}>Save Changes</Button>
             </Group>
-            <Button color="red" variant="outline" onClick={() => setDeleteConfirmOpened(true)}>
-              Delete Account
-            </Button>
-          </Paper>
-        </Tabs.Panel>
+          </Stack>
+        </Paper>
 
-        <Tabs.Panel value="prompts">
-          <Paper withBorder p="xl" radius="md">
-            <Group justify="space-between" align="center" mb="xl">
-              <div>
-                <Title order={4} mb="xs">Custom Prompt Templates</Title>
-                <Text size="sm" c="dimmed">
-                  Manage your custom prompt templates used for generating summaries.
-                </Text>
-              </div>
-              <Button leftSection={<IconPlus size={16} />} onClick={() => {
-                setEditingPrompt(null);
-                setPromptName('');
-                setPromptContent('');
-                setNewPromptInput('');
-                setCreatePromptModalOpened(true);
-              }}>
-                Create Template
+        <Paper withBorder p="xl" radius="md">
+          <Title order={4} mb="md">Change Password</Title>
+          <Stack>
+            <PasswordInput
+              label="Current Password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.currentTarget.value)}
+            />
+            <PasswordInput
+              label="New Password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.currentTarget.value)}
+            />
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={handlePasswordRequest}
+                loading={changingPassword}
+                disabled={!currentPassword || !newPassword}
+              >
+                Change Password
               </Button>
             </Group>
+          </Stack>
+        </Paper>
 
-            <Title order={5} mb="sm">Your Templates</Title>
-            {userPrompts.length === 0 ? (
-              <Text c="dimmed" size="sm">You haven't created any custom templates yet.</Text>
-            ) : (
-              <ScrollArea>
-              <Table>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Name</Table.Th>
-                    <Table.Th style={{ width: '100px' }}>Actions</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {userPrompts.map(prompt => (
-                    <Table.Tr key={prompt.id}>
-                      <Table.Td>{prompt.name}</Table.Td>
-                      <Table.Td>
-                        <Group gap="xs" wrap="nowrap">
-                          <ActionIcon variant="subtle" color="blue" onClick={() => handleEditPrompt(prompt)}>
-                            <IconEdit size={16} />
-                          </ActionIcon>
-                          <ActionIcon variant="subtle" color="red" onClick={() => handleDeletePrompt(prompt.id)}>
-                            <IconTrash size={16} />
-                          </ActionIcon>
-                        </Group>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table></ScrollArea>
-            )}
-          </Paper>
-        </Tabs.Panel>
+        <Paper withBorder p="xl" radius="md">
+          <Title order={4} mb="md">Email Address</Title>
+          <Text size="sm" c="dimmed" mb="md">
+            Current email: <b>{profile.email}</b>
+          </Text>
+          <Stack>
+            <TextInput
+              label="New Email"
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.currentTarget.value)}
+              placeholder="your@newemail.com"
+            />
+            <PasswordInput
+              label="Confirm with Password"
+              value={emailPassword}
+              onChange={(e) => setEmailPassword(e.currentTarget.value)}
+            />
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={handleChangeEmail}
+                loading={changingEmail}
+                disabled={!newEmail || !emailPassword}
+              >
+                Change Email
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
 
-        <Tabs.Panel value="usage">
-          <Paper withBorder p="xl" radius="md">
-            <Title order={4} mb="xs">Usage & Quotas</Title>
-            {quotas && (
-              <Text size="sm" c="dimmed" mb="xl">
-                Plan: <b>{quotas.tier_name}</b>
+        <Paper withBorder p="xl" radius="md">
+          <Title order={4} mb="md" c="red">Danger Zone</Title>
+          <Group gap="xs" mb="md">
+            <IconAlertCircle size={20} color="var(--mantine-color-red-6)" />
+            <Text size="sm" c="dimmed">
+              Once you delete your account, there is no going back. Please be certain.
+            </Text>
+          </Group>
+          <Button color="red" variant="outline" onClick={() => setDeleteConfirmOpened(true)}>
+            Delete Account
+          </Button>
+        </Paper>
+
+        <Paper withBorder p="xl" radius="md">
+          <Group justify="space-between" align="center" mb="xl">
+            <div>
+              <Title order={4} mb="xs">Custom Prompt Templates</Title>
+              <Text size="sm" c="dimmed">
+                Manage your custom prompt templates used for generating summaries.
               </Text>
-            )}
+            </div>
+            <Button leftSection={<IconPlus size={16} />} onClick={() => {
+              setEditingPrompt(null);
+              setPromptName('');
+              setPromptContent('');
+              setNewPromptInput('');
+              setCreatePromptModalOpened(true);
+            }}>
+              Create Template
+            </Button>
+          </Group>
 
-            {quotas && (() => {
-              const q = quotas.quotas || {};
-              const sumUsed = (...keys) => keys.reduce((s, k) => s + (q[k]?.used || 0), 0);
-              const sumLimit = (...keys) => {
-                const vals = keys.map(k => q[k]?.limit).filter(v => v !== undefined);
-                if (vals.some(v => v === -1)) return -1;
-                return vals.reduce((s, v) => s + v, 0);
-              };
-              const isUnlimited = (...keys) => keys.some(k => q[k]?.unlimited || q[k]?.limit === -1);
-              const cards = [
-                {
-                  key: 'items_processed',
-                  label: 'Items Processed',
-                  color: 'blue',
-                  used: sumUsed('resources', 'notes', 'exercises'),
-                  limit: sumLimit('resources', 'notes', 'exercises'),
-                  unlimited: isUnlimited('resources', 'notes', 'exercises'),
-                  reset_period: q.notes?.reset_period,
-                },
-                {
-                  key: 'chat_messages',
-                  label: 'Chat Messages',
-                  color: 'indigo',
-                  used: sumUsed('conversations', 'messages'),
-                  limit: sumLimit('conversations', 'messages'),
-                  unlimited: isUnlimited('conversations', 'messages'),
-                  reset_period: q.messages?.reset_period,
-                },
-                { key: 'subjects', label: 'Subjects', color: 'violet', ...q.subjects },
-                { key: 'groups', label: 'Groups', color: 'grape', ...q.groups },
-                {
-                  key: 'storage_gb',
-                  label: 'Storage (GB)',
-                  color: 'teal',
-                  ...q.storage_gb,
-                  used: q.storage_gb?.used !== undefined ? Number(q.storage_gb.used).toFixed(1) : 0,
-                },
-              ];
-              return (
-                <Box
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                    gap: 'var(--mantine-spacing-md)',
-                    alignItems: 'stretch',
-                  }}
-                >
-                  {cards.map(q => {
-                    if (!q) return null;
-                    const pct = q.limit > 0 ? Math.round((Math.min(q.used, q.limit) / q.limit) * 100) : 0;
-                    const color = pct >= 90 ? 'red' : pct >= 75 ? 'yellow' : q.color;
-                    const period = q.reset_period ? `per ${q.reset_period}` : 'lifetime';
-                    return (
-                      <Paper key={q.key} withBorder p="sm" radius="md">
-                        <Group gap="sm" wrap="nowrap">
-                          <RingProgress
-                            size={54}
-                            thickness={5}
-                            roundCaps
-                            sections={[{ value: pct, color }]}
-                          />
-                          <Box style={{ flex: 1, minWidth: 0 }}>
-                            <Group gap="xs" wrap="nowrap" justify="space-between">
-                              <Text size="sm" fw={500}>{q.label}</Text>
-                              <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-                                {q.unlimited
-                                  ? `${q.used} (unlimited, ${period})`
-                                  : `${q.used} / ${q.limit} (${period})`
-                                }
-                              </Text>
-                            </Group>
-                          </Box>
-                        </Group>
-                      </Paper>
-                    );
-                  })}
-                </Box>
-              );
-            })()}
+          <Title order={5} mb="sm">Your Templates</Title>
+          {userPrompts.length === 0 ? (
+            <Text c="dimmed" size="sm">You haven't created any custom templates yet.</Text>
+          ) : (
+            <ScrollArea>
+            <Table>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Name</Table.Th>
+                  <Table.Th style={{ width: '100px' }}>Actions</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {userPrompts.map(prompt => (
+                  <Table.Tr key={prompt.id}>
+                    <Table.Td>{prompt.name}</Table.Td>
+                    <Table.Td>
+                      <Group gap="xs" wrap="nowrap">
+                        <ActionIcon variant="subtle" color="blue" onClick={() => handleEditPrompt(prompt)}>
+                          <IconEdit size={16} />
+                        </ActionIcon>
+                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeletePrompt(prompt.id)}>
+                          <IconTrash size={16} />
+                        </ActionIcon>
+                      </Group>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table></ScrollArea>
+          )}
+        </Paper>
 
-            {!quotas && <Text c="dimmed">No quota data available.</Text>}
-          </Paper>
-        </Tabs.Panel>
-      </Tabs>
+        <Paper withBorder p="xl" radius="md">
+          <Title order={4} mb="xs">Usage & Quotas</Title>
+          {quotas && (
+            <Text size="sm" c="dimmed" mb="xl">
+              Plan: <b>{quotas.tier_name}</b>
+            </Text>
+          )}
+
+          {quotas && (() => {
+            const q = quotas.quotas || {};
+            const sumUsed = (...keys) => keys.reduce((s, k) => s + (q[k]?.used || 0), 0);
+            const sumLimit = (...keys) => {
+              const vals = keys.map(k => q[k]?.limit).filter(v => v !== undefined);
+              if (vals.some(v => v === -1)) return -1;
+              return vals.reduce((s, v) => s + v, 0);
+            };
+            const isUnlimited = (...keys) => keys.some(k => q[k]?.unlimited || q[k]?.limit === -1);
+            const cards = [
+              {
+                key: 'items_processed',
+                label: 'Items Processed',
+                color: 'blue',
+                used: sumUsed('resources', 'notes', 'exercises'),
+                limit: sumLimit('resources', 'notes', 'exercises'),
+                unlimited: isUnlimited('resources', 'notes', 'exercises'),
+                reset_period: q.notes?.reset_period,
+              },
+              {
+                key: 'chat_messages',
+                label: 'Chat Messages',
+                color: 'indigo',
+                used: sumUsed('conversations', 'messages'),
+                limit: sumLimit('conversations', 'messages'),
+                unlimited: isUnlimited('conversations', 'messages'),
+                reset_period: q.messages?.reset_period,
+              },
+              { key: 'subjects', label: 'Subjects', color: 'violet', ...q.subjects },
+              { key: 'groups', label: 'Groups', color: 'grape', ...q.groups },
+              {
+                key: 'storage_gb',
+                label: 'Storage (GB)',
+                color: 'teal',
+                ...q.storage_gb,
+                used: q.storage_gb?.used !== undefined ? Number(q.storage_gb.used).toFixed(1) : 0,
+              },
+            ];
+            return (
+              <Box
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                  gap: 'var(--mantine-spacing-md)',
+                  alignItems: 'stretch',
+                }}
+              >
+                {cards.map(q => {
+                  if (!q) return null;
+                  const pct = q.limit > 0 ? Math.round((Math.min(q.used, q.limit) / q.limit) * 100) : 0;
+                  const color = pct >= 90 ? 'red' : pct >= 75 ? 'yellow' : q.color;
+                  const period = q.reset_period ? `per ${q.reset_period}` : 'lifetime';
+                  return (
+                    <Paper key={q.key} withBorder p="sm" radius="md">
+                      <Group gap="sm" wrap="nowrap">
+                        <RingProgress
+                          size={54}
+                          thickness={5}
+                          roundCaps
+                          sections={[{ value: pct, color }]}
+                        />
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                          <Group gap="xs" wrap="nowrap" justify="space-between">
+                            <Text size="sm" fw={500}>{q.label}</Text>
+                            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                              {q.unlimited
+                                ? `${q.used} (unlimited, ${period})`
+                                : `${q.used} / ${q.limit} (${period})`
+                              }
+                            </Text>
+                          </Group>
+                        </Box>
+                      </Group>
+                    </Paper>
+                  );
+                })}
+              </Box>
+            );
+          })()}
+
+          {!quotas && <Text c="dimmed">No quota data available.</Text>}
+        </Paper>
+      </Box>
       <Modal opened={createPromptModalOpened} onClose={() => setCreatePromptModalOpened(false)} title={editingPrompt ? "Edit Custom Template" : "Create Custom Template"} centered size="lg">
         <form onSubmit={(e) => { e.preventDefault(); handleSavePrompt(); }}>
           <Stack gap="md">
