@@ -574,7 +574,7 @@ def create_invitation(
             db.query(UserInvitation)
             .filter(
                 func.lower(UserInvitation.email) == func.lower(target_email),
-                not UserInvitation.is_used,
+                UserInvitation.is_used == False,
             )
             .first()
         )

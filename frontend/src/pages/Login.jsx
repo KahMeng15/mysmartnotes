@@ -123,7 +123,7 @@ export default function Login() {
           if (data.detail && !data.access_token) {
             setError(data.detail);
           } else {
-            setSuccess('✅ Email verified! You can now log in.');
+            setSuccess('Email verified! You can now log in.');
           }
         })
         .catch(() => setError('Verification request failed.'))

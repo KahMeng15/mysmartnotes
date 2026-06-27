@@ -298,6 +298,7 @@ async def csrf_protection_middleware(request: Request, call_next):
         "/auth/password-reset-request",
         "/auth/password-reset",
         "/auth/logout",
+        "/auth/verify-email",
     }
     if request.url.path in csrf_exempt_paths:
         return await call_next(request)
