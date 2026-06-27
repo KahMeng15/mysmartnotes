@@ -226,7 +226,7 @@ def validate_invitation_token(db: Session, token: str | None, email: str) -> Use
 
     invitation = (
         db.query(UserInvitation)
-        .filter(UserInvitation.token == token, UserInvitation.is_used == False)
+        .filter(UserInvitation.token == token, not UserInvitation.is_used)
         .first()
     )
     if not invitation:
@@ -286,7 +286,7 @@ def get_invitation(token: str, db: Session = Depends(get_db)):
     """Return invitation details for a valid token (public, no auth required)"""
     invite = (
         db.query(UserInvitation)
-        .filter(UserInvitation.token == token, UserInvitation.is_used == False)
+        .filter(UserInvitation.token == token, not UserInvitation.is_used)
         .first()
     )
     if not invite:
@@ -339,7 +339,7 @@ def register(
 
         invitation = (
             db.query(UserInvitation)
-            .filter(UserInvitation.token == token, UserInvitation.is_used == False)
+            .filter(UserInvitation.token == token, not UserInvitation.is_used)
             .first()
         )
         if not invitation:
@@ -1678,7 +1678,7 @@ def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session =
         update(EmailVerificationToken)
         .where(
             EmailVerificationToken.token == verify_data.token,
-            EmailVerificationToken.is_used == False,
+            not EmailVerificationToken.is_used,
         )
         .values(is_used=True)
     )
@@ -1747,7 +1747,7 @@ def check_verification_token_validity(token: str, db: Session = Depends(get_db))
     """Check if an email verification token is still valid"""
     verify_token = (
         db.query(EmailVerificationToken)
-        .filter(EmailVerificationToken.token == token, EmailVerificationToken.is_used == False)
+        .filter(EmailVerificationToken.token == token, not EmailVerificationToken.is_used)
         .first()
     )
 
@@ -1787,7 +1787,7 @@ def resend_verification(
         db.query(EmailVerificationToken)
         .filter(
             EmailVerificationToken.email == email,
-            EmailVerificationToken.is_used == False,
+            not EmailVerificationToken.is_used,
             EmailVerificationToken.expires_at > datetime.utcnow(),
         )
         .all()

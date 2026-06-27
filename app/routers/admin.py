@@ -49,7 +49,11 @@ from app.schemas.admin import (
 from app.utils.auth import hash_password, validate_password_complexity
 from app.utils.cache import clear_cache_pattern_sync
 from app.utils.db import get_db
-from app.utils.email import send_account_approved_email, send_invitation_email, send_password_reset_email
+from app.utils.email import (
+    send_account_approved_email,
+    send_invitation_email,
+    send_password_reset_email,
+)
 from app.utils.invitation_utils import build_link_only_email, is_link_only_email
 from app.utils.observability import get_runtime_metrics_snapshot
 from app.utils.quotas import ensure_default_tier_configs
@@ -577,7 +581,7 @@ def create_invitation(
             db.query(UserInvitation)
             .filter(
                 func.lower(UserInvitation.email) == func.lower(target_email),
-                UserInvitation.is_used == False,
+                not UserInvitation.is_used,
             )
             .first()
         )
