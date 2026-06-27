@@ -43,6 +43,7 @@ from app.schemas.admin import (
     UserAdminResponse,
     UserInvitationCreate,
     UserInvitationResponse,
+    UserInvitationUpdate,
     UserLogSchema,
 )
 from app.utils.auth import hash_password, validate_password_complexity
@@ -588,6 +589,7 @@ def create_invitation(
         existing_invite.expires_at = expires_at
         existing_invite.tier = invite_data.tier
         existing_invite.email = email_value
+        existing_invite.label = invite_data.label
         db.commit()
         db.refresh(existing_invite)
         invite = existing_invite
@@ -597,6 +599,7 @@ def create_invitation(
             token=token,
             invited_by=admin.id,
             tier=invite_data.tier,
+            label=invite_data.label,
             expires_at=expires_at,
         )
         db.add(invite)
@@ -662,6 +665,41 @@ def revoke_invitation(
     db.delete(invite)
     db.commit()
     return {"message": "Invitation revoked"}
+
+
+@router.put("/invitations/{token}", response_model=UserInvitationResponse)
+def update_invitation(
+    token: str,
+    update_data: UserInvitationUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin_user),
+):
+    invite = db.query(UserInvitation).filter(UserInvitation.token == token).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    if update_data.label is not None:
+        invite.label = update_data.label
+
+    db.commit()
+    db.refresh(invite)
+
+    settings = db.query(SystemSettings).first()
+    domain = settings.domain_url if settings and settings.domain_url else "http://localhost:8000"
+    if not domain.startswith("http"):
+        domain = f"http://{domain}"
+
+    resp = UserInvitationResponse.model_validate(invite)
+    resp.send_email = not is_link_only_email(invite.email)
+    resp.invitation_link = f"{domain.rstrip('/')}/signup?token={invite.token}"
+
+    if invite.used_by:
+        accepted_user = db.query(User).filter(User.id == invite.used_by).first()
+        if accepted_user:
+            resp.accepted_by_email = accepted_user.email
+            resp.accepted_by_name = accepted_user.full_name or accepted_user.nickname or "N/A"
+
+    return resp
 
 
 # --- User Logs ---

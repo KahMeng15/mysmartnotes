@@ -482,6 +482,7 @@ class UserInvitation(Base):
     invited_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     used_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     tier = Column(String(50), default="free")
+    label = Column(String(255), nullable=True)
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

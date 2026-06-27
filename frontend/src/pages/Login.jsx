@@ -43,7 +43,7 @@ async function getFirebaseAuth() {
 
 export default function Login() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [panel, setPanel] = useState('login'); // 'login' | 'register' | 'forgot' | 'google-complete' | 'verify'
 
   const [quote, setQuote] = useState(quotes[0]);
@@ -113,21 +113,30 @@ export default function Login() {
     const verifyToken = searchParams.get('verify_token');
     if (verifyToken) {
       setPanel('verify');
+      const controller = new AbortController();
       fetch('/api/auth/verify-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: verifyToken }),
+        signal: controller.signal,
       })
         .then(r => r.json())
         .then(data => {
+          setPanel('login');
+          setSearchParams({}, { replace: true });
           if (data.detail && !data.access_token) {
             setError(data.detail);
           } else {
             setSuccess('Email verified! You can now log in.');
           }
         })
-        .catch(() => setError('Verification request failed.'))
-        .finally(() => setPanel('login'));
+        .catch(err => {
+          if (err.name === 'AbortError') return;
+          setPanel('login');
+          setSearchParams({}, { replace: true });
+          setError('Verification request failed.');
+        });
+      return () => controller.abort();
     }
   }, []);
 
@@ -277,7 +286,7 @@ export default function Login() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: regEmail,
+          email: invitedEmail || regEmail,
           password: regPassword,
           nickname: regNickname,
           full_name: regFullName,
@@ -294,6 +303,7 @@ export default function Login() {
         throw new Error(msg);
       }
       setError(null);
+      setSearchParams({}, { replace: true });
       setPanel('registration-done');
     } catch (err) {
       setError(err.message);
@@ -627,7 +637,7 @@ export default function Login() {
               {signupConfig === 'approval' ? (
                 <>
                   <Text size="md" c="dimmed" mb="xs">
-                    We've sent a verification email to <strong>{regEmail}</strong>.
+                    We've sent a verification email to <strong>{invitedEmail || regEmail}</strong>.
                   </Text>
                   <Text size="md" c="dimmed" mb="xs">
                     ✅ Please verify your email using the link sent to your inbox.
@@ -639,7 +649,7 @@ export default function Login() {
               ) : (
                 <>
                   <Text size="md" c="dimmed" mb="xs">
-                    We've sent a verification email to <strong>{regEmail}</strong>.
+                    We've sent a verification email to <strong>{invitedEmail || regEmail}</strong>.
                   </Text>
                   <Text size="md" c="dimmed" mb="xl">
                     Please check your inbox (and spam folder) and click the link to verify your account before logging in.
@@ -654,7 +664,7 @@ export default function Login() {
                 {resending ? (
                   'Sending…'
                 ) : (
-                  <Anchor component="button" type="button" size="sm" onClick={() => handleResendVerification(regEmail)}>
+                  <Anchor component="button" type="button" size="sm" onClick={() => handleResendVerification(invitedEmail || regEmail)}>
                     Resend verification email
                   </Anchor>
                 )}
@@ -700,6 +710,13 @@ export default function Login() {
                 Finish Sign Up
               </Button>
             </form>
+          )}
+
+          {/* ── VERIFY ── */}
+          {panel === 'verify' && (
+            <Box py={60}>
+              <Text size="lg" c="dimmed">Verifying your email, please hang on…</Text>
+            </Box>
           )}
 
           {/* ── FORGOT PASSWORD ── */}

@@ -1663,36 +1663,57 @@ class EmailVerifySubmit(BaseModel):
 def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session = Depends(get_db)):
     """Verify email with valid token"""
 
-    # Find the verification token
+    # Atomically claim the token — only succeeds if not yet used and not expired
+    from sqlalchemy import update
+
+    result = db.execute(
+        update(EmailVerificationToken)
+        .where(
+            EmailVerificationToken.token == verify_data.token,
+            EmailVerificationToken.is_used == False,
+        )
+        .values(is_used=True)
+    )
+    db.commit()
+
+    if result.rowcount == 0:
+        # Token not found or already used
+        token = (
+            db.query(EmailVerificationToken)
+            .filter(EmailVerificationToken.token == verify_data.token)
+            .first()
+        )
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification link.",
+            )
+        if token.expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification link has expired. Please request a new one by trying to log in.",
+            )
+        # Token was claimed by a concurrent request — if user is already verified, treat as success
+        user = db.query(User).filter(User.id == token.user_id).first()
+        if user and user.is_verified:
+            return {"message": "Email verified successfully! You can now log in."}
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification link has already been used.",
+        )
+
+    # Fetch the now-used token and its user
     verify_token = (
         db.query(EmailVerificationToken)
-        .filter(
-            EmailVerificationToken.token == verify_data.token, EmailVerificationToken.is_used == False
-        )
+        .filter(EmailVerificationToken.token == verify_data.token)
         .first()
     )
-
-    if not verify_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or already-used verification link.",
-        )
-
-    # Check if token has expired
-    if verify_token.expires_at < datetime.utcnow():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification link has expired. Please request a new one by trying to log in.",
-        )
-
-    # Get user
     user = db.query(User).filter(User.id == verify_token.user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found.")
 
-    # Update verification status
+    # Update user verification status
     user.is_verified = True
-    verify_token.is_used = True
 
     # Log action
     ip_address = request.client.host if request.client else None
@@ -1703,12 +1724,12 @@ def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session =
         )
     )
 
-    # Send welcome email
+    db.commit()
+
+    # Send welcome email (after commit, so concurrent duplicates are blocked)
     from app.utils.email import send_welcome_email
 
     send_welcome_email(db, user.email, user.full_name or user.nickname)
-
-    db.commit()
 
     return {"message": "Email verified successfully! You can now log in."}
 

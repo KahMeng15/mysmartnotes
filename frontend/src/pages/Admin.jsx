@@ -289,10 +289,17 @@ function AdminPendingApprovals() {
 
 function AdminInvitations() {
   const [invites, setInvites] = useState([]);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [resultModalOpen, setResultModalOpen] = useState(false);
+  const [resultLink, setResultLink] = useState('');
+  const [resultMessage, setResultMessage] = useState('');
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [editingInvite, setEditingInvite] = useState(null);
+  const [editLabel, setEditLabel] = useState('');
   const [inviteMethod, setInviteMethod] = useState('email');
   const [email, setEmail] = useState('');
   const [tier, setTier] = useState('free');
+  const [inviteLabel, setInviteLabel] = useState('');
   const isMobile = useMediaQuery('(max-width: 48em)');
 
   const loadInvites = async () => {
@@ -311,22 +318,34 @@ function AdminInvitations() {
   const sendInvite = async () => {
     try {
       const sendEmail = inviteMethod === 'email';
-      const payload = { tier, send_email: sendEmail };
+      const payload = { tier, send_email: sendEmail, label: inviteLabel || undefined };
       if (sendEmail) payload.email = email;
       const res = await fetchApi('/admin/invitations', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
+      setCreateModalOpen(false);
+      setResultLink(res.invitation_link);
       if (sendEmail) {
-        alert(`Invitation email sent to ${email}`);
+        setResultMessage(`Invitation email sent to ${email}`);
       } else {
-        alert(`Invitation Link: ${res.invitation_link}`);
+        setResultMessage('Shareable invitation link created');
       }
-      setModalOpen(false);
+      setResultModalOpen(true);
+      setInviteLabel('');
+      setEmail('');
       loadInvites();
     } catch (e) {
       alert(e.message);
     }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(resultLink).then(() => {
+      alert('Link copied to clipboard');
+    }).catch(() => {
+      prompt('Copy this link:', resultLink);
+    });
   };
 
   const handleRevoke = async (token) => {
@@ -342,11 +361,32 @@ function AdminInvitations() {
     }
   };
 
+  const handleSaveLabel = async () => {
+    if (!editingInvite) return;
+    try {
+      await fetchApi(`/admin/invitations/${editingInvite.token}`, {
+        method: 'PUT',
+        body: JSON.stringify({ label: editLabel || null })
+      });
+      setLabelModalOpen(false);
+      setEditingInvite(null);
+      loadInvites();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  const openLabelModal = (invite) => {
+    setEditingInvite(invite);
+    setEditLabel(invite.label || '');
+    setLabelModalOpen(true);
+  };
+
   return (
     <Stack>
       <Group justify="space-between">
         <Title order={3}>Pending Invitations</Title>
-        <Button onClick={() => setModalOpen(true)}>New Invitation</Button>
+        <Button onClick={() => setCreateModalOpen(true)}>New Invitation</Button>
       </Group>
       <ScrollArea>
         <Table striped horizontalSpacing={isMobile ? 'xs' : 'sm'}>
@@ -354,9 +394,11 @@ function AdminInvitations() {
             <Table.Tr>
               <Table.Th>Email</Table.Th>
               <Table.Th>Method</Table.Th>
+              <Table.Th>Label</Table.Th>
               <Table.Th>Token</Table.Th>
               <Table.Th>Tier</Table.Th>
               <Table.Th>Status</Table.Th>
+              <Table.Th>Used By</Table.Th>
               <Table.Th>Actions</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -365,13 +407,30 @@ function AdminInvitations() {
               <Table.Tr key={i.token}>
                 <Table.Td>{i.send_email ? i.email : 'Link only'}</Table.Td>
                 <Table.Td>{i.send_email ? 'Email' : 'Link'}</Table.Td>
-                <Table.Td>{i.token.substring(0, 8)}...</Table.Td>
+                <Table.Td>
+                  <Group gap={4} wrap="nowrap">
+                    <Text size="sm" lineClamp={1}>{i.label || '—'}</Text>
+                    <Button size="xs" variant="subtle" compact onClick={() => openLabelModal(i)}>
+                      {i.label ? 'Edit' : 'Add'}
+                    </Button>
+                  </Group>
+                </Table.Td>
+                <Table.Td><Text size="xs" ff="mono">{i.token.substring(0, 8)}...</Text></Table.Td>
                 <Table.Td>{i.tier}</Table.Td>
                 <Table.Td>{i.is_used ? 'Used' : 'Pending'}</Table.Td>
                 <Table.Td>
-                  {!i.is_used && (
-                    <Button size="xs" color="red" variant="subtle" loading={revoking === i.token} onClick={() => handleRevoke(i.token)}>Revoke</Button>
+                  {i.is_used && i.accepted_by_email ? (
+                    <Text size="sm" lineClamp={1}>{i.accepted_by_email}</Text>
+                  ) : (
+                    <Text size="sm" c="dimmed">—</Text>
                   )}
+                </Table.Td>
+                <Table.Td>
+                  <Group gap={4} wrap="nowrap">
+                    {!i.is_used && (
+                      <Button size="xs" color="red" variant="subtle" loading={revoking === i.token} onClick={() => handleRevoke(i.token)}>Revoke</Button>
+                    )}
+                  </Group>
                 </Table.Td>
               </Table.Tr>
             ))}
@@ -379,7 +438,7 @@ function AdminInvitations() {
         </Table>
       </ScrollArea>
 
-      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title="Invite User" fullScreen={isMobile}>
+      <Modal opened={createModalOpen} onClose={() => { setCreateModalOpen(false); setInviteLabel(''); }} title="Invite User" fullScreen={isMobile}>
         <Stack>
           <Radio.Group value={inviteMethod} onChange={setInviteMethod} label="Method">
             <Group>
@@ -396,7 +455,24 @@ function AdminInvitations() {
             {value: 'early_tester', label: 'Early Testers'},
             {value: 'free', label: 'Free'}
           ]} />
+          <TextInput label="Label (optional)" value={inviteLabel} onChange={(e) => setInviteLabel(e.currentTarget.value)} placeholder="e.g. John's invite" />
           <Button onClick={sendInvite}>Create Invitation</Button>
+        </Stack>
+      </Modal>
+
+      <Modal opened={resultModalOpen} onClose={() => setResultModalOpen(false)} title="Invitation Created" fullScreen={isMobile}>
+        <Stack>
+          <Text size="sm">{resultMessage}</Text>
+          <TextInput label="Invitation Link" value={resultLink} readOnly />
+          <Button onClick={handleCopyLink}>Copy Link</Button>
+        </Stack>
+      </Modal>
+
+      <Modal opened={labelModalOpen} onClose={() => setLabelModalOpen(false)} title="Edit Invitation Label" fullScreen={isMobile}>
+        <Stack>
+          <TextInput label="Email" value={editingInvite?.email || ''} disabled />
+          <TextInput label="Label" value={editLabel} onChange={(e) => setEditLabel(e.currentTarget.value)} placeholder="Optional label" />
+          <Button onClick={handleSaveLabel}>Save</Button>
         </Stack>
       </Modal>
     </Stack>

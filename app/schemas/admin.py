@@ -56,6 +56,7 @@ class UserInvitationCreate(BaseModel):
     email: EmailStr | None = None
     tier: str = "free"
     send_email: bool = True
+    label: str | None = None
 
     @model_validator(mode="after")
     def ensure_email_when_sending(self):
@@ -64,12 +65,17 @@ class UserInvitationCreate(BaseModel):
         return self
 
 
+class UserInvitationUpdate(BaseModel):
+    label: str | None = None
+
+
 class UserInvitationResponse(BaseModel):
     id: int
     email: str
     token: str
     invited_by: int
     tier: str
+    label: str | None = None
     is_used: bool
     used_by: int | None = None
     accepted_by_email: str | None = None
