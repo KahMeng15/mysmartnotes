@@ -1663,6 +1663,14 @@ class EmailVerifySubmit(BaseModel):
 def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session = Depends(get_db)):
     """Verify email with valid token"""
 
+    sys_settings = db.query(SystemSettings).first()
+    approval_mode = sys_settings.signup_config == "approval" if sys_settings else False
+    success_msg = (
+        "Email verified! Please wait for the admin to approve your access. You will receive an email."
+        if approval_mode
+        else "Email verified successfully! You can now log in."
+    )
+
     # Atomically claim the token — only succeeds if not yet used and not expired
     from sqlalchemy import update
 
@@ -1696,7 +1704,7 @@ def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session =
         # Token was claimed by a concurrent request — if user is already verified, treat as success
         user = db.query(User).filter(User.id == token.user_id).first()
         if user and user.is_verified:
-            return {"message": "Email verified successfully! You can now log in."}
+            return {"message": success_msg}
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Verification link has already been used.",
@@ -1731,7 +1739,7 @@ def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session =
 
     send_welcome_email(db, user.email, user.full_name or user.nickname)
 
-    return {"message": "Email verified successfully! You can now log in."}
+    return {"message": success_msg}
 
 
 @router.get("/email-verification-token-valid")

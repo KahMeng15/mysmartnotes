@@ -15,7 +15,7 @@ import {
   Alert,
   Divider,
 } from '@mantine/core';
-import { IconCheck, IconAlertCircle } from '@tabler/icons-react';
+import { IconCheck, IconAlertCircle, IconInfoCircle } from '@tabler/icons-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi, setAuthToken } from '../lib/api';
 
@@ -127,7 +127,7 @@ export default function Login() {
           if (data.detail && !data.access_token) {
             setError(data.detail);
           } else {
-            setSuccess('Email verified! You can now log in.');
+            setSuccess(data.message || 'Email verified!');
           }
         })
         .catch(err => {
@@ -455,11 +455,6 @@ export default function Login() {
                   🔧 Maintenance in progress, brb
                 </Alert>
               )}
-              {signupConfig === 'approval' && !maintenanceMode && (
-                <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
-                  Account registration requires approval from an administrator.
-                </Alert>
-              )}
               {isVerificationError && (
                 <Alert icon={<IconAlertCircle size={16} />} color="red" mb="md" withCloseButton onClose={() => setError(null)}>
                   {resending ? (
@@ -518,13 +513,22 @@ export default function Login() {
                 </>
               )}
 
+              {signupConfig === 'approval' && !maintenanceMode && (
+                <Alert icon={<IconInfoCircle size={16} />} color="blue" py="xs" mt="md">
+                  <Text size="sm">Account registration requires approval from an administrator.</Text>
+                </Alert>
+              )}
+
               <Group mt="lg" gap="xs">
                 {signupConfig === 'invite' ? (
                   <Text size="sm" c="dimmed">Invite only system, contact the system administrator to sign up and use this app.</Text>
                 ) : maintenanceMode ? null : (
-                  <Anchor component="button" type="button" size="sm" fw={600} onClick={() => switchPanel('register')}>
-                    Sign up
+                  <>
+                  <Text size="sm" c="dimmed">Don't have an account? </Text>
+                  <Anchor component="button" type="button" size="sm" c="blue" onClick={() => switchPanel('register')}>
+                    Sign Up
                   </Anchor>
+                  </>
                 )}
               </Group>
               <Group mt={5}>
@@ -549,11 +553,6 @@ export default function Login() {
               </Box>
             ) : (
             <form onSubmit={handleRegister}>
-              {signupConfig === 'approval' && (
-                <Alert icon={<IconAlertCircle size={16} />} color="blue" mb="md">
-                  After verifying your email, your account will need to be approved by an administrator before you can log in.
-                </Alert>
-              )}
               <Button
                 id="btn-google-signup"
                 fullWidth
@@ -622,6 +621,12 @@ export default function Login() {
                 Create Account
               </Button>
 
+              {signupConfig === 'approval' && (
+                <Alert icon={<IconInfoCircle size={16} />} color="blue" py="xs" mt="md">
+                  <Text size="sm">After verifying your email, your account will need to be approved by an administrator before you can log in.</Text>
+                </Alert>
+              )}
+
               <Group mt="md">
                 <Text size="sm" c="dimmed">Already have an account?</Text>
                 <Anchor component="button" type="button" size="sm" fw={600} onClick={() => switchPanel('login')}>
@@ -642,7 +647,7 @@ export default function Login() {
                     We've sent a verification email to <strong>{invitedEmail || regEmail}</strong>.
                   </Text>
                   <Text size="md" c="dimmed" mb="xs">
-                    ✅ Please verify your email using the link sent to your inbox.
+                    Please verify your email using the link sent to your inbox.
                   </Text>
                   <Text size="md" c="dimmed" mb="xl">
                     After verification, your account will be reviewed by an administrator. You'll receive an email once your account is approved.
