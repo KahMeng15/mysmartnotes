@@ -76,7 +76,7 @@ export default function Login() {
   const [googleFullName, setGoogleFullName] = useState('');
   const [googleAgreeTos, setGoogleAgreeTos] = useState(false);
   const [googleAgreePrivacy, setGoogleAgreePrivacy] = useState(false);
-  const [googleFairUse, setGoogleAgreeFairUse] = useState(false);
+  const [googleAgreeFairUse, setGoogleAgreeFairUse] = useState(false);
 
   // Public settings
   const [signupConfig, setSignupConfig] = useState('open');
@@ -207,13 +207,14 @@ export default function Login() {
     try {
       const auth = await getFirebaseAuth();
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
       const idToken = await result.user.getIdToken();
 
       const res = await fetch('/api/auth/google-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
+        body: JSON.stringify({ idToken, invitation_token: invitationToken }),
       });
       const data = await res.json();
 
@@ -255,6 +256,7 @@ export default function Login() {
           idToken: googleIdToken,
           nickname: googleNickname,
           full_name: googleFullName,
+          invitation_token: invitationToken,
           agree_tos: googleAgreeTos,
           agree_privacy: googleAgreePrivacy,
           agree_fair_use: googleAgreeFairUse,
@@ -714,7 +716,7 @@ export default function Login() {
 
           {/* ── VERIFY ── */}
           {panel === 'verify' && (
-            <Box py={60}>
+            <Box py={0}>
               <Text size="lg" c="dimmed">Verifying your email, please hang on…</Text>
             </Box>
           )}
