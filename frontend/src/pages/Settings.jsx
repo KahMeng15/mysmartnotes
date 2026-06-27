@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Box, Title, Paper, Tabs, TextInput, Textarea, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader, ActionIcon, Table, Modal, ScrollArea } from '@mantine/core';
-import { IconEdit, IconTrash, IconPlus, IconSparkles } from '@tabler/icons-react';
+import { Box, Title, Paper, Tabs, TextInput, PasswordInput, Textarea, Button, Group, Stack, Text, Divider, RingProgress, Center, Loader, ActionIcon, Table, Modal, ScrollArea } from '@mantine/core';
+import { IconEdit, IconTrash, IconPlus, IconSparkles, IconAlertCircle } from '@tabler/icons-react';
 import { useMediaQuery } from '@mantine/hooks';
 import { fetchApi } from '../lib/api';
 
@@ -9,12 +9,19 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   
   const [profile, setProfile] = useState({ nickname: '', full_name: '', email: '' });
-  const [stats, setStats] = useState(null);
   const [quotas, setQuotas] = useState(null);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [changingEmail, setChangingEmail] = useState(false);
+  const [deleteConfirmOpened, setDeleteConfirmOpened] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [userPrompts, setUserPrompts] = useState([]);
   const [editingPrompt, setEditingPrompt] = useState(null);
@@ -28,10 +35,9 @@ export default function Settings() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [profileData, statsData, quotasData, promptsData] = await Promise.all([
+        const [profileData, quotasData, promptsData] = await Promise.all([
           fetchApi('/auth/me'),
-          fetchApi('/auth/stats'),
-          fetchApi('/auth/quotas').catch(() => null), // Ignore if 404
+          fetchApi('/auth/quotas').catch(() => null),
           fetchApi('/prompts').catch(() => [])
         ]);
         
@@ -40,7 +46,6 @@ export default function Settings() {
           full_name: profileData.full_name || '',
           email: profileData.email || ''
         });
-        setStats(statsData);
         setQuotas(quotasData);
         setUserPrompts(promptsData || []);
       } catch (err) {
@@ -77,11 +82,56 @@ export default function Settings() {
   };
 
   const handlePasswordRequest = async () => {
+    if (!currentPassword || !newPassword) return;
+    setChangingPassword(true);
+    setMessage(null);
     try {
-      await fetchApi('/auth/request-password-change', { method: 'POST' });
-      setMessage({ type: 'success', text: 'Password reset email sent!' });
+      await fetchApi('/auth/request-password-change', {
+        method: 'POST',
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+      });
+      setMessage({ type: 'success', text: 'Password changed successfully!' });
+      setCurrentPassword('');
+      setNewPassword('');
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Failed to request password reset' });
+      setMessage({ type: 'error', text: err.message || 'Failed to change password' });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const handleChangeEmail = async () => {
+    if (!newEmail || !emailPassword) return;
+    setChangingEmail(true);
+    setMessage(null);
+    try {
+      const res = await fetchApi('/auth/change-email', {
+        method: 'POST',
+        body: JSON.stringify({ new_email: newEmail, password: emailPassword })
+      });
+      setMessage({ type: 'success', text: 'Email changed! Verification sent to new address.' });
+      setProfile(prev => ({ ...prev, email: res.email }));
+      setNewEmail('');
+      setEmailPassword('');
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Failed to change email' });
+    } finally {
+      setChangingEmail(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await fetchApi('/auth/profile', { method: 'DELETE' });
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Failed to delete account' });
+      setDeleteConfirmOpened(false);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -161,15 +211,15 @@ export default function Settings() {
   }
 
   return (
-    <Box maw={800} mx="auto">
+    <Box maw={1200}>
       <Title order={2} mb="xl">Account Settings</Title>
 
       <Tabs value={activeTab} onChange={setActiveTab} orientation={isMobile ? 'horizontal' : 'vertical'} variant="pills">
-        <Tabs.List mr={isMobile ? 0 : 'xl'}>
-          <Tabs.Tab value="profile">Profile</Tabs.Tab>
-          <Tabs.Tab value="account">Account & Security</Tabs.Tab>
-          <Tabs.Tab value="prompts">Prompt Templates</Tabs.Tab>
-          <Tabs.Tab value="usage">Usage & Quotas</Tabs.Tab>
+        <Tabs.List mr={isMobile ? 0 : 'xl'} style={{ minWidth: isMobile ? undefined : 200 }}>
+          <Tabs.Tab value="profile" ta="left">Profile</Tabs.Tab>
+          <Tabs.Tab value="account" ta="left">Account & Security</Tabs.Tab>
+          <Tabs.Tab value="prompts" ta="left">Prompt Templates</Tabs.Tab>
+          <Tabs.Tab value="usage" ta="left">Usage & Quotas</Tabs.Tab>
         </Tabs.List>
 
         <Tabs.Panel value="profile">
@@ -187,7 +237,6 @@ export default function Settings() {
                 value={profile.full_name} 
                 onChange={(e) => setProfile({...profile, full_name: e.currentTarget.value})} 
               />
-              <TextInput label="Email Address" value={profile.email} disabled />
               
               <Group justify="flex-end" mt="md">
                 <Button onClick={handleProfileUpdate} loading={saving}>Save Changes</Button>
@@ -198,22 +247,74 @@ export default function Settings() {
 
         <Tabs.Panel value="account">
           <Paper withBorder p="xl" radius="md">
-            <Title order={4} mb="md">Security</Title>
+            <Title order={4} mb="md">Change Password</Title>
             {message && <Text color={message.type === 'error' ? 'red' : 'teal'} mb="md">{message.text}</Text>}
+            <Stack>
+              <PasswordInput
+                label="Current Password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.currentTarget.value)}
+              />
+              <PasswordInput
+                label="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.currentTarget.value)}
+              />
+              <Group justify="flex-end" mt="md">
+                <Button
+                  variant="light"
+                  onClick={handlePasswordRequest}
+                  loading={changingPassword}
+                  disabled={!currentPassword || !newPassword}
+                >
+                  Change Password
+                </Button>
+              </Group>
+            </Stack>
+
+            <Divider my="xl" />
+
+            <Title order={4} mb="md">Email Address</Title>
             <Text size="sm" c="dimmed" mb="md">
-              A password reset link will be sent to your registered email address ({profile.email}).
+              Current email: <b>{profile.email}</b>
             </Text>
-            <Button variant="light" onClick={handlePasswordRequest}>
-              Request Password Change
-            </Button>
+            <Stack>
+              <TextInput
+                label="New Email"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.currentTarget.value)}
+                placeholder="your@newemail.com"
+              />
+              <PasswordInput
+                label="Confirm with Password"
+                value={emailPassword}
+                onChange={(e) => setEmailPassword(e.currentTarget.value)}
+              />
+              <Group justify="flex-end" mt="md">
+                <Button
+                  variant="light"
+                  onClick={handleChangeEmail}
+                  loading={changingEmail}
+                  disabled={!newEmail || !emailPassword}
+                >
+                  Change Email
+                </Button>
+              </Group>
+            </Stack>
 
             <Divider my="xl" />
 
             <Title order={4} mb="md" c="red">Danger Zone</Title>
-            <Text size="sm" c="dimmed" mb="md">
-              Once you delete your account, there is no going back. Please be certain.
-            </Text>
-            <Button color="red" variant="outline">Delete Account</Button>
+            <Group gap="xs" mb="md">
+              <IconAlertCircle size={20} color="var(--mantine-color-red-6)" />
+              <Text size="sm" c="dimmed">
+                Once you delete your account, there is no going back. Please be certain.
+              </Text>
+            </Group>
+            <Button color="red" variant="outline" onClick={() => setDeleteConfirmOpened(true)}>
+              Delete Account
+            </Button>
           </Paper>
         </Tabs.Panel>
 
@@ -273,50 +374,94 @@ export default function Settings() {
 
         <Tabs.Panel value="usage">
           <Paper withBorder p="xl" radius="md">
-            <Title order={4} mb="md">Account Usage</Title>
-            
-            {stats && (
-              <Group grow mb="xl" wrap="wrap">
-                <Box miw={120}>
-                  <Text size="xl" fw={700}>{stats.total_notes || 0}</Text>
-                  <Text size="sm" c="dimmed">Total Notes Processed</Text>
-                </Box>
-                <Box miw={120}>
-                  <Text size="xl" fw={700}>{stats.total_chat_messages || 0}</Text>
-                  <Text size="sm" c="dimmed">AI Questions Asked</Text>
-                </Box>
-                <Box miw={120}>
-                  <Text size="xl" fw={700}>{stats.total_quizzes_taken || 0}</Text>
-                  <Text size="sm" c="dimmed">Quizzes Completed</Text>
-                </Box>
-              </Group>
+            <Title order={4} mb="xs">Usage & Quotas</Title>
+            {quotas && (
+              <Text size="sm" c="dimmed" mb="xl">
+                Plan: <b>{quotas.tier_name}</b>
+              </Text>
             )}
 
-            {quotas && (
-              <>
-                <Divider my="xl" />
-                <Title order={4} mb="md">Current Plan: Free Tier</Title>
-                <Group>
-                  <RingProgress
-                    size={120}
-                    roundCaps
-                    thickness={8}
-                    sections={[{ value: (quotas.notes_used / quotas.notes_limit) * 100, color: 'blue' }]}
-                    label={
-                      <Text ta="center" size="xs" fw={700}>
-                        {Math.round((quotas.notes_used / quotas.notes_limit) * 100)}%
-                      </Text>
-                    }
-                  />
-                  <Box>
-                    <Text fw={500}>Document Processing Quota</Text>
-                    <Text size="sm" c="dimmed">{quotas.notes_used} of {quotas.notes_limit} documents used this month.</Text>
-                  </Box>
-                </Group>
-              </>
-            )}
-            
-            {!quotas && !stats && <Text c="dimmed">No usage data available yet.</Text>}
+            {quotas && (() => {
+              const q = quotas.quotas || {};
+              const sumUsed = (...keys) => keys.reduce((s, k) => s + (q[k]?.used || 0), 0);
+              const sumLimit = (...keys) => {
+                const vals = keys.map(k => q[k]?.limit).filter(v => v !== undefined);
+                if (vals.some(v => v === -1)) return -1;
+                return vals.reduce((s, v) => s + v, 0);
+              };
+              const isUnlimited = (...keys) => keys.some(k => q[k]?.unlimited || q[k]?.limit === -1);
+              const cards = [
+                {
+                  key: 'items_processed',
+                  label: 'Items Processed',
+                  color: 'blue',
+                  used: sumUsed('resources', 'notes', 'exercises'),
+                  limit: sumLimit('resources', 'notes', 'exercises'),
+                  unlimited: isUnlimited('resources', 'notes', 'exercises'),
+                  reset_period: q.notes?.reset_period,
+                },
+                {
+                  key: 'chat_messages',
+                  label: 'Chat Messages',
+                  color: 'indigo',
+                  used: sumUsed('conversations', 'messages'),
+                  limit: sumLimit('conversations', 'messages'),
+                  unlimited: isUnlimited('conversations', 'messages'),
+                  reset_period: q.messages?.reset_period,
+                },
+                { key: 'subjects', label: 'Subjects', color: 'violet', ...q.subjects },
+                { key: 'groups', label: 'Groups', color: 'grape', ...q.groups },
+                {
+                  key: 'storage_gb',
+                  label: 'Storage (GB)',
+                  color: 'teal',
+                  ...q.storage_gb,
+                  used: q.storage_gb?.used !== undefined ? Number(q.storage_gb.used).toFixed(1) : 0,
+                },
+              ];
+              return (
+                <Box
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                    gap: 'var(--mantine-spacing-md)',
+                    alignItems: 'stretch',
+                  }}
+                >
+                  {cards.map(q => {
+                    if (!q) return null;
+                    const pct = q.limit > 0 ? Math.round((Math.min(q.used, q.limit) / q.limit) * 100) : 0;
+                    const color = pct >= 90 ? 'red' : pct >= 75 ? 'yellow' : q.color;
+                    const period = q.reset_period ? `per ${q.reset_period}` : 'lifetime';
+                    return (
+                      <Paper key={q.key} withBorder p="sm" radius="md">
+                        <Group gap="sm" wrap="nowrap">
+                          <RingProgress
+                            size={54}
+                            thickness={5}
+                            roundCaps
+                            sections={[{ value: pct, color }]}
+                          />
+                          <Box style={{ flex: 1, minWidth: 0 }}>
+                            <Group gap="xs" wrap="nowrap" justify="space-between">
+                              <Text size="sm" fw={500}>{q.label}</Text>
+                              <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+                                {q.unlimited
+                                  ? `${q.used} (unlimited, ${period})`
+                                  : `${q.used} / ${q.limit} (${period})`
+                                }
+                              </Text>
+                            </Group>
+                          </Box>
+                        </Group>
+                      </Paper>
+                    );
+                  })}
+                </Box>
+              );
+            })()}
+
+            {!quotas && <Text c="dimmed">No quota data available.</Text>}
           </Paper>
         </Tabs.Panel>
       </Tabs>
@@ -379,6 +524,25 @@ export default function Settings() {
             </Group>
           </Stack>
         </form>
+      </Modal>
+      <Modal opened={deleteConfirmOpened} onClose={() => !deleting && setDeleteConfirmOpened(false)} title="Delete Account" centered size="sm">
+        <Stack>
+          <Group gap="xs">
+            <IconAlertCircle size={24} color="var(--mantine-color-red-6)" />
+            <Text fw={500}>Are you absolutely sure?</Text>
+          </Group>
+          <Text size="sm" c="dimmed">
+            This will permanently delete your account and all associated data. This action cannot be undone.
+          </Text>
+          <Group justify="flex-end" mt="md">
+            <Button variant="default" onClick={() => setDeleteConfirmOpened(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleDeleteAccount} loading={deleting}>
+              {deleting ? 'Deleting...' : 'Delete My Account'}
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
     </Box>
   );

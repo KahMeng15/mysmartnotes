@@ -42,9 +42,9 @@ DEFAULT_TIER_CONFIGS = {
         "max_storage_gb": 5,
         "max_exercises": 20,
         "max_notes": 50,
-        "conversations_reset_period": None,
-        "messages_reset_period": None,
-        "notes_reset_period": None,
+        "conversations_reset_period": "month",
+        "messages_reset_period": "month",
+        "notes_reset_period": "month",
     },
     "pro": {
         "display_name": "Pro",
@@ -56,9 +56,9 @@ DEFAULT_TIER_CONFIGS = {
         "max_storage_gb": 100,
         "max_exercises": 200,
         "max_notes": 500,
-        "conversations_reset_period": None,
-        "messages_reset_period": None,
-        "notes_reset_period": None,
+        "conversations_reset_period": "month",
+        "messages_reset_period": "month",
+        "notes_reset_period": "month",
     },
     "early_tester": {
         "display_name": "Early Tester",
@@ -110,7 +110,9 @@ def get_period_start(reset_period: str) -> datetime:
     """Get the start of the current period based on reset_period type"""
     now = datetime.utcnow()
 
-    if reset_period == "week":
+    if reset_period == "day":
+        period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif reset_period == "week":
         # Monday of current week
         days_since_monday = now.weekday()
         period_start = now - timedelta(days=days_since_monday)
@@ -163,7 +165,7 @@ def get_user_conversation_count(user: User, db: Session, reset_period: str | Non
 
     if reset_period:
         period_start = get_period_start(reset_period)
-        query = query.filter(ChatMessage.timestamp >= period_start)
+        query = query.filter(ChatMessage.created_at >= period_start)
 
     count = query.scalar() or 0
     return count
@@ -175,7 +177,7 @@ def get_user_message_count(user: User, db: Session, reset_period: str | None = N
 
     if reset_period:
         period_start = get_period_start(reset_period)
-        query = query.filter(ChatMessage.timestamp >= period_start)
+        query = query.filter(ChatMessage.created_at >= period_start)
 
     count = query.scalar() or 0
     return count

@@ -501,7 +501,11 @@ function AdminTiers() {
     const key = `${tierId}_${field}`;
     if (key in editValues) return editValues[key];
     const t = tiers.find(t => t.id === tierId);
-    return t ? t[field] : 0;
+    if (!t) return 0;
+    if (field === 'items_processed') return t.max_resources ?? 0;
+    if (field === 'chat_messages') return t.max_conversations ?? 0;
+    if (field === 'chat_reset_period') return t.conversations_reset_period || '';
+    return t[field] ?? 0;
   };
 
   const setEdit = (tierId, field, value) => {
@@ -510,9 +514,29 @@ function AdminTiers() {
 
   const saveTier = async (tierData) => {
     const payload = { ...tierData };
-    for (const field of ['max_notes', 'max_subjects', 'max_groups', 'max_storage_gb']) {
+    const editableFields = ['max_resources', 'max_notes', 'max_subjects', 'max_groups', 'max_conversations', 'max_messages', 'max_storage_gb', 'max_exercises', 'notes_reset_period'];
+    for (const field of editableFields) {
       const key = `${tierData.id}_${field}`;
       if (key in editValues) payload[field] = editValues[key];
+    }
+    // Items processed sets resources, notes, and exercises
+    const ipKey = `${tierData.id}_items_processed`;
+    if (ipKey in editValues) {
+      const v = editValues[ipKey];
+      payload.max_resources = v; payload.max_notes = v; payload.max_exercises = v;
+    }
+    // Chat messages numeric sets conversations and messages
+    const cmKey = `${tierData.id}_chat_messages`;
+    if (cmKey in editValues) {
+      const v = editValues[cmKey];
+      payload.max_conversations = v; payload.max_messages = v;
+    }
+    // Chat messages reset period -> both conversations and messages periods
+    const crKey = `${tierData.id}_chat_reset_period`;
+    if (crKey in editValues) {
+      const v = editValues[crKey];
+      payload.conversations_reset_period = v;
+      payload.messages_reset_period = v;
     }
     try {
       await fetchApi(`/admin/tiers/${payload.id}`, {
@@ -529,18 +553,24 @@ function AdminTiers() {
     <Stack>
       <Title order={3}>Tier Configuration</Title>
       {tiers.map(t => (
-        <Paper key={t.id} p="md" withBorder>
-          <Title order={4} mb="md">{t.display_name}</Title>
-          <Stack>
-            <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }}>
-              <NumberInput label="Max Notes" value={getEdit(t.id, 'max_notes')} onChange={(v) => setEdit(t.id, 'max_notes', v)} />
-              <NumberInput label="Max Subjects" value={getEdit(t.id, 'max_subjects')} onChange={(v) => setEdit(t.id, 'max_subjects', v)} />
-              <NumberInput label="Max Groups" value={getEdit(t.id, 'max_groups')} onChange={(v) => setEdit(t.id, 'max_groups', v)} />
-              <NumberInput label="Max Storage (GB)" value={getEdit(t.id, 'max_storage_gb')} onChange={(v) => setEdit(t.id, 'max_storage_gb', v)} />
-            </SimpleGrid>
-            <Button onClick={() => saveTier(t)} fullWidth={isMobile}>Save</Button>
-          </Stack>
-        </Paper>
+          <Paper key={t.id} p="md" withBorder>
+            <Title order={4} mb="md">{t.display_name}</Title>
+            <Stack>
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 4 }}>
+                <NumberInput label="Items Processed" value={getEdit(t.id, 'items_processed')} onChange={(v) => setEdit(t.id, 'items_processed', v)} />
+                <NumberInput label="Chat Messages" value={getEdit(t.id, 'chat_messages')} onChange={(v) => setEdit(t.id, 'chat_messages', v)} />
+                <NumberInput label="Subjects" value={getEdit(t.id, 'max_subjects')} onChange={(v) => setEdit(t.id, 'max_subjects', v)} />
+                <NumberInput label="Groups" value={getEdit(t.id, 'max_groups')} onChange={(v) => setEdit(t.id, 'max_groups', v)} />
+                <NumberInput label="Storage (GB)" value={getEdit(t.id, 'max_storage_gb')} onChange={(v) => setEdit(t.id, 'max_storage_gb', v)} />
+              </SimpleGrid>
+              <Divider label="Reset Periods (empty = lifetime)" labelPosition="center" />
+              <SimpleGrid cols={{ base: 1, sm: 2 }}>
+                <Select label="Items Processed Reset" data={['', 'day', 'week', 'month']} value={getEdit(t.id, 'notes_reset_period') || ''} onChange={(v) => setEdit(t.id, 'notes_reset_period', v || null)} clearable />
+                <Select label="Chat Messages Reset" data={['', 'day', 'week', 'month']} value={getEdit(t.id, 'chat_reset_period') || ''} onChange={(v) => setEdit(t.id, 'chat_reset_period', v || null)} clearable />
+              </SimpleGrid>
+              <Button onClick={() => saveTier(t)} fullWidth={isMobile}>Save</Button>
+            </Stack>
+          </Paper>
       ))}
     </Stack>
   );

@@ -168,6 +168,7 @@ class UserActionRequest(BaseModel):
 class TierConfigSchema(BaseModel):
     id: str  # unlimited, free, pro
     display_name: str
+    max_resources: int = -1
     max_notes: int = -1
     max_subjects: int = -1
     max_groups: int = -1
@@ -175,11 +176,10 @@ class TierConfigSchema(BaseModel):
     max_messages: int = -1
     max_storage_gb: int = -1
     max_exercises: int = -1
-    max_summaries: int = -1
     # Reset periods: "week", "month", or None for cumulative
     conversations_reset_period: str | None = None
     messages_reset_period: str | None = None
-    summaries_reset_period: str | None = None
+    notes_reset_period: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

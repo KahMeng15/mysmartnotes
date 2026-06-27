@@ -1181,6 +1181,70 @@ async def update_profile(
     return _prepare_user_for_response(current_user)
 
 
+class ChangeEmailRequest(BaseModel):
+    new_email: EmailStr
+    password: str
+
+
+@router.post("/change-email", response_model=UserSchema)
+async def change_email(
+    request_data: ChangeEmailRequest,
+    current_user: User = Depends(get_current_user_from_token),
+    db: Session = Depends(get_db),
+):
+    """Change user email with password verification"""
+    if current_user.hashed_password:
+        if not verify_password(request_data.password, current_user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password",
+            )
+
+    new_email = request_data.new_email.lower().strip()
+
+    if new_email == current_user.email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New email is the same as current email",
+        )
+
+    existing = db.query(User).filter(func.lower(User.email) == new_email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This email is already registered to another account. Please log into that account and delete it first, then try again.",
+        )
+
+    current_user.email = new_email
+    current_user.is_verified = False
+
+    # Generate verification token
+    token_str = secrets.token_urlsafe(48)
+    verify_token = EmailVerificationToken(
+        user_id=current_user.id,
+        email=new_email,
+        token=token_str,
+        expires_at=datetime.utcnow() + timedelta(hours=48),
+    )
+    db.add(verify_token)
+    db.commit()
+
+    # Send verification email
+    sys_settings = db.query(SystemSettings).first()
+    domain = (
+        sys_settings.domain_url
+        if sys_settings and sys_settings.domain_url
+        else "http://localhost:8000"
+    )
+    if not domain.startswith("http"):
+        domain = f"http://{domain}"
+    verify_link = f"{domain.rstrip('/')}/login?verify_token={token_str}"
+    send_verification_email(db, new_email, verify_link)
+
+    db.refresh(current_user)
+    return _prepare_user_for_response(current_user)
+
+
 @router.get("/stats")
 async def get_user_stats(
     current_user: User = Depends(get_current_user_from_token), db: Session = Depends(get_db)
