@@ -539,12 +539,17 @@ def user_action(
         reset_link = f"{domain}/login?reset_token={reset_token.token}"
         email_sent = send_password_reset_email(db, user.email, reset_link)
         if not email_sent:
-            raise HTTPException(status_code=500, detail="Failed to send password reset email. Check SMTP configuration.")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to send password reset email. Check SMTP configuration.",
+            )
     elif request.action == "change_email":
         if not request.value:
             raise HTTPException(status_code=400, detail="New email address required")
         new_email = request.value.lower().strip()
-        existing = db.query(User).filter(func.lower(User.email) == new_email, User.id != user.id).first()
+        existing = (
+            db.query(User).filter(func.lower(User.email) == new_email, User.id != user.id).first()
+        )
         if existing:
             raise HTTPException(status_code=400, detail="Email already in use by another user")
         user.email = new_email

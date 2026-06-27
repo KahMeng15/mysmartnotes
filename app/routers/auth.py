@@ -293,7 +293,10 @@ def get_invitation(token: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Invalid or expired invitation token.")
     if invite.expires_at < datetime.utcnow():
         raise HTTPException(status_code=404, detail="Invitation token has expired.")
-    return {"email": None if is_link_only_email(invite.email) else invite.email, "tier": invite.tier}
+    return {
+        "email": None if is_link_only_email(invite.email) else invite.email,
+        "tier": invite.tier,
+    }
 
 
 @router.post("/register", response_model=UserSchema)
@@ -1890,7 +1893,9 @@ def resend_verification(
     email_sent = send_verification_email(db, user.email, verify_link)
     if not email_sent:
         logger.warning(f"Failed to resend verification email to {user.email}")
-        return {"message": "Warning: Unable to send verification email. Please check server email configuration and try again later."}
+        return {
+            "message": "Warning: Unable to send verification email. Please check server email configuration and try again later."
+        }
 
     # Log action
     ip_address = request.client.host if request.client else None
@@ -1905,7 +1910,9 @@ def resend_verification(
     )
     db.commit()
 
-    return {"message": "A new verification link has been sent to your email. Check your spam folder if you don't see it."}
+    return {
+        "message": "A new verification link has been sent to your email. Check your spam folder if you don't see it."
+    }
 
 
 # --- Google Account Linking ---

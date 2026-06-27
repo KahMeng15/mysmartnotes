@@ -158,7 +158,12 @@ def send_welcome_email(db: Session, recipient_email: str, full_name: str) -> boo
     return send_email(db, recipient_email, subject, body, is_html=True)
 
 
-def send_account_approved_email(db: Session, recipient_email: str, full_name: str, login_url: str = "http://localhost:8000/login") -> bool:
+def send_account_approved_email(
+    db: Session,
+    recipient_email: str,
+    full_name: str,
+    login_url: str = "http://localhost:8000/login",
+) -> bool:
     """Send an email notification when an admin approves a user's account"""
     subject = "Your velonote account has been approved!"
     body = f"""

@@ -583,9 +583,7 @@ def apply_invitation_label_migration():
                 )
             )
             if not result.fetchone():
-                conn.execute(
-                    text("ALTER TABLE user_invitations ADD COLUMN label VARCHAR(255)")
-                )
+                conn.execute(text("ALTER TABLE user_invitations ADD COLUMN label VARCHAR(255)"))
                 logger.info("Added label column to user_invitations table")
             conn.commit()
     except Exception as e:
