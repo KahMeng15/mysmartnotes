@@ -110,6 +110,8 @@ class SmartPipeline:
             return self._process_pdf(file_path)
         elif ext == ".pptx":
             return self._process_pptx(file_path)
+        elif ext == ".docx":
+            return self._process_docx(file_path)
         else:
             raise ValueError(f"Unsupported file format: {ext}")
 
@@ -1076,6 +1078,59 @@ class SmartPipeline:
                 return True
 
         return False
+
+    def _process_docx(self, docx_path: str) -> str:
+        """Process a DOCX file using python-docx style-based extraction."""
+        try:
+            from docx import Document
+        except ImportError:
+            raise ImportError("python-docx is required for DOCX processing. Install: pip install python-docx")
+
+        logger.info(f"Processing DOCX: {docx_path}")
+        doc = Document(docx_path)
+        md_parts = []
+
+        for paragraph in doc.paragraphs:
+            text = paragraph.text.strip()
+            if not text:
+                continue
+
+            style_name = paragraph.style.name if paragraph.style else ""
+
+            if style_name.startswith("Heading 1"):
+                md_parts.append(f"# {text}")
+            elif style_name.startswith("Heading 2"):
+                md_parts.append(f"## {text}")
+            elif style_name.startswith("Heading 3"):
+                md_parts.append(f"### {text}")
+            elif style_name.startswith("Heading 4"):
+                md_parts.append(f"#### {text}")
+            elif style_name.startswith("Heading 5"):
+                md_parts.append(f"##### {text}")
+            elif style_name.startswith("Heading 6"):
+                md_parts.append(f"###### {text}")
+            else:
+                numPr = paragraph._element.find(
+                    './/{http://schemas.openxmlformats.org/wordprocessingml/2006/main}numPr'
+                )
+                if numPr is not None:
+                    md_parts.append(f"1. {text}")
+                elif style_name in ("List Bullet", "List Paragraph", "List"):
+                    md_parts.append(f"- {text}")
+                elif style_name == "Code" or self._looks_like_code(text):
+                    md_parts.append(f"```\n{text}\n```")
+                else:
+                    md_parts.append(text)
+
+        markdown = "\n\n".join(md_parts)
+        markdown = self._fix_punctuation_spacing(markdown)
+        logger.info(f"DOCX extraction complete: {len(md_parts)} blocks")
+
+        lines = [l for l in markdown.split("\n") if l.strip()]
+        headings = len([l for l in lines if l.startswith("#")])
+        list_items = len([l for l in lines if l.startswith("- ") or l.startswith("1. ")])
+        logger.info(f"DOCX Output: {len(lines)} lines, {headings} headings, {list_items} list items")
+        return markdown
 
     # ── chunk size for AI polish (characters) ──
     # Reduced to 1500 to minimize "stream failed" errors with slow reasoning models

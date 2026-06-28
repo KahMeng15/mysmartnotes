@@ -7,6 +7,7 @@ from datetime import datetime
 from app.models.db import Resource, User
 from app.processing.ocr import OCRProcessor
 from app.processing.smart_pipeline import SmartPipeline
+from app.processing.unified_processor import UnifiedContentProcessor
 from app.utils.cache import clear_cache_pattern_sync
 from app.utils.db import SessionLocal
 from app.utils.storage import StorageManager
@@ -47,6 +48,32 @@ def get_pipeline_for_user(user: User) -> SmartPipeline:
     return SmartPipeline(
         use_polish=has_any_ai_key,
         gemini_api_key=gemini_key,  # May be None for non-Gemini providers — polish still works via AIClient tiers
+        gemini_model=gemini_model,
+    )
+
+
+def get_unified_processor_for_user(user: User) -> UnifiedContentProcessor:
+    """Get a UnifiedContentProcessor with the appropriate settings for this user."""
+    from app.config import get_settings
+    app_settings = get_settings()
+
+    tier1_provider = getattr(app_settings, "GLOBAL_AI_TIER1_PROVIDER", "gemini").lower()
+    tier1_api_key = getattr(app_settings, "GLOBAL_AI_TIER1_API_KEY", None)
+    gemini_key = None
+    if tier1_provider == "gemini":
+        gemini_key = tier1_api_key or app_settings.GEMINI_API_KEY
+    else:
+        gemini_key = getattr(app_settings, "GEMINI_API_KEY", None) or None
+    gemini_model = app_settings.GLOBAL_AI_TIER1_MODEL
+
+    if not getattr(user, "use_global_ai_config", False):
+        if getattr(user, "ai_model", None):
+            gemini_model = user.ai_model
+
+    has_any_ai_key = bool(tier1_api_key) or bool(gemini_key)
+    return UnifiedContentProcessor(
+        use_polish=has_any_ai_key,
+        gemini_api_key=gemini_key,
         gemini_model=gemini_model,
     )
 
@@ -191,115 +218,70 @@ def process_resource_task(
         start_time = time.time()
         file_ext = os.path.splitext(file_path)[1].lower()
 
-        if file_ext in (".pdf", ".pptx"):
-            logger.info(f"Processing resource {resource_id} (SmartPipeline)")
-            progress_callback(15, "Initializing AI pipeline...")
-
-            # Custom wrapper to pass messages through the pipeline's callback
-            def pipeline_callback(p):
-                if is_cancelled():
-                    raise InterruptedError("Task cancelled by user")
-                msg = "Extracting text..."
-                if p > 30:
-                    msg = "Analyzing document structure..."
-                if p > 60:
-                    msg = "Polishing with AI..."
-                if p > 85:
-                    msg = "Finalizing content..."
-                progress_callback(p, msg)
-
-            try:
-                markdown, timings = extract_markdown_for_user(
-                    user, file_path, progress_callback=pipeline_callback
-                )
-            except InterruptedError:
-                logger.info(f"Task {task_id} halted during smart pipeline")
-                return {"status": "cancelled"}
-
-            structured_segments = markdown_to_segments(markdown)
-
-            # Save to file storage
-            StorageManager.save_resource_text(resource.id, markdown)
-            StorageManager.save_resource_json(resource.id, "structured", structured_segments)
-            StorageManager.save_resource_json(resource.id, "timings", timings)
-
-            # Auto-title detection from H1
-            if auto_detect_title:
-                for line in markdown.split("\n"):
-                    if line.strip().startswith("# "):
-                        detected_title = line.strip()[2:].strip()
-                        if detected_title:
-                            resource.title = detected_title
-                            break
-
-            resource.processing_time_ms = int((time.time() - start_time) * 1000)
-            resource.updated_at = datetime.utcnow()
-            db.commit()
-
-            # STEP 4: Compute and store embeddings
-            if markdown and markdown.strip():
-                if is_cancelled():
-                    logger.info(f"Task {task_id} halted before embeddings")
-                    return {"status": "cancelled"}
-                try:
-                    progress_callback(95, "Generating search embeddings...")
-                    from app.processing.embeddings import update_resource_embeddings
-
-                    update_resource_embeddings(resource.id, markdown, db)
-                except Exception as e:
-                    logger.error(f"Error updating embeddings: {e}")
-
-            TaskManager._update_db_task(
-                task_id, status="completed", progress=100, message="Completed"
-            )
-            logger.info(f"Processing complete for resource {resource_id}")
-            clear_cache_pattern_sync(f"cache_resp:/resources*:u{user.id}*")
-            return {"status": "success", "resource_id": resource_id}
-
-        else:
-            # Fallback to OCR for images
-            logger.info(f"Processing resource {resource_id} (OCR Fallback)")
+        def pipeline_callback(p):
             if is_cancelled():
-                return {"status": "cancelled"}
+                raise InterruptedError("Task cancelled by user")
+            msg = "Extracting text..."
+            if p > 30:
+                msg = "Analyzing document structure..."
+            if p > 60:
+                msg = "Polishing with AI..."
+            if p > 85:
+                msg = "Finalizing content..."
+            progress_callback(p, msg)
 
-            progress_callback(20, "OCR: Analyzing image...")
-            ocr_result = OCRProcessor.extract_text(
-                file_path, resource.file_type, note_id=resource_id
+        try:
+            processor = get_unified_processor_for_user(user)
+            bundle = processor.extract(
+                file_path, resource_id=resource.id, progress_callback=pipeline_callback
             )
+        except InterruptedError:
+            logger.info(f"Task {task_id} halted during processing")
+            return {"status": "cancelled"}
 
-            if is_cancelled():
-                return {"status": "cancelled"}
-            progress_callback(80, "Structuring content...")
+        markdown = bundle.markdown
+        structured_segments = markdown_to_segments(markdown)
 
-            raw_text = ocr_result.get("raw_text", "")
-            structured_content = ocr_result.get("structured_content", [])
-            images_data = ocr_result.get("images", [])
-
-            # Save to file storage
-            StorageManager.save_resource_text(resource.id, raw_text)
-            StorageManager.save_resource_json(resource.id, "structured", structured_content)
+        StorageManager.save_resource_text(resource.id, markdown)
+        StorageManager.save_resource_json(resource.id, "structured", structured_segments)
+        StorageManager.save_resource_json(resource.id, "timings", bundle.timings)
+        if bundle.images:
+            images_data = [img.to_dict() if hasattr(img, "to_dict") else img for img in bundle.images]
             StorageManager.save_resource_json(resource.id, "images", images_data)
+            StorageManager.save_resource_json(resource.id, "image_map", bundle.image_map)
 
-            resource.processing_time_ms = int((time.time() - start_time) * 1000)
-            resource.updated_at = datetime.utcnow()
-            db.commit()
+        if bundle.warnings:
+            logger.warning(f"Resource {resource_id} warnings: {bundle.warnings}")
 
-            if raw_text:
-                if is_cancelled():
-                    return {"status": "cancelled"}
-                try:
-                    progress_callback(95, "Generating search embeddings...")
-                    from app.processing.embeddings import update_resource_embeddings
+        if auto_detect_title:
+            for line in markdown.split("\n"):
+                if line.strip().startswith("# "):
+                    detected_title = line.strip()[2:].strip()
+                    if detected_title:
+                        resource.title = detected_title
+                        break
 
-                    update_resource_embeddings(resource.id, raw_text, db)
-                except Exception as e:
-                    logger.error(f"Error updating embeddings: {e}")
+        resource.processing_time_ms = int((time.time() - start_time) * 1000)
+        resource.updated_at = datetime.utcnow()
+        db.commit()
 
-            TaskManager._update_db_task(
-                task_id, status="completed", progress=100, message="Completed"
-            )
-            clear_cache_pattern_sync(f"cache_resp:/resources*:u{user.id}*")
-            return {"status": "success", "resource_id": resource_id}
+        if markdown and markdown.strip():
+            if is_cancelled():
+                logger.info(f"Task {task_id} halted before embeddings")
+                return {"status": "cancelled"}
+            try:
+                progress_callback(95, "Generating search embeddings...")
+                from app.processing.embeddings import update_resource_embeddings
+                update_resource_embeddings(resource.id, markdown, db)
+            except Exception as e:
+                logger.error(f"Error updating embeddings: {e}")
+
+        TaskManager._update_db_task(
+            task_id, status="completed", progress=100, message="Completed"
+        )
+        logger.info(f"Processing complete for resource {resource_id}")
+        clear_cache_pattern_sync(f"cache_resp:/resources*:u{user.id}*")
+        return {"status": "success", "resource_id": resource_id}
 
     except Exception as e:
         if "Task cancelled by user" in str(e):

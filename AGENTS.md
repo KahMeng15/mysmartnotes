@@ -8,7 +8,7 @@
 - `app/worker_main.py` — polls `Task` table; handlers in `TASK_REGISTRY` dict (`app/worker_main.py:21`)
 - `app/models/db.py` — all SQLAlchemy ORM models (~580 lines)
 - `app/schemas/` — Pydantic models (`schemas.py`, `admin.py`, `analytics.py`, `exercise.py`)
-- `app/processing/` — document extraction (`smart_pipeline.py`), AI client, embeddings
+- `app/processing/` — document extraction (`smart_pipeline.py`, `unified_processor.py`), image extraction (`image_extractor_v2.py`, `image_text_mapper.py`), scanned doc OCR (`scanned_doc_handler.py`, `image_preprocessor.py`), AI client, embeddings
 - `app/utils/` — auth (JWT), db session, tasks (DB-backed queue), websocket, caching
 - `frontend/` — React app (Vite). Dev server proxies `/api` → `localhost:8000` (`frontend/vite.config.js`)
 
@@ -24,10 +24,15 @@ cd frontend && npm run dev                                   # Frontend only
 docker compose up -d --build                                 # Full stack
 docker compose -f docker-compose.dev.yml up -d db redis      # Infra only for local dev
 cd frontend && npm run lint                                  # Frontend lint
-python scripts/ProcessingAlgorithmTest/run_smart.py          # Offline extraction test (no server)
+python scripts/resource_processing_test/process_all.py        # One-command: drop file in input/, run this
+python scripts/resource_processing_test/run_test.py           # Offline extraction test (all formats + images)
+python scripts/resource_processing_test/run_test.py --historical  # With quality trend tracking
+python scripts/resource_processing_test/correction_tool.py "output/reports/OUTPUT_lecture.md"  # Interactive correction
+python scripts/resource_processing_test/analyze_corrections.py --suggest-tweaks  # Pipeline improvement suggestions
+python scripts/run_benchmark.sh                             # Full benchmark suite
 ```
 
-No Python tests exist — no `test_*.py` files in the repo.
+No Python tests exist — no `test_*.py` files in the repo. Use the test harness in `scripts/resource_processing_test/` instead.
 
 ## Database
 
@@ -59,11 +64,44 @@ Startup blocks if: `SECRET_KEY < 32 chars`, `DATABASE_URL` not PostgreSQL, or CO
 
 ## Key patterns
 
-- **File storage:** `uploads/{user_id}/{lecture_id}/`, `generated/{lecture_id}/`, `output/images/{lecture_id}/`
+- **File storage:** `uploads/{user_id}/{lecture_id}/`, `generated/{lecture_id}/`, `data/extracted_images/{resource_id}/` (extracted diagrams/images), `data/resources/{resource_id}/` (text + structured JSON + images metadata)
 - **ID generation:** prefixed hex IDs (`gp_`, `sj_`, `rs_`, `nt_`, `ex_`, `mg_`, `cv_`) via `generate_random_id()` in `app/utils/db.py`
 - **Pipeline singleton:** `app/routers/processing.py → _pipeline` (module-level, reused across requests)
+- **Unified processing:** `app/processing/unified_processor.py` → `UnifiedContentProcessor.extract()` is the single entry point for all formats. Used by both `process_resource_task` and `process_exercise_task`. Returns `ContentBundle { markdown, images[], image_map, processing_path, timings, warnings }`.
+- **Image extraction:** `ImageExtractorV2` in `image_extractor_v2.py` handles all formats (PDF/PyMuPDF+OpenCV, PPTX/python-pptx shapes, DOCX/python-docx inline, image files). `ImageClassifier` filters logos/backgrounds/decorations. `ImageTextMapper` places images inline near their corresponding text by position.
+- **Scanned doc detection:** `ScannedDocHandler` checks text density (<50 chars/page = scanned). Routes to Tesseract with PSM configuration based on document type (printed/handwritten/mixed). `ImagePreprocessor` applies deskew, CLAHE, denoise, binarize before OCR.
 - **Startup bootstrap:** Admin user from `ADMIN_EMAIL` env var, `SystemSettings` row, export template seeding — all in `main.py` lifespan
 - **Migrations:** Add to `app/utils/db.py` as new `apply_*_migration()` functions called from `init_db()` — never hand-write SQL migration scripts
+
+### 2026-06-29 — Comprehensive processing overhaul: unified pipeline, image extraction, OCR, test harness
+
+**What was built:**
+
+1. **`UnifiedContentProcessor`** (`app/processing/unified_processor.py`) — single entry point for ALL formats. Auto-detects scanned PDFs vs native. Returns `ContentBundle { markdown, images[], image_map, ... }`.
+
+2. **`ImageExtractorV2`** (`app/processing/image_extractor_v2.py`) — extracts images from PDF (PyMuPDF + OpenCV), PPTX (python-pptx shapes), DOCX (inline), and image files. `ImageClassifier` filters logos, backgrounds, decorations using size/position/repetition/variance heuristics.
+
+3. **`ImageTextMapper`** (`app/processing/image_text_mapper.py`) — places images inline near their corresponding text by slide/page position. Detects "as shown in the figure" references.
+
+4. **`ScannedDocHandler`** (`app/processing/scanned_doc_handler.py`) — detects scanned PDFs via text density (<50 chars/page). Routes to Tesseract with per-document-type PSM config (printed/handwritten/mixed).
+
+5. **`ImagePreprocessor`** (`app/processing/image_preprocessor.py`) — deskew, CLAHE contrast enhancement, denoise, perspective correction, binarization for OCR.
+
+6. **DOCX support** added to `SmartPipeline._process_docx()` — style-based heading detection, list detection.
+
+7. **`process_resource_task`** and **`process_exercise_task`** both use `UnifiedContentProcessor` now.
+
+8. **Test harness** (`scripts/resource_processing_test/`) — comprehensive `run_test.py` with structural diff engine, quality metrics (overall_score, structural_validity, content_preservation, consistency, image_recall), report generation, and historical trend tracking.
+
+9. **Correction CLI** (`correction_tool.py`) — interactive tool for marking heading/list/image/OCR corrections.
+
+10. **Self-improvement engine** (`analyze_corrections.py`) — pattern analysis across accumulated corrections, suggests pipeline parameter tweaks.
+
+11. **Image serving API** (`GET /resources/{id}/images/{path}`).
+
+12. **Automation**: `scripts/run_benchmark.sh`, `.githooks/pre-commit`.
+
+**All local.** No external API calls required. Tesseract for OCR, python-pptx/PyMuPDF/python-docx for extraction, OpenCV for image processing. Ollama as optional AI polish.
 
 ## Session Log
 

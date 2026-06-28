@@ -1304,3 +1304,35 @@ def get_related_content(
             f"Error fetching related content for resource {resource_id}: {e}", exc_info=True
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{resource_id}/images/{image_path:path}")
+def serve_resource_image(
+    resource_id: str,
+    image_path: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Serve an extracted image for a resource."""
+    resource = (
+        db.query(Resource)
+        .filter(Resource.id == resource_id, Resource.user_id == current_user.id)
+        .first()
+    )
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+
+    from app.config import get_settings
+    settings = get_settings()
+    image_storage_base = getattr(settings, "EXTRACTED_IMAGE_DIR", "data/extracted_images")
+    full_path = os.path.join(image_storage_base, resource_id, image_path)
+
+    if not os.path.exists(full_path):
+        alt_path = os.path.join("data/extracted_images", resource_id, image_path)
+        if os.path.exists(alt_path):
+            full_path = alt_path
+        else:
+            raise HTTPException(status_code=404, detail="Image not found")
+
+    from fastapi.responses import FileResponse
+    return FileResponse(full_path)

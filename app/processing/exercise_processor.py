@@ -232,25 +232,36 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str | None = 
         progress_callback(10, "Extracting text from file...")
         raw_text = ""
 
-        if file_ext in (".pdf", ".pptx", ".txt", ".md", ".docx"):
-            if file_ext == ".docx":
-                from docx import Document
+        try:
+            from app.processing.unified_processor import UnifiedContentProcessor
+            processor = UnifiedContentProcessor(use_polish=False)
+            bundle = processor.extract(file_path, resource_id=exercise_id)
+            raw_text = bundle.markdown
 
-                doc = Document(file_path)
-                raw_text = "\n".join([p.text for p in doc.paragraphs])
+            if bundle.images and exercise_id:
+                images_data = [img.to_dict() if hasattr(img, "to_dict") else img for img in bundle.images]
+                from app.utils.storage import StorageManager
+                StorageManager.save_resource_json(exercise_id, "images", images_data)
+                StorageManager.save_resource_json(exercise_id, "image_map", bundle.image_map)
+        except ImportError:
+            if file_ext in (".pdf", ".pptx", ".txt", ".md", ".docx"):
+                if file_ext == ".docx":
+                    from docx import Document
+                    doc = Document(file_path)
+                    raw_text = "\n".join([p.text for p in doc.paragraphs])
+                else:
+                    pipeline = get_pipeline_for_user(user)
+                    pipeline.use_polish = False
+                    raw_text = pipeline.process(file_path)
+                    if isinstance(raw_text, str) and raw_text.startswith("Error:"):
+                        raise RuntimeError(raw_text)
             else:
-                pipeline = get_pipeline_for_user(user)
-                pipeline.use_polish = False
-                raw_text = pipeline.process(file_path)
-                if isinstance(raw_text, str) and raw_text.startswith("Error:"):
-                    raise RuntimeError(raw_text)
-        else:
-            ocr_result = OCRProcessor.extract_text(
-                file_path,
-                "image" if file_ext in (".png", ".jpg", ".jpeg") else "unknown",
-                note_id=exercise_id,
-            )
-            raw_text = ocr_result.get("raw_text", "")
+                ocr_result = OCRProcessor.extract_text(
+                    file_path,
+                    "image" if file_ext in (".png", ".jpg", ".jpeg") else "unknown",
+                    note_id=exercise_id,
+                )
+                raw_text = ocr_result.get("raw_text", "")
 
         if not raw_text.strip():
             raise ValueError("No text could be extracted from the file.")

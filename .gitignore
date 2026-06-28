@@ -1512,3 +1512,6 @@ frontend_old/node_modules/type-check/lib/check.js
 frontend_old/node_modules/type-check/lib/index.js
 frontend_old/node_modules/type-check/lib/parse-type.js
 docker-test-env/*
+scripts/resource_processing_test/input/*
+scripts/resource_processing_test/output/*
+scripts/resource_processing_test/temp_input/*
