@@ -18,6 +18,7 @@ import {
 import { IconCheck, IconAlertCircle, IconInfoCircle } from '@tabler/icons-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi, setAuthToken } from '../lib/api';
+import { useTurnstile } from '../hooks/useTurnstile';
 
 // Firebase imports
 import { initializeApp } from 'firebase/app';
@@ -45,6 +46,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [panel, setPanel] = useState('login'); // 'login' | 'register' | 'forgot' | 'google-complete' | 'verify'
+  const turnstile = useTurnstile();
 
   const [quote, setQuote] = useState(quotes[0]);
 
@@ -160,6 +162,11 @@ export default function Login() {
   // ── LOGIN ──────────────────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
+    const cfToken = turnstile.getToken();
+    if (!cfToken) {
+      setError('Please complete the human verification.');
+      return;
+    }
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -167,7 +174,7 @@ export default function Login() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, cf_turnstile_response: cfToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to login');
@@ -176,18 +183,24 @@ export default function Login() {
       setError(err.message);
     } finally {
       setLoading(false);
+      turnstile.reset();
     }
   };
 
   const isVerificationError = error && error.toLowerCase().includes('not verified');
 
   const handleResendVerification = async (emailAddr) => {
+    const cfToken = turnstile.getToken();
+    if (!cfToken) {
+      setError('Please complete the human verification.');
+      return;
+    }
     setResending(true);
     try {
       const res = await fetch('/api/auth/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailAddr }),
+        body: JSON.stringify({ email: emailAddr, cf_turnstile_response: cfToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to resend');
@@ -197,6 +210,7 @@ export default function Login() {
       setError(err.message);
     } finally {
       setResending(false);
+      turnstile.reset();
     }
   };
 
@@ -212,17 +226,23 @@ export default function Login() {
       const result = await signInWithPopup(auth, provider);
       const idToken = await result.user.getIdToken();
 
+      const cfToken = turnstile.getToken();
+      if (!cfToken) {
+        turnstile.reset();
+        setError('Please complete the human verification before signing in with Google.');
+        return;
+      }
+
       const res = await fetch('/api/auth/google-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken, invitation_token: invitationToken }),
+        body: JSON.stringify({ idToken, invitation_token: invitationToken, cf_turnstile_response: cfToken }),
       });
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.detail || 'Google sign-in failed');
 
       if (data.is_new_user) {
-        // Need profile completion
         setGoogleIdToken(idToken);
         setGoogleFullName(data.full_name || '');
         setGoogleNickname(data.suggested_nickname || '');
@@ -236,12 +256,18 @@ export default function Login() {
       }
     } finally {
       setLoading(false);
+      turnstile.reset();
     }
   };
 
   // ── GOOGLE COMPLETE PROFILE ────────────────────────────────────────────────
   const handleGoogleComplete = async (e) => {
     e.preventDefault();
+    const cfToken = turnstile.getToken();
+    if (!cfToken) {
+      setError('Please complete the human verification.');
+      return;
+    }
     if (!googleAgreeTos || !googleAgreePrivacy || !googleAgreeFairUse) {
       setError('You must agree to all policies to register.');
       return;
@@ -261,6 +287,7 @@ export default function Login() {
           agree_tos: googleAgreeTos,
           agree_privacy: googleAgreePrivacy,
           agree_fair_use: googleAgreeFairUse,
+          cf_turnstile_response: cfToken,
         }),
       });
       const data = await res.json();
@@ -276,12 +303,18 @@ export default function Login() {
       setError(err.message);
     } finally {
       setLoading(false);
+      turnstile.reset();
     }
   };
 
   // ── REGISTER ───────────────────────────────────────────────────────────────
   const handleRegister = async (e) => {
     e.preventDefault();
+    const cfToken = turnstile.getToken();
+    if (!cfToken) {
+      setError('Please complete the human verification.');
+      return;
+    }
     if (!agreeTos || !agreePrivacy || !agreeFairUse) {
       setError('You must agree to all policies to register.');
       return;
@@ -302,6 +335,7 @@ export default function Login() {
           agree_tos: agreeTos,
           agree_privacy: agreePrivacy,
           agree_fair_use: agreeFairUse,
+          cf_turnstile_response: cfToken,
         }),
       });
       const data = await res.json();
@@ -318,12 +352,18 @@ export default function Login() {
       setError(err.message);
     } finally {
       setLoading(false);
+      turnstile.reset();
     }
   };
 
   // ── FORGOT PASSWORD ────────────────────────────────────────────────────────
   const handleForgotPassword = async (e) => {
     e.preventDefault();
+    const cfToken = turnstile.getToken();
+    if (!cfToken) {
+      setError('Please complete the human verification.');
+      return;
+    }
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -331,7 +371,7 @@ export default function Login() {
       const res = await fetch('/api/auth/password-reset-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail }),
+        body: JSON.stringify({ email: forgotEmail, cf_turnstile_response: cfToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Request failed');
@@ -342,6 +382,7 @@ export default function Login() {
       setError(err.message);
     } finally {
       setLoading(false);
+      turnstile.reset();
     }
   };
 
@@ -442,7 +483,6 @@ export default function Login() {
               </Text>
             </Box>
 
-          {/* Global alerts */}
           {success && (
             <Alert icon={<IconCheck size={16} />} color="teal" mb="md" withCloseButton onClose={() => setSuccess(null)}>
               {success}
@@ -525,6 +565,8 @@ export default function Login() {
                   <Text size="sm">Account registration requires approval from an administrator.</Text>
                 </Alert>
               )}
+
+              <Box mt="md" ref={turnstile.containerRef} />
 
               <Group mt="lg" gap="xs">
                 {signupConfig === 'invite' ? (
@@ -634,6 +676,8 @@ export default function Login() {
                 </Alert>
               )}
 
+              <Box mt="md" ref={turnstile.containerRef} />
+
               <Group mt="md">
                 <Text size="sm" c="dimmed">Already have an account?</Text>
                 <Anchor component="button" type="button" size="sm" fw={600} onClick={() => switchPanel('login')}>
@@ -730,6 +774,7 @@ export default function Login() {
                 prefix="gc-"
               />
 
+              <Box mt="md" ref={turnstile.containerRef} />
               <Button id="btn-gc-submit" fullWidth size="md" mt="xl" type="submit" loading={loading} style={{ backgroundColor: '#171738' }}>
                 Finish Sign Up
               </Button>
@@ -762,6 +807,7 @@ export default function Login() {
               <Button id="btn-reset" fullWidth size="md" type="submit" loading={loading} style={{ backgroundColor: '#171738' }}>
                 Send Reset Link
               </Button>
+              <Box mt="md" ref={turnstile.containerRef} />
               <Group mt="xl">
                 <Anchor component="button" type="button" size="sm" fw={600} onClick={() => switchPanel('login')}>
                   Back to Login

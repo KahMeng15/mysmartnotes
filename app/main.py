@@ -204,6 +204,7 @@ from starlette.responses import JSONResponse
 
 from app.models.db import IPFilter, SystemSettings
 from app.utils.db import SessionLocal
+from app.utils.turnstile import turnstile_middleware
 
 # Custom exception handlers — API-only JSON responses
 _CAT_BASE = "https://http.cat"
@@ -282,6 +283,9 @@ async def rate_limit_middleware(request: Request, call_next):
         bucket.append(now)
 
     return await call_next(request)
+
+
+app.middleware("http")(turnstile_middleware)
 
 
 @app.middleware("http")

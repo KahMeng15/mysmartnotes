@@ -258,6 +258,10 @@ class Settings(BaseSettings):
     # Admin bootstrap
     ADMIN_EMAIL: str = _json_config.get("ADMIN_EMAIL", "")
 
+    # Cloudflare Turnstile (bot protection) — no default; omit to disable
+    TURNSTILE_SITE_KEY: str = _json_config.get("TURNSTILE_SITE_KEY", "")
+    TURNSTILE_SECRET_KEY: str = _json_config.get("TURNSTILE_SECRET_KEY", "")
+
     # ------------------------------------------------------------------
     # Computed / constant pass-throughs
     # ------------------------------------------------------------------
