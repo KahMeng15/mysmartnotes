@@ -609,16 +609,21 @@ export default function SubjectView() {
           const initialNoteProgress = {};
 
           activeTasksData.tasks.forEach(t => {
+            const isActive = t.status !== 'completed' && t.status !== 'failed' && t.status !== 'cancelled';
             if (t.task_type === 'note_generation' && t.input_data && t.input_data.kwargs && t.input_data.kwargs.note_id) {
               const summaryId = t.input_data.kwargs.note_id;
-              summaryTasks[summaryId] = t.task_id;
+              if (isActive) {
+                summaryTasks[summaryId] = t.task_id;
+              }
               if (t.progress !== undefined) {
                 summaryProgress[summaryId] = t.progress;
               }
             } else if (t.task_type === 'resource_processing' || t.task_type === 'ocr') {
               const noteId = t.input_data?.kwargs?.resource_id || (t.task_id && t.task_id.startsWith('ocr_') ? t.task_id.split('_').slice(2).join('_') : null);
               if (noteId) {
-                initialReprocessingNoteIds.push(noteId);
+                if (isActive) {
+                  initialReprocessingNoteIds.push(noteId);
+                }
                 if (t.progress !== undefined) {
                   initialNoteProgress[noteId] = t.progress;
                 }
