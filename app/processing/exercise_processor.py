@@ -389,10 +389,10 @@ Respond with ONLY the JSON object.
         for q_data in questions_data:
             if not isinstance(q_data, dict):
                 continue
-            q_text = str(q_data.get("question_text", "")).strip()
+            q_text = str(q_data.get("question_text") or q_data.get("question") or "").strip()
             if not q_text:
                 continue
-            q_type = _normalize_type(str(q_data.get("question_type", "subjective")))
+            q_type = _normalize_type(str(q_data.get("question_type") or q_data.get("type") or "subjective"))
             options = q_data.get("options") if q_type == "objective" else None
 
             r_title = q_data.get("resource_title") or ""
@@ -410,7 +410,7 @@ Respond with ONLY the JSON object.
                 {
                     "question_text": q_text,
                     "original_number": q_data.get("original_number"),
-                    "answer_text": str(q_data.get("answer_text", "")).strip(),
+                    "answer_text": str(q_data.get("answer_text") or q_data.get("answer") or "").strip(),
                     "question_type": q_type,
                     "options": options,
                     "topic": q_data.get("topic"),
