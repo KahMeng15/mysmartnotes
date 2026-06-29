@@ -1323,6 +1323,7 @@ def serve_resource_image(
         raise HTTPException(status_code=404, detail="Resource not found")
 
     from app.config import get_settings
+
     settings = get_settings()
     image_storage_base = getattr(settings, "EXTRACTED_IMAGE_DIR", "data/extracted_images")
     full_path = os.path.join(image_storage_base, resource_id, image_path)
@@ -1335,4 +1336,5 @@ def serve_resource_image(
             raise HTTPException(status_code=404, detail="Image not found")
 
     from fastapi.responses import FileResponse
+
     return FileResponse(full_path)

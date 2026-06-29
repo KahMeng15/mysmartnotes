@@ -14,8 +14,13 @@ logger = logging.getLogger(__name__)
 class ImagePreprocessor:
     """Image preprocessing for scanned/handwritten document OCR."""
 
-    def __init__(self, clahe_clip_limit: float = 2.0, clahe_grid_size: tuple = (8, 8),
-                 denoise_strength: float = 10.0, binarize_method: str = "sauvola"):
+    def __init__(
+        self,
+        clahe_clip_limit: float = 2.0,
+        clahe_grid_size: tuple = (8, 8),
+        denoise_strength: float = 10.0,
+        binarize_method: str = "sauvola",
+    ):
         self.clahe_clip_limit = clahe_clip_limit
         self.clahe_grid_size = clahe_grid_size
         self.denoise_strength = denoise_strength
@@ -86,7 +91,9 @@ class ImagePreprocessor:
         h, w = gray_img.shape[:2]
         center = (w // 2, h // 2)
         matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-        rotated = cv2.warpAffine(gray_img, matrix, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+        rotated = cv2.warpAffine(
+            gray_img, matrix, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE
+        )
         return rotated
 
     def rotate_color(self, rgb_img, angle: float):
@@ -95,24 +102,32 @@ class ImagePreprocessor:
         h, w = rgb_img.shape[:2]
         center = (w // 2, h // 2)
         matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-        rotated = cv2.warpAffine(rgb_img, matrix, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+        rotated = cv2.warpAffine(
+            rgb_img, matrix, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE
+        )
         return rotated
 
     def enhance_contrast(self, gray_img):
         import cv2
+
         clahe = cv2.createCLAHE(clipLimit=self.clahe_clip_limit, tileGridSize=self.clahe_grid_size)
         return clahe.apply(gray_img)
 
     def denoise(self, gray_img):
         import cv2
+
         return cv2.fastNlMeansDenoising(gray_img, h=self.denoise_strength)
 
     def denoise_color(self, rgb_img):
         import cv2
-        return cv2.fastNlMeansDenoisingColored(rgb_img, h=self.denoise_strength, hColor=self.denoise_strength)
+
+        return cv2.fastNlMeansDenoisingColored(
+            rgb_img, h=self.denoise_strength, hColor=self.denoise_strength
+        )
 
     def binarize(self, gray_img, method: str | None = None):
         import cv2
+
         method = method or self.binarize_method
 
         if method == "otsu":
@@ -120,14 +135,19 @@ class ImagePreprocessor:
             return binary
 
         elif method == "adaptive":
-            return cv2.adaptiveThreshold(gray_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2)
+            return cv2.adaptiveThreshold(
+                gray_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2
+            )
 
         elif method == "sauvola":
             try:
                 import cv2
                 from cv2 import ximgproc
+
                 sauvola = ximgproc.createThreshSauvolaBlockSize(31)
-                return sauvola.adaptiveThreshold(gray_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 31, 2)
+                return sauvola.adaptiveThreshold(
+                    gray_img, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 31, 2
+                )
             except (ImportError, AttributeError):
                 return self.binarize(gray_img, "adaptive")
 
@@ -175,12 +195,10 @@ class ImagePreprocessor:
         height_b = np.linalg.norm(tl - bl)
         max_height = max(int(height_a), int(height_b))
 
-        dst = np.array([
-            [0, 0],
-            [max_width - 1, 0],
-            [max_width - 1, max_height - 1],
-            [0, max_height - 1]
-        ], dtype=np.float32)
+        dst = np.array(
+            [[0, 0], [max_width - 1, 0], [max_width - 1, max_height - 1], [0, max_height - 1]],
+            dtype=np.float32,
+        )
 
         M = cv2.getPerspectiveTransform(rect, dst)
         return cv2.warpAffine(gray_img, M, (max_width, max_height))

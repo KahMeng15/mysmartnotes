@@ -27,6 +27,7 @@ class ScannedDocHandler:
         if self._preprocessor is None:
             try:
                 from app.processing.image_preprocessor import ImagePreprocessor
+
                 self._preprocessor = ImagePreprocessor()
             except ImportError:
                 return None
@@ -35,6 +36,7 @@ class ScannedDocHandler:
     def is_scanned_pdf(self, pdf_path: str) -> tuple[bool, float]:
         try:
             import pdfplumber
+
             total_chars = 0
             page_count = 0
             with pdfplumber.open(pdf_path) as pdf:
@@ -72,6 +74,7 @@ class ScannedDocHandler:
         for pil_img in page_images[:3]:
             try:
                 import cv2
+
                 gray = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2GRAY)
                 data = pytesseract.image_to_data(gray, output_type=pytesseract.Output.DICT)
                 confs = []
@@ -87,8 +90,12 @@ class ScannedDocHandler:
             return "diagram"
 
         avg_conf = float(np.mean(all_confidences)) / 100.0
-        low_conf_ratio = sum(1 for c in all_confidences if float(c) < 40) / max(len(all_confidences), 1)
-        high_conf_ratio = sum(1 for c in all_confidences if float(c) > 70) / max(len(all_confidences), 1)
+        low_conf_ratio = sum(1 for c in all_confidences if float(c) < 40) / max(
+            len(all_confidences), 1
+        )
+        high_conf_ratio = sum(1 for c in all_confidences if float(c) > 70) / max(
+            len(all_confidences), 1
+        )
 
         if high_conf_ratio > 0.8 and avg_conf > self.PRINTED_CONF_THRESHOLD:
             return "printed"
@@ -101,8 +108,9 @@ class ScannedDocHandler:
         else:
             return "mixed"
 
-    def ocr_pipeline(self, page_images: list, doc_type: str,
-                     lang: str = "eng", progress_callback=None) -> str:
+    def ocr_pipeline(
+        self, page_images: list, doc_type: str, lang: str = "eng", progress_callback=None
+    ) -> str:
         import numpy as np
         import pytesseract
 
@@ -114,6 +122,7 @@ class ScannedDocHandler:
                 progress_callback(int((page_idx / total) * 80))
 
             import cv2
+
             cv_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
             if self.preprocessor:
@@ -184,14 +193,14 @@ class ScannedDocHandler:
         return "\n".join(structured)
 
     def _merge_split_words(self, text: str) -> str:
-        text = re.sub(r'(\w)-\n(\w)', r'\1\2', text)
+        text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)
         return text
 
     def _clean_ocr_artifacts(self, text: str) -> str:
-        text = re.sub(r'\n{3,}', '\n\n', text)
-        text = re.sub(r'[|¦]{2,}', '|', text)
-        text = re.sub(r'[_]{4,}', '', text)
-        text = re.sub(r'[•·]', '-', text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r"[|¦]{2,}", "|", text)
+        text = re.sub(r"[_]{4,}", "", text)
+        text = re.sub(r"[•·]", "-", text)
         return text.strip()
 
     def process_scanned_pdf(self, pdf_path: str, progress_callback=None) -> str:

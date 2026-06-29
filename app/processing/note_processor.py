@@ -54,6 +54,7 @@ def get_pipeline_for_user(user: User) -> SmartPipeline:
 def get_unified_processor_for_user(user: User) -> UnifiedContentProcessor:
     """Get a UnifiedContentProcessor with the appropriate settings for this user."""
     from app.config import get_settings
+
     app_settings = get_settings()
 
     tier1_provider = getattr(app_settings, "GLOBAL_AI_TIER1_PROVIDER", "gemini").lower()
@@ -244,7 +245,9 @@ def process_resource_task(
         StorageManager.save_resource_json(resource.id, "structured", structured_segments)
         StorageManager.save_resource_json(resource.id, "timings", bundle.timings)
         if bundle.images:
-            images_data = [img.to_dict() if hasattr(img, "to_dict") else img for img in bundle.images]
+            images_data = [
+                img.to_dict() if hasattr(img, "to_dict") else img for img in bundle.images
+            ]
             StorageManager.save_resource_json(resource.id, "images", images_data)
             StorageManager.save_resource_json(resource.id, "image_map", bundle.image_map)
 
@@ -270,13 +273,12 @@ def process_resource_task(
             try:
                 progress_callback(95, "Generating search embeddings...")
                 from app.processing.embeddings import update_resource_embeddings
+
                 update_resource_embeddings(resource.id, markdown, db)
             except Exception as e:
                 logger.error(f"Error updating embeddings: {e}")
 
-        TaskManager._update_db_task(
-            task_id, status="completed", progress=100, message="Completed"
-        )
+        TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
         logger.info(f"Processing complete for resource {resource_id}")
         clear_cache_pattern_sync(f"cache_resp:/resources*:u{user.id}*")
         return {"status": "success", "resource_id": resource_id}

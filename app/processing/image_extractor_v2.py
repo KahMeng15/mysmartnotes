@@ -55,7 +55,9 @@ class ImageClassifier:
         self._knowledge = knowledge or PipelineKnowledge()
         self._position_cache: dict[str, list] = {}  # filename -> [(x, y, w, h), ...]
 
-    def classify(self, image: ExtractedImage, page_width: float = 0, page_height: float = 0) -> ExtractedImage:
+    def classify(
+        self, image: ExtractedImage, page_width: float = 0, page_height: float = 0
+    ) -> ExtractedImage:
         if image.width < self.MIN_IMAGE_SIZE and image.height < self.MIN_IMAGE_SIZE:
             image.is_decorative = True
             image.confidence = 0.95
@@ -74,7 +76,9 @@ class ImageClassifier:
                 image.is_diagram = False
                 return image
 
-            if (x_ratio < self.CORNER_MARGIN_RATIO or x_ratio > (1 - self.CORNER_MARGIN_RATIO)) and y_ratio < self.CORNER_MARGIN_RATIO:
+            if (
+                x_ratio < self.CORNER_MARGIN_RATIO or x_ratio > (1 - self.CORNER_MARGIN_RATIO)
+            ) and y_ratio < self.CORNER_MARGIN_RATIO:
                 image.is_decorative = True
                 image.confidence = 0.85
                 image.is_diagram = False
@@ -108,8 +112,12 @@ class ImageClassifier:
     def check_template_repeat(self, image: ExtractedImage, source_key: str) -> ExtractedImage:
         if source_key not in self._position_cache:
             self._position_cache[source_key] = []
-        pos_key = (round(image.position_x, -1), round(image.position_y, -1),
-                   round(image.width, -1), round(image.height, -1))
+        pos_key = (
+            round(image.position_x, -1),
+            round(image.position_y, -1),
+            round(image.width, -1),
+            round(image.height, -1),
+        )
         self._position_cache[source_key].append(pos_key)
 
         positions = self._position_cache[source_key]
@@ -144,7 +152,11 @@ class ImageExtractorV2:
 
     SUPPORTED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"}
 
-    def __init__(self, output_base_dir: str = "data/extracted_images", classifier: ImageClassifier | None = None):
+    def __init__(
+        self,
+        output_base_dir: str = "data/extracted_images",
+        classifier: ImageClassifier | None = None,
+    ):
         self.output_base_dir = output_base_dir
         self.classifier = classifier or ImageClassifier()
 
@@ -170,7 +182,9 @@ class ImageExtractorV2:
             f.write(blob)
         return filepath
 
-    def _extract_from_pptx(self, pptx_path: str, output_dir: str, resource_id: str) -> list[ExtractedImage]:
+    def _extract_from_pptx(
+        self, pptx_path: str, output_dir: str, resource_id: str
+    ) -> list[ExtractedImage]:
         try:
             from pptx import Presentation
         except ImportError:
@@ -184,14 +198,30 @@ class ImageExtractorV2:
 
         for slide_idx, slide in enumerate(prs.slides):
             self._extract_shapes_recursive(
-                slide.shapes, slide_idx, slide_width, slide_height,
-                output_dir, pptx_path, images, resource_id
+                slide.shapes,
+                slide_idx,
+                slide_width,
+                slide_height,
+                output_dir,
+                pptx_path,
+                images,
+                resource_id,
             )
 
         return self._deduplicate_and_classify(images, pptx_path)
 
-    def _extract_shapes_recursive(self, shapes, slide_idx, slide_width, slide_height,
-                                   output_dir, source_path, images, resource_id, depth=0):
+    def _extract_shapes_recursive(
+        self,
+        shapes,
+        slide_idx,
+        slide_width,
+        slide_height,
+        output_dir,
+        source_path,
+        images,
+        resource_id,
+        depth=0,
+    ):
         if depth > 10:
             return
         try:
@@ -204,8 +234,15 @@ class ImageExtractorV2:
                 shape_type = getattr(shape, "shape_type", None)
                 if shape_type == MSO_SHAPE_TYPE.GROUP:
                     self._extract_shapes_recursive(
-                        shape.shapes, slide_idx, slide_width, slide_height,
-                        output_dir, source_path, images, resource_id, depth + 1
+                        shape.shapes,
+                        slide_idx,
+                        slide_width,
+                        slide_height,
+                        output_dir,
+                        source_path,
+                        images,
+                        resource_id,
+                        depth + 1,
                     )
                     continue
 
@@ -213,8 +250,14 @@ class ImageExtractorV2:
                     img_id = f"img_{uuid.uuid4().hex[:8]}"
                     try:
                         image_blob = shape.image.blob
-                        img_ext = "." + shape.image.content_type.split("/")[-1] if "/" in (shape.image.content_type or "") else ".png"
-                        file_path = self._save_image_blob(image_blob, output_dir, f"slide{slide_idx + 1}_{img_id}", img_ext)
+                        img_ext = (
+                            "." + shape.image.content_type.split("/")[-1]
+                            if "/" in (shape.image.content_type or "")
+                            else ".png"
+                        )
+                        file_path = self._save_image_blob(
+                            image_blob, output_dir, f"slide{slide_idx + 1}_{img_id}", img_ext
+                        )
 
                         extracted = ExtractedImage(
                             id=img_id,
@@ -228,8 +271,12 @@ class ImageExtractorV2:
                             position_y=getattr(shape, "top", 0) or 0,
                             width=getattr(shape, "width", 0) or 0,
                             height=getattr(shape, "height", 0) or 0,
-                            bbox={"x": getattr(shape, "left", 0), "y": getattr(shape, "top", 0),
-                                  "w": getattr(shape, "width", 0), "h": getattr(shape, "height", 0)},
+                            bbox={
+                                "x": getattr(shape, "left", 0),
+                                "y": getattr(shape, "top", 0),
+                                "w": getattr(shape, "width", 0),
+                                "h": getattr(shape, "height", 0),
+                            },
                             source_shape_type="picture",
                         )
                         images.append(extracted)
@@ -250,10 +297,16 @@ class ImageExtractorV2:
                         position_y=getattr(shape, "top", 0) or 0,
                         width=getattr(shape, "width", 0) or 0,
                         height=getattr(shape, "height", 0) or 0,
-                        bbox={"x": getattr(shape, "left", 0), "y": getattr(shape, "top", 0),
-                              "w": getattr(shape, "width", 0), "h": getattr(shape, "height", 0)},
+                        bbox={
+                            "x": getattr(shape, "left", 0),
+                            "y": getattr(shape, "top", 0),
+                            "w": getattr(shape, "width", 0),
+                            "h": getattr(shape, "height", 0),
+                        },
                         source_shape_type="chart",
-                        caption=shape.chart.chart_title.text if hasattr(shape.chart, "chart_title") else "",
+                        caption=shape.chart.chart_title.text
+                        if hasattr(shape.chart, "chart_title")
+                        else "",
                     )
                     images.append(extracted)
 
@@ -271,8 +324,12 @@ class ImageExtractorV2:
                         position_y=getattr(shape, "top", 0) or 0,
                         width=getattr(shape, "width", 0) or 0,
                         height=getattr(shape, "height", 0) or 0,
-                        bbox={"x": getattr(shape, "left", 0), "y": getattr(shape, "top", 0),
-                              "w": getattr(shape, "width", 0), "h": getattr(shape, "height", 0)},
+                        bbox={
+                            "x": getattr(shape, "left", 0),
+                            "y": getattr(shape, "top", 0),
+                            "w": getattr(shape, "width", 0),
+                            "h": getattr(shape, "height", 0),
+                        },
                         source_shape_type="smartart",
                     )
                     images.append(extracted)
@@ -281,11 +338,14 @@ class ImageExtractorV2:
                 logger.debug(f"Error processing shape on slide {slide_idx + 1}: {e}")
                 continue
 
-    def _extract_from_pdf(self, pdf_path: str, output_dir: str, resource_id: str) -> list[ExtractedImage]:
+    def _extract_from_pdf(
+        self, pdf_path: str, output_dir: str, resource_id: str
+    ) -> list[ExtractedImage]:
         images = []
 
         try:
             import fitz
+
             doc = fitz.open(pdf_path)
             for page_num, page in enumerate(doc):
                 for img_index, img in enumerate(page.get_images(full=True)):
@@ -315,7 +375,9 @@ class ImageExtractorV2:
                             position_y=bbox[1] if bbox else 0,
                             width=(bbox[2] - bbox[0]) if bbox else 0,
                             height=(bbox[3] - bbox[1]) if bbox else 0,
-                            bbox={"x0": bbox[0], "y0": bbox[1], "x1": bbox[2], "y1": bbox[3]} if bbox else None,
+                            bbox={"x0": bbox[0], "y0": bbox[1], "x1": bbox[2], "y1": bbox[3]}
+                            if bbox
+                            else None,
                             source_shape_type="embedded",
                         )
                         images.append(extracted)
@@ -337,11 +399,15 @@ class ImageExtractorV2:
             for page_num, pil_img in enumerate(pil_images):
                 cv_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
                 gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
-                grad = cv2.morphologyEx(gray, cv2.MORPH_GRADIENT, cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2)))
+                grad = cv2.morphologyEx(
+                    gray, cv2.MORPH_GRADIENT, cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+                )
                 _, binary = cv2.threshold(grad, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
                 kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 20))
                 connected = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
-                contours, _ = cv2.findContours(connected, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                contours, _ = cv2.findContours(
+                    connected, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                )
 
                 height, width = cv_img.shape[:2]
                 for cnt in contours:
@@ -356,13 +422,15 @@ class ImageExtractorV2:
                     if w / h > 12 or h / w > 12:
                         continue
 
-                    roi_gray = gray[y:y + h, x:x + w]
+                    roi_gray = gray[y : y + h, x : x + w]
                     std_dev = np.std(roi_gray)
                     if std_dev < 20:
                         continue
 
                     try:
-                        text_content = pytesseract.image_to_string(roi_gray, config="--psm 6").strip()
+                        text_content = pytesseract.image_to_string(
+                            roi_gray, config="--psm 6"
+                        ).strip()
                         if 0 < len(text_content) < 4:
                             continue
                         if text_content.isalpha() and len(text_content) < 6:
@@ -382,7 +450,7 @@ class ImageExtractorV2:
                         continue
 
                     img_id = f"p{page_num + 1}_cv{uuid.uuid4().hex[:6]}"
-                    roi = cv_img[y:y + h, x:x + w]
+                    roi = cv_img[y : y + h, x : x + w]
                     filename = f"{img_id}.jpg"
                     save_path = os.path.join(output_dir, filename)
                     cv2.imwrite(save_path, roi)
@@ -410,7 +478,9 @@ class ImageExtractorV2:
 
         return self._deduplicate_and_classify(images, pdf_path)
 
-    def _extract_from_docx(self, docx_path: str, output_dir: str, resource_id: str) -> list[ExtractedImage]:
+    def _extract_from_docx(
+        self, docx_path: str, output_dir: str, resource_id: str
+    ) -> list[ExtractedImage]:
         try:
             from docx import Document
         except ImportError:
@@ -439,7 +509,9 @@ class ImageExtractorV2:
                     if not blip:
                         continue
                     for b in blip:
-                        embed_id = b.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
+                        embed_id = b.get(
+                            "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
+                        )
                         if not embed_id:
                             continue
                         rel = doc.part.related_parts.get(embed_id)
@@ -447,7 +519,9 @@ class ImageExtractorV2:
                             continue
                         image_blob = rel.blob
                         content_type = getattr(rel, "content_type", "image/png") or "image/png"
-                        img_ext = "." + content_type.split("/")[-1] if "/" in content_type else ".png"
+                        img_ext = (
+                            "." + content_type.split("/")[-1] if "/" in content_type else ".png"
+                        )
 
                         img_id = f"docx_p{para_idx}_{uuid.uuid4().hex[:6]}"
                         file_path = self._save_image_blob(image_blob, output_dir, img_id, img_ext)
@@ -477,8 +551,11 @@ class ImageExtractorV2:
 
         return self._deduplicate_and_classify(images, docx_path)
 
-    def _extract_from_image(self, image_path: str, output_dir: str, resource_id: str) -> list[ExtractedImage]:
+    def _extract_from_image(
+        self, image_path: str, output_dir: str, resource_id: str
+    ) -> list[ExtractedImage]:
         import shutil
+
         filename = os.path.basename(image_path)
         dest_path = os.path.join(output_dir, filename)
         shutil.copy2(image_path, dest_path)
@@ -497,13 +574,16 @@ class ImageExtractorV2:
         )
         return [self.classifier.classify(extracted)]
 
-    def _deduplicate_and_classify(self, images: list[ExtractedImage], source_key: str) -> list[ExtractedImage]:
+    def _deduplicate_and_classify(
+        self, images: list[ExtractedImage], source_key: str
+    ) -> list[ExtractedImage]:
         seen_hashes = set()
         unique_images = []
         for img in images:
             if img.file_path and os.path.exists(img.file_path):
                 try:
                     import hashlib
+
                     with open(img.file_path, "rb") as f:
                         file_hash = hashlib.md5(f.read(), usedforsecurity=False).hexdigest()
                     img.md5_hash = file_hash

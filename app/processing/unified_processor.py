@@ -33,11 +33,27 @@ class ContentBundle:
 class UnifiedContentProcessor:
     """Single entry point for processing all document types."""
 
-    SUPPORTED_EXTS = {".pdf", ".pptx", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff"}
+    SUPPORTED_EXTS = {
+        ".pdf",
+        ".pptx",
+        ".docx",
+        ".txt",
+        ".md",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".tiff",
+    }
     IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"}
 
-    def __init__(self, use_polish: bool = False, gemini_api_key: str | None = None,
-                 gemini_model: str | None = None):
+    def __init__(
+        self,
+        use_polish: bool = False,
+        gemini_api_key: str | None = None,
+        gemini_model: str | None = None,
+    ):
         self.use_polish = use_polish
         self.gemini_api_key = gemini_api_key
         self.gemini_model = gemini_model
@@ -50,6 +66,7 @@ class UnifiedContentProcessor:
     def smart_pipeline(self):
         if self._smart_pipeline is None:
             from app.processing.smart_pipeline import SmartPipeline
+
             self._smart_pipeline = SmartPipeline(
                 use_polish=self.use_polish,
                 gemini_api_key=self.gemini_api_key,
@@ -61,6 +78,7 @@ class UnifiedContentProcessor:
     def image_extractor(self):
         if self._image_extractor is None:
             from app.processing.image_extractor_v2 import ImageExtractorV2
+
             self._image_extractor = ImageExtractorV2()
         return self._image_extractor
 
@@ -68,6 +86,7 @@ class UnifiedContentProcessor:
     def scanned_handler(self):
         if self._scanned_handler is None:
             from app.processing.scanned_doc_handler import ScannedDocHandler
+
             self._scanned_handler = ScannedDocHandler()
         return self._scanned_handler
 
@@ -75,11 +94,13 @@ class UnifiedContentProcessor:
     def image_mapper(self):
         if self._image_mapper is None:
             from app.processing.image_text_mapper import ImageTextMapper
+
             self._image_mapper = ImageTextMapper()
         return self._image_mapper
 
-    def extract(self, file_path: str, resource_id: str = "",
-                progress_callback: Callable | None = None) -> ContentBundle:
+    def extract(
+        self, file_path: str, resource_id: str = "", progress_callback: Callable | None = None
+    ) -> ContentBundle:
         ext = Path(file_path).suffix.lower()
         timings = {}
 
@@ -124,12 +145,15 @@ class UnifiedContentProcessor:
         except Exception as e:
             return ContentBundle(markdown=f"Error reading text file: {e}", warnings=[str(e)])
 
-    def _process_image(self, file_path: str, resource_id: str,
-                       progress_callback: Callable | None = None) -> ContentBundle:
+    def _process_image(
+        self, file_path: str, resource_id: str, progress_callback: Callable | None = None
+    ) -> ContentBundle:
         if progress_callback:
             progress_callback(10, "Processing image...")
 
-        ocr_text = self.scanned_handler.process_image_file(file_path, progress_callback=progress_callback)
+        ocr_text = self.scanned_handler.process_image_file(
+            file_path, progress_callback=progress_callback
+        )
 
         if progress_callback:
             progress_callback(70, "Extracting images...")
@@ -147,14 +171,16 @@ class UnifiedContentProcessor:
             processing_path="image_ocr",
         )
 
-    def _process_scanned_pdf(self, file_path: str, resource_id: str,
-                              progress_callback: Callable | None,
-                              timings: dict) -> ContentBundle:
+    def _process_scanned_pdf(
+        self, file_path: str, resource_id: str, progress_callback: Callable | None, timings: dict
+    ) -> ContentBundle:
         if progress_callback:
             progress_callback(10, "Converting scanned PDF to images...")
 
         t0 = time.time()
-        ocr_text = self.scanned_handler.process_scanned_pdf(file_path, progress_callback=progress_callback)
+        ocr_text = self.scanned_handler.process_scanned_pdf(
+            file_path, progress_callback=progress_callback
+        )
         timings["ocr_extraction"] = time.time() - t0
 
         if progress_callback:
@@ -176,9 +202,9 @@ class UnifiedContentProcessor:
             timings=timings,
         )
 
-    def _process_native_pdf(self, file_path: str, resource_id: str,
-                             progress_callback: Callable | None,
-                             timings: dict) -> ContentBundle:
+    def _process_native_pdf(
+        self, file_path: str, resource_id: str, progress_callback: Callable | None, timings: dict
+    ) -> ContentBundle:
         warnings = []
 
         if progress_callback:
@@ -203,12 +229,16 @@ class UnifiedContentProcessor:
             progress_callback(85, "Placing images in document...")
 
         t0 = time.time()
-        markdown_with_images = self.image_mapper.insert_images(markdown, images, source_format="pdf")
+        markdown_with_images = self.image_mapper.insert_images(
+            markdown, images, source_format="pdf"
+        )
         timings["image_mapping"] = time.time() - t0
 
         missing_refs = self._check_missing_diagram_refs(markdown)
         if missing_refs:
-            warnings.append(f"Text references {len(missing_refs)} diagram(s) but no image was found nearby")
+            warnings.append(
+                f"Text references {len(missing_refs)} diagram(s) but no image was found nearby"
+            )
 
         return ContentBundle(
             markdown=markdown_with_images,
@@ -218,8 +248,9 @@ class UnifiedContentProcessor:
             warnings=warnings,
         )
 
-    def _process_pptx(self, file_path: str, resource_id: str,
-                       progress_callback: Callable | None = None) -> ContentBundle:
+    def _process_pptx(
+        self, file_path: str, resource_id: str, progress_callback: Callable | None = None
+    ) -> ContentBundle:
         warnings = []
 
         if progress_callback:
@@ -240,7 +271,9 @@ class UnifiedContentProcessor:
             progress_callback(85, "Placing images in slides...")
 
         t0 = time.time()
-        markdown_with_images = self.image_mapper.insert_images(markdown, images, source_format="pptx")
+        markdown_with_images = self.image_mapper.insert_images(
+            markdown, images, source_format="pptx"
+        )
         timings["image_mapping"] = time.time() - t0
 
         return ContentBundle(
@@ -251,8 +284,9 @@ class UnifiedContentProcessor:
             warnings=warnings,
         )
 
-    def _process_docx(self, file_path: str, resource_id: str,
-                       progress_callback: Callable | None = None) -> ContentBundle:
+    def _process_docx(
+        self, file_path: str, resource_id: str, progress_callback: Callable | None = None
+    ) -> ContentBundle:
         if progress_callback:
             progress_callback(10, "Extracting text from DOCX...")
 
@@ -270,7 +304,9 @@ class UnifiedContentProcessor:
         if progress_callback:
             progress_callback(85, "Placing images in document...")
 
-        markdown_with_images = self.image_mapper.insert_images(markdown, images, source_format="docx")
+        markdown_with_images = self.image_mapper.insert_images(
+            markdown, images, source_format="docx"
+        )
 
         return ContentBundle(
             markdown=markdown_with_images,

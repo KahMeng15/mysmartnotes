@@ -15,7 +15,12 @@ from threading import Lock
 
 logger = logging.getLogger(__name__)
 
-_KNOWLEDGE_PATH = Path(__file__).parent.parent.parent / "scripts" / "resource_processing_test" / "pipeline_knowledge.json"
+_KNOWLEDGE_PATH = (
+    Path(__file__).parent.parent.parent
+    / "scripts"
+    / "resource_processing_test"
+    / "pipeline_knowledge.json"
+)
 _lock = Lock()
 _default_knowledge = None
 
@@ -39,8 +44,14 @@ def _get_defaults() -> dict:
                 {"position": "corner", "max_size": 150, "description": "corner logos"},
             ],
             "heading_keywords": [
-                "Introduction", "Overview", "Summary", "Conclusion",
-                "Learning Outcomes", "Objectives", "Agenda", "Outline",
+                "Introduction",
+                "Overview",
+                "Summary",
+                "Conclusion",
+                "Learning Outcomes",
+                "Objectives",
+                "Agenda",
+                "Outline",
             ],
             "ppt_noise_patterns": ["slide number", "page \\d+", "confidential", "draft"],
             "bullet_chars_to_normalize": [],
@@ -154,7 +165,9 @@ class PipelineKnowledge:
         prev_avg = perf.get("avg_score", 1.0)
         perf["avg_score"] = ((prev_avg * (total - 1)) + score) / total
         prev_time = perf.get("avg_processing_time_ms", 0)
-        perf["avg_processing_time_ms"] = int(((prev_time * (total - 1)) + processing_time_ms) / total)
+        perf["avg_processing_time_ms"] = int(
+            ((prev_time * (total - 1)) + processing_time_ms) / total
+        )
         history = perf.setdefault("score_history", [])
         history.append({"score": score, "at": __import__("datetime").datetime.utcnow().isoformat()})
         if len(history) > 100:
@@ -166,9 +179,7 @@ class PipelineKnowledge:
         perf = data.get("performance", {})
         cp = data.get("correction_patterns", {})
         heading_count = cp.get("heading_level", {}).get("count", 0)
-        total_corrections = sum(
-            v.get("count", 0) for v in cp.values() if isinstance(v, dict)
-        )
+        total_corrections = sum(v.get("count", 0) for v in cp.values() if isinstance(v, dict))
         lines = [
             f"  Knowledge base: {_KNOWLEDGE_PATH.name}",
             f"  Corrections applied: {total_corrections}",

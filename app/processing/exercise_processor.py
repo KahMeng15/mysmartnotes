@@ -234,19 +234,24 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str | None = 
 
         try:
             from app.processing.unified_processor import UnifiedContentProcessor
+
             processor = UnifiedContentProcessor(use_polish=False)
             bundle = processor.extract(file_path, resource_id=exercise_id)
             raw_text = bundle.markdown
 
             if bundle.images and exercise_id:
-                images_data = [img.to_dict() if hasattr(img, "to_dict") else img for img in bundle.images]
+                images_data = [
+                    img.to_dict() if hasattr(img, "to_dict") else img for img in bundle.images
+                ]
                 from app.utils.storage import StorageManager
+
                 StorageManager.save_resource_json(exercise_id, "images", images_data)
                 StorageManager.save_resource_json(exercise_id, "image_map", bundle.image_map)
         except ImportError:
             if file_ext in (".pdf", ".pptx", ".txt", ".md", ".docx"):
                 if file_ext == ".docx":
                     from docx import Document
+
                     doc = Document(file_path)
                     raw_text = "\n".join([p.text for p in doc.paragraphs])
                 else:

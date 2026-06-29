@@ -13,15 +13,17 @@ logger = logging.getLogger(__name__)
 
 VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 
-_TURNSTILE_PATHS = frozenset({
-    "/auth/login",
-    "/auth/register",
-    "/auth/google-login",
-    "/auth/google-complete",
-    "/auth/password-reset-request",
-    "/auth/password-reset",
-    "/auth/resend-verification",
-})
+_TURNSTILE_PATHS = frozenset(
+    {
+        "/auth/login",
+        "/auth/register",
+        "/auth/google-login",
+        "/auth/google-complete",
+        "/auth/password-reset-request",
+        "/auth/password-reset",
+        "/auth/resend-verification",
+    }
+)
 
 
 async def validate_turnstile(token: str, ip: str | None = None) -> bool:

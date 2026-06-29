@@ -1086,7 +1086,9 @@ class SmartPipeline:
         try:
             from docx import Document
         except ImportError:
-            raise ImportError("python-docx is required for DOCX processing. Install: pip install python-docx")
+            raise ImportError(
+                "python-docx is required for DOCX processing. Install: pip install python-docx"
+            )
 
         logger.info(f"Processing DOCX: {docx_path}")
         doc = Document(docx_path)
@@ -1113,7 +1115,7 @@ class SmartPipeline:
                 md_parts.append(f"###### {text}")
             else:
                 numPr = paragraph._element.find(
-                    './/{http://schemas.openxmlformats.org/wordprocessingml/2006/main}numPr'
+                    ".//{http://schemas.openxmlformats.org/wordprocessingml/2006/main}numPr"
                 )
                 if numPr is not None:
                     md_parts.append(f"1. {text}")
@@ -1131,7 +1133,9 @@ class SmartPipeline:
         lines = [l for l in markdown.split("\n") if l.strip()]
         headings = len([l for l in lines if l.startswith("#")])
         list_items = len([l for l in lines if l.startswith("- ") or l.startswith("1. ")])
-        logger.info(f"DOCX Output: {len(lines)} lines, {headings} headings, {list_items} list items")
+        logger.info(
+            f"DOCX Output: {len(lines)} lines, {headings} headings, {list_items} list items"
+        )
         return markdown
 
     # ── chunk size for AI polish (characters) ──

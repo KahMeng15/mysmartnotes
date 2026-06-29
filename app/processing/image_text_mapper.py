@@ -67,11 +67,17 @@ class ImageTextMapper:
                         result.append(self._format_image_ref(img))
                         slide_images_placed.add(img_id)
 
-            is_last_line = (line_idx == len(lines) - 1) or (line_idx < len(lines) - 1 and not lines[line_idx + 1].strip())
+            is_last_line = (line_idx == len(lines) - 1) or (
+                line_idx < len(lines) - 1 and not lines[line_idx + 1].strip()
+            )
             if is_last_line and current_slide > 0:
                 slide_images = images_by_slide.get(current_slide, [])
-                unplaced = [img for img in slide_images
-                            if (img.get("id") if isinstance(img, dict) else getattr(img, "id", "")) not in slide_images_placed]
+                unplaced = [
+                    img
+                    for img in slide_images
+                    if (img.get("id") if isinstance(img, dict) else getattr(img, "id", ""))
+                    not in slide_images_placed
+                ]
                 for img in unplaced:
                     result.append(self._format_image_ref(img))
 
@@ -96,17 +102,29 @@ class ImageTextMapper:
             has_ref_pattern = any(re.search(p, line.lower()) for p in DIAGRAM_REF_PATTERNS)
             if has_ref_pattern:
                 page_images = images_by_page.get(current_page, [])
-                unplaced = [img for img in page_images
-                            if (img.get("id") if isinstance(img, dict) else getattr(img, "id", "")) not in page_images_placed]
+                unplaced = [
+                    img
+                    for img in page_images
+                    if (img.get("id") if isinstance(img, dict) else getattr(img, "id", ""))
+                    not in page_images_placed
+                ]
                 if unplaced:
                     result.append(self._format_image_ref(unplaced[0]))
-                    page_images_placed.add(unplaced[0].get("id") if isinstance(unplaced[0], dict) else getattr(unplaced[0], "id", ""))
+                    page_images_placed.add(
+                        unplaced[0].get("id")
+                        if isinstance(unplaced[0], dict)
+                        else getattr(unplaced[0], "id", "")
+                    )
 
             is_page_end = self._is_page_boundary(line, lines, line_idx)
             if is_page_end and current_page > 0:
                 page_images = images_by_page.get(current_page, [])
-                unplaced = [img for img in page_images
-                            if (img.get("id") if isinstance(img, dict) else getattr(img, "id", "")) not in page_images_placed]
+                unplaced = [
+                    img
+                    for img in page_images
+                    if (img.get("id") if isinstance(img, dict) else getattr(img, "id", ""))
+                    not in page_images_placed
+                ]
                 for img in unplaced:
                     result.append(self._format_image_ref(img))
 
@@ -114,9 +132,12 @@ class ImageTextMapper:
 
     def _insert_generic_images(self, markdown: str, images: list) -> str:
         lines = markdown.split("\n")
-        images_sorted = sorted(images, key=lambda img: (
-            img.get("position_y", 0) if isinstance(img, dict) else getattr(img, "position_y", 0)
-        ))
+        images_sorted = sorted(
+            images,
+            key=lambda img: (
+                img.get("position_y", 0) if isinstance(img, dict) else getattr(img, "position_y", 0)
+            ),
+        )
 
         result = []
         image_idx = 0
@@ -165,7 +186,11 @@ class ImageTextMapper:
     def _group_images_by_slide(self, images: list) -> dict[int, list]:
         groups = {}
         for img in images:
-            slide = img.get("slide_index", 0) if isinstance(img, dict) else getattr(img, "slide_index", 0)
+            slide = (
+                img.get("slide_index", 0)
+                if isinstance(img, dict)
+                else getattr(img, "slide_index", 0)
+            )
             if slide not in groups:
                 groups[slide] = []
             groups[slide].append(img)
@@ -174,7 +199,11 @@ class ImageTextMapper:
     def _group_images_by_page(self, images: list) -> dict[int, list]:
         groups = {}
         for img in images:
-            page = img.get("page_number", 0) if isinstance(img, dict) else getattr(img, "page_number", 0)
+            page = (
+                img.get("page_number", 0)
+                if isinstance(img, dict)
+                else getattr(img, "page_number", 0)
+            )
             if page not in groups:
                 groups[page] = []
             groups[page].append(img)
@@ -209,7 +238,9 @@ class ImageTextMapper:
             return True
         return False
 
-    def insert_image_placeholders(self, markdown: str, images: list, source_format: str = "") -> str:
+    def insert_image_placeholders(
+        self, markdown: str, images: list, source_format: str = ""
+    ) -> str:
         result = markdown
         pattern_refs = set()
         for pattern in DIAGRAM_REF_PATTERNS:
