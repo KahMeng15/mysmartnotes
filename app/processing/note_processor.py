@@ -5,7 +5,6 @@ from collections.abc import Callable
 from datetime import datetime
 
 from app.models.db import Resource, User
-from app.processing.ocr import OCRProcessor
 from app.processing.smart_pipeline import SmartPipeline
 from app.processing.unified_processor import UnifiedContentProcessor
 from app.utils.cache import clear_cache_pattern_sync
@@ -216,7 +215,6 @@ def process_resource_task(
             TaskManager.update_task_progress(task_id, percent, message=message)
 
         start_time = time.time()
-        file_ext = os.path.splitext(file_path)[1].lower()
 
         def pipeline_callback(p):
             if is_cancelled():

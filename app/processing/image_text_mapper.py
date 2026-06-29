@@ -5,7 +5,6 @@ into the markdown at the correct position.
 
 import logging
 import re
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -181,14 +180,14 @@ class ImageTextMapper:
             groups[page].append(img)
         return groups
 
-    def _detect_slide_number(self, line: str, line_idx: int, boundaries: list[int]) -> Optional[int]:
+    def _detect_slide_number(self, line: str, line_idx: int, boundaries: list[int]) -> int | None:
         if line_idx in boundaries:
             for i, b in enumerate(boundaries):
                 if b == line_idx:
                     return i + 1
         return None
 
-    def _detect_page_number(self, line: str) -> Optional[int]:
+    def _detect_page_number(self, line: str) -> int | None:
         m = re.match(r"\[Page\s+(\d+)\]", line)
         if m:
             return int(m.group(1))

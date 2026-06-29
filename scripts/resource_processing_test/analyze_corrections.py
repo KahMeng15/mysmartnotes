@@ -11,11 +11,16 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
+import logging
 import os
 import sys
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def load_corrections(corrections_dir: str) -> list[dict]:
@@ -92,6 +97,73 @@ def _infer_source_types(corrections: list[dict]) -> Counter:
         else:
             ext_counts["Unknown"] += 1
     return ext_counts
+
+
+def persist_to_knowledge(analysis: dict, corrections_dir: str):
+    """Write analysis results into pipeline_knowledge.json so the pipeline reads them."""
+    knowledge_path = Path(__file__).parent / "pipeline_knowledge.json"
+    try:
+        if knowledge_path.exists():
+            with open(knowledge_path) as f:
+                knowledge = json.load(f)
+        else:
+            knowledge = {}
+
+        knowledge["version"] = knowledge.get("version", 1) + 1
+        knowledge["last_updated"] = datetime.utcnow().isoformat()
+        knowledge["total_correction_files"] = analysis.get("total_files", 0)
+        knowledge["total_corrections_processed"] = analysis.get("total_corrections", 0)
+
+        corrections = load_corrections(corrections_dir)
+        all_corrections = [c for corr in corrections for c in corr.get("corrections", [])]
+
+        type_counts = analysis.get("type_counts", {})
+        cp = knowledge.setdefault("correction_patterns", {})
+        for t, count in type_counts.items():
+            pattern = cp.setdefault(t, {"count": 0, "by_format": {}})
+            pattern["count"] = count
+
+        # Extract heading adjustments to tune thresholds
+        heading_corrections = [c for c in all_corrections
+                               if c.get("type") in ("heading_level", "mark_heading")]
+        if len(heading_corrections) >= 3:
+            h1_count = sum(1 for c in heading_corrections if c.get("from") == "h2" and c.get("to") == "h1")
+            h2_count = sum(1 for c in heading_corrections if c.get("from") == "h3" and c.get("to") == "h2")
+            if h1_count > len(heading_corrections) * 0.3:
+                current = knowledge.setdefault("heading_thresholds", {}).get("pptx_h1_multiplier", 1.6)
+                knowledge["heading_thresholds"]["pptx_h1_multiplier"] = round(current + 0.05, 2)
+                logger.info(f"Tuning: raised PPTX H1 threshold to {knowledge['heading_thresholds']['pptx_h1_multiplier']}")
+            if h2_count > len(heading_corrections) * 0.3:
+                current = knowledge.setdefault("heading_thresholds", {}).get("pptx_h2_multiplier", 1.3)
+                knowledge["heading_thresholds"]["pptx_h2_multiplier"] = round(current + 0.05, 2)
+                logger.info(f"Tuning: raised PPTX H2 threshold to {knowledge['heading_thresholds']['pptx_h2_multiplier']}")
+
+        # Extract image skips — compute MD5 from file path so should_skip_image(md5_hash) works
+        ignore_images = [c for c in all_corrections if c.get("type") == "ignore_image"]
+        if len(ignore_images) >= 2:
+            skip_list = knowledge.setdefault("skip_images_md5", [])
+            for c in ignore_images:
+                img_path = c.get("image_path", "")
+                if not img_path:
+                    continue
+                try:
+                    with open(img_path, "rb") as f:
+                        md5_hash = hashlib.md5(f.read()).hexdigest()
+                except (FileNotFoundError, IOError):
+                    logger.warning(f"Cannot compute MD5 for '{img_path}' — file not found")
+                    continue
+                if md5_hash not in skip_list:
+                    skip_list.append(md5_hash)
+                    logger.info(f"Tuning: added MD5 {md5_hash[:12]}... to image skip list (from '{img_path}')")
+
+        with open(knowledge_path, "w") as f:
+            json.dump(knowledge, f, indent=2)
+
+        print(f"\n  Knowledge file updated: {knowledge_path.name}")
+        print(f"  Version {knowledge['version']} — {knowledge['total_corrections_processed']} total corrections")
+
+    except Exception as e:
+        print(f"  Warning: Could not update knowledge file: {e}")
 
 
 def suggest_tweaks(corrections_dir: str) -> list[dict]:
@@ -184,12 +256,17 @@ def main():
                         help="Auto-apply safe parameter tweaks")
     parser.add_argument("--dry-run", action="store_true", default=True,
                         help="Show what would be changed without applying (default: True)")
+    parser.add_argument("--persist", "-p", action="store_true", default=True,
+                        help="Write results to pipeline_knowledge.json (default: True)")
     args = parser.parse_args()
 
     base_dir = Path(__file__).parent
     corrections_dir = args.corrections_dir or str(base_dir / "corrections")
 
-    analyze(corrections_dir)
+    analysis = analyze(corrections_dir)
+
+    if analysis and args.persist:
+        persist_to_knowledge(analysis, corrections_dir)
 
     if args.suggest_tweaks or args.apply_safe:
         apply_safe_tweaks(corrections_dir, dry_run=not args.apply_safe)

@@ -7,9 +7,7 @@ the appropriate OCR pipeline. Supports printed text (Tesseract), handwriting
 """
 
 import logging
-import os
 import re
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +79,8 @@ class ScannedDocHandler:
                     if c != "-1" and data["text"][i].strip():
                         confs.append(float(c))
                 all_confidences.extend(confs)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Error parsing confidence: {e}")
                 continue
 
         if not all_confidences:

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from app.config import get_settings
 from app.processing.font_extractor import FontAwareExtractor
+from app.processing.pipeline_knowledge import PipelineKnowledge
 from app.processing.signal_merger import SignalMerger, blocks_to_markdown
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class SmartPipeline:
         self.table_detector = None  # Legacy: disabled
         self.merger = SignalMerger()
         self.timings = {}
+        self.knowledge = PipelineKnowledge()
 
     def process(
         self, file_path: str, progress_callback: Callable[[int], None] | None = None
@@ -697,10 +699,10 @@ class SmartPipeline:
             median_size = 18.0
 
         # Heading thresholds are relative to median body size.
-        # A true heading should be meaningfully larger than body text.
-        h1_threshold = max(median_size * 1.6, 28.0)
-        h2_threshold = max(median_size * 1.3, 22.0)
-        h3_threshold = max(median_size * 1.1, 16.0)
+        # Can be tuned via pipeline_knowledge.json from user corrections.
+        h1_threshold = self.knowledge.get_pptx_h1_threshold(median_size)
+        h2_threshold = self.knowledge.get_pptx_h2_threshold(median_size)
+        h3_threshold = self.knowledge.get_pptx_h3_threshold(median_size)
         logger.debug(
             f"PPTX median body size: {median_size:.1f}pt → "
             f"h1≥{h1_threshold:.1f}, h2≥{h2_threshold:.1f}, h3≥{h3_threshold:.1f}"

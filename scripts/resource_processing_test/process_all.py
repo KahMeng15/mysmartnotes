@@ -113,6 +113,12 @@ def process_and_report(file_path: Path, polish: bool = False) -> dict:
     output_md.write_text(bundle.markdown, encoding="utf-8")
     print(f"\n  Output: {output_md}")
 
+    try:
+        from app.processing.pipeline_knowledge import PipelineKnowledge
+        PipelineKnowledge().record_performance(score, int(elapsed * 1000))
+    except Exception:
+        pass
+
     from scripts.resource_processing_test.test_harness.reporter import Reporter
     expected_dir = Path(__file__).parent / "expected"
     expected_file = expected_dir / f"{file_path.stem}.md"
@@ -187,8 +193,10 @@ def run_self_improvement():
         print(f"\n{'=' * 60}")
         print(f"  SELF-IMPROVEMENT ANALYSIS")
         print(f"{'=' * 60}")
-        from scripts.resource_processing_test.analyze_corrections import analyze, suggest_tweaks
-        analyze(str(corrections_dir))
+        from scripts.resource_processing_test.analyze_corrections import analyze, suggest_tweaks, persist_to_knowledge
+        analysis = analyze(str(corrections_dir))
+        if analysis:
+            persist_to_knowledge(analysis, str(corrections_dir))
         suggestions = suggest_tweaks(str(corrections_dir))
         if suggestions:
             print(f"\n  Suggested tweaks:")
@@ -197,6 +205,17 @@ def run_self_improvement():
                 print(f"           Target: {s['target']}")
     else:
         print(f"\n  No corrections yet. Use --correct to review and save corrections.")
+
+    try:
+        from app.processing.pipeline_knowledge import PipelineKnowledge
+        knowledge = PipelineKnowledge()
+        print(f"\n{'=' * 60}")
+        print(f"  PIPELINE KNOWLEDGE STATE")
+        print(f"{'=' * 60}")
+        print(knowledge.summary())
+        knowledge.reload()
+    except Exception:
+        pass
 
 
 def main():

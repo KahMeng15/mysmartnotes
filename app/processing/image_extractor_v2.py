@@ -8,9 +8,10 @@ Filters out logos, backgrounds, and decorative elements using heuristics.
 import logging
 import os
 import uuid
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional
+
+from app.processing.pipeline_knowledge import PipelineKnowledge
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class ExtractedImage:
     position_y: float = 0.0
     width: float = 0.0
     height: float = 0.0
-    bbox: Optional[dict] = None
+    bbox: dict | None = None
     source_shape_type: str = "unknown"  # picture, chart, smartart, group, embedded, contour
     is_diagram: bool = False
     is_decorative: bool = False
@@ -50,7 +51,8 @@ class ImageClassifier:
     LOW_VARIANCE_THRESHOLD = 15
     EXTREME_ASPECT = 15
 
-    def __init__(self):
+    def __init__(self, knowledge: PipelineKnowledge | None = None):
+        self._knowledge = knowledge or PipelineKnowledge()
         self._position_cache: dict[str, list] = {}  # filename -> [(x, y, w, h), ...]
 
     def classify(self, image: ExtractedImage, page_width: float = 0, page_height: float = 0) -> ExtractedImage:
@@ -116,6 +118,24 @@ class ImageClassifier:
             image.is_decorative = True
             image.is_diagram = False
             image.confidence = 0.95
+            return image
+
+        if image.md5_hash and self._knowledge.should_skip_image(image.md5_hash):
+            image.is_decorative = True
+            image.is_diagram = False
+            image.confidence = 0.98
+            return image
+
+        patterns = self._knowledge.decorative_patterns
+        for pattern in patterns:
+            max_w = pattern.get("max_width", 0)
+            max_h = pattern.get("max_height", 0)
+            if max_w and max_h and image.width <= max_w and image.height <= max_h:
+                image.is_decorative = True
+                image.is_diagram = False
+                image.confidence = pattern.get("confidence", 0.8)
+                return image
+
         return image
 
 
@@ -124,7 +144,7 @@ class ImageExtractorV2:
 
     SUPPORTED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"}
 
-    def __init__(self, output_base_dir: str = "data/extracted_images", classifier: Optional[ImageClassifier] = None):
+    def __init__(self, output_base_dir: str = "data/extracted_images", classifier: ImageClassifier | None = None):
         self.output_base_dir = output_base_dir
         self.classifier = classifier or ImageClassifier()
 
@@ -153,7 +173,6 @@ class ImageExtractorV2:
     def _extract_from_pptx(self, pptx_path: str, output_dir: str, resource_id: str) -> list[ExtractedImage]:
         try:
             from pptx import Presentation
-            from pptx.enum.shapes import MSO_SHAPE_TYPE
         except ImportError:
             logger.error("python-pptx not installed")
             return []
@@ -269,8 +288,6 @@ class ImageExtractorV2:
             import fitz
             doc = fitz.open(pdf_path)
             for page_num, page in enumerate(doc):
-                page_width = page.rect.width
-                page_height = page.rect.height
                 for img_index, img in enumerate(page.get_images(full=True)):
                     try:
                         xref = img[0]
@@ -311,10 +328,10 @@ class ImageExtractorV2:
             logger.warning(f"PDF image extraction error: {e}")
 
         try:
-            from pdf2image import convert_from_path
             import cv2
             import numpy as np
             import pytesseract
+            from pdf2image import convert_from_path
 
             pil_images = convert_from_path(pdf_path)
             for page_num, pil_img in enumerate(pil_images):
@@ -396,7 +413,6 @@ class ImageExtractorV2:
     def _extract_from_docx(self, docx_path: str, output_dir: str, resource_id: str) -> list[ExtractedImage]:
         try:
             from docx import Document
-            from lxml import etree
         except ImportError:
             logger.error("python-docx not installed")
             return []
@@ -489,7 +505,7 @@ class ImageExtractorV2:
                 try:
                     import hashlib
                     with open(img.file_path, "rb") as f:
-                        file_hash = hashlib.md5(f.read()).hexdigest()
+                        file_hash = hashlib.md5(f.read(), usedforsecurity=False).hexdigest()
                     img.md5_hash = file_hash
                     if file_hash in seen_hashes:
                         if os.path.exists(img.file_path):

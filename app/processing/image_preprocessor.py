@@ -7,7 +7,6 @@ Each step is optional and can be configured independently.
 """
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +82,6 @@ class ImagePreprocessor:
 
     def rotate(self, gray_img, angle: float):
         import cv2
-        import numpy as np
 
         h, w = gray_img.shape[:2]
         center = (w // 2, h // 2)
@@ -93,7 +91,6 @@ class ImagePreprocessor:
 
     def rotate_color(self, rgb_img, angle: float):
         import cv2
-        import numpy as np
 
         h, w = rgb_img.shape[:2]
         center = (w // 2, h // 2)
@@ -114,7 +111,7 @@ class ImagePreprocessor:
         import cv2
         return cv2.fastNlMeansDenoisingColored(rgb_img, h=self.denoise_strength, hColor=self.denoise_strength)
 
-    def binarize(self, gray_img, method: Optional[str] = None):
+    def binarize(self, gray_img, method: str | None = None):
         import cv2
         method = method or self.binarize_method
 
@@ -139,7 +136,6 @@ class ImagePreprocessor:
 
     def detect_page_corners(self, gray_img):
         import cv2
-        import numpy as np
 
         blurred = cv2.GaussianBlur(gray_img, (5, 5), 0)
         edged = cv2.Canny(blurred, 50, 150)

@@ -11,11 +11,10 @@ Returns a ContentBundle with markdown, images, and metadata.
 """
 
 import logging
-import os
 import time
-from dataclasses import dataclass, field, asdict
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +36,8 @@ class UnifiedContentProcessor:
     SUPPORTED_EXTS = {".pdf", ".pptx", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff"}
     IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".webp"}
 
-    def __init__(self, use_polish: bool = False, gemini_api_key: Optional[str] = None,
-                 gemini_model: Optional[str] = None):
+    def __init__(self, use_polish: bool = False, gemini_api_key: str | None = None,
+                 gemini_model: str | None = None):
         self.use_polish = use_polish
         self.gemini_api_key = gemini_api_key
         self.gemini_model = gemini_model
@@ -80,7 +79,7 @@ class UnifiedContentProcessor:
         return self._image_mapper
 
     def extract(self, file_path: str, resource_id: str = "",
-                progress_callback: Optional[Callable] = None) -> ContentBundle:
+                progress_callback: Callable | None = None) -> ContentBundle:
         ext = Path(file_path).suffix.lower()
         timings = {}
 
@@ -98,7 +97,7 @@ class UnifiedContentProcessor:
 
         if ext == ".pdf":
             t0 = time.time()
-            is_scanned, confidence = self.scanned_handler.is_scanned_pdf(file_path)
+            is_scanned, _confidence = self.scanned_handler.is_scanned_pdf(file_path)
             timings["scanned_detection"] = time.time() - t0
 
             if is_scanned:
@@ -119,14 +118,14 @@ class UnifiedContentProcessor:
 
     def _process_text(self, file_path: str) -> ContentBundle:
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 text = f.read()
             return ContentBundle(markdown=text, processing_path="text")
         except Exception as e:
             return ContentBundle(markdown=f"Error reading text file: {e}", warnings=[str(e)])
 
     def _process_image(self, file_path: str, resource_id: str,
-                       progress_callback: Optional[Callable] = None) -> ContentBundle:
+                       progress_callback: Callable | None = None) -> ContentBundle:
         if progress_callback:
             progress_callback(10, "Processing image...")
 
@@ -149,7 +148,7 @@ class UnifiedContentProcessor:
         )
 
     def _process_scanned_pdf(self, file_path: str, resource_id: str,
-                              progress_callback: Optional[Callable],
+                              progress_callback: Callable | None,
                               timings: dict) -> ContentBundle:
         if progress_callback:
             progress_callback(10, "Converting scanned PDF to images...")
@@ -178,7 +177,7 @@ class UnifiedContentProcessor:
         )
 
     def _process_native_pdf(self, file_path: str, resource_id: str,
-                             progress_callback: Optional[Callable],
+                             progress_callback: Callable | None,
                              timings: dict) -> ContentBundle:
         warnings = []
 
@@ -220,7 +219,7 @@ class UnifiedContentProcessor:
         )
 
     def _process_pptx(self, file_path: str, resource_id: str,
-                       progress_callback: Optional[Callable] = None) -> ContentBundle:
+                       progress_callback: Callable | None = None) -> ContentBundle:
         warnings = []
 
         if progress_callback:
@@ -253,7 +252,7 @@ class UnifiedContentProcessor:
         )
 
     def _process_docx(self, file_path: str, resource_id: str,
-                       progress_callback: Optional[Callable] = None) -> ContentBundle:
+                       progress_callback: Callable | None = None) -> ContentBundle:
         if progress_callback:
             progress_callback(10, "Extracting text from DOCX...")
 
@@ -282,6 +281,7 @@ class UnifiedContentProcessor:
 
     def _check_missing_diagram_refs(self, markdown: str) -> list[str]:
         import re
+
         from app.processing.image_text_mapper import DIAGRAM_REF_PATTERNS
 
         refs = []
