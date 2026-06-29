@@ -217,16 +217,17 @@ def process_resource_task(
 
         start_time = time.time()
 
-        def pipeline_callback(p):
+        def pipeline_callback(p, msg=None):
             if is_cancelled():
                 raise InterruptedError("Task cancelled by user")
-            msg = "Extracting text..."
-            if p > 30:
-                msg = "Analyzing document structure..."
-            if p > 60:
-                msg = "Polishing with AI..."
-            if p > 85:
-                msg = "Finalizing content..."
+            if not msg:
+                msg = "Extracting text..."
+                if p > 30:
+                    msg = "Analyzing document structure..."
+                if p > 60:
+                    msg = "Polishing with AI..."
+                if p > 85:
+                    msg = "Finalizing content..."
             progress_callback(p, msg)
 
         try:

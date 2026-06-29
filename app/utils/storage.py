@@ -1,42 +1,77 @@
 import json
 import logging
 import os
+import functools
 from typing import Any
 
 from app.utils.cache import delete_cache_sync, get_cache_sync, set_cache_sync
+from app.utils.db import SessionLocal
 
 logger = logging.getLogger(__name__)
 
 # Base directory for data - assuming it's in the project root
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-RESOURCES_DIR = os.path.join(DATA_DIR, "resources")
-NOTES_DIR = os.path.join(DATA_DIR, "notes")
-EXERCISES_DIR = os.path.join(DATA_DIR, "exercises")
+USERS_DIR = os.path.join(DATA_DIR, "users")
 
-# Ensure directories exist
-os.makedirs(RESOURCES_DIR, exist_ok=True)
-os.makedirs(NOTES_DIR, exist_ok=True)
-os.makedirs(EXERCISES_DIR, exist_ok=True)
+# Helper to find user ID for an entity
+@functools.lru_cache(maxsize=10000)
+def _get_user_id_for_entity(entity_id: str) -> str:
+    """Find the user ID associated with a resource, note, or exercise."""
+    # Prefix mapping
+    if entity_id.startswith("rs_"):
+        model_name = "Resource"
+    elif entity_id.startswith("nt_"):
+        model_name = "Note"
+    elif entity_id.startswith("ex_"):
+        model_name = "Exercise"
+    else:
+        return "unowned"
 
+    try:
+        # Import models locally to avoid circular dependencies
+        from app.models.db import Resource, Note, Exercise
+        model_class = {"Resource": Resource, "Note": Note, "Exercise": Exercise}[model_name]
+        
+        with SessionLocal() as db:
+            entity = db.query(model_class).filter(model_class.id == entity_id).first()
+            if entity:
+                # Notes and Exercises might need to look up their parent Resource
+                if model_name in ["Note", "Exercise"]:
+                    resource = db.query(Resource).filter(Resource.id == entity.resource_id).first()
+                    if resource:
+                        return str(resource.user_id)
+                else:
+                    return str(entity.user_id)
+    except Exception as e:
+        logger.error(f"Error fetching user_id for {entity_id}: {e}")
+        
+    return "unowned"
+
+def _ensure_dir(path: str):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    return path
 
 class StorageManager:
     """Central manager for file-based storage of large text content with Redis caching"""
 
     @staticmethod
     def _get_resource_path(resource_id: str, suffix: str = "", extension: str = "md") -> str:
+        user_id = _get_user_id_for_entity(resource_id)
         filename = f"{resource_id}{suffix}.{extension}"
-        return os.path.join(RESOURCES_DIR, filename)
+        return _ensure_dir(os.path.join(USERS_DIR, user_id, "resources", filename))
 
     @staticmethod
     def _get_note_path(note_id: str, suffix: str = "", extension: str = "md") -> str:
+        user_id = _get_user_id_for_entity(note_id)
         filename = f"{note_id}{suffix}.{extension}"
-        return os.path.join(NOTES_DIR, filename)
+        return _ensure_dir(os.path.join(USERS_DIR, user_id, "notes", filename))
 
     @staticmethod
     def _get_exercise_path(exercise_id: str, suffix: str = "", extension: str = "json") -> str:
+        user_id = _get_user_id_for_entity(exercise_id)
         filename = f"{exercise_id}{'_' + suffix if suffix else ''}.{extension}"
-        return os.path.join(EXERCISES_DIR, filename)
+        return _ensure_dir(os.path.join(USERS_DIR, user_id, "exercises", filename))
 
     # --- Resource Content Methods ---
 
@@ -241,7 +276,8 @@ class StorageManager:
     @staticmethod
     def delete_exercise_files(exercise_id: str):
         """Delete all generated files associated with an exercise"""
-        exercises_dir = EXERCISES_DIR
+        user_id = _get_user_id_for_entity(exercise_id)
+        exercises_dir = os.path.join(USERS_DIR, user_id, "exercises")
         if not os.path.exists(exercises_dir):
             return
 

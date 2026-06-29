@@ -94,6 +94,10 @@ async def process_next_task():
         else:
             result = handler(**kwargs)
 
+        # If handler explicitly returned an error status, raise it so it gets marked as failed
+        if isinstance(result, dict) and result.get("status") in ("error", "failed"):
+            raise Exception(result.get("message", "Task returned error status"))
+            
         # Mark complete
         TaskManager._update_db_task(task_id, status="completed", result=result, progress=100)
         logger.info(f"Task {task_id} completed successfully")

@@ -64,7 +64,7 @@ def _rebuild_resource_content(
     if not os.path.exists(note.file_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource file not found")
 
-    # Clear cache first to ensure other requests (like SubjectView) immediately see the reset state
+    # Clear cache first to ensure other requests immediately see the reset state
     clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
 
     # Delete output PDF file if it exists
@@ -84,122 +84,19 @@ def _rebuild_resource_content(
     db.commit()
     db.refresh(note)
 
-    # Initialize or update Task status to processing
+    # Process content extraction in background (Offloaded to Worker)
     task_id = f"ocr_{current_user.id}_{note.id}"
-    input_data = _serialize_result({"kwargs": {"resource_id": note.id}})
-    db_task = db.query(Task).filter(Task.task_id == task_id).first()
-    if not db_task:
-        db_task = Task(
-            task_id=task_id,
-            user_id=current_user.id,
-            task_type="resource_processing",
-            status="processing",
-            progress=10,
-            input_data=input_data,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-        )
-        db.add(db_task)
-    else:
-        db_task.status = "processing"
-        db_task.progress = 10
-        db_task.error_message = None
-        db_task.input_data = input_data
-        db_task.updated_at = datetime.utcnow()
-    db.commit()
+    from app.utils.tasks import TaskManager
+    TaskManager.submit_task(
+        task_id,
+        "resource_processing",
+        current_user.id,
+        resource_id=note.id,
+        file_name=note.file_name,
+        auto_detect_title=False,
+    )
 
-    import time
-
-    start_time = time.time()
-    try:
-        file_ext = os.path.splitext(note.file_path)[1].lower()
-
-        if file_ext in (".pdf", ".pptx"):
-            logger.info(f"Rebuilding note {note.id} with SmartPipeline from scratch")
-            TaskManager.update_task_progress(task_id, 15, "Extracting with AI pipeline...")
-            raw_text, timings = extract_markdown_for_user(current_user, note.file_path)
-            StorageManager.save_resource_json(note.id, "timings", timings)
-            structured_content = markdown_to_segments(raw_text)
-            TaskManager.update_task_progress(task_id, 60, "Saving extracted content...")
-
-            images_data = []
-            if file_ext == ".pdf":
-                try:
-                    extractor = ImageExtractor(resource_id=note.id)
-                    images_extracted = extractor.extract_images_from_pdf(note.file_path)
-                    images_data = [img.to_dict() for img in images_extracted]
-                    logger.info(f"Extracted {len(images_data)} images during resource rebuild")
-                except Exception as e:
-                    logger.warning(f"Image extraction failed during resource rebuild: {e}")
-
-            # Save to file storage
-            StorageManager.save_resource_text(note.id, raw_text)
-            StorageManager.save_resource_json(note.id, "structured", structured_content)
-            StorageManager.save_resource_json(note.id, "images", images_data)
-
-        else:
-            logger.info(f"Rebuilding note {note.id} with OCR fallback")
-            TaskManager.update_task_progress(task_id, 15, "Running OCR...")
-            ocr_result = OCRProcessor.extract_text(
-                note.file_path, note.file_type, resource_id=note.id, use_v2=use_v2
-            )
-            raw_text = ocr_result.get("raw_text", "")
-            structured_content = ocr_result.get("structured_content", [])
-            images_data = ocr_result.get("images", [])
-            TaskManager.update_task_progress(task_id, 60, "Saving extracted content...")
-
-            # Save to file storage
-            StorageManager.save_resource_text(note.id, raw_text)
-            StorageManager.save_resource_json(note.id, "structured", structured_content)
-            StorageManager.save_resource_json(note.id, "images", images_data)
-
-        # Auto-detect title from first H1 heading
-        if raw_text:
-            for line in raw_text.split("\n"):
-                if line.strip().startswith("# "):
-                    detected_title = line.strip()[2:].strip()
-                    if detected_title:
-                        note.title = detected_title
-                        logger.info(
-                            f"Auto-detected title '{detected_title}' for note {note.id} during rebuild"
-                        )
-                        break
-
-        note.processing_time_ms = int((time.time() - start_time) * 1000)
-        note.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(note)
-
-        if raw_text and raw_text.strip():
-            try:
-                TaskManager.update_task_progress(task_id, 90, "Generating search embeddings...")
-                from app.processing.embeddings import update_resource_embeddings
-
-                update_resource_embeddings(note.id, raw_text, db)
-                logger.info(f"Updated embeddings after rebuilding note {note.id}")
-            except Exception as e:
-                logger.error(
-                    f"Error updating embeddings after resource rebuild: {e}", exc_info=True
-                )
-
-        logger.info(
-            f"Resource rebuild complete: {note.id}, "
-            f"{len(raw_text)} chars, {len(structured_content)} segments, {len(images_data)} images"
-        )
-
-        # Mark Task complete
-        TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
-
-        return note
-    except Exception as e:
-        logger.error(f"Error during resource rebuild for {note.id}: {e}", exc_info=True)
-        # Mark Task failed
-        db_task.status = "failed"
-        db_task.error_message = str(e)
-        db_task.progress = 0
-        db_task.updated_at = datetime.utcnow()
-        db.commit()
-        raise
+    return note
 
 
 @router.get("", response_model=list[ResourceResponse])
@@ -296,7 +193,7 @@ async def upload_resource(
             break
 
         # Create upload directory structure
-        user_upload_dir = os.path.join(UPLOAD_DIR, str(current_user.id))
+        user_upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "users", str(current_user.id), "uploads")
         os.makedirs(user_upload_dir, exist_ok=True)
 
         # Save file
@@ -1326,11 +1223,12 @@ def serve_resource_image(
     from app.config import get_settings
 
     settings = get_settings()
-    image_storage_base = getattr(settings, "EXTRACTED_IMAGE_DIR", "data/extracted_images")
-    full_path = os.path.join(image_storage_base, resource_id, image_path)
+    safe_path = os.path.basename(image_path)
+    image_storage_base = os.path.join("data", "users", str(current_user.id), "extracted_images")
+    full_path = os.path.join(image_storage_base, resource_id, safe_path)
 
     if not os.path.exists(full_path):
-        alt_path = os.path.join("data/extracted_images", resource_id, image_path)
+        alt_path = os.path.join("data", "extracted_images", resource_id, image_path)
         if os.path.exists(alt_path):
             full_path = alt_path
         else:
@@ -1362,7 +1260,7 @@ async def upload_resource_image(
     if kind.mime in ["image/gif", "image/svg+xml"]:
         raise HTTPException(status_code=400, detail="GIF and SVG formats are not allowed")
 
-    upload_dir = os.path.join("data", "user_uploads", resource_id)
+    upload_dir = os.path.join("data", "users", str(current_user.id), "user_images", resource_id)
     os.makedirs(upload_dir, exist_ok=True)
     
     ext = kind.extension
@@ -1388,7 +1286,7 @@ def serve_user_image(
         raise HTTPException(status_code=404, detail="Resource not found")
         
     safe_path = os.path.basename(image_path)
-    full_path = os.path.join("data", "user_uploads", resource_id, safe_path)
+    full_path = os.path.join("data", "users", str(current_user.id), "user_images", resource_id, safe_path)
     
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="Image not found")
