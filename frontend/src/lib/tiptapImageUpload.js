@@ -92,3 +92,22 @@ export const ImageUploadPlugin = (id, endpointPrefix) => {
     }
   });
 };
+
+import { Extension } from '@tiptap/core';
+
+export const ImageUploadExtension = Extension.create({
+  name: 'imageUpload',
+
+  addOptions() {
+    return {
+      id: null,
+      endpointPrefix: 'resources'
+    };
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      ImageUploadPlugin(this.options.id, this.options.endpointPrefix)
+    ];
+  }
+});

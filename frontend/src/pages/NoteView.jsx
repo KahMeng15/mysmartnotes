@@ -18,7 +18,7 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { ResizableImageExtension } from '../lib/ResizableImageExtension';
-import { ImageUploadPlugin, handleImageUploadFlow } from '../lib/tiptapImageUpload';
+import { ImageUploadExtension, handleImageUploadFlow } from '../lib/tiptapImageUpload';
 
 export default function NoteView() {
   const { id } = useParams();
@@ -43,6 +43,7 @@ export default function NoteView() {
 
   const [saveModalOpened, setSaveModalOpened] = useState(false);
   const [cancelModalOpened, setCancelModalOpened] = useState(false);
+  const scrollFrameRef = useRef(null);
 
   const [relatedNotes, setRelatedNotes] = useState([]);
   const [relatedExercises, setRelatedExercises] = useState([]);
@@ -67,7 +68,7 @@ export default function NoteView() {
         inline: true,
         allowBase64: true,
       }),
-      ImageUploadPlugin(id, 'resources'),
+      ImageUploadExtension.configure({ id, endpointPrefix: 'resources' }),
     ],
     content: content,
   });
@@ -175,9 +176,13 @@ export default function NoteView() {
   };
 
   const handleScroll = () => {
-    if (!viewportRef.current || !markdownRef.current) return;
-    const viewportRect = viewportRef.current.getBoundingClientRect();
-    const viewportTop = viewportRect.top;
+    if (scrollFrameRef.current) return;
+    
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      if (!viewportRef.current || !markdownRef.current) return;
+      const viewportRect = viewportRef.current.getBoundingClientRect();
+      const viewportTop = viewportRect.top;
 
       let activeEls = [];
       let currentAccumulatedTop = 0;
@@ -230,6 +235,7 @@ export default function NoteView() {
           markdownRef.current.style.setProperty(`--h${i + 1}-top`, `${currentAccumulatedTop}px`);
         }
       }
+    });
   };
 
   useEffect(() => {

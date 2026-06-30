@@ -10,7 +10,7 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { ResizableImageExtension } from '../lib/ResizableImageExtension';
-import { ImageUploadPlugin, handleImageUploadFlow } from '../lib/tiptapImageUpload';
+import { ImageUploadExtension, handleImageUploadFlow } from '../lib/tiptapImageUpload';
 import * as TablerIcons from '@tabler/icons-react';
 import { formatParams } from '../lib/formatters';
 
@@ -98,6 +98,7 @@ export default function SummaryView() {
 
   const viewportRef = useRef(null);
   const markdownRef = useRef(null);
+  const scrollFrameRef = useRef(null);
   const textareaRef = useRef(null);
 
   const editor = useEditor({
@@ -112,7 +113,7 @@ export default function SummaryView() {
         inline: true,
         allowBase64: true,
       }),
-      ImageUploadPlugin(summaryId, 'notes'),
+      ImageUploadExtension.configure({ id: summaryId, endpointPrefix: 'resources' }),
     ],
     content: summaryContent,
   });
@@ -445,9 +446,13 @@ export default function SummaryView() {
   };
 
   const handleScroll = () => {
-    if (!viewportRef.current || !markdownRef.current) return;
-    const viewportRect = viewportRef.current.getBoundingClientRect();
-    const viewportTop = viewportRect.top;
+    if (scrollFrameRef.current) return;
+    
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      if (!viewportRef.current || !markdownRef.current) return;
+      const viewportRect = viewportRef.current.getBoundingClientRect();
+      const viewportTop = viewportRect.top;
 
       let activeEls = [];
       let currentAccumulatedTop = 0;
@@ -503,6 +508,7 @@ export default function SummaryView() {
           markdownRef.current.style.setProperty(`--h${i + 1}-top`, `${currentAccumulatedTop}px`);
         }
       }
+    });
   };
 
   useEffect(() => {

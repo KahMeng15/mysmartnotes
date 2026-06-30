@@ -1257,11 +1257,31 @@ async def upload_resource_image(
     os.makedirs(upload_dir, exist_ok=True)
 
     ext = kind.extension
-    filename = f"img_{uuid.uuid4().hex}.{ext}"
-    filepath = os.path.join(upload_dir, filename)
-
-    with open(filepath, "wb") as f:
-        f.write(contents)
+    
+    # Process and compress image using PIL
+    import io
+    from PIL import Image
+    
+    try:
+        img = Image.open(io.BytesIO(contents))
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+            
+        # Max dimensions to prevent massive resolutions
+        max_size = (1920, 1080)
+        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+        
+        # Save compressed as webp
+        filename = f"img_{uuid.uuid4().hex}.webp"
+        filepath = os.path.join(upload_dir, filename)
+        img.save(filepath, 'WEBP', quality=80, method=6)
+    except Exception as e:
+        logger.error(f"Image compression failed: {e}")
+        # Fallback to original if processing fails
+        filename = f"img_{uuid.uuid4().hex}.{ext}"
+        filepath = os.path.join(upload_dir, filename)
+        with open(filepath, "wb") as f:
+            f.write(contents)
 
     return {"url": f"/api/resources/{resource_id}/user-images/{filename}"}
 
