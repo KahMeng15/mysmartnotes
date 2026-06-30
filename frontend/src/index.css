@@ -76,3 +76,25 @@ body {
   background-color: #f8f9fa;
   font-weight: 600;
 }
+
+/* Lazy rendering for long markdown documents */
+.markdown-content p,
+.markdown-content ul,
+.markdown-content ol,
+.markdown-content table,
+.markdown-content pre,
+.markdown-content blockquote {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
+
+.sticky-markdown p,
+.sticky-markdown ul,
+.sticky-markdown ol,
+.sticky-markdown table,
+.sticky-markdown pre,
+.sticky-markdown blockquote {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
+
