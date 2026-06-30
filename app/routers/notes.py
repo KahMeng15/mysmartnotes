@@ -3,10 +3,9 @@
 import logging
 import os
 import uuid
-import filetype
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -666,8 +665,6 @@ async def export_note(
     db: Session = Depends(get_db),
 ):
     """Export a specific generated summary as PDF or DOCX"""
-    import os
-    import uuid
     from pathlib import Path
 
     from app.models.db import ExportTemplate, Note, Resource
@@ -799,9 +796,7 @@ async def download_note_export(
     db: Session = Depends(get_db),
 ):
     """Download a previously generated summary export"""
-    import os
 
-    from fastapi.responses import FileResponse
 
     from app.models.db import Note, Resource
 

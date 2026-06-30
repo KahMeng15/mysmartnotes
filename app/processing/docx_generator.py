@@ -42,7 +42,7 @@ class DocxGenerator:
         self.resource_id = resource_id
         self.note_title = note_title
         self.base_output_dir = base_output_dir
-        
+
         from app.utils.storage import _get_user_id_for_entity
         user_id = _get_user_id_for_entity(resource_id)
         if user_id != "unowned":

@@ -162,7 +162,7 @@ class ImageExtractorV2:
 
     def extract(self, file_path: str, resource_id: str = "") -> list[ExtractedImage]:
         ext = Path(file_path).suffix.lower()
-        
+
         from app.utils.storage import _get_user_id_for_entity
         user_id = _get_user_id_for_entity(resource_id) if resource_id else "unowned"
         output_base = os.path.join("data", "users", user_id, "extracted_images") if user_id != "unowned" else self.output_base_dir

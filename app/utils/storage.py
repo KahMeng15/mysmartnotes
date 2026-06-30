@@ -1,7 +1,7 @@
+import functools
 import json
 import logging
 import os
-import functools
 from typing import Any
 
 from app.utils.cache import delete_cache_sync, get_cache_sync, set_cache_sync
@@ -30,9 +30,9 @@ def _get_user_id_for_entity(entity_id: str) -> str:
 
     try:
         # Import models locally to avoid circular dependencies
-        from app.models.db import Resource, Note, Exercise
+        from app.models.db import Exercise, Note, Resource
         model_class = {"Resource": Resource, "Note": Note, "Exercise": Exercise}[model_name]
-        
+
         with SessionLocal() as db:
             entity = db.query(model_class).filter(model_class.id == entity_id).first()
             if entity:
@@ -45,7 +45,7 @@ def _get_user_id_for_entity(entity_id: str) -> str:
                     return str(entity.user_id)
     except Exception as e:
         logger.error(f"Error fetching user_id for {entity_id}: {e}")
-        
+
     return "unowned"
 
 def _ensure_dir(path: str):

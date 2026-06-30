@@ -196,14 +196,14 @@ class DocumentGenerator:
         self.resource_id = resource_id
         self.note_title = note_title
         self.base_output_dir = base_output_dir
-        
+
         from app.utils.storage import _get_user_id_for_entity
         user_id = _get_user_id_for_entity(resource_id)
         if user_id != "unowned":
             self.output_dir = os.path.join("data", "users", user_id, "exports", resource_id)
         else:
             self.output_dir = os.path.join(base_output_dir, resource_id)
-            
+
         self.page_size = page_size
         self._template_config = None
         # Resolved footer settings (set during generate_pdf, used in _on_page callback)

@@ -4,9 +4,9 @@ import json
 import logging
 import os
 import uuid
-import filetype
 from datetime import datetime
 
+import filetype
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -21,13 +21,10 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.db import Exercise, Note, Resource, Subject, Task, User
-from app.processing.image_extractor import ImageExtractor
+from app.models.db import Exercise, Note, Resource, Subject, User
 from app.processing.note_processor import (
-    extract_markdown_for_user,
     markdown_to_segments,
 )
-from app.processing.ocr import OCRProcessor
 from app.processing.text_processor import ContentType
 from app.schemas.schemas import ResourceResponse
 from app.utils.auth import get_current_user
@@ -35,7 +32,7 @@ from app.utils.cache import cache_response, clear_cache_pattern_sync
 from app.utils.db import generate_random_id, get_db
 from app.utils.quotas import enforce_quota_resources, enforce_quota_storage
 from app.utils.storage import StorageManager
-from app.utils.tasks import TaskManager, _serialize_result
+from app.utils.tasks import TaskManager
 
 logger = logging.getLogger(__name__)
 
@@ -299,7 +296,7 @@ def reprocess_ocr(
 
     try:
         logger.info(f"Reprocessing OCR for note {resource_id} (use_v2={use_v2})")
-        
+
         # Pre-task cleanup
         clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
         if note.output_pdf_path and os.path.exists(note.output_pdf_path):
@@ -323,7 +320,7 @@ def reprocess_ocr(
             file_name=note.title,
             auto_detect_title=False,
         )
-        
+
         logger.info(f"Successfully submitted task for reprocessing OCR for note {resource_id}")
 
         note_data = ResourceResponse.from_orm(note)
@@ -360,7 +357,7 @@ def reprocess_resource_from_scratch(
 
     try:
         logger.info(f"Starting full resource rebuild for {resource_id}")
-        
+
         # Pre-task cleanup
         clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
         if note.output_pdf_path and os.path.exists(note.output_pdf_path):
@@ -385,12 +382,12 @@ def reprocess_resource_from_scratch(
             file_name=note.title,
             auto_detect_title=True,
         )
-        
+
         logger.info(f"Successfully submitted task for rebuilding note {resource_id} from scratch")
 
         note_data = ResourceResponse.from_orm(note)
         # Note: timings will be None since we deleted them above
-        
+
         return note_data
 
     except Exception as e:
@@ -1212,9 +1209,6 @@ def serve_resource_image(
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
 
-    from app.config import get_settings
-
-    settings = get_settings()
     safe_path = os.path.basename(image_path)
     image_storage_base = os.path.join("data", "users", str(current_user.id), "extracted_images")
     full_path = os.path.join(image_storage_base, resource_id, safe_path)
@@ -1240,28 +1234,28 @@ async def upload_resource_image(
     resource = db.query(Resource).filter(Resource.id == resource_id, Resource.user_id == current_user.id).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
-        
+
     contents = await file.read()
     if len(contents) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
-        
+
     kind = filetype.guess(contents)
     if not kind or not kind.mime.startswith("image/"):
         raise HTTPException(status_code=400, detail="Invalid image file")
-        
+
     if kind.mime in ["image/gif", "image/svg+xml"]:
         raise HTTPException(status_code=400, detail="GIF and SVG formats are not allowed")
 
     upload_dir = os.path.join("data", "users", str(current_user.id), "user_images", resource_id)
     os.makedirs(upload_dir, exist_ok=True)
-    
+
     ext = kind.extension
     filename = f"img_{uuid.uuid4().hex}.{ext}"
     filepath = os.path.join(upload_dir, filename)
-    
+
     with open(filepath, "wb") as f:
         f.write(contents)
-        
+
     return {"url": f"/api/resources/{resource_id}/user-images/{filename}"}
 
 
@@ -1276,11 +1270,11 @@ def serve_user_image(
     resource = db.query(Resource).filter(Resource.id == resource_id, Resource.user_id == current_user.id).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
-        
+
     safe_path = os.path.basename(image_path)
     full_path = os.path.join("data", "users", str(current_user.id), "user_images", resource_id, safe_path)
-    
+
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="Image not found")
-        
+
     return FileResponse(full_path)
