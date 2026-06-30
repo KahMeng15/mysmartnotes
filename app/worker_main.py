@@ -94,9 +94,17 @@ async def process_next_task():
         else:
             result = handler(**kwargs)
 
-        # Mark complete
-        TaskManager._update_db_task(task_id, status="completed", result=result, progress=100)
-        logger.info(f"Task {task_id} completed successfully")
+        # Mark complete or failed based on result
+        if isinstance(result, dict) and result.get("status") in ("error", "failed"):
+            TaskManager._update_db_task(task_id, status="failed", result=result, progress=0)
+            logger.info(f"Task {task_id} failed with error: {result}")
+        elif isinstance(result, dict) and result.get("status") == "cancelled":
+            TaskManager._update_db_task(task_id, status="cancelled", result=result)
+            logger.info(f"Task {task_id} cancelled")
+        else:
+            TaskManager._update_db_task(task_id, status="completed", result=result, progress=100)
+            logger.info(f"Task {task_id} completed successfully")
+            
         return True
 
     except Exception as e:

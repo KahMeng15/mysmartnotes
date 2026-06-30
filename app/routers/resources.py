@@ -47,158 +47,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
 
-def _rebuild_resource_content(
-    note: "Resource",
-    current_user: "User",
-    db: Session,
-    use_v2: bool = True,
-    reset_first: bool = False,
-) -> "Resource":
-    """
-    Rebuild a note's extracted content from the original uploaded file.
-    For PDF/PPTX, this reruns the SmartPipeline from scratch. For images,
-    this reruns OCR extraction. Structured content, images, processing time,
-    and embeddings are refreshed together.
-    """
-    if not os.path.exists(note.file_path):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource file not found")
 
-    # Clear cache first to ensure other requests (like SubjectView) immediately see the reset state
-    clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
-
-    # Delete output PDF file if it exists
-    if note.output_pdf_path and os.path.exists(note.output_pdf_path):
-        try:
-            os.remove(note.output_pdf_path)
-            logger.info(f"Deleted output PDF for note {note.id}: {note.output_pdf_path}")
-        except Exception as e:
-            logger.warning(f"Error deleting output PDF for note {note.id}: {e}")
-    note.output_pdf_path = None
-    note.processing_time_ms = None
-
-    if reset_first:
-        StorageManager.delete_resource_files(note.id)
-
-    note.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(note)
-
-    # Initialize or update Task status to processing
-    task_id = f"ocr_{current_user.id}_{note.id}"
-    input_data = _serialize_result({"kwargs": {"resource_id": note.id}})
-    db_task = db.query(Task).filter(Task.task_id == task_id).first()
-    if not db_task:
-        db_task = Task(
-            task_id=task_id,
-            user_id=current_user.id,
-            task_type="resource_processing",
-            status="processing",
-            progress=10,
-            input_data=input_data,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-        )
-        db.add(db_task)
-    else:
-        db_task.status = "processing"
-        db_task.progress = 10
-        db_task.error_message = None
-        db_task.input_data = input_data
-        db_task.updated_at = datetime.utcnow()
-    db.commit()
-
-    import time
-
-    start_time = time.time()
-    try:
-        file_ext = os.path.splitext(note.file_path)[1].lower()
-
-        if file_ext in (".pdf", ".pptx"):
-            logger.info(f"Rebuilding note {note.id} with SmartPipeline from scratch")
-            TaskManager.update_task_progress(task_id, 15, "Extracting with AI pipeline...")
-            raw_text, timings = extract_markdown_for_user(current_user, note.file_path)
-            StorageManager.save_resource_json(note.id, "timings", timings)
-            structured_content = markdown_to_segments(raw_text)
-            TaskManager.update_task_progress(task_id, 60, "Saving extracted content...")
-
-            images_data = []
-            if file_ext == ".pdf":
-                try:
-                    extractor = ImageExtractor(resource_id=note.id)
-                    images_extracted = extractor.extract_images_from_pdf(note.file_path)
-                    images_data = [img.to_dict() for img in images_extracted]
-                    logger.info(f"Extracted {len(images_data)} images during resource rebuild")
-                except Exception as e:
-                    logger.warning(f"Image extraction failed during resource rebuild: {e}")
-
-            # Save to file storage
-            StorageManager.save_resource_text(note.id, raw_text)
-            StorageManager.save_resource_json(note.id, "structured", structured_content)
-            StorageManager.save_resource_json(note.id, "images", images_data)
-
-        else:
-            logger.info(f"Rebuilding note {note.id} with OCR fallback")
-            TaskManager.update_task_progress(task_id, 15, "Running OCR...")
-            ocr_result = OCRProcessor.extract_text(
-                note.file_path, note.file_type, resource_id=note.id, use_v2=use_v2
-            )
-            raw_text = ocr_result.get("raw_text", "")
-            structured_content = ocr_result.get("structured_content", [])
-            images_data = ocr_result.get("images", [])
-            TaskManager.update_task_progress(task_id, 60, "Saving extracted content...")
-
-            # Save to file storage
-            StorageManager.save_resource_text(note.id, raw_text)
-            StorageManager.save_resource_json(note.id, "structured", structured_content)
-            StorageManager.save_resource_json(note.id, "images", images_data)
-
-        # Auto-detect title from first H1 heading
-        if raw_text:
-            for line in raw_text.split("\n"):
-                if line.strip().startswith("# "):
-                    detected_title = line.strip()[2:].strip()
-                    if detected_title:
-                        note.title = detected_title
-                        logger.info(
-                            f"Auto-detected title '{detected_title}' for note {note.id} during rebuild"
-                        )
-                        break
-
-        note.processing_time_ms = int((time.time() - start_time) * 1000)
-        note.updated_at = datetime.utcnow()
-        db.commit()
-        db.refresh(note)
-
-        if raw_text and raw_text.strip():
-            try:
-                TaskManager.update_task_progress(task_id, 90, "Generating search embeddings...")
-                from app.processing.embeddings import update_resource_embeddings
-
-                update_resource_embeddings(note.id, raw_text, db)
-                logger.info(f"Updated embeddings after rebuilding note {note.id}")
-            except Exception as e:
-                logger.error(
-                    f"Error updating embeddings after resource rebuild: {e}", exc_info=True
-                )
-
-        logger.info(
-            f"Resource rebuild complete: {note.id}, "
-            f"{len(raw_text)} chars, {len(structured_content)} segments, {len(images_data)} images"
-        )
-
-        # Mark Task complete
-        TaskManager._update_db_task(task_id, status="completed", progress=100, message="Completed")
-
-        return note
-    except Exception as e:
-        logger.error(f"Error during resource rebuild for {note.id}: {e}", exc_info=True)
-        # Mark Task failed
-        db_task.status = "failed"
-        db_task.error_message = str(e)
-        db_task.progress = 0
-        db_task.updated_at = datetime.utcnow()
-        db.commit()
-        raise
 
 
 @router.get("", response_model=list[ResourceResponse])
@@ -451,23 +300,42 @@ def reprocess_ocr(
 
     try:
         logger.info(f"Reprocessing OCR for note {resource_id} (use_v2={use_v2})")
-        note = _rebuild_resource_content(note, current_user, db, use_v2=use_v2, reset_first=False)
-        logger.info(f"Successfully reprocessed OCR for note {resource_id}")
+        
+        # Pre-task cleanup
+        clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
+        if note.output_pdf_path and os.path.exists(note.output_pdf_path):
+            try:
+                os.remove(note.output_pdf_path)
+            except Exception:
+                pass
+        note.output_pdf_path = None
+        note.processing_time_ms = None
+        note.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(note)
+
+        # Submit background task
+        task_id = f"ocr_{current_user.id}_{note.id}"
+        TaskManager.submit_task(
+            task_id,
+            "resource_processing",
+            current_user.id,
+            resource_id=note.id,
+            file_name=note.title,
+            auto_detect_title=False,
+        )
+        
+        logger.info(f"Successfully submitted task for reprocessing OCR for note {resource_id}")
 
         note_data = ResourceResponse.from_orm(note)
         timings = StorageManager.get_resource_json(note.id, "timings")
         if timings:
             note_data.timings = timings
 
-        clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
         return note_data
 
     except Exception as e:
-        import sys
-        import traceback
-
-        traceback.print_exc(file=sys.stderr)
-        logger.error(f"Error reprocessing OCR: {e}", exc_info=True)
+        logger.error(f"Error submitting reprocessing task: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error reprocessing OCR: {e!s}",
@@ -493,21 +361,44 @@ def reprocess_resource_from_scratch(
 
     try:
         logger.info(f"Starting full resource rebuild for {resource_id}")
-        note = _rebuild_resource_content(note, current_user, db, use_v2=use_v2, reset_first=True)
-        logger.info(f"Successfully rebuilt note {resource_id} from scratch")
+        
+        # Pre-task cleanup
+        clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
+        if note.output_pdf_path and os.path.exists(note.output_pdf_path):
+            try:
+                os.remove(note.output_pdf_path)
+            except Exception:
+                pass
+        note.output_pdf_path = None
+        note.processing_time_ms = None
+        StorageManager.delete_resource_files(note.id)
+        note.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(note)
+
+        # Submit background task
+        task_id = f"ocr_{current_user.id}_{note.id}"
+        TaskManager.submit_task(
+            task_id,
+            "resource_processing",
+            current_user.id,
+            resource_id=note.id,
+            file_name=note.title,
+            auto_detect_title=True,
+        )
+        
+        logger.info(f"Successfully submitted task for rebuilding note {resource_id} from scratch")
 
         note_data = ResourceResponse.from_orm(note)
-        timings = StorageManager.get_resource_json(note.id, "timings")
-        if timings:
-            note_data.timings = timings
-
-        clear_cache_pattern_sync(f"cache_resp:/resources*:u{current_user.id}*")
+        # Note: timings will be None since we deleted them above
+        
         return note_data
+
     except Exception as e:
-        logger.error(f"Error rebuilding note from scratch: {e}", exc_info=True)
+        logger.error(f"Error submitting resource rebuild task: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error rebuilding note: {e!s}",
+            detail=f"Error rebuilding resource: {e!s}",
         )
 
 
