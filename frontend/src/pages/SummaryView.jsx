@@ -10,7 +10,6 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { ResizableImageExtension } from '../lib/ResizableImageExtension';
-import Dropcursor from '@tiptap/extension-dropcursor';
 import { ImageUploadPlugin, handleImageUploadFlow } from '../lib/tiptapImageUpload';
 import * as TablerIcons from '@tabler/icons-react';
 import { formatParams } from '../lib/formatters';
@@ -113,7 +112,6 @@ export default function SummaryView() {
         inline: true,
         allowBase64: true,
       }),
-      Dropcursor,
       ImageUploadPlugin(summaryId, 'notes'),
     ],
     content: summaryContent,

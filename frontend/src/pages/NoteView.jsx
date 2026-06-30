@@ -18,7 +18,6 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { ResizableImageExtension } from '../lib/ResizableImageExtension';
-import Dropcursor from '@tiptap/extension-dropcursor';
 import { ImageUploadPlugin, handleImageUploadFlow } from '../lib/tiptapImageUpload';
 
 export default function NoteView() {
@@ -63,13 +62,11 @@ export default function NoteView() {
       TableRow,
       TableHeader,
       TableCell,
-      TableCell,
       Markdown,
       ResizableImageExtension.configure({
         inline: true,
         allowBase64: true,
       }),
-      Dropcursor,
       ImageUploadPlugin(id, 'resources'),
     ],
     content: content,
