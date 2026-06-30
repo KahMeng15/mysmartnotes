@@ -56,9 +56,11 @@ export const ResizableImageComponent = (props) => {
           maxWidth: '100%',
           width: '100%',
           height: 'auto',
-          display: loaded ? 'block' : 'none',
+          opacity: loaded ? 1 : 0,
+          position: loaded ? 'static' : 'absolute',
+          pointerEvents: loaded ? 'auto' : 'none',
           borderRadius: '8px',
-          margin: '1rem 0',
+          margin: loaded ? '1rem 0' : 0,
           transition: 'max-width 0.2s ease',
           boxShadow: selected ? '0 0 0 2px var(--mantine-color-blue-5)' : 'none'
         }}

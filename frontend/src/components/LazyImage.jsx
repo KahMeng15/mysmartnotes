@@ -40,10 +40,12 @@ export const LazyImage = ({ src, alt, title, style, maxWidth, ...props }) => {
         style={{
           width: '100%',
           height: 'auto',
-          display: loaded && !error ? 'block' : 'none',
+          opacity: (loaded && !error) ? 1 : 0,
+          position: (loaded && !error) ? 'static' : 'absolute',
+          pointerEvents: (loaded && !error) ? 'auto' : 'none',
           maxWidth: maxWidth || '100%',
           borderRadius: '8px',
-          margin: '1rem 0',
+          margin: (loaded && !error) ? '1rem 0' : 0,
           ...style
         }}
         {...props}

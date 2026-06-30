@@ -1244,8 +1244,10 @@ async def upload_resource_image(
     
     try:
         img = Image.open(io.BytesIO(contents))
-        if img.mode in ('RGBA', 'P'):
-            img = img.convert('RGB')
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        elif img.mode not in ('RGB', 'RGBA'):
+            img = img.convert('RGBA')
             
         # Max dimensions to prevent massive resolutions
         max_size = (1920, 1080)
@@ -1274,13 +1276,30 @@ def serve_user_image(
     db: Session = Depends(get_db),
 ):
     from fastapi.responses import FileResponse
-    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.user_id == current_user.id).first()
+    resource = db.query(Resource).filter(Resource.id == resource_id).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
+        
+    has_access = False
+    if resource.user_id == current_user.id:
+        has_access = True
+    elif resource.subject_id:
+        from app.models.db import Subject, GroupMember
+        subject = db.query(Subject).filter(Subject.id == resource.subject_id).first()
+        if subject and subject.group_id:
+            member = db.query(GroupMember).filter(
+                GroupMember.group_id == subject.group_id,
+                GroupMember.user_id == current_user.id
+            ).first()
+            if member:
+                has_access = True
+                
+    if not has_access:
+        raise HTTPException(status_code=403, detail="Not authorized to access this resource")
 
     safe_path = os.path.basename(image_path)
     full_path = os.path.join(
-        StorageManager.get_user_images_dir(current_user.id, resource_id), safe_path
+        StorageManager.get_user_images_dir(resource.user_id, resource_id), safe_path
     )
 
     if not os.path.exists(full_path):
