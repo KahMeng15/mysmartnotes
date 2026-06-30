@@ -894,6 +894,7 @@ async def download_export(
 async def update_resource_content(
     resource_id: str,
     body: dict,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -929,14 +930,20 @@ async def update_resource_content(
 
     # Update embeddings to stay in sync
     if new_text and new_text.strip():
-        try:
+        def background_update_embeddings(res_id: str, txt: str):
+            from app.utils.db import SessionLocal
             from app.processing.embeddings import update_resource_embeddings
-
-            update_resource_embeddings(note.id, new_text, db)
-            logger.info(f"Updated embeddings for note {resource_id}")
-        except Exception as e:
-            logger.error(f"Error updating embeddings: {e}", exc_info=True)
-            # Don't fail the content update
+            
+            local_db = SessionLocal()
+            try:
+                update_resource_embeddings(res_id, txt, local_db)
+                logger.info(f"Updated embeddings for note {res_id}")
+            except Exception as e:
+                logger.error(f"Error updating embeddings: {e}", exc_info=True)
+            finally:
+                local_db.close()
+                
+        background_tasks.add_task(background_update_embeddings, note.id, new_text)
 
     logger.info(f"Updated content for note {resource_id}: {len(new_text)} chars")
     return note

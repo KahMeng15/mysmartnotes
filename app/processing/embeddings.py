@@ -239,10 +239,14 @@ def compute_and_store_embeddings(resource_id: str, text: str, db) -> int:
         db.query(ResourceEmbedding).filter(ResourceEmbedding.resource_id == resource_id).delete()
         db.commit()
 
+        # Clean text to remove huge base64 images or markdown images before embedding
+        import re
+        clean_text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
+        
         # Split text into chunks
         chunks = []
         positions = []
-        words = text.split()
+        words = clean_text.split()
         current_chunk = []
         current_length = 0
         char_position = 0
