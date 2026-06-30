@@ -13,6 +13,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi, notifyTaskStarted } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { LazyImage } from '../components/LazyImage';
 
 const stepLabels = {
   step1: "1. Scope Identification",
@@ -808,15 +809,11 @@ export default function ChatInterface() {
               if (src.endsWith('#small')) maxWidth = '33%';
               if (src.endsWith('#large')) maxWidth = '100%';
               return (
-                <img
-                  {...props}
-                  style={{
-                    maxWidth: maxWidth,
-                    height: 'auto',
-                    display: 'block',
-                    margin: '0.5rem 0',
-                    borderRadius: '8px'
-                  }}
+                <LazyImage
+                  src={src}
+                  alt={props.alt}
+                  title={props.title}
+                  maxWidth={maxWidth}
                 />
               );
             }

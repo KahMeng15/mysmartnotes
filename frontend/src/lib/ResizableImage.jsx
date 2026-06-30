@@ -1,10 +1,11 @@
 import { NodeViewWrapper } from '@tiptap/react';
-import { ActionIcon, Group, Tooltip, Paper, Text } from '@mantine/core';
+import { ActionIcon, Group, Tooltip, Paper, Text, Skeleton } from '@mantine/core';
 import { useState } from 'react';
 
 export const ResizableImageComponent = (props) => {
   const { node, updateAttributes, selected } = props;
   const src = node.attrs.src;
+  const [loaded, setLoaded] = useState(false);
   
   // Extract size from hash or default to medium
   let currentSize = 'medium';
@@ -23,11 +24,16 @@ export const ResizableImageComponent = (props) => {
   if (currentSize === 'medium') maxWidth = '66%';
 
   return (
-    <NodeViewWrapper style={{ display: 'inline-block', position: 'relative', maxWidth: '100%' }}>
+    <NodeViewWrapper style={{ display: 'inline-block', position: 'relative', maxWidth: '100%', width: maxWidth }}>
+      {!loaded && (
+        <Skeleton height={200} width="100%" radius="md" animate style={{ margin: '1rem 0' }} />
+      )}
       <img
         src={src}
         alt={node.attrs.alt}
         title={node.attrs.title}
+        loading="lazy"
+        onLoad={() => setLoaded(true)}
         data-drag-handle="true"
         className={selected ? 'ProseMirror-selectednode' : ''}
         onDragStart={(e) => {
@@ -47,9 +53,10 @@ export const ResizableImageComponent = (props) => {
           }, 0);
         }}
         style={{
-          maxWidth: maxWidth,
+          maxWidth: '100%',
+          width: '100%',
           height: 'auto',
-          display: 'block',
+          display: loaded ? 'block' : 'none',
           borderRadius: '8px',
           margin: '1rem 0',
           transition: 'max-width 0.2s ease',

@@ -11,6 +11,7 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { ResizableImageExtension } from '../lib/ResizableImageExtension';
 import { ImageUploadExtension, handleImageUploadFlow } from '../lib/tiptapImageUpload';
+import { LazyImage } from '../components/LazyImage';
 import * as TablerIcons from '@tabler/icons-react';
 import { formatParams } from '../lib/formatters';
 
@@ -1121,15 +1122,11 @@ export default function SummaryView() {
                                   if (src.endsWith('#small')) maxWidth = '33%';
                                   if (src.endsWith('#large')) maxWidth = '100%';
                                   return (
-                                    <img
-                                      {...props}
-                                      style={{
-                                        maxWidth: maxWidth,
-                                        height: 'auto',
-                                        display: 'block',
-                                        margin: '1rem 0',
-                                        borderRadius: '8px'
-                                      }}
+                                    <LazyImage
+                                      src={src}
+                                      alt={props.alt}
+                                      title={props.title}
+                                      maxWidth={maxWidth}
                                     />
                                   );
                                 }
