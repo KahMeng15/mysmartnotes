@@ -226,8 +226,7 @@ def process_resource_task(
             if p > 60 and not message:
                 msg = "Polishing with AI..."
             if p > 85 and not message:
-                msg = "Finalizing content..."
-            progress_callback(p, msg)
+                msg = "Finalizing content..."            progress_callback(p, msg)
 
         try:
             processor = get_unified_processor_for_user(user)

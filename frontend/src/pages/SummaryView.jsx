@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDisclosure } from '@mantine/hooks';
 import { Box, Container, Title, Text, Button, Center, Loader, Select, ScrollArea, Group, ActionIcon, Stack, Paper, Modal, Progress, Badge, Tooltip, NavLink as MantineNavLink, SegmentedControl, Textarea, TextInput, Menu, Code, Drawer, Card, Divider } from '@mantine/core';
-import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu, IconDeviceFloppy, IconPencil, IconX, IconH1, IconH2, IconH3, IconTypography, IconCode, IconEye, IconDownload } from '@tabler/icons-react';
+import { IconRobot, IconAlertCircle, IconFileText, IconCheck, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconSparkles, IconBolt, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconList, IconListNumbers, IconTable, IconFile, IconLayersLinked, IconBinaryTree, IconCpu, IconDeviceFloppy, IconPencil, IconX, IconH1, IconH2, IconH3, IconTypography, IconCode, IconEye, IconDownload, IconPhotoPlus } from '@tabler/icons-react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
@@ -9,6 +9,9 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import { ResizableImageExtension } from '../lib/ResizableImageExtension';
+import Dropcursor from '@tiptap/extension-dropcursor';
+import { ImageUploadPlugin, handleImageUploadFlow } from '../lib/tiptapImageUpload';
 import * as TablerIcons from '@tabler/icons-react';
 import { formatParams } from '../lib/formatters';
 
@@ -106,6 +109,12 @@ export default function SummaryView() {
       TableHeader,
       TableCell,
       Markdown,
+      ResizableImageExtension.configure({
+        inline: true,
+        allowBase64: true,
+      }),
+      Dropcursor,
+      ImageUploadPlugin(summaryId, 'notes'),
     ],
     content: summaryContent,
   });
@@ -592,6 +601,37 @@ export default function SummaryView() {
     }
   };
 
+  const hiddenFileInput = useRef(null);
+
+  const handleUploadClick = () => {
+    hiddenFileInput.current.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = await handleImageUploadFlow(file, summaryId, 'notes');
+    if (url) {
+      if (!isRawMode && editor) {
+        editor.chain().focus().setImage({ src: url }).run();
+      } else {
+        const el = textareaRef.current;
+        if (el) {
+          const start = el.selectionStart;
+          const before = summaryContent.substring(0, start);
+          const after = summaryContent.substring(el.selectionEnd);
+          const inserted = `![image](${url})`;
+          setSummaryContent(before + inserted + after);
+          setTimeout(() => {
+            el.focus();
+            el.setSelectionRange(start + inserted.length, start + inserted.length);
+          }, 0);
+        }
+      }
+    }
+    e.target.value = '';
+  };
+
   if (!summaryId) return null;
 
   const isCurrentlyProcessing = taskStatus && (taskStatus.status === 'pending' || taskStatus.status === 'processing' || taskStatus.status === 'running');
@@ -701,6 +741,19 @@ export default function SummaryView() {
           word-break: normal;
           word-wrap: normal;
         }
+        .sticky-markdown img {
+          max-width: 66%;
+          height: auto;
+          display: block;
+          margin: 1rem 0;
+          border-radius: 8px;
+        }
+        .sticky-markdown img[src$="#small"] {
+          max-width: 33%;
+        }
+        .sticky-markdown img[src$="#large"] {
+          max-width: 100%;
+        }
         .sticky-markdown table {
           border-collapse: collapse;
           width: 100%;
@@ -715,6 +768,8 @@ export default function SummaryView() {
         }
         .sticky-markdown .ProseMirror {
           min-height: 50vh;
+          white-space: pre-wrap;
+          word-wrap: break-word;
         }
         .sticky-markdown .ProseMirror:focus {
           outline: none;
@@ -852,6 +907,13 @@ export default function SummaryView() {
 
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
+        <input 
+          type="file" 
+          accept="image/*" 
+          style={{ display: 'none' }} 
+          ref={hiddenFileInput} 
+          onChange={handleFileChange} 
+        />
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <Group wrap="nowrap" gap="xs" style={{ overflow: 'hidden', minWidth: 0 }}>
             <ActionIcon variant="subtle" color="gray" onClick={() => isEditing ? setCancelModalOpened(true) : navigate(-1)}>
@@ -1231,6 +1293,14 @@ export default function SummaryView() {
                       active={isRawMode}
                     />
                   </Tooltip>
+                  <Tooltip label="Insert Image" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Insert Image" : ""}
+                      leftSection={<IconPhotoPlus size="1.2rem" stroke={1.5} />}
+                      onClick={handleUploadClick}
+                    />
+                  </Tooltip>
+
                 </>
               )}
 

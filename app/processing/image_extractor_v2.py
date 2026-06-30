@@ -162,7 +162,11 @@ class ImageExtractorV2:
 
     def extract(self, file_path: str, resource_id: str = "") -> list[ExtractedImage]:
         ext = Path(file_path).suffix.lower()
-        output_dir = os.path.join(self.output_base_dir, resource_id or Path(file_path).stem)
+        
+        from app.utils.storage import _get_user_id_for_entity
+        user_id = _get_user_id_for_entity(resource_id) if resource_id else "unowned"
+        output_base = os.path.join("data", "users", user_id, "extracted_images") if user_id != "unowned" else self.output_base_dir
+        output_dir = os.path.join(output_base, resource_id or Path(file_path).stem)
         os.makedirs(output_dir, exist_ok=True)
 
         if ext == ".pdf":

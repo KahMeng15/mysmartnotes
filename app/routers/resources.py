@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import uuid
+import filetype
 from datetime import datetime
 
 from fastapi import (
@@ -45,8 +46,6 @@ UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "upload
 GENERATED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "generated")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(GENERATED_DIR, exist_ok=True)
-
-
 
 
 
@@ -144,7 +143,7 @@ async def upload_resource(
             break
 
         # Create upload directory structure
-        user_upload_dir = os.path.join(UPLOAD_DIR, str(current_user.id))
+        user_upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "users", str(current_user.id), "uploads")
         os.makedirs(user_upload_dir, exist_ok=True)
 
         # Save file
@@ -495,7 +494,7 @@ async def generate_pdf(
             # Images currently disabled - feature not yet implemented
         elif note.extracted_text:
             # Markdown-only: convert to segments
-            structured_data = _markdown_to_segments(note.extracted_text)
+            structured_data = markdown_to_segments(note.extracted_text)
             for item in structured_data:
                 segment = ContentSegment(
                     content=item["content"],
@@ -723,7 +722,7 @@ async def export_resource(
                 segments.append(segment)
             # Images currently disabled - feature not yet implemented
         elif note.extracted_text:
-            structured_data = _markdown_to_segments(note.extracted_text)
+            structured_data = markdown_to_segments(note.extracted_text)
             for item in structured_data:
                 # If it's the first H1 and we are skipping it, do so
                 if skip_first_h1 and item["type"] == "h1":
@@ -919,7 +918,7 @@ async def update_resource_content(
         )
 
     StorageManager.save_resource_text(note.id, new_text)
-    StorageManager.save_resource_json(note.id, "structured", _markdown_to_segments(new_text))
+    StorageManager.save_resource_json(note.id, "structured", markdown_to_segments(new_text))
     note.updated_at = datetime.utcnow()
 
     # Invalidate existing summary when content changes
@@ -1216,11 +1215,12 @@ def serve_resource_image(
     from app.config import get_settings
 
     settings = get_settings()
-    image_storage_base = getattr(settings, "EXTRACTED_IMAGE_DIR", "data/extracted_images")
-    full_path = os.path.join(image_storage_base, resource_id, image_path)
+    safe_path = os.path.basename(image_path)
+    image_storage_base = os.path.join("data", "users", str(current_user.id), "extracted_images")
+    full_path = os.path.join(image_storage_base, resource_id, safe_path)
 
     if not os.path.exists(full_path):
-        alt_path = os.path.join("data/extracted_images", resource_id, image_path)
+        alt_path = os.path.join("data", "extracted_images", resource_id, image_path)
         if os.path.exists(alt_path):
             full_path = alt_path
         else:
@@ -1228,4 +1228,59 @@ def serve_resource_image(
 
     from fastapi.responses import FileResponse
 
+    return FileResponse(full_path)
+
+@router.post("/{resource_id}/upload-image")
+async def upload_resource_image(
+    resource_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.user_id == current_user.id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+        
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+        
+    kind = filetype.guess(contents)
+    if not kind or not kind.mime.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Invalid image file")
+        
+    if kind.mime in ["image/gif", "image/svg+xml"]:
+        raise HTTPException(status_code=400, detail="GIF and SVG formats are not allowed")
+
+    upload_dir = os.path.join("data", "users", str(current_user.id), "user_images", resource_id)
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    ext = kind.extension
+    filename = f"img_{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+    
+    with open(filepath, "wb") as f:
+        f.write(contents)
+        
+    return {"url": f"/api/resources/{resource_id}/user-images/{filename}"}
+
+
+@router.get("/{resource_id}/user-images/{image_path:path}")
+def serve_user_image(
+    resource_id: str,
+    image_path: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from fastapi.responses import FileResponse
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.user_id == current_user.id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+        
+    safe_path = os.path.basename(image_path)
+    full_path = os.path.join("data", "users", str(current_user.id), "user_images", resource_id, safe_path)
+    
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+        
     return FileResponse(full_path)

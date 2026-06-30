@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useDisclosure } from '@mantine/hooks';
 import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, ActionIcon, ScrollArea, Progress, Drawer, Stack, Tooltip, NavLink as MantineNavLink, Modal, Button, Menu, Divider, Card } from '@mantine/core';
-import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconTypography, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconTypography, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt, IconPhotoPlus } from '@tabler/icons-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
@@ -17,6 +17,9 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import { ResizableImageExtension } from '../lib/ResizableImageExtension';
+import Dropcursor from '@tiptap/extension-dropcursor';
+import { ImageUploadPlugin, handleImageUploadFlow } from '../lib/tiptapImageUpload';
 
 export default function NoteView() {
   const { id } = useParams();
@@ -60,7 +63,14 @@ export default function NoteView() {
       TableRow,
       TableHeader,
       TableCell,
+      TableCell,
       Markdown,
+      ResizableImageExtension.configure({
+        inline: true,
+        allowBase64: true,
+      }),
+      Dropcursor,
+      ImageUploadPlugin(id, 'resources'),
     ],
     content: content,
   });
@@ -134,6 +144,37 @@ export default function NoteView() {
         }
       }, 0);
     }
+  };
+
+  const hiddenFileInput = useRef(null);
+
+  const handleUploadClick = () => {
+    hiddenFileInput.current.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = await handleImageUploadFlow(file, id, 'resources');
+    if (url) {
+      if (!isRawMode && editor) {
+        editor.chain().focus().setImage({ src: url }).run();
+      } else {
+        const el = textareaRef.current;
+        if (el) {
+          const start = el.selectionStart;
+          const before = content.substring(0, start);
+          const after = content.substring(el.selectionEnd);
+          const inserted = `![image](${url})`;
+          setContent(before + inserted + after);
+          setTimeout(() => {
+            el.focus();
+            el.setSelectionRange(start + inserted.length, start + inserted.length);
+          }, 0);
+        }
+      }
+    }
+    e.target.value = '';
   };
 
   const handleScroll = () => {
@@ -498,9 +539,24 @@ export default function NoteView() {
         }
         .sticky-markdown .ProseMirror {
           min-height: 50vh;
+          white-space: pre-wrap;
+          word-wrap: break-word;
         }
         .sticky-markdown .ProseMirror:focus {
           outline: none;
+        }
+        .sticky-markdown img {
+          max-width: 66%;
+          height: auto;
+          display: block;
+          margin: 1rem 0;
+          border-radius: 8px;
+        }
+        .sticky-markdown img[src$="#small"] {
+          max-width: 33%;
+        }
+        .sticky-markdown img[src$="#large"] {
+          max-width: 100%;
         }
         .sticky-markdown table {
           border-collapse: collapse;
@@ -524,6 +580,14 @@ export default function NoteView() {
           background-color: var(--mantine-color-gray-0);
         }
       `}</style>
+
+      <input 
+        type="file" 
+        accept="image/*" 
+        style={{ display: 'none' }} 
+        ref={hiddenFileInput} 
+        onChange={handleFileChange} 
+      />
 
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
@@ -799,6 +863,13 @@ export default function NoteView() {
                       leftSection={isRawMode ? <IconEye size="1.2rem" stroke={1.5} /> : <IconCode size="1.2rem" stroke={1.5} />}
                       onClick={handleToggleRaw}
                       active={isRawMode}
+                    />
+                  </Tooltip>
+                  <Tooltip label="Insert Image" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Insert Image" : ""}
+                      leftSection={<IconPhotoPlus size="1.2rem" stroke={1.5} />}
+                      onClick={handleUploadClick}
                     />
                   </Tooltip>
                 </>

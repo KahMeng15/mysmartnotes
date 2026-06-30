@@ -104,7 +104,6 @@ async def process_next_task():
         else:
             TaskManager._update_db_task(task_id, status="completed", result=result, progress=100)
             logger.info(f"Task {task_id} completed successfully")
-            
         return True
 
     except Exception as e:
