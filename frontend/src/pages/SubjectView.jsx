@@ -703,17 +703,17 @@ export default function SubjectView() {
           setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
           fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
             if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
-          });
-        } else if (status === 'failed') {
+          }).catch(err => console.log('Resource fetch failed, might be deleted', err));
+        } else if (status === 'failed' || status === 'cancelled') {
           setReprocessingNoteIds(prev => prev.filter(id => id !== rid));
-          if (t.error === 'Cancelled by user') {
+          if (t.error === 'Cancelled by user' || status === 'cancelled') {
             setCancelledNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
           } else {
             setFailedNoteIds(prev => prev.includes(rid) ? prev : [...prev, rid]);
           }
           fetchApi(`/resources/${rid}?t=${Date.now()}`).then(updated => {
             if (updated) setNotes(prev => prev.map(n => n.id === rid ? updated : n));
-          });
+          }).catch(err => console.log('Resource fetch failed, might be deleted', err));
         }
       }
 
