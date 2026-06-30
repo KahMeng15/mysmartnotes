@@ -66,6 +66,7 @@ import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkUnwrapImages from 'remark-unwrap-images';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
@@ -1081,7 +1082,7 @@ export default function SummaryView() {
                             <EditorContent editor={editor} />
                           ) : (
                             <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
+                              remarkPlugins={[remarkGfm, remarkUnwrapImages]}
                               urlTransform={(uri) => uri}
                               components={{
                                 pre(props) {

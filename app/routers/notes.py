@@ -727,8 +727,8 @@ async def export_note(
     )
 
     # 4. Generate the summary
-    generated_dir = "generated"
-    output_dir = os.path.join(generated_dir, str(doc.resource_id))
+    from app.utils.paths import LEGACY_GENERATED_DIR
+    output_dir = os.path.join(LEGACY_GENERATED_DIR, str(doc.resource_id))
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     safe_title = "".join(
@@ -744,9 +744,8 @@ async def export_note(
             from app.processing.document_generator import DocumentGenerator
 
             generator = DocumentGenerator(
-                resource_id=doc.resource_id, note_title=note.title, base_output_dir=generated_dir
+                resource_id=doc.resource_id, note_title=note.title
             )
-            # Generator uses its own internal path, we need to move it after
             temp_path = generator.generate_pdf(segments, [], template_config=template_config)
             import shutil
 
@@ -755,7 +754,7 @@ async def export_note(
             from app.processing.docx_generator import DocxGenerator
 
             generator = DocxGenerator(
-                resource_id=doc.resource_id, note_title=note.title, base_output_dir=generated_dir
+                resource_id=doc.resource_id, note_title=note.title
             )
             temp_path = generator.generate_docx(segments, [], template_config=template_config)
             import shutil

@@ -154,20 +154,20 @@ class ImageExtractorV2:
 
     def __init__(
         self,
-        output_base_dir: str = "data/extracted_images",
+        output_base_dir: str | None = None,
         classifier: ImageClassifier | None = None,
     ):
-        self.output_base_dir = output_base_dir
+        from app.utils.paths import LEGACY_EXTRACTED_IMAGES_DIR
+        self.output_base_dir = output_base_dir or LEGACY_EXTRACTED_IMAGES_DIR
         self.classifier = classifier or ImageClassifier()
 
     def extract(self, file_path: str, resource_id: str = "") -> list[ExtractedImage]:
         ext = Path(file_path).suffix.lower()
 
-        from app.utils.storage import _get_user_id_for_entity
-        user_id = _get_user_id_for_entity(resource_id) if resource_id else "unowned"
-        output_base = os.path.join("data", "users", user_id, "extracted_images") if user_id != "unowned" else self.output_base_dir
-        output_dir = os.path.join(output_base, resource_id or Path(file_path).stem)
-        os.makedirs(output_dir, exist_ok=True)
+        from app.utils.storage import StorageManager
+        output_dir = StorageManager.get_extracted_images_dir_for_resource(
+            resource_id or Path(file_path).stem
+        )
 
         if ext == ".pdf":
             return self._extract_from_pdf(file_path, output_dir, resource_id)

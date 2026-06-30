@@ -38,13 +38,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/resources", tags=["resources"])
 
-# Upload directory - use local temp directory
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "uploads")
-GENERATED_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "generated")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(GENERATED_DIR, exist_ok=True)
-
-
 
 @router.get("", response_model=list[ResourceResponse])
 @cache_response(ttl=3600)
@@ -139,13 +132,9 @@ async def upload_resource(
                 raise e
             break
 
-        # Create upload directory structure
-        user_upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "users", str(current_user.id), "uploads")
-        os.makedirs(user_upload_dir, exist_ok=True)
-
         # Save file
         file_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file.filename}"
-        file_path = os.path.join(user_upload_dir, file_name)
+        file_path = StorageManager.get_upload_path(current_user.id, file_name)
 
         with open(file_path, "wb") as f:
             f.write(contents)
@@ -513,7 +502,6 @@ async def generate_pdf(
         generator = DocumentGenerator(
             resource_id=note.id,
             note_title=note.title,
-            base_output_dir=GENERATED_DIR,
         )
 
         output_path = generator.generate_pdf(
@@ -749,7 +737,6 @@ async def export_resource(
             generator = DocumentGenerator(
                 resource_id=note.id,
                 note_title=note.title,
-                base_output_dir=GENERATED_DIR,
             )
             output_path = generator.generate_pdf(
                 content_segments=segments,
@@ -766,7 +753,6 @@ async def export_resource(
             generator = DocxGenerator(
                 resource_id=note.id,
                 note_title=note.title,
-                base_output_dir=GENERATED_DIR,
             )
             output_path = generator.generate_docx(
                 content_segments=segments,
@@ -1217,17 +1203,12 @@ def serve_resource_image(
         raise HTTPException(status_code=404, detail="Resource not found")
 
     safe_path = os.path.basename(image_path)
-    image_storage_base = os.path.join("data", "users", str(current_user.id), "extracted_images")
-    full_path = os.path.join(image_storage_base, resource_id, safe_path)
+    full_path = os.path.join(
+        StorageManager.get_extracted_images_dir(current_user.id, resource_id), safe_path
+    )
 
     if not os.path.exists(full_path):
-        alt_path = os.path.join("data", "extracted_images", resource_id, image_path)
-        if os.path.exists(alt_path):
-            full_path = alt_path
-        else:
-            raise HTTPException(status_code=404, detail="Image not found")
-
-    from fastapi.responses import FileResponse
+        raise HTTPException(status_code=404, detail="Image not found")
 
     return FileResponse(full_path)
 
@@ -1253,8 +1234,7 @@ async def upload_resource_image(
     if kind.mime in ["image/gif", "image/svg+xml"]:
         raise HTTPException(status_code=400, detail="GIF and SVG formats are not allowed")
 
-    upload_dir = os.path.join("data", "users", str(current_user.id), "user_images", resource_id)
-    os.makedirs(upload_dir, exist_ok=True)
+    upload_dir = StorageManager.get_user_images_dir(current_user.id, resource_id)
 
     ext = kind.extension
     
@@ -1299,7 +1279,9 @@ def serve_user_image(
         raise HTTPException(status_code=404, detail="Resource not found")
 
     safe_path = os.path.basename(image_path)
-    full_path = os.path.join("data", "users", str(current_user.id), "user_images", resource_id, safe_path)
+    full_path = os.path.join(
+        StorageManager.get_user_images_dir(current_user.id, resource_id), safe_path
+    )
 
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail="Image not found")

@@ -13,6 +13,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { fetchApi, notifyTaskStarted } from '../lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkUnwrapImages from 'remark-unwrap-images';
 import { LazyImage } from '../components/LazyImage';
 
 const stepLabels = {
@@ -798,7 +799,7 @@ export default function ChatInterface() {
     return (
       <Box className="markdown-content">
         <ReactMarkdown 
-          remarkPlugins={[remarkGfm]} 
+          remarkPlugins={[remarkGfm, remarkUnwrapImages]} 
           urlTransform={(uri) => uri}
           components={{ 
             a: LinkRenderer,

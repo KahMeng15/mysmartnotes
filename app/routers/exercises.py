@@ -165,11 +165,7 @@ def upload_exercise(
     # Save file
     file_id = generate_random_id(db, Exercise)
     ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
-    user_dir = os.path.join(
-        os.path.dirname(__file__), "..", "..", "data", f"user_{current_user.id}"
-    )
-    os.makedirs(user_dir, exist_ok=True)
-    file_path = os.path.join(user_dir, f"{file_id}{ext}")
+    file_path = StorageManager.get_upload_path(current_user.id, f"{file_id}{ext}")
 
     with open(file_path, "wb") as buffer:
         buffer.write(file.file.read())
@@ -763,17 +759,12 @@ async def export_exercise(
         segments.append(ContentSegment(content="", content_type=ContentType.BODY, page_number=1))
 
     try:
-        from app.routers.processing import GENERATED_DIR
-
-        "".join(c for c in exercise.title if c.isalnum() or c in (" ", "-", "_")).strip()
-
         if export_format == "pdf":
             from app.processing.document_generator import DocumentGenerator
 
             generator = DocumentGenerator(
-                lecture_id=exercise.id,
-                lecture_title=f"Exercise: {exercise.title}",
-                base_output_dir=GENERATED_DIR,
+                resource_id=exercise.id,
+                note_title=f"Exercise: {exercise.title}",
             )
             output_path = generator.generate_pdf(
                 content_segments=segments,
@@ -787,9 +778,8 @@ async def export_exercise(
             from app.processing.docx_generator import DocxGenerator
 
             generator = DocxGenerator(
-                lecture_id=exercise.id,
-                lecture_title=f"Exercise: {exercise.title}",
-                base_output_dir=GENERATED_DIR,
+                resource_id=exercise.id,
+                note_title=f"Exercise: {exercise.title}",
             )
             output_path = generator.generate_docx(
                 content_segments=segments,

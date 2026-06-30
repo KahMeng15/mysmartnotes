@@ -37,21 +37,12 @@ class DocxGenerator:
         self,
         resource_id: str,
         note_title: str,
-        base_output_dir: str = "generated",
     ):
         self.resource_id = resource_id
         self.note_title = note_title
-        self.base_output_dir = base_output_dir
 
-        from app.utils.storage import _get_user_id_for_entity
-        user_id = _get_user_id_for_entity(resource_id)
-        if user_id != "unowned":
-            self.output_dir = os.path.join("data", "users", user_id, "exports", resource_id)
-        else:
-            self.output_dir = os.path.join(base_output_dir, resource_id)
-
-        # Create output directory
-        Path(self.output_dir).mkdir(parents=True, exist_ok=True)
+        from app.utils.storage import StorageManager
+        self.output_dir = StorageManager.get_exports_dir_for_resource(resource_id)
 
         self.output_docx = os.path.join(self.output_dir, "OUTPUT.docx")
 
