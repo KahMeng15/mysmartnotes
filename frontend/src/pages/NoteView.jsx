@@ -237,6 +237,23 @@ export default function NoteView() {
   }, [content, isEditing, isRawMode]);
 
   useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isEditing) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    
+    if (isEditing) {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isEditing]);
+
+  useEffect(() => {
     if (loading || !markdownRef.current || isEditing || isRawMode) return;
 
     if (refPosition) {
@@ -675,6 +692,7 @@ export default function NoteView() {
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeRaw]}
+                        urlTransform={(uri) => uri}
                         components={{
                           pre(props) {
                             return <>{props.children}</>;
@@ -705,6 +723,25 @@ export default function NoteView() {
                               <code {...rest} className={className}>
                                 {children}
                               </code>
+                            );
+                          },
+                          img(props) {
+                            if (!props.src) return null;
+                            const src = props.src;
+                            let maxWidth = '66%'; // default medium
+                            if (src.endsWith('#small')) maxWidth = '33%';
+                            if (src.endsWith('#large')) maxWidth = '100%';
+                            return (
+                              <img
+                                {...props}
+                                style={{
+                                  maxWidth: maxWidth,
+                                  height: 'auto',
+                                  display: 'block',
+                                  margin: '1rem 0',
+                                  borderRadius: '8px'
+                                }}
+                              />
                             );
                           }
                         }}

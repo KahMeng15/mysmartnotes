@@ -30,6 +30,22 @@ export const ResizableImageComponent = (props) => {
         title={node.attrs.title}
         data-drag-handle="true"
         className={selected ? 'ProseMirror-selectednode' : ''}
+        onDragStart={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clone = e.currentTarget.cloneNode(true);
+          clone.style.width = `${rect.width}px`;
+          clone.style.height = `${rect.height}px`;
+          clone.style.maxWidth = 'none';
+          clone.style.position = 'absolute';
+          clone.style.top = '-9999px';
+          document.body.appendChild(clone);
+          e.dataTransfer.setDragImage(clone, e.nativeEvent.offsetX || rect.width / 2, e.nativeEvent.offsetY || rect.height / 2);
+          setTimeout(() => {
+            if (clone.parentNode) {
+              clone.parentNode.removeChild(clone);
+            }
+          }, 0);
+        }}
         style={{
           maxWidth: maxWidth,
           height: 'auto',

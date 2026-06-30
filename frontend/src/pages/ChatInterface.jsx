@@ -796,7 +796,32 @@ export default function ChatInterface() {
 
     return (
       <Box className="markdown-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: LinkRenderer }}>
+        <ReactMarkdown 
+          remarkPlugins={[remarkGfm]} 
+          urlTransform={(uri) => uri}
+          components={{ 
+            a: LinkRenderer,
+            img(props) {
+              if (!props.src) return null;
+              const src = props.src;
+              let maxWidth = '66%';
+              if (src.endsWith('#small')) maxWidth = '33%';
+              if (src.endsWith('#large')) maxWidth = '100%';
+              return (
+                <img
+                  {...props}
+                  style={{
+                    maxWidth: maxWidth,
+                    height: 'auto',
+                    display: 'block',
+                    margin: '0.5rem 0',
+                    borderRadius: '8px'
+                  }}
+                />
+              );
+            }
+          }}
+        >
           {processedAnswer}
         </ReactMarkdown>
       </Box>
