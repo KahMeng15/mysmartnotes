@@ -477,10 +477,12 @@ export default function Login() {
         >
           <Box style={{ width: '100%', maxWidth: '420px', margin: '0 auto' }}>
             <Box mb={40}>
-              <img src="/velonote.svg" height={48} alt="velonote" style={{ display: 'block' }} />
-              <Text fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif', fontSize: 'clamp(1.5rem, 6vw, 2.5rem)' }}>
-                velonote
-              </Text>
+              <Box ta="center">
+                <img src="/velonote.svg" height={48} alt="velonote" style={{ display: 'block', margin: '0 auto' }} />
+                <Text fw={900} c="#171738" style={{ fontFamily: 'Instrument Sans, sans-serif', fontSize: 'clamp(1.5rem, 6vw, 2.5rem)', lineHeight: 1 }}>
+                  velo<span style={{ color: '#593C8F' }}>note</span>
+                </Text>
+              </Box>
             </Box>
 
           {success && (
@@ -566,9 +568,9 @@ export default function Login() {
                 </Alert>
               )}
 
-              <Box mt="md" ref={turnstile.containerRef} />
+              <Box mt="md" ref={turnstile.containerRef} ta="center" />
 
-              <Group mt="lg" gap="xs">
+              <Group mt="lg" gap="xs" justify="center">
                 {signupConfig === 'invite' ? (
                   <Text size="sm" c="dimmed">Invite only system, contact the system administrator to sign up and use this app.</Text>
                 ) : maintenanceMode ? null : (
@@ -580,7 +582,7 @@ export default function Login() {
                   </>
                 )}
               </Group>
-              <Group mt={5}>
+              <Group mt={5} justify="center">
                 <Anchor component="button" type="button" size="sm" c="blue" onClick={() => switchPanel('forgot')}>
                   Forgot password?
                 </Anchor>
