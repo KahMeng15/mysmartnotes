@@ -931,7 +931,7 @@ export default function ExerciseView() {
 
         {/* Right Sidebar */}
         {!taskActive && (
-        <Box w={sidebarOpen ? 280 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
+        <Box w={sidebarOpen ? 280 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 200ms ease, min-width 200ms ease', minWidth: sidebarOpen ? 280 : 80, overflow: 'hidden' }} p="md">
           <Box style={{ flex: 1, overflowY: 'auto' }}>
             <Stack gap={0} align="stretch">
               {sidebarOpen && (

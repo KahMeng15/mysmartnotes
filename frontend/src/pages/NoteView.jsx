@@ -763,7 +763,7 @@ export default function NoteView() {
 
         {/* Right Sidebar */}
         {isProcessed && (
-          <Box w={sidebarOpen ? 250 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease' }} p="md">
+          <Box w={sidebarOpen ? 250 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 200ms ease, min-width 200ms ease', minWidth: sidebarOpen ? 250 : 80, overflow: 'hidden' }} p="md">
             <Box style={{ flex: 1, overflowY: 'auto' }}>
               <Stack gap={0} align="stretch">
                 {sidebarOpen && <Title order={5} fw={600} c="dimmed" mb="xs">Smart Actions</Title>}
