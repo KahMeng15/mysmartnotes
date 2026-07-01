@@ -767,6 +767,9 @@ export default function ExerciseView() {
             <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}>
               <Text size="xs" fw={700}>H3</Text>
             </ActionIcon>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => editor?.chain().focus().toggleCodeBlock().run()}>
+              <Text size="xs" fw={700} style={{ fontFamily: 'monospace' }}>{'</>'}</Text>
+            </ActionIcon>
           </Group>
           <Box p="sm" style={{ minHeight: minRows * 24 }}>
             <EditorContent editor={editor} />
@@ -776,12 +779,19 @@ export default function ExerciseView() {
     );
   }
 
-  function SubPartRenderer({ part, userAnswers, setUserAnswers, gradingResults, gradingLoading, handleGrade, handleResetQuestion, explanations, explainLoading, handleExplain, showExplanations, setShowExplanations, isInteractive, isExam, examActive, hasGraded, viewMode, showAns, revealedAnswers, toggleReveal, sendExplanationFollowUp, handleDeleteExplanation, depth }) {
+  function HtmlContent({ html, ...props }) {
+    if (!html) return null;
+    return (
+      <Box className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} style={{ lineHeight: 1.65 }} {...props} />
+    );
+  }
+
+  function SubPartRenderer({ part, userAnswers, setUserAnswers, gradingResults, gradingLoading, handleGrade, handleResetQuestion, isInteractive, isExam, examActive, hasGraded, viewMode, showAns, depth, explanations, explainLoading, handleExplain, showExplanations, setShowExplanations, revealedAnswers, toggleReveal }) {
     const spId = part.id;
     const partGrade = gradingResults[spId];
     const partHasGraded = !!partGrade;
-    const partExplanation = explanations[spId] || part.explanation;
-    const partShowAns = (isInteractive && partHasGraded) || (viewMode === 'show') || (viewMode === 'hide' && revealedAnswers[spId]);
+    const partExplanation = explanations?.[spId] || part.explanation;
+    const partShowAns = showAns || revealedAnswers?.[spId];
     const isLast = depth >= 2;
 
     let parsedPartOptions = [];
@@ -791,17 +801,17 @@ export default function ExerciseView() {
 
     return (
       <Box mb="md">
-        <Group gap={8} wrap="nowrap" mb={4}>
+        <Group justify="space-between" wrap="nowrap" mb={4}>
           <Text fw={500} size="sm" c="dimmed">
             ({part.label || '?'})
           </Text>
           {part.max_marks > 0 && (
-            <Badge size="xs" variant="light" color="blue" radius="sm">
+            <Badge size="xs" variant="light" color="blue" radius="sm" style={{ flexShrink: 0 }}>
               {part.max_marks} {part.max_marks === 1 ? 'mark' : 'marks'}
             </Badge>
           )}
         </Group>
-        <Text fw={500} size="sm" mb="xs">{part.question_text}</Text>
+        <HtmlContent html={part.question_text} mb="xs" />
 
         {/* Nested sub-parts */}
         {part.sub_parts?.length > 0 && (
@@ -810,7 +820,7 @@ export default function ExerciseView() {
               <SubPartRenderer
                 key={spp.id}
                 part={spp}
-                {...{ userAnswers, setUserAnswers, gradingResults, gradingLoading, handleGrade, handleResetQuestion, explanations, explainLoading, handleExplain, showExplanations, setShowExplanations, isInteractive, isExam, examActive, hasGraded, viewMode, showAns, revealedAnswers, toggleReveal, sendExplanationFollowUp, handleDeleteExplanation }}
+                {...{ userAnswers, setUserAnswers, gradingResults, gradingLoading, handleGrade, handleResetQuestion, isInteractive, isExam, examActive, hasGraded, viewMode, showAns, explanations, explainLoading, handleExplain, showExplanations, setShowExplanations, revealedAnswers, toggleReveal }}
                 depth={depth + 1}
               />
             ))}
@@ -839,6 +849,7 @@ export default function ExerciseView() {
                 autosize
                 size="xs"
                 disabled={partHasGraded || (isExam && !examActive)}
+                styles={{ input: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '12px' } }}
               />
             )}
 
@@ -849,21 +860,9 @@ export default function ExerciseView() {
                     Check
                   </Button>
                 ) : (
-                  <>
-                    <Button size="compact-sm" variant="light" color="gray" onClick={() => handleResetQuestion(spId)} leftSection={<IconRefresh size={12} />}>
-                      Reset
-                    </Button>
-                    {!partExplanation && (
-                      <Button size="compact-sm" variant="light" loading={explainLoading[spId]} onClick={() => handleExplain(spId)} leftSection={<IconBulb size={12} />}>
-                        Explain
-                      </Button>
-                    )}
-                    {partExplanation && !showExplanations[spId] && (
-                      <Button size="compact-sm" variant="light" onClick={() => setShowExplanations(prev => ({...prev, [spId]: true}))} leftSection={<IconBulb size={12} />}>
-                        Show Explanation
-                      </Button>
-                    )}
-                  </>
+                  <Button size="compact-sm" variant="light" color="gray" onClick={() => handleResetQuestion(spId)} leftSection={<IconRefresh size={12} />}>
+                    Reset
+                  </Button>
                 )}
               </Group>
             )}
@@ -871,36 +870,73 @@ export default function ExerciseView() {
             {partHasGraded && partGrade && (
               <Box mt="sm">
                 <GradeDisplay grade={partGrade} correctAnswer={part.answer_text} />
-                {partExplanation && showExplanations[spId] && (
-                  <Paper mt="xs" p="sm" bg="var(--mantine-color-white)" radius="sm" withBorder>
-                    <Group justify="space-between" align="center" wrap="nowrap" mb={4}>
-                      <Text size="xs"><IconBulb size={12} style={{ marginRight: 4, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation</b></Text>
-                      <ActionIcon variant="subtle" color="gray" size="xs" onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(spId); }}>
-                        <IconTrash size={12} />
-                      </ActionIcon>
-                    </Group>
-                    <Box className="markdown-content" size="xs">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{partExplanation}</ReactMarkdown>
-                    </Box>
-                  </Paper>
-                )}
               </Box>
             )}
           </Box>
         )}
 
-        {!isInteractive && partShowAns && (
-          <Paper p="sm" bg="var(--mantine-color-blue-0)" radius="sm" mt={4}
-            style={{ cursor: viewMode === 'hide' && !partShowAns ? 'pointer' : 'default', position: 'relative', overflow: 'hidden' }}
-            onClick={() => { if (!partShowAns && viewMode === 'hide') toggleReveal(spId); }}>
+        {!isInteractive && (partShowAns || viewMode === 'hide') && (
+          <Paper p="md" bg="var(--mantine-color-blue-0)" radius="sm" mt="xs"
+            style={{
+              cursor: !partShowAns ? 'pointer' : 'default',
+              position: 'relative',
+              overflow: 'hidden',
+              transition: 'all 0.2s ease'
+            }}
+            onClick={() => {
+              if (!partShowAns && viewMode === 'hide') {
+                toggleReveal(spId);
+              }
+            }}
+          >
             {!partShowAns && (
               <Center style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, background: 'rgba(231, 245, 255, 0.3)' }}>
-                <Badge size="sm" variant="light" style={{ pointerEvents: 'none' }}>Click to reveal</Badge>
+                <Badge size="lg" variant="light" style={{ pointerEvents: 'none' }}>
+                  Click to reveal answer
+                </Badge>
               </Center>
             )}
-            <Box style={{ filter: !partShowAns ? 'blur(6px)' : 'none', opacity: !partShowAns ? 0.5 : 1, transition: 'filter 0.3s ease', userSelect: !partShowAns ? 'none' : 'auto', pointerEvents: !partShowAns ? 'none' : 'auto' }}>
-              <Text size="xs" fw={500} c="blue.9">Answer:</Text>
-              <Text size="xs" c="blue.9">{part.answer_text || "No answer provided."}</Text>
+            <Box style={{ filter: !partShowAns ? 'blur(6px)' : 'none', opacity: !partShowAns ? 0.5 : 1, transition: 'all 0.35s ease', userSelect: !partShowAns ? 'none' : 'auto', pointerEvents: !partShowAns ? 'none' : 'auto' }}>
+              <Text fw={500} c="blue.9">Answer:</Text>
+              <Box c="blue.9"><HtmlContent html={part.answer_text || "No answer provided."} /></Box>
+              <Box mt="md">
+                {partExplanation && showExplanations?.[spId] && (
+                  <Paper p="md" bg="var(--mantine-color-white)" radius="sm" mb="sm">
+                    {explainLoading?.[spId] ? (
+                      <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
+                    ) : (
+                      <>
+                        <Group justify="space-between" align="center" wrap="nowrap" mb={8}>
+                          <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation</b></Text>
+                          <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [spId]: false })); }}>
+                            <IconEyeOff size={14} />
+                          </ActionIcon>
+                        </Group>
+                        <Box className="markdown-content" size="sm">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{partExplanation}</ReactMarkdown>
+                        </Box>
+                      </>
+                    )}
+                  </Paper>
+                )}
+                <Group gap="xs">
+                  {!partExplanation && (
+                    <Button size="xs" variant="light" loading={explainLoading?.[spId]} onClick={(e) => { e.stopPropagation(); handleExplain(spId); }} leftSection={<IconBulb size={14} />}>
+                      Ask AI to Explain
+                    </Button>
+                  )}
+                  {partExplanation && !showExplanations?.[spId] && (
+                    <Button size="xs" variant="light" onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [spId]: true })); }} leftSection={<IconBulb size={14} />}>
+                      Show AI Explanation
+                    </Button>
+                  )}
+                  {viewMode === 'hide' && (
+                    <Button size="xs" variant="default" onClick={(e) => { e.stopPropagation(); toggleReveal(spId); }} leftSection={partShowAns ? <IconEyeOff size={14} /> : <IconEye size={14} />}>
+                      {partShowAns ? "Re-hide Answer" : "Reveal Answer"}
+                    </Button>
+                  )}
+                </Group>
+              </Box>
             </Box>
           </Paper>
         )}
@@ -915,7 +951,7 @@ export default function ExerciseView() {
       return (
         <Alert color={grade.is_correct ? 'green' : 'red'} icon={grade.is_correct ? <IconCheck /> : <IconX />}>
           <Text fw={500}>{grade.feedback}</Text>
-          {!grade.is_correct && <Text mt="xs" size="sm"><b>Correct Answer:</b> {grade.correct_answer}</Text>}
+          {!grade.is_correct && <Box mt="xs" size="sm"><b>Correct Answer:</b> <HtmlContent html={grade.correct_answer} style={{ display: 'inline' }} /></Box>}
         </Alert>
       );
     }
@@ -939,7 +975,7 @@ export default function ExerciseView() {
         {isAiError && correctAnswer && (
           <Paper mt="xs" p="sm" withBorder radius="md" bg="blue.0">
             <Text size="xs" fw={600} mb={2} c="dimmed">Correct Answer:</Text>
-            <Text size="sm">{correctAnswer}</Text>
+            <HtmlContent html={correctAnswer} />
           </Paper>
         )}
         {grade.criterion_results?.length > 0 && !isAiError && (
@@ -1581,9 +1617,10 @@ export default function ExerciseView() {
                         </Box>
                         <Group justify="space-between" align="flex-start" mb="sm" wrap="nowrap">
                           <Box style={{ flex: 1, minWidth: 0 }}>
-                            <Text fw={600} size="lg">
-                              {idx + 1}. {q.question_text}
-                            </Text>
+                            <Box fw={600} size="lg">
+                              <Text component="span" fw={600} size="lg">{idx + 1}. </Text>
+                              <HtmlContent html={q.question_text} style={{ display: 'inline' }} />
+                            </Box>
                           </Box>
                           {totalMarks > 0 && (
                             <Badge size="sm" variant="light" color="blue" radius="sm" ml="xs" style={{ flexShrink: 0 }}>
@@ -1604,21 +1641,19 @@ export default function ExerciseView() {
                                 gradingLoading={gradingLoading}
                                 handleGrade={handleGrade}
                                 handleResetQuestion={handleResetQuestion}
-                                explanations={explanations}
-                                explainLoading={explainLoading}
-                                handleExplain={handleExplain}
-                                showExplanations={showExplanations}
-                                setShowExplanations={setShowExplanations}
                                 isInteractive={isInteractive}
                                 isExam={isExam}
                                 examActive={examActive}
                                 hasGraded={hasGraded}
                                 viewMode={viewMode}
                                 showAns={showAns}
+                                explanations={explanations}
+                                explainLoading={explainLoading}
+                                handleExplain={handleExplain}
+                                showExplanations={showExplanations}
+                                setShowExplanations={setShowExplanations}
                                 revealedAnswers={revealedAnswers}
                                 toggleReveal={toggleReveal}
-                                sendExplanationFollowUp={sendExplanationFollowUp}
-                                handleDeleteExplanation={handleDeleteExplanation}
                                 depth={0}
                               />
                             ))}
@@ -1627,6 +1662,8 @@ export default function ExerciseView() {
 
                         {isInteractive ? (
                           <Box mt="md">
+                            {!q.sub_parts?.length && (
+                              <>
                             {parsedOptions.length > 0 ? (
                                <Radio.Group
                                  value={userAnswers[q.id] || ''}
@@ -1653,6 +1690,7 @@ export default function ExerciseView() {
                                     }
                                   }
                                 }}
+                                styles={{ input: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '13px' } }}
                               />
                             )}
                             
@@ -1754,10 +1792,12 @@ export default function ExerciseView() {
                                 )}
                               </Paper>
                             )}
+                            </>
+                            )}
                           </Box>
                         ) : (
                           <Box mt="md">
-                            {(showAns || viewMode === 'hide') && (
+                            {!q.sub_parts?.length && (showAns || viewMode === 'hide') && (
                               <Box>
                                 <Paper 
                                   p="md" 
@@ -1782,9 +1822,9 @@ export default function ExerciseView() {
                                       </Badge>
                                     </Center>
                                   )}
-                                  <Box style={{ filter: !showAns ? 'blur(6px)' : 'none', opacity: !showAns ? 0.5 : 1, transition: 'filter 0.3s ease, opacity 0.3s ease', userSelect: !showAns ? 'none' : 'auto', pointerEvents: !showAns ? 'none' : 'auto' }}>
+                                  <Box style={{ filter: !showAns ? 'blur(6px)' : 'none', opacity: !showAns ? 0.5 : 1, transition: 'all 0.35s ease', userSelect: !showAns ? 'none' : 'auto', pointerEvents: !showAns ? 'none' : 'auto' }}>
                                     <Text fw={500} c="blue.9">Answer:</Text>
-                                    <Text c="blue.9">{q.answer_text || "No answer provided."}</Text>
+                                    <Box c="blue.9"><HtmlContent html={q.answer_text || "No answer provided."} /></Box>
                                     
                                       <Box mt="md">
                                         {explanation && showExplanations[q.id] && (
@@ -2574,13 +2614,16 @@ export default function ExerciseView() {
       >
         {historyModalQuestion && (
           <Stack spacing="md">
-            <Text fw={600} size="lg">Q{historyModalQuestion.idx + 1}. {historyModalQuestion.question_text}</Text>
+            <Box fw={600} size="lg">
+              <Text component="span" fw={600} size="lg">Q{historyModalQuestion.idx + 1}. </Text>
+              <HtmlContent html={historyModalQuestion.question_text} style={{ display: 'inline' }} />
+            </Box>
 
             {historyModalQuestion.userAnswer ? (
               <Box>
                 <Text fw={500} size="sm" c="dimmed">Your Answer:</Text>
                 <Paper p="sm" bg="var(--mantine-color-gray-0)" radius="sm" withBorder>
-                  <Text>{historyModalQuestion.userAnswer}</Text>
+                  <Text style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', whiteSpace: 'pre-wrap', fontSize: '13px' }}>{historyModalQuestion.userAnswer}</Text>
                 </Paper>
               </Box>
             ) : (
@@ -2590,7 +2633,7 @@ export default function ExerciseView() {
             <Box>
               <Text fw={500} size="sm" c="dimmed">Correct Answer:</Text>
               <Paper p="sm" bg="var(--mantine-color-blue-0)" radius="sm" withBorder>
-                <Text>{historyModalQuestion.answer_text || "No answer provided."}</Text>
+                <HtmlContent html={historyModalQuestion.answer_text || "No answer provided."} />
               </Paper>
             </Box>
 
