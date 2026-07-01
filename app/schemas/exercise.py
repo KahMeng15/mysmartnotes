@@ -6,6 +6,25 @@ from pydantic import BaseModel, Field
 from app.schemas.schemas import SubjectResponse
 
 
+class MarkingCriterion(BaseModel):
+    criterion: str
+    max_points: int = 1
+    description: str = ""
+
+
+class ExerciseSubPart(BaseModel):
+    id: str
+    label: str = ""
+    question_text: str = ""
+    answer_text: str = ""
+    max_marks: int = 0
+    question_type: str = "subjective"
+    options: Any | None = None
+    order: int = 0
+    sub_parts: list["ExerciseSubPart"] = []
+    marking_scheme: list[MarkingCriterion] = []
+
+
 class ExerciseQuestionBase(BaseModel):
     question_text: str
     answer_text: str
@@ -19,6 +38,9 @@ class ExerciseQuestionBase(BaseModel):
     difficulty: str | None = None
     reference_resource_id: str | None = None
     reference_resource_title: str | None = None
+    max_marks: int = 0
+    sub_parts: list[ExerciseSubPart] = []
+    marking_scheme: list[MarkingCriterion] = []
 
 
 class ExerciseQuestionCreate(ExerciseQuestionBase):
@@ -34,6 +56,9 @@ class ExerciseQuestionUpdate(BaseModel):
     explanation: str | None = None
     topic: str | None = None
     reference_quote: str | None = None
+    max_marks: int | None = None
+    sub_parts: list[ExerciseSubPart] | None = None
+    marking_scheme: list[MarkingCriterion] | None = None
 
 
 class ExerciseQuestionResponse(ExerciseQuestionBase):
@@ -81,18 +106,27 @@ class ExerciseCheckRequest(BaseModel):
     user_answer: str
 
 
-class ExerciseCheckResponse(BaseModel):
-    is_correct: bool
-    feedback: str
-    correct_answer: str
+class CriterionResult(BaseModel):
+    criterion: str
+    max_points: int
+    awarded_points: int
+    rationale: str
+
+
+class GradeResponse(BaseModel):
+    total_awarded: int
+    total_max: int
+    criterion_results: list[CriterionResult] = []
+    feedback: str = ""
+    correct_answer: str = ""
 
 
 class ExerciseExplainRequest(BaseModel):
-    scope: str = "source"  # source, web, both
+    scope: str = "source"
     ai_mode: str = "quick"
     output_format: str = "sentence"
     user_answer: str | None = None
-    view_mode: str | None = "hide"  # hide, show, interactive, exam, conversation
+    view_mode: str | None = "hide"
 
 
 class BulkExerciseQuestionUpdate(BaseModel):
@@ -106,6 +140,9 @@ class BulkExerciseQuestionUpdate(BaseModel):
     explanation: str | None = None
     topic: str | None = None
     reference_quote: str | None = None
+    max_marks: int = 0
+    sub_parts: list[ExerciseSubPart] = []
+    marking_scheme: list[MarkingCriterion] = []
 
 
 class BulkExerciseUpdate(BaseModel):
@@ -129,3 +166,10 @@ class ExerciseGenerateRequest(BaseModel):
     lengths: list[str] = ["Short", "Medium", "Long"]
     difficulties: list[str] = ["Easy", "Medium", "Hard"]
     num_questions: int = Field(10, ge=1, le=100)
+
+
+class ExerciseSessionSubmit(BaseModel):
+    awarded_marks: int
+    total_marks: int
+    question_scores: dict
+    duration_minutes: int = 0

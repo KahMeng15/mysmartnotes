@@ -290,6 +290,9 @@ class StudySession(Base):
     user_id = Column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    exercise_id = Column(
+        String(16), ForeignKey("exercises.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     resource_id = Column(
         String(16), ForeignKey("resources.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -298,6 +301,9 @@ class StudySession(Base):
     questions_attempted = Column(Integer, default=0)
     questions_correct = Column(Integer, default=0)
     score = Column(Float)
+    total_marks = Column(Integer, default=0)
+    awarded_marks = Column(Integer, default=0)
+    question_scores = Column(JSON, nullable=True)
     start_time = Column(DateTime, default=datetime.utcnow)
     end_time = Column(DateTime)
     status = Column(String(50), default="completed")  # completed, interrupted
@@ -305,6 +311,7 @@ class StudySession(Base):
 
     # Relationships
     user = relationship("User", back_populates="study_sessions")
+    exercise = relationship("Exercise")
     resource = relationship("Resource", back_populates="study_sessions")
 
 

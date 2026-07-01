@@ -11,7 +11,7 @@ from app.processing.ai_client import AIClient
 from app.processing.embeddings import retrieve_relevant_chunks
 from app.processing.note_processor import get_pipeline_for_user
 from app.processing.ocr import OCRProcessor
-from app.schemas.exercise import ExerciseCheckResponse
+from app.schemas.exercise import GradeResponse
 from app.utils.db import SessionLocal
 from app.utils.storage import StorageManager
 from app.utils.tasks import TaskManager
@@ -161,6 +161,87 @@ def _extract_fallback_questions(raw_text: str) -> list[dict[str, Any]]:
         )
         i = j if j > i else i + 1
     return extracted
+
+
+def _normalize_question_structure(q: dict) -> dict:
+    """Validate and normalize marks, sub_parts, marking_scheme on a question dict."""
+    q["max_marks"] = max(int(q.get("max_marks", 0) or 0), 0)
+
+    raw_scheme = q.get("marking_scheme", [])
+    if isinstance(raw_scheme, list):
+        normalized_scheme = []
+        for c in raw_scheme:
+            if isinstance(c, dict):
+                normalized_scheme.append({
+                    "criterion": str(c.get("criterion", c.get("name", ""))),
+                    "max_points": int(c.get("max_points", c.get("marks", 1)) or 1),
+                    "description": str(c.get("description", "")),
+                })
+        q["marking_scheme"] = normalized_scheme
+    else:
+        q["marking_scheme"] = []
+
+    raw_sub_parts = q.get("sub_parts", [])
+    if isinstance(raw_sub_parts, list):
+        q["sub_parts"] = _normalize_sub_parts(raw_sub_parts, q.get("id", ""))
+    else:
+        q["sub_parts"] = []
+
+    if q["sub_parts"]:
+        child_sum = sum(sp.get("max_marks", 0) for sp in q["sub_parts"])
+        if child_sum > 0 and q["max_marks"] == 0:
+            q["max_marks"] = child_sum
+
+    if q["max_marks"] == 0:
+        q["max_marks"] = 1
+
+    return q
+
+
+def _normalize_sub_parts(parts: list, parent_id: str, depth: int = 0) -> list:
+    """Recursively normalize sub-parts with depth limit of 3."""
+    if depth >= 3:
+        return []
+    normalized = []
+    for i, sp in enumerate(parts):
+        if not isinstance(sp, dict):
+            continue
+        label = str(sp.get("label", chr(97 + i)))
+        sp["id"] = str(sp.get("id", f"{parent_id}{label}"))
+        sp["label"] = label
+        sp["question_text"] = str(sp.get("question_text", "") or "")
+        sp["answer_text"] = str(sp.get("answer_text", "") or "")
+        sp["max_marks"] = max(int(sp.get("max_marks", 0) or 0), 0)
+        sp["question_type"] = str(sp.get("question_type", "subjective"))
+        sp["options"] = sp.get("options") if sp.get("question_type") == "objective" else None
+        sp["order"] = int(sp.get("order", i))
+
+        raw_scheme = sp.get("marking_scheme", [])
+        if isinstance(raw_scheme, list):
+            sp["marking_scheme"] = [
+                {
+                    "criterion": str(c.get("criterion", c.get("name", ""))),
+                    "max_points": int(c.get("max_points", c.get("marks", 1)) or 1),
+                    "description": str(c.get("description", "")),
+                }
+                for c in raw_scheme if isinstance(c, dict)
+            ]
+        else:
+            sp["marking_scheme"] = []
+
+        sp["sub_parts"] = _normalize_sub_parts(
+            sp.get("sub_parts", []), sp["id"], depth + 1
+        )
+
+        if sp["sub_parts"]:
+            child_sum = sum(s.get("max_marks", 0) for s in sp["sub_parts"])
+            if child_sum > 0 and sp["max_marks"] == 0:
+                sp["max_marks"] = child_sum
+        if sp["max_marks"] == 0:
+            sp["max_marks"] = 1
+
+        normalized.append(sp)
+    return normalized
 
 
 def _extract_title_from_text(raw_text: str) -> str | None:
@@ -316,7 +397,8 @@ Rules:
 9. **CRITICAL - Handle Squished Lists**: Split them onto SEPARATE LINES, keeping the original letter prefix. NEVER convert `a. / b. / c.` markers to `- `.
 10. **Nested Inline Lists**: Convert inline lists to numbered lines.
 11. **Question Extraction**: The `original_number` is the question label. The `question_text` must NOT start with the original number.
-12. **Format the output as a strict JSON object**. The JSON object must have:
+12. **Marks Detection**: Detect marks/points for each question from patterns like "(4 marks)", "[4]", "4 points", "total: 5". If a question has labeled sub-parts (a, b, c or i, ii, iii), split them into `sub_parts`.
+13. **Format the output as a strict JSON object**. The JSON object must have:
     - `"suggested_title"`: A short, descriptive title.
     - `"questions"`: An array of objects, each with:
         - `"question_text"`: Clean question text (no leading number).
@@ -326,6 +408,19 @@ Rules:
         - `"options"`: For `"objective"`, an array of 4 options. `null` for others.
         - `"topic"`: A short 1-4 word description of the specific topic or concept this question covers.
         - `"difficulty"`: Must be "Easy", "Medium", or "Hard".
+        - `"max_marks"`: Total marks available for this question (integer). Default to 1 if not found.
+        - `"sub_parts"`: Array of sub-questions if the question has labeled parts (a, b, c or i, ii, iii). Each with:
+            - `"label"`: The letter/number prefix (e.g., "a", "b", "i", "ii").
+            - `"question_text"`: The sub-part question text.
+            - `"answer_text"`: The sub-part answer.
+            - `"max_marks"`: Marks for this sub-part.
+            - `"sub_parts"`: Nested sub-parts (for 3-level like 1a(i)).
+            - `"question_type"`: Same classification as parent.
+            - `"options"`: For objective sub-parts.
+        - `"marking_scheme"`: Array of marking criteria, each with:
+            - `"criterion"`: Short name (e.g., "Correct formula")
+            - `"max_points"`: Points allocated for this criterion
+            - `"description"`: What the student must demonstrate
         - `"resource_title"`: The exact title of the resource (from the list above) that this question likely references. `null` if unclear.
         - `"reference_quote"`: A short excerpt from the extracted text (not from the resource list) that supports the answer. `null` if none.
 
@@ -385,7 +480,7 @@ Respond with ONLY the JSON object.
         if not questions_data:
             raise ValueError("AI failed to structure the imported content properly.")
 
-        normalized_questions = []
+            normalized_questions = []
         for q_data in questions_data:
             if not isinstance(q_data, dict):
                 continue
@@ -406,6 +501,8 @@ Respond with ONLY the JSON object.
                             mapped_id = rid
                             break
 
+            q_data = _normalize_question_structure(q_data)
+
             normalized_questions.append(
                 {
                     "question_text": q_text,
@@ -415,6 +512,9 @@ Respond with ONLY the JSON object.
                     "options": options,
                     "topic": q_data.get("topic"),
                     "difficulty": q_data.get("difficulty"),
+                    "max_marks": q_data.get("max_marks", 1),
+                    "sub_parts": q_data.get("sub_parts", []),
+                    "marking_scheme": q_data.get("marking_scheme", []),
                     "reference_resource_id": mapped_id,
                     "reference_resource_title": r_title_clean if r_title_clean else None,
                     "reference_quote": q_data.get("reference_quote"),
@@ -475,30 +575,122 @@ Respond with ONLY the JSON object.
         db.close()
 
 
-def grade_answer(user: User, question: dict[str, Any], user_answer: str) -> ExerciseCheckResponse:
-    """Grades a user's answer using the LLM for subjective questions"""
+def _fallback_grade(
+    question: dict, user_answer: str, max_marks: int, answer_text: str, error: str = ""
+) -> "GradeResponse":
+    """Basic keyword-match fallback when AI grading is unavailable."""
+    from app.schemas.exercise import CriterionResult, GradeResponse
+
+    ua_lower = (user_answer or "").strip().lower()
+    ca_lower = (answer_text or "").strip().lower()
+
+    if not ua_lower:
+        return GradeResponse(
+            total_awarded=0, total_max=max_marks,
+            criterion_results=[
+                CriterionResult(criterion="Overall correctness", max_points=max_marks, awarded_points=0, rationale="No answer provided.")
+            ],
+            feedback="No answer provided.", correct_answer=answer_text,
+        )
+
+    key_words = [w for w in ca_lower.split() if len(w) > 3]
+    if not key_words:
+        key_words = ca_lower.split()
+    matched = sum(1 for w in key_words if w in ua_lower)
+    ratio = matched / max(len(key_words), 1)
+    awarded = round(max_marks * ratio)
+    if awarded == 0 and ua_lower and len(ua_lower) > 5:
+        awarded = round(max_marks * 0.25)
+
+    return GradeResponse(
+        total_awarded=min(awarded, max_marks),
+        total_max=max_marks,
+        criterion_results=[
+            CriterionResult(
+                criterion="Overall correctness",
+                max_points=max_marks,
+                awarded_points=min(awarded, max_marks),
+                rationale=f"Matched {matched}/{len(key_words)} key terms from the correct answer."
+                         if matched > 0 else "No key terms matched. AI unavailable for detailed grading.",
+            )
+        ],
+        feedback=f"Basic match: {matched}/{len(key_words)} key terms. AI grading unavailable.",
+        correct_answer=answer_text,
+    )
+
+
+def grade_answer(
+    user: User, question: dict[str, Any], user_answer: str
+) -> "GradeResponse":
+    """Grades a user's answer using the LLM for subjective questions,
+    returning per-criterion mark breakdown."""
+    from app.schemas.exercise import CriterionResult, GradeResponse
+
     client = AIClient()
 
     question_text = question.get("question_text", "")
     answer_text = question.get("answer_text", "")
+    max_marks = question.get("max_marks", 1) or 1
+    marking_scheme = question.get("marking_scheme", [])
+    sub_parts = question.get("sub_parts", [])
+
+    # Objective questions: full marks or zero with single criterion
+    if question.get("question_type") == "objective":
+        is_correct = user_answer.strip().lower() == answer_text.strip().lower()
+        return GradeResponse(
+            total_awarded=max_marks if is_correct else 0,
+            total_max=max_marks,
+            criterion_results=[
+                CriterionResult(
+                    criterion="Correct answer",
+                    max_points=max_marks,
+                    awarded_points=max_marks if is_correct else 0,
+                    rationale="Answer matches the correct answer exactly."
+                    if is_correct
+                    else "Answer does not match the correct answer.",
+                )
+            ],
+            feedback="Correct!" if is_correct else "Incorrect.",
+            correct_answer=answer_text,
+        )
 
     prompt = f"""
 Question: {question_text}
 Correct Answer: {answer_text}
+Max Marks: {max_marks}
+Marking Scheme: {json.dumps(marking_scheme if marking_scheme else [])}
+Sub-parts: {json.dumps(sub_parts if sub_parts else [])}
 User's Answer: {user_answer}
+
+Evaluate the user's answer against EACH criterion in the marking scheme.
+For each criterion, determine the points awarded and explain why.
+Return a strict JSON object with these keys:
+- "total_awarded": integer, total marks awarded across all criteria
+- "total_max": integer, should equal {max_marks}
+- "criterion_results": array of objects, each with:
+    - "criterion": the criterion name
+    - "max_points": max points for this criterion
+    - "awarded_points": points awarded (0 to max_points)
+    - "rationale": brief explanation of why these points were awarded or deducted
+- "feedback": brief 1-2 sentence summary of the overall evaluation
+
+If there is NO marking scheme, evaluate holistically and return a single criterion "Overall correctness".
+Do NOT include markdown formatting. Return only the raw JSON.
 """
     system_prompt = (
-        "You are grading a student's answer. Do NOT require exact wording. "
-        "Evaluate if the student's answer correctly captures the core meaning or concept of the Correct Answer. "
-        "Be lenient with typos, synonyms, or alternative phrasings as long as the fundamental concept is accurate. "
-        "Return your evaluation as a strict JSON object with two keys: "
-        "'is_correct' (boolean) and 'feedback' (string, a brief 1-2 sentence explanation). "
-        "Do NOT include any markdown formatting, just the raw JSON."
+        "You are a teacher grading a student's answer. "
+        "Use the marking scheme to award partial credit fairly. "
+        "Be lenient with typos and alternative phrasings as long as the concept is correct. "
+        "Award full marks for a criterion if the student demonstrates understanding of that point."
     )
-    response = _run_async(
-        client.generate_text, prompt=prompt, system_instruction=system_prompt, max_tokens=4000
-    )
+
     try:
+        response = _run_async(
+            client.generate_text, prompt=prompt, system_instruction=system_prompt,
+            max_tokens=4000, raw_output=True
+        )
+        if not response or not response.strip():
+            raise ValueError("Empty response from AI")
         json_text = response.strip()
         if json_text.startswith("```json"):
             json_text = json_text[7:]
@@ -507,17 +699,41 @@ User's Answer: {user_answer}
         if json_text.endswith("```"):
             json_text = json_text[:-3]
         result = json.loads(json_text.strip())
-        return ExerciseCheckResponse(
-            is_correct=result.get("is_correct", False),
-            feedback=result.get("feedback", "Could not parse feedback."),
+        if isinstance(result, list):
+            result = result[0] if result else {}
+        if not isinstance(result, dict):
+            raise ValueError(f"Expected JSON object, got {type(result).__name__}")
+        criterion_results = []
+        for cr in result.get("criterion_results", []):
+            if isinstance(cr, dict):
+                criterion_results.append(
+                    CriterionResult(
+                        criterion=str(cr.get("criterion", "Criterion")),
+                        max_points=int(cr.get("max_points", max_marks)),
+                        awarded_points=int(cr.get("awarded_points", 0)),
+                        rationale=str(cr.get("rationale", "")),
+                    )
+                )
+        if not criterion_results:
+            total_awarded = result.get("total_awarded", 0)
+            criterion_results = [
+                CriterionResult(
+                    criterion="Overall correctness",
+                    max_points=max_marks,
+                    awarded_points=int(total_awarded),
+                    rationale=result.get("feedback", ""),
+                )
+            ]
+        return GradeResponse(
+            total_awarded=result.get("total_awarded", 0),
+            total_max=result.get("total_max", max_marks),
+            criterion_results=criterion_results,
+            feedback=result.get("feedback", ""),
             correct_answer=answer_text,
         )
-    except Exception:
-        return ExerciseCheckResponse(
-            is_correct=False,
-            feedback="An error occurred while grading your answer.",
-            correct_answer=answer_text,
-        )
+    except Exception as e:
+        logger.warning(f"AI grading failed: {e}. Falling back to keyword match.")
+        return _fallback_grade(question, user_answer, max_marks, answer_text, str(e))
 
 
 def explain_answer(
@@ -743,6 +959,19 @@ Each object must have the following keys:
 - "options": (ONLY for "objective" type) a list of 4 string options containing the correct answer and 3 distractors. Leave as null for other types.
 - "topic": A short 1-4 word description of the specific topic or concept this question covers.
 - "difficulty": Must be "Easy", "Medium", or "Hard".
+- "max_marks": Total marks available for this question (integer). Assign marks proportionally based on complexity.
+- "sub_parts": Array of sub-questions if the question has distinct parts (a, b, c or i, ii, iii). Each with:
+    - "label": The part label (e.g., "a", "b").
+    - "question_text": The sub-part question text.
+    - "answer_text": The sub-part answer.
+    - "max_marks": Marks for this sub-part.
+    - "sub_parts": Nested sub-parts for further decomposition (max 3 levels).
+    - "question_type": Classification for this sub-part.
+    - "options": For objective sub-parts.
+- "marking_scheme": Array of marking criteria, each with:
+    - "criterion": Short name (e.g., "Correct formula").
+    - "max_points": Points for this criterion.
+    - "description": What the student must demonstrate.
 - "resource_title": The exact title of the resource (from the --- Title --- headers above) that this question was derived from.
 - "reference_quote": A short, exact excerpt or line from the content that supports the answer.
 
@@ -770,6 +999,7 @@ Respond with ONLY the JSON array.
                     valid_questions = []
                     for q in questions_data:
                         if isinstance(q, dict) and "question_text" in q:
+                            q = _normalize_question_structure(q)
                             valid_questions.append(q)
                     all_questions_data.extend(valid_questions)
                 else:

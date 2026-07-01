@@ -3,7 +3,7 @@ import {
   Box, Title, Text, Group, Card, Button, Stack, Loader, Center, 
   Badge, ActionIcon, Textarea, Collapse, Radio, Paper, Alert, Menu,
   Grid, Select, SegmentedControl, TextInput, Divider, NumberInput, Switch,
-  Container, ScrollArea, Tooltip, NavLink as MantineNavLink, Progress, Modal, Drawer, Rating, Popover
+  Container, ScrollArea, Tooltip, NavLink as MantineNavLink, Progress, RingProgress, Modal, Drawer, Rating, Popover
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -499,9 +499,21 @@ export default function ExerciseView() {
       const correctAns = question.answer_text.trim().toLowerCase();
       const userAns = answer.trim().toLowerCase();
       const isCorrect = userAns === correctAns || correctAns.includes(userAns) || userAns.includes(correctAns);
+      const maxM = question.max_marks || 1;
       setGradingResults(prev => ({ 
         ...prev, 
-        [qId]: { is_correct: isCorrect, feedback: isCorrect ? "Correct!" : "Incorrect.", correct_answer: question.answer_text } 
+        [qId]: {
+          total_awarded: isCorrect ? maxM : 0,
+          total_max: maxM,
+          criterion_results: [{
+            criterion: "Correct answer",
+            max_points: maxM,
+            awarded_points: isCorrect ? maxM : 0,
+            rationale: isCorrect ? "Answer matches the correct answer." : "Answer does not match the correct answer."
+          }],
+          feedback: isCorrect ? "Correct!" : "Incorrect.",
+          correct_answer: question.answer_text
+        }
       }));
       if (question.score_type === 'both') {
         handleExplain(qId);
@@ -527,6 +539,26 @@ export default function ExerciseView() {
     }
   };
 
+  const saveSession = async () => {
+    try {
+      const gradeEntries = Object.entries(gradingResults);
+      if (gradeEntries.length === 0) return;
+      const totalMax = gradeEntries.reduce((s, [, g]) => s + ((g.total_max || (g.is_correct !== undefined ? 1 : 0))), 0);
+      const totalAwarded = gradeEntries.reduce((s, [, g]) => s + ((g.total_awarded !== undefined ? g.total_awarded : (g.is_correct ? 1 : 0))), 0);
+      await fetchApi(`/exercises/${id}/submit`, {
+        method: 'POST',
+        body: JSON.stringify({
+          awarded_marks: totalAwarded,
+          total_marks: totalMax,
+          question_scores: gradingResults,
+          duration_minutes: examTimerMinutes - (examTimeRemaining !== null ? Math.floor(examTimeRemaining / 60) : 0),
+        })
+      });
+    } catch (e) {
+      console.error("Failed to save session:", e);
+    }
+  };
+
   const handleCheckAll = async () => {
     const promises = (exercise.questions || []).map(q => {
       if (!userAnswers[q.id]) return Promise.resolve();
@@ -536,6 +568,7 @@ export default function ExerciseView() {
       return Promise.resolve();
     });
     await Promise.all(promises);
+    saveSession();
   };
 
   const handleExplain = async (qId) => {
@@ -625,11 +658,11 @@ export default function ExerciseView() {
     setRevealedAnswers({});
   };
 
-  const handleSubmitExam = () => {
+  const handleSubmitExam = async () => {
     setExamActive(false);
     setExamCompleted(true);
     clearInterval(timerRef.current);
-    handleCheckAll();
+    await handleCheckAll();
   };
 
   const toggleReveal = (qId) => {
@@ -737,6 +770,297 @@ export default function ExerciseView() {
           </Box>
         </Box>
       </Box>
+    );
+  }
+
+  function SubPartRenderer({ part, userAnswers, setUserAnswers, gradingResults, gradingLoading, handleGrade, handleResetQuestion, explanations, explainLoading, handleExplain, showExplanations, setShowExplanations, isInteractive, isExam, examActive, hasGraded, viewMode, showAns, revealedAnswers, toggleReveal, sendExplanationFollowUp, handleDeleteExplanation, depth }) {
+    const spId = part.id;
+    const partGrade = gradingResults[spId];
+    const partHasGraded = !!partGrade;
+    const partExplanation = explanations[spId] || part.explanation;
+    const partShowAns = (isInteractive && partHasGraded) || (viewMode === 'show') || (viewMode === 'hide' && revealedAnswers[spId]);
+    const isLast = depth >= 2;
+
+    let parsedPartOptions = [];
+    try {
+      parsedPartOptions = typeof part.options === 'string' ? JSON.parse(part.options) : (part.options || []);
+    } catch(e) { parsedPartOptions = []; }
+
+    return (
+      <Box mb="md">
+        <Group gap={8} wrap="nowrap" mb={4}>
+          <Text fw={500} size="sm" c="dimmed">
+            ({part.label || '?'})
+          </Text>
+          {part.max_marks > 0 && (
+            <Badge size="xs" variant="light" color="blue" radius="sm">
+              {part.max_marks} {part.max_marks === 1 ? 'mark' : 'marks'}
+            </Badge>
+          )}
+        </Group>
+        <Text fw={500} size="sm" mb="xs">{part.question_text}</Text>
+
+        {/* Nested sub-parts */}
+        {part.sub_parts?.length > 0 && (
+          <Box ml="md" mt="sm" style={{borderLeft: '2px solid var(--mantine-color-gray-2)', paddingLeft: 14}}>
+            {part.sub_parts.map(spp => (
+              <SubPartRenderer
+                key={spp.id}
+                part={spp}
+                {...{ userAnswers, setUserAnswers, gradingResults, gradingLoading, handleGrade, handleResetQuestion, explanations, explainLoading, handleExplain, showExplanations, setShowExplanations, isInteractive, isExam, examActive, hasGraded, viewMode, showAns, revealedAnswers, toggleReveal, sendExplanationFollowUp, handleDeleteExplanation }}
+                depth={depth + 1}
+              />
+            ))}
+          </Box>
+        )}
+
+        {isInteractive && !isLast && (
+          <Box mt="xs">
+            {parsedPartOptions.length > 0 ? (
+              <Radio.Group
+                value={userAnswers[spId] || ''}
+                onChange={(v) => setUserAnswers(prev => ({...prev, [spId]: v}))}
+              >
+                <Stack mt="xs">
+                  {parsedPartOptions.map((opt, i) => (
+                    <Radio key={i} value={opt} label={opt} disabled={partHasGraded || (isExam && !examActive)} size="xs" />
+                  ))}
+                </Stack>
+              </Radio.Group>
+            ) : (
+              <Textarea
+                placeholder="Type your answer here..."
+                value={userAnswers[spId] || ''}
+                onChange={(e) => setUserAnswers(prev => ({...prev, [spId]: e.currentTarget.value}))}
+                minRows={1}
+                autosize
+                size="xs"
+                disabled={partHasGraded || (isExam && !examActive)}
+              />
+            )}
+
+            {!isExam && (
+              <Group mt="xs">
+                {!partHasGraded ? (
+                  <Button size="compact-sm" loading={gradingLoading[spId]} onClick={() => handleGrade(spId)} disabled={!userAnswers[spId]}>
+                    Check
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="compact-sm" variant="light" color="gray" onClick={() => handleResetQuestion(spId)} leftSection={<IconRefresh size={12} />}>
+                      Reset
+                    </Button>
+                    {!partExplanation && (
+                      <Button size="compact-sm" variant="light" loading={explainLoading[spId]} onClick={() => handleExplain(spId)} leftSection={<IconBulb size={12} />}>
+                        Explain
+                      </Button>
+                    )}
+                    {partExplanation && !showExplanations[spId] && (
+                      <Button size="compact-sm" variant="light" onClick={() => setShowExplanations(prev => ({...prev, [spId]: true}))} leftSection={<IconBulb size={12} />}>
+                        Show Explanation
+                      </Button>
+                    )}
+                  </>
+                )}
+              </Group>
+            )}
+
+            {partHasGraded && partGrade && (
+              <Box mt="sm">
+                <GradeDisplay grade={partGrade} correctAnswer={part.answer_text} />
+                {partExplanation && showExplanations[spId] && (
+                  <Paper mt="xs" p="sm" bg="var(--mantine-color-white)" radius="sm" withBorder>
+                    <Group justify="space-between" align="center" wrap="nowrap" mb={4}>
+                      <Text size="xs"><IconBulb size={12} style={{ marginRight: 4, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation</b></Text>
+                      <ActionIcon variant="subtle" color="gray" size="xs" onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(spId); }}>
+                        <IconTrash size={12} />
+                      </ActionIcon>
+                    </Group>
+                    <Box className="markdown-content" size="xs">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{partExplanation}</ReactMarkdown>
+                    </Box>
+                  </Paper>
+                )}
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {!isInteractive && partShowAns && (
+          <Paper p="sm" bg="var(--mantine-color-blue-0)" radius="sm" mt={4}
+            style={{ cursor: viewMode === 'hide' && !partShowAns ? 'pointer' : 'default', position: 'relative', overflow: 'hidden' }}
+            onClick={() => { if (!partShowAns && viewMode === 'hide') toggleReveal(spId); }}>
+            {!partShowAns && (
+              <Center style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, background: 'rgba(231, 245, 255, 0.3)' }}>
+                <Badge size="sm" variant="light" style={{ pointerEvents: 'none' }}>Click to reveal</Badge>
+              </Center>
+            )}
+            <Box style={{ filter: !partShowAns ? 'blur(6px)' : 'none', opacity: !partShowAns ? 0.5 : 1, transition: 'filter 0.3s ease', userSelect: !partShowAns ? 'none' : 'auto', pointerEvents: !partShowAns ? 'none' : 'auto' }}>
+              <Text size="xs" fw={500} c="blue.9">Answer:</Text>
+              <Text size="xs" c="blue.9">{part.answer_text || "No answer provided."}</Text>
+            </Box>
+          </Paper>
+        )}
+      </Box>
+    );
+  }
+
+  function GradeDisplay({ grade, correctAnswer }) {
+    if (!grade || grade.total_awarded === undefined) return null;
+    const isLegacy = grade.is_correct !== undefined && grade.total_awarded === undefined;
+    if (isLegacy) {
+      return (
+        <Alert color={grade.is_correct ? 'green' : 'red'} icon={grade.is_correct ? <IconCheck /> : <IconX />}>
+          <Text fw={500}>{grade.feedback}</Text>
+          {!grade.is_correct && <Text mt="xs" size="sm"><b>Correct Answer:</b> {grade.correct_answer}</Text>}
+        </Alert>
+      );
+    }
+    const isAiError = grade.feedback && grade.feedback.startsWith('AI grading unavailable');
+    return (
+      <Box>
+        <Alert color={grade.total_awarded === grade.total_max ? 'green' : isAiError ? 'yellow' : grade.total_awarded > 0 ? 'yellow' : 'red'}
+          icon={grade.total_awarded === grade.total_max ? <IconCheck /> : <IconX />}>
+          <Box>
+            <Group justify="space-between" wrap="wrap" gap="xs">
+              <Box>
+                <Text fw={600} size="sm">Score: {grade.total_awarded}/{grade.total_max}</Text>
+              </Box>
+              <Badge size="md" variant="filled" color={grade.total_awarded === grade.total_max ? 'green' : isAiError ? 'gray' : grade.total_awarded > 0 ? 'yellow' : 'red'} style={{ flexShrink: 0 }}>
+                {isAiError ? 'Not graded' : grade.total_awarded === grade.total_max ? 'Perfect' : grade.total_awarded > 0 ? 'Partial' : 'Incorrect'}
+              </Badge>
+            </Group>
+            {grade.feedback && <Text size="xs" mt={4}>{grade.feedback}</Text>}
+          </Box>
+        </Alert>
+        {isAiError && correctAnswer && (
+          <Paper mt="xs" p="sm" withBorder radius="md" bg="blue.0">
+            <Text size="xs" fw={600} mb={2} c="dimmed">Correct Answer:</Text>
+            <Text size="sm">{correctAnswer}</Text>
+          </Paper>
+        )}
+        {grade.criterion_results?.length > 0 && !isAiError && (
+          <Paper mt="xs" p="sm" withBorder radius="md">
+            <Text size="xs" fw={600} mb="xs" c="dimmed">Marking Breakdown</Text>
+            {grade.criterion_results.map((cr, i) => (
+              <Group key={i} justify="space-between" wrap="nowrap" py={4}
+                style={{borderBottom: i < grade.criterion_results.length - 1 ? '1px solid #f0f0f0' : 'none'}}>
+                <Box style={{flex: 1}}>
+                  <Text size="xs" fw={500}>{cr.criterion}</Text>
+                  {cr.rationale && <Text size="xs" c="dimmed">{cr.rationale}</Text>}
+                </Box>
+                <Badge size="sm" variant="light" color={cr.awarded_points === cr.max_points ? 'green' : cr.awarded_points > 0 ? 'yellow' : 'red'}>
+                  {cr.awarded_points}/{cr.max_points}
+                </Badge>
+              </Group>
+            ))}
+          </Paper>
+        )}
+      </Box>
+    );
+  }
+
+  function SubPartEditor({ part, onChange, onRemove, depth }) {
+    if (depth >= 2) return null;
+    return (
+      <Paper p="xs" withBorder mb="xs" style={{marginLeft: depth * 16}}>
+        <Group justify="space-between" mb="xs">
+          <Text size="xs" fw={600} c="dimmed">Sub-part ({part.label || '?'})</Text>
+          <ActionIcon color="red" variant="subtle" size="sm" onClick={onRemove}><IconX size={14} /></ActionIcon>
+        </Group>
+        <Stack gap="xs">
+          <Group grow>
+            <TextInput size="xs" label="Label" value={part.label || ''}
+              onChange={(e) => onChange({...part, label: e.currentTarget.value})} />
+            <NumberInput size="xs" label="Max Marks" value={part.max_marks ?? 1}
+              onChange={(v) => onChange({...part, max_marks: v || 0})} min={0} />
+            <Select size="xs" label="Type" data={['subjective', 'objective', 'fill_in_the_blank']}
+              value={part.question_type}
+              onChange={(v) => onChange({...part, question_type: v})} />
+          </Group>
+          <Textarea size="xs" label="Question" value={part.question_text}
+            onChange={(e) => onChange({...part, question_text: e.currentTarget.value})} minRows={1} autosize />
+          <Textarea size="xs" label="Answer" value={part.answer_text}
+            onChange={(e) => onChange({...part, answer_text: e.currentTarget.value})} minRows={1} autosize />
+          {part.question_type === 'objective' && (
+            <Textarea size="xs" label="Options (one per line)" value={Array.isArray(part.options) ? part.options.join('\n') : ''}
+              onChange={(e) => onChange({...part, options: e.currentTarget.value.split('\n').filter(Boolean)})} minRows={2} />
+          )}
+
+          {/* Nested sub-part editor */}
+          <Box>
+            <Group justify="space-between" mb={4}>
+              <Text size="xs" fw={500} c="dimmed">Sub-parts</Text>
+              <Button size="compact-xs" variant="light" onClick={() => {
+                const subParts = [...(part.sub_parts || [])];
+                const label = String.fromCharCode(97 + subParts.length);
+                subParts.push({
+                  id: `${part.id}${label}`,
+                  label,
+                  question_text: '',
+                  answer_text: '',
+                  max_marks: 1,
+                  question_type: 'subjective',
+                  options: null,
+                  sub_parts: [],
+                  marking_scheme: [],
+                });
+                onChange({...part, sub_parts: subParts});
+              }} leftSection={<IconPlus size={10} />}>Add</Button>
+            </Group>
+            {(part.sub_parts || []).map((spp, sppIdx) => (
+              <SubPartEditor
+                key={spp.id || sppIdx}
+                part={spp}
+                onChange={(updated) => {
+                  const subParts = [...(part.sub_parts || [])];
+                  subParts[sppIdx] = updated;
+                  onChange({...part, sub_parts: subParts});
+                }}
+                onRemove={() => {
+                  const subParts = [...(part.sub_parts || [])];
+                  subParts.splice(sppIdx, 1);
+                  onChange({...part, sub_parts: subParts});
+                }}
+                depth={depth + 1}
+              />
+            ))}
+          </Box>
+
+          {/* Marking scheme for sub-part */}
+          <Box>
+            <Group justify="space-between" mb={4}>
+              <Text size="xs" fw={500} c="dimmed">Marking Scheme</Text>
+              <Button size="compact-xs" variant="light" onClick={() => {
+                const ms = [...(part.marking_scheme || [])];
+                ms.push({ criterion: '', max_points: 1, description: '' });
+                onChange({...part, marking_scheme: ms});
+              }} leftSection={<IconPlus size={10} />}>Add</Button>
+            </Group>
+            {(part.marking_scheme || []).map((mc, mcIdx) => (
+              <Group key={mcIdx} gap={4} mb={2} wrap="nowrap">
+                <TextInput size="xs" placeholder="Criterion" value={mc.criterion}
+                  onChange={(e) => {
+                    const ms = [...(part.marking_scheme || [])];
+                    ms[mcIdx] = {...ms[mcIdx], criterion: e.currentTarget.value};
+                    onChange({...part, marking_scheme: ms});
+                  }} style={{flex: 2}} />
+                <NumberInput size="xs" placeholder="Pts" value={mc.max_points}
+                  onChange={(v) => {
+                    const ms = [...(part.marking_scheme || [])];
+                    ms[mcIdx] = {...ms[mcIdx], max_points: v || 1};
+                    onChange({...part, marking_scheme: ms});
+                  }} min={1} style={{width: 60}} />
+                <ActionIcon color="red" variant="subtle" size="xs" onClick={() => {
+                  const ms = [...(part.marking_scheme || [])];
+                  ms.splice(mcIdx, 1);
+                  onChange({...part, marking_scheme: ms});
+                }}><IconX size={12} /></ActionIcon>
+              </Group>
+            ))}
+          </Box>
+        </Stack>
+      </Paper>
     );
   }
 
@@ -981,20 +1305,15 @@ export default function ExerciseView() {
                                 setEditedQuestions(newQs);
                               }}
                             />
-                            <Select 
-                              label="Score Display" 
-                              data={[
-                                { value: '', label: 'Auto' },
-                                { value: 'objective', label: 'Objective' },
-                                { value: 'subjective', label: 'Subjective' },
-                                { value: 'both', label: 'Both' },
-                              ]}
-                              value={q.score_type || ''}
+                            <NumberInput 
+                              label="Max Marks" 
+                              value={q.max_marks ?? 1} 
                               onChange={(v) => {
                                 const newQs = [...editedQuestions];
-                                newQs[idx].score_type = v;
+                                newQs[idx].max_marks = v || 0;
                                 setEditedQuestions(newQs);
                               }}
+                              min={0}
                             />
                           </Group>
                           <QEditor
@@ -1015,6 +1334,108 @@ export default function ExerciseView() {
                               setEditedQuestions(newQs);
                             }}
                           />
+
+                          {/* Sub-part editor */}
+                          <Box>
+                            <Group justify="space-between" mb="xs">
+                              <Text size="sm" fw={500}>Sub-parts</Text>
+                              <Button size="compact-xs" variant="light" onClick={() => {
+                                const newQs = [...editedQuestions];
+                                if (!newQs[idx].sub_parts) newQs[idx].sub_parts = [];
+                                const label = String.fromCharCode(97 + newQs[idx].sub_parts.length);
+                                newQs[idx].sub_parts.push({
+                                  id: `${q.id || idx}${label}`,
+                                  label,
+                                  question_text: '',
+                                  answer_text: '',
+                                  max_marks: 1,
+                                  question_type: 'subjective',
+                                  options: null,
+                                  sub_parts: [],
+                                  marking_scheme: [],
+                                });
+                                setEditedQuestions(newQs);
+                              }} leftSection={<IconPlus size={12} />}>Add</Button>
+                            </Group>
+                            {(q.sub_parts || []).map((sp, spIdx) => (
+                              <SubPartEditor
+                                key={sp.id || spIdx}
+                                part={sp}
+                                onChange={(updated) => {
+                                  const newQs = [...editedQuestions];
+                                  newQs[idx].sub_parts[spIdx] = updated;
+                                  setEditedQuestions(newQs);
+                                }}
+                                onRemove={() => {
+                                  const newQs = [...editedQuestions];
+                                  newQs[idx].sub_parts.splice(spIdx, 1);
+                                  setEditedQuestions(newQs);
+                                }}
+                                depth={0}
+                              />
+                            ))}
+                          </Box>
+
+                          {/* Marking scheme editor */}
+                          <Box>
+                            <Group justify="space-between" mb="xs">
+                              <Text size="sm" fw={500}>Marking Scheme</Text>
+                              <Button size="compact-xs" variant="light" onClick={() => {
+                                const newQs = [...editedQuestions];
+                                if (!newQs[idx].marking_scheme) newQs[idx].marking_scheme = [];
+                                newQs[idx].marking_scheme.push({
+                                  criterion: '',
+                                  max_points: 1,
+                                  description: '',
+                                });
+                                setEditedQuestions(newQs);
+                              }} leftSection={<IconPlus size={12} />}>Add Criterion</Button>
+                            </Group>
+                            {(q.marking_scheme || []).map((mc, mcIdx) => (
+                              <Group key={mcIdx} gap="xs" mb={4} wrap="nowrap">
+                                <TextInput
+                                  size="xs"
+                                  placeholder="Criterion name"
+                                  value={mc.criterion}
+                                  onChange={(e) => {
+                                    const newQs = [...editedQuestions];
+                                    newQs[idx].marking_scheme[mcIdx].criterion = e.currentTarget.value;
+                                    setEditedQuestions(newQs);
+                                  }}
+                                  style={{ flex: 2 }}
+                                />
+                                <NumberInput
+                                  size="xs"
+                                  placeholder="Points"
+                                  value={mc.max_points}
+                                  onChange={(v) => {
+                                    const newQs = [...editedQuestions];
+                                    newQs[idx].marking_scheme[mcIdx].max_points = v || 1;
+                                    setEditedQuestions(newQs);
+                                  }}
+                                  min={1}
+                                  style={{ width: 80 }}
+                                />
+                                <TextInput
+                                  size="xs"
+                                  placeholder="Description"
+                                  value={mc.description}
+                                  onChange={(e) => {
+                                    const newQs = [...editedQuestions];
+                                    newQs[idx].marking_scheme[mcIdx].description = e.currentTarget.value;
+                                    setEditedQuestions(newQs);
+                                  }}
+                                  style={{ flex: 3 }}
+                                />
+                                <ActionIcon color="red" variant="subtle" size="sm" onClick={() => {
+                                  const newQs = [...editedQuestions];
+                                  newQs[idx].marking_scheme.splice(mcIdx, 1);
+                                  setEditedQuestions(newQs);
+                                }}><IconX size={14} /></ActionIcon>
+                              </Group>
+                            ))}
+                          </Box>
+
                           {q.question_type === 'objective' && (
                             <QEditor
                               label="Options (one per line)"
@@ -1101,6 +1522,7 @@ export default function ExerciseView() {
                       parsedOptions = typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || []);
                     } catch(e) { parsedOptions = []; }
 
+                    const totalMarks = q.max_marks || (q.sub_parts?.length > 0 ? q.sub_parts.reduce((s, sp) => s + (sp.max_marks || 0), 0) : 0);
                     return (
                       <Card key={q.id} shadow="sm" padding="lg" radius="md" withBorder>
                         <Box mb="xs">
@@ -1146,13 +1568,51 @@ export default function ExerciseView() {
                             )}
                           </Group>
                         </Box>
-                        <Group justify="space-between" align="flex-start" mb="sm">
-                          <Box>
+                        <Group justify="space-between" align="flex-start" mb="sm" wrap="nowrap">
+                          <Box style={{ flex: 1, minWidth: 0 }}>
                             <Text fw={600} size="lg">
                               {idx + 1}. {q.question_text}
                             </Text>
                           </Box>
+                          {totalMarks > 0 && (
+                            <Badge size="sm" variant="light" color="blue" radius="sm" ml="xs" style={{ flexShrink: 0 }}>
+                              {totalMarks} {totalMarks === 1 ? 'mark' : 'marks'}
+                            </Badge>
+                          )}
                         </Group>
+
+                        {q.sub_parts?.length > 0 && (
+                          <Box ml="lg" mt="sm" style={{borderLeft: '2px solid var(--mantine-color-gray-2)', paddingLeft: 16}}>
+                            {q.sub_parts.map(sp => (
+                              <SubPartRenderer
+                                key={sp.id}
+                                part={sp}
+                                userAnswers={userAnswers}
+                                setUserAnswers={setUserAnswers}
+                                gradingResults={gradingResults}
+                                gradingLoading={gradingLoading}
+                                handleGrade={handleGrade}
+                                handleResetQuestion={handleResetQuestion}
+                                explanations={explanations}
+                                explainLoading={explainLoading}
+                                handleExplain={handleExplain}
+                                showExplanations={showExplanations}
+                                setShowExplanations={setShowExplanations}
+                                isInteractive={isInteractive}
+                                isExam={isExam}
+                                examActive={examActive}
+                                hasGraded={hasGraded}
+                                viewMode={viewMode}
+                                showAns={showAns}
+                                revealedAnswers={revealedAnswers}
+                                toggleReveal={toggleReveal}
+                                sendExplanationFollowUp={sendExplanationFollowUp}
+                                handleDeleteExplanation={handleDeleteExplanation}
+                                depth={0}
+                              />
+                            ))}
+                          </Box>
+                        )}
 
                         {isInteractive ? (
                           <Box mt="md">
@@ -1216,16 +1676,9 @@ export default function ExerciseView() {
                             )}
 
                             {hasGraded && (
-                              <Alert 
-                                mt="md" 
-                                color={grade?.is_correct ? 'green' : 'red'} 
-                                icon={grade?.is_correct ? <IconCheck /> : <IconX />}
-                              >
-                                <Text fw={500}>{grade?.feedback}</Text>
-                                {!grade?.is_correct && (
-                                  <Text mt="xs" size="sm"><b>Correct Answer:</b> {grade?.correct_answer}</Text>
-                                )}
-                              </Alert>
+                              <Box mt="md">
+                                <GradeDisplay grade={grade} correctAnswer={q.answer_text} />
+                              </Box>
                             )}
                             
                             {explanation && showExplanations[q.id] && (
@@ -1415,6 +1868,30 @@ export default function ExerciseView() {
                   });
                 })()
                 )}
+
+                {(() => {
+                  const gradeEntries = Object.entries(gradingResults);
+                  if (gradeEntries.length === 0) return null;
+                  const totalMax = gradeEntries.reduce((s, [, g]) => s + ((g.total_max || (g.is_correct !== undefined ? 1 : 0))), 0);
+                  const totalAwarded = gradeEntries.reduce((s, [, g]) => s + ((g.total_awarded !== undefined ? g.total_awarded : (g.is_correct ? 1 : 0))), 0);
+                  const pct = totalMax > 0 ? Math.round((totalAwarded / totalMax) * 100) : 0;
+                  return (
+                    <Paper p="lg" withBorder mb="xl" radius="md" bg="gray.0">
+                      <Group justify="space-between" wrap="nowrap">
+                        <Box>
+                          <Title order={4}>Score Summary</Title>
+                          <Text size="xl" fw={700} mt={4}>{totalAwarded} / {totalMax}</Text>
+                          <Text size="sm" c="dimmed">{exercise.questions?.length || 0} question{(exercise.questions?.length || 0) !== 1 ? 's' : ''}</Text>
+                        </Box>
+                        <RingProgress
+                          size={90} thickness={10}
+                          sections={[{ value: pct, color: pct === 100 ? 'green' : pct >= 50 ? 'blue' : 'red' }]}
+                          label={<Text ta="center" size="sm" fw={700}>{pct}%</Text>}
+                        />
+                      </Group>
+                    </Paper>
+                  );
+                })()}
 
                 {!editMode && viewMode === 'interactive' && exercise.questions?.length > 0 && (
                   <Button size="lg" onClick={handleCheckAll} mb="xl">
@@ -1771,6 +2248,36 @@ export default function ExerciseView() {
                           </Text>
                         </Group>
                       )}
+
+                      {exercise.questions?.length > 0 && (() => {
+                        const totalMarks = exercise.questions.reduce((s, q) => s + (q.max_marks || (q.sub_parts?.reduce((ss, sp) => ss + (sp.max_marks || 0), 0) || 1)), 0);
+                        return (
+                          <Group justify="space-between" wrap="nowrap">
+                            <Text size="xs" fw={600} c="dimmed">Total Marks</Text>
+                            <Text size="xs" fw={500}>{totalMarks}</Text>
+                          </Group>
+                        );
+                      })()}
+
+                      {Object.keys(gradingResults).length > 0 && (() => {
+                        const entries = Object.entries(gradingResults);
+                        const totalMax = entries.reduce((s, [, g]) => s + ((g.total_max || (g.is_correct !== undefined ? 1 : 0))), 0);
+                        const totalAwarded = entries.reduce((s, [, g]) => s + ((g.total_awarded !== undefined ? g.total_awarded : (g.is_correct ? 1 : 0))), 0);
+                        const pct = totalMax > 0 ? Math.round((totalAwarded / totalMax) * 100) : 0;
+                        return (
+                          <>
+                            <Divider my={4} />
+                            <Group justify="space-between" wrap="nowrap">
+                              <Text size="xs" fw={600} c="dimmed">Session Score</Text>
+                              <Text size="xs" fw={700}>{totalAwarded}/{totalMax}</Text>
+                            </Group>
+                            <Group justify="space-between" wrap="nowrap">
+                              <Text size="xs" fw={600} c="dimmed">Percentage</Text>
+                              <Text size="xs" fw={700} c={pct >= 80 ? 'green' : pct >= 50 ? 'yellow' : 'red'}>{pct}%</Text>
+                            </Group>
+                          </>
+                        );
+                      })()}
                     </Stack>
                   </Card>
                 </Box>
@@ -1913,13 +2420,15 @@ export default function ExerciseView() {
                         }
                         return answeredQuestions.map(({ q, idx, hasAnswer, grade }) => {
                           let statusColor = 'gray';
-                          let statusIcon = '—';
-                          let statusLabel = 'Unanswered';
+                          let statusLabel = '';
                           if (grade) {
-                            if (grade.is_correct) { statusColor = 'green'; statusIcon = '✓'; statusLabel = 'Correct'; }
-                            else { statusColor = 'red'; statusIcon = '✗'; statusLabel = 'Wrong'; }
+                            const awarded = grade.total_awarded !== undefined ? grade.total_awarded : (grade.is_correct ? 1 : 0);
+                            const maxM = grade.total_max !== undefined ? grade.total_max : 1;
+                            statusColor = awarded === maxM ? 'green' : awarded > 0 ? 'yellow' : 'red';
+                            statusLabel = `${awarded}/${maxM}`;
                           } else if (hasAnswer) {
-                            statusColor = 'yellow'; statusIcon = '○'; statusLabel = 'Pending';
+                            statusColor = 'yellow';
+                            statusLabel = 'Pending';
                           }
                           return (
                             <Paper
@@ -1936,7 +2445,7 @@ export default function ExerciseView() {
                             >
                               <Group justify="space-between" wrap="nowrap">
                                 <Text size="xs" lineClamp={1} style={{ flex: 1 }}>Q{idx + 1}. {q.question_text}</Text>
-                                <Badge size="xs" color={statusColor} variant="light">{statusIcon} {statusLabel}</Badge>
+                                {statusLabel && <Badge size="xs" color={statusColor} variant="light">{statusLabel}</Badge>}
                               </Group>
                             </Paper>
                           );
@@ -2074,15 +2583,9 @@ export default function ExerciseView() {
             </Box>
 
             {historyModalQuestion.grade && (
-              <Alert
-                color={historyModalQuestion.grade.is_correct ? 'green' : 'red'}
-                icon={historyModalQuestion.grade.is_correct ? <IconCheck /> : <IconX />}
-              >
-                <Text fw={500}>{historyModalQuestion.grade.is_correct ? 'Correct!' : 'Incorrect'}</Text>
-                {historyModalQuestion.grade.feedback && (
-                  <Text size="sm" mt={4}>{historyModalQuestion.grade.feedback}</Text>
-                )}
-              </Alert>
+              <Box>
+                <GradeDisplay grade={historyModalQuestion.grade} correctAnswer={historyModalQuestion.answer_text} />
+              </Box>
             )}
 
             {(historyModalQuestion.explanation || explanations[historyModalQuestion.id]) && (
@@ -2154,6 +2657,34 @@ export default function ExerciseView() {
                       <Text size="xs" fw={500}>{exercise.questions.length}</Text>
                     </Group>
                   )}
+                  {exercise?.questions?.length > 0 && (() => {
+                    const totalMarks = exercise.questions.reduce((s, q) => s + (q.max_marks || (q.sub_parts?.reduce((ss, sp) => ss + (sp.max_marks || 0), 0) || 1)), 0);
+                    return (
+                      <Group justify="space-between" wrap="nowrap">
+                        <Text size="xs" fw={600} c="dimmed">Total Marks</Text>
+                        <Text size="xs" fw={500}>{totalMarks}</Text>
+                      </Group>
+                    );
+                  })()}
+                  {Object.keys(gradingResults).length > 0 && (() => {
+                    const entries = Object.entries(gradingResults);
+                    const totalMax = entries.reduce((s, [, g]) => s + ((g.total_max || (g.is_correct !== undefined ? 1 : 0))), 0);
+                    const totalAwarded = entries.reduce((s, [, g]) => s + ((g.total_awarded !== undefined ? g.total_awarded : (g.is_correct ? 1 : 0))), 0);
+                    const pct = totalMax > 0 ? Math.round((totalAwarded / totalMax) * 100) : 0;
+                    return (
+                      <>
+                        <Divider my={4} />
+                        <Group justify="space-between" wrap="nowrap">
+                          <Text size="xs" fw={600} c="dimmed">Session Score</Text>
+                          <Text size="xs" fw={700}>{totalAwarded}/{totalMax}</Text>
+                        </Group>
+                        <Group justify="space-between" wrap="nowrap">
+                          <Text size="xs" fw={600} c="dimmed">Percentage</Text>
+                          <Text size="xs" fw={700} c={pct >= 80 ? 'green' : pct >= 50 ? 'yellow' : 'red'}>{pct}%</Text>
+                        </Group>
+                      </>
+                    );
+                  })()}
                 </Stack>
               </Card>
 
@@ -2271,13 +2802,15 @@ export default function ExerciseView() {
                       }
                       return answeredQuestions.map(({ q, idx, hasAnswer, grade }) => {
                         let statusColor = 'gray';
-                        let statusIcon = '—';
-                        let statusLabel = 'Unanswered';
+                        let statusLabel = '';
                         if (grade) {
-                          if (grade.is_correct) { statusColor = 'green'; statusIcon = '✓'; statusLabel = 'Correct'; }
-                          else { statusColor = 'red'; statusIcon = '✗'; statusLabel = 'Wrong'; }
+                          const awarded = grade.total_awarded !== undefined ? grade.total_awarded : (grade.is_correct ? 1 : 0);
+                          const maxM = grade.total_max !== undefined ? grade.total_max : 1;
+                          statusColor = awarded === maxM ? 'green' : awarded > 0 ? 'yellow' : 'red';
+                          statusLabel = `${awarded}/${maxM}`;
                         } else if (hasAnswer) {
-                          statusColor = 'yellow'; statusIcon = '○'; statusLabel = 'Pending';
+                          statusColor = 'yellow';
+                          statusLabel = 'Pending';
                         }
                         return (
                           <Paper
@@ -2295,7 +2828,7 @@ export default function ExerciseView() {
                           >
                             <Group justify="space-between" wrap="nowrap">
                               <Text size="xs" lineClamp={1} style={{ flex: 1 }}>Q{idx + 1}. {q.question_text}</Text>
-                              <Badge size="xs" color={statusColor} variant="light">{statusIcon} {statusLabel}</Badge>
+                              {statusLabel && <Badge size="xs" color={statusColor} variant="light">{statusLabel}</Badge>}
                             </Group>
                           </Paper>
                         );

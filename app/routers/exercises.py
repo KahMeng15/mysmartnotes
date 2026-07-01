@@ -26,13 +26,14 @@ from app.processing.exercise_processor import (
 )
 from app.schemas.exercise import (
     ExerciseCheckRequest,
-    ExerciseCheckResponse,
     ExerciseCreate,
     ExerciseExplainRequest,
     ExerciseGenerateRequest,
     ExerciseResponse,
+    ExerciseSessionSubmit,
     ExerciseStateSave,
     ExerciseUpdate,
+    GradeResponse,
     BulkExerciseUpdate,
 )
 from app.utils.auth import get_current_user
@@ -43,6 +44,30 @@ from app.utils.tasks import TaskManager
 _export_progress = {}
 
 logger = logging.getLogger(__name__)
+
+
+def _find_question_recursive(questions: list[dict], question_id: str) -> dict | None:
+    """Find a question or sub-part by ID recursively."""
+    for q in questions:
+        if str(q.get("id")) == str(question_id):
+            return q
+        for sp in q.get("sub_parts", []):
+            found = _find_sub_part_recursive(sp, question_id)
+            if found:
+                return found
+    return None
+
+
+def _find_sub_part_recursive(part: dict, target_id: str) -> dict | None:
+    """Recursively search sub-parts by ID."""
+    if str(part.get("id")) == str(target_id):
+        return part
+    for sp in part.get("sub_parts", []):
+        found = _find_sub_part_recursive(sp, target_id)
+        if found:
+            return found
+    return None
+
 
 router = APIRouter(
     prefix="/exercises", tags=["exercises"], responses={401: {"description": "Unauthorized"}}
@@ -69,7 +94,7 @@ def get_all_exercises(
             ex_data.parameters = params
         questions = StorageManager.get_exercise_json(ex.id)
         if questions:
-            ex_data.questions = questions
+            ex_data.questions = _ensure_question_defaults(questions)
         response_exercises.append(ex_data)
     return response_exercises
 
@@ -118,8 +143,25 @@ def get_exercise(
         ex_data.parameters = params
     questions = StorageManager.get_exercise_json(exercise.id)
     if questions:
-        ex_data.questions = questions
+        ex_data.questions = _ensure_question_defaults(questions)
     return ex_data
+
+
+def _ensure_question_defaults(questions: list[dict]) -> list[dict]:
+    """Backward-compat: fill in default marks, sub_parts, marking_scheme for old questions."""
+    for q in questions:
+        q.setdefault("max_marks", 1)
+        q.setdefault("sub_parts", [])
+        q.setdefault("marking_scheme", [])
+        for sp in q.get("sub_parts", []):
+            sp.setdefault("max_marks", 1)
+            sp.setdefault("sub_parts", [])
+            sp.setdefault("marking_scheme", [])
+            for ssp in sp.get("sub_parts", []):
+                ssp.setdefault("max_marks", 1)
+                ssp.setdefault("sub_parts", [])
+                ssp.setdefault("marking_scheme", [])
+    return questions
 
 
 @router.put("/{exercise_id}/content", response_model=ExerciseResponse)
@@ -139,6 +181,8 @@ def update_exercise_content(
         raise HTTPException(status_code=404, detail="Exercise not found")
 
     questions = payload.get("questions", [])
+    from app.processing.exercise_processor import _normalize_question_structure
+    questions = [_normalize_question_structure(q) for q in questions]
     StorageManager.save_exercise_json(exercise.id, questions)
 
     exercise.updated_at = datetime.utcnow()
@@ -254,7 +298,7 @@ def merge_exercises(
     return new_ex
 
 
-@router.post("/{exercise_id}/questions/{question_id}/grade")
+@router.post("/{exercise_id}/questions/{question_id}/grade", response_model=GradeResponse)
 def grade_exercise_answer(
     exercise_id: str,
     question_id: str,
@@ -262,7 +306,7 @@ def grade_exercise_answer(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Grade a subjective or coding answer using AI"""
+    """Grade an answer with per-criterion mark breakdown"""
     exercise = (
         db.query(Exercise)
         .filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id)
@@ -272,24 +316,52 @@ def grade_exercise_answer(
         raise HTTPException(status_code=404, detail="Exercise not found")
 
     questions = StorageManager.get_exercise_json(exercise_id) or []
-    question = next((q for q in questions if str(q.get("id")) == str(question_id)), None)
+    question = _find_question_recursive(questions, question_id)
 
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
 
-    # Standard string match fallback ONLY for objective questions that have options
-    options = question.get("options")
-    if question.get("question_type") == "objective" and options and len(options) > 0:
-        answer_text = question.get("answer_text", "")
-        is_correct = req.user_answer.strip().lower() == answer_text.strip().lower()
-        return ExerciseCheckResponse(
-            is_correct=is_correct,
-            feedback="Correct!" if is_correct else "Incorrect.",
-            correct_answer=answer_text,
-        )
-
-    # Use AI to grade
     return grade_answer(current_user, question, req.user_answer)
+
+
+@router.post("/{exercise_id}/submit")
+def submit_exercise_session(
+    exercise_id: str,
+    payload: ExerciseSessionSubmit,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Save graded exercise session to study_sessions with mark breakdown"""
+    from app.models.db import StudySession
+
+    exercise = (
+        db.query(Exercise)
+        .filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id)
+        .first()
+    )
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+
+    session = StudySession(
+        user_id=current_user.id,
+        exercise_id=exercise_id,
+        resource_id=exercise.resource_id,
+        session_type="exercise",
+        total_marks=payload.total_marks,
+        awarded_marks=payload.awarded_marks,
+        question_scores=payload.question_scores,
+        duration_minutes=payload.duration_minutes,
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return {
+        "message": "Session saved",
+        "session_id": session.id,
+        "awarded_marks": payload.awarded_marks,
+        "total_marks": payload.total_marks,
+    }
 
 
 @router.post("/{exercise_id}/questions/{question_id}/explain")
@@ -310,7 +382,7 @@ def explain_exercise_answer(
         raise HTTPException(status_code=404, detail="Exercise not found")
 
     questions = StorageManager.get_exercise_json(exercise_id) or []
-    question = next((q for q in questions if str(q.get("id")) == str(question_id)), None)
+    question = _find_question_recursive(questions, question_id)
 
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
@@ -331,6 +403,49 @@ def explain_exercise_answer(
     return {"explanation": explanation}
 
 
+@router.get("/{exercise_id}/sessions")
+def get_exercise_sessions(
+    exercise_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return past study sessions for this exercise"""
+    from app.models.db import StudySession
+
+    exercise = (
+        db.query(Exercise)
+        .filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id)
+        .first()
+    )
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+
+    sessions = (
+        db.query(StudySession)
+        .filter(
+            StudySession.exercise_id == exercise_id,
+            StudySession.user_id == current_user.id,
+        )
+        .order_by(StudySession.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": s.id,
+            "session_type": s.session_type,
+            "duration_minutes": s.duration_minutes,
+            "total_marks": s.total_marks,
+            "awarded_marks": s.awarded_marks,
+            "question_scores": s.question_scores,
+            "questions_attempted": s.questions_attempted,
+            "questions_correct": s.questions_correct,
+            "score": s.score,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+        }
+        for s in sessions
+    ]
+
+
 @router.delete("/{exercise_id}/questions/{question_id}/explain")
 def delete_exercise_explanation(
     exercise_id: str,
@@ -348,7 +463,7 @@ def delete_exercise_explanation(
         raise HTTPException(status_code=404, detail="Exercise not found")
 
     questions = StorageManager.get_exercise_json(exercise_id) or []
-    question = next((q for q in questions if str(q.get("id")) == str(question_id)), None)
+    question = _find_question_recursive(questions, question_id)
 
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")

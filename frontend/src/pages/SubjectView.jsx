@@ -1386,6 +1386,14 @@ export default function SubjectView() {
                           <Badge variant="light" size="xs" fw={500}>
                              {ex.questions.length} Questions
                           </Badge>
+                          {(() => {
+                            const totalMarks = ex.questions.reduce((s, q) => s + (q.max_marks || (q.sub_parts?.reduce((ss, sp) => ss + (sp.max_marks || 0), 0) || 1)), 0);
+                            return totalMarks > 0 ? (
+                              <Badge variant="light" color="blue" size="xs" fw={500}>
+                                {totalMarks} total marks
+                              </Badge>
+                            ) : null;
+                          })()}
                           {qTypes.length > 0 && (
                             <Badge variant="light" size="xs" fw={500}>
                               {qTypes.map(t => t.charAt(0).toUpperCase() + t.replace(/_/g, ' ').slice(1)).join(', ')}

@@ -125,6 +125,7 @@ def init_db():
         apply_backup_settings_migration()
         apply_invitation_label_migration()
         apply_chat_exercise_id_migration()
+        apply_exercise_marks_migration()
     except Exception as e:
         logger.error(f"Failed to apply PostgreSQL migrations: {e}")
 
@@ -614,3 +615,56 @@ def apply_chat_exercise_id_migration():
             conn.commit()
     except Exception as e:
         logger.error(f"Failed to apply chat exercise_id migration: {e}", exc_info=True)
+
+
+def apply_exercise_marks_migration():
+    """Add marks columns to study_sessions table"""
+    from sqlalchemy import text
+
+    try:
+        with engine.connect() as conn:
+            for col in ["total_marks", "awarded_marks"]:
+                result = conn.execute(
+                    text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_name = 'study_sessions' AND column_name = :col"
+                    ),
+                    {"col": col},
+                )
+                if not result.fetchone():
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE study_sessions ADD COLUMN {col} INTEGER DEFAULT 0"
+                        )
+                    )
+                    logger.info(f"Added {col} column to study_sessions table")
+            result = conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'study_sessions' AND column_name = 'question_scores'"
+                )
+            )
+            if not result.fetchone():
+                conn.execute(
+                    text(
+                        "ALTER TABLE study_sessions ADD COLUMN question_scores JSON"
+                    )
+                )
+                logger.info("Added question_scores column to study_sessions table")
+            result = conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'study_sessions' AND column_name = 'exercise_id'"
+                )
+            )
+            if not result.fetchone():
+                conn.execute(
+                    text(
+                        "ALTER TABLE study_sessions ADD COLUMN exercise_id VARCHAR(16) "
+                        "REFERENCES exercises(id) ON DELETE SET NULL"
+                    )
+                )
+                logger.info("Added exercise_id column to study_sessions table")
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to apply exercise marks migration: {e}", exc_info=True)
