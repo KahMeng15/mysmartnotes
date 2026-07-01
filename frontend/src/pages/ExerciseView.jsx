@@ -3,11 +3,11 @@ import {
   Box, Title, Text, Group, Card, Button, Stack, Loader, Center, 
   Badge, ActionIcon, Textarea, Collapse, Radio, Paper, Alert, Menu,
   Grid, Select, SegmentedControl, TextInput, Divider, NumberInput, Switch,
-  Container, ScrollArea, Tooltip, NavLink as MantineNavLink, Progress, Modal, Drawer
+  Container, ScrollArea, Tooltip, NavLink as MantineNavLink, Progress, Modal, Drawer, Rating, Popover
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments, IconSend, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconLayoutCards, IconFileText, IconList, IconListNumbers, IconTable } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments, IconSend, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconLayoutCards, IconFileText, IconList, IconListNumbers, IconTable, IconStar, IconInfoCircle } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 import ReactMarkdown from 'react-markdown';
@@ -223,6 +223,20 @@ export default function ExerciseView() {
       sidebarSettingsOpen,
     }));
   }, [id, sidebarOpen, sidebarChatActive, sidebarChatConversationId, sidebarChatMessages, sidebarChatInput, sidebarAiMode, sidebarOutputFormat, sidebarSettingsOpen]);
+
+  // Sidebar chat action button state
+  const [sidebarChatActiveTab, setSidebarChatActiveTab] = useState({});
+  const [sidebarChatRateOpened, setSidebarChatRateOpened] = useState({});
+  const [sidebarChatComment, setSidebarChatComment] = useState({});
+  const handleSidebarRate = async (msgId, val, commentKey) => {
+    const comment = sidebarChatComment[commentKey] || '';
+    try {
+      await fetchApi(`/chat/messages/${msgId}/rate`, {
+        method: 'POST',
+        body: JSON.stringify({ rating: val, comment }),
+      });
+    } catch {}
+  };
 
   const openSidebarChat = async (conversationId = null) => {
     setSidebarChatActive(true);
@@ -1410,8 +1424,14 @@ export default function ExerciseView() {
                     <Text size="sm" c="dimmed" ta="center" mt="xl">Ask a question about this exercise.</Text>
                   ) : (
                     <Stack spacing="md">
-                      {sidebarChatMessages.map((m, i) => (
-                        <Box key={m.id || i}>
+                      {sidebarChatMessages.map((m, i) => {
+                        const hasSources = m.detailed_sources?.length > 0;
+                        const isWebSearch = m.detailed_sources?.some(s => s.is_web);
+                        const filteredSources = m.detailed_sources?.filter(s => s.is_web || s.score >= 50) || [];
+                        const msgKey = m.id || i;
+                        const activeTab = sidebarChatActiveTab[msgKey];
+                        return (
+                        <Box key={msgKey}>
                           <Group align="flex-start" justify="flex-end" wrap="nowrap">
                             <Paper p="sm" radius="xl" style={{ backgroundColor: '#171738', color: '#fff', maxWidth: '80%', borderBottomRightRadius: '4px' }}>
                               <Text size="sm" style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{m.message}</Text>
@@ -1422,14 +1442,92 @@ export default function ExerciseView() {
                               <Box className="markdown-content" style={{ fontSize: '14px', lineHeight: 1.5 }}>
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.response}</ReactMarkdown>
                               </Box>
+                              <Group gap="md" mt="xs" pt="xs" style={{ fontSize: '12px', color: '#888' }}>
+                                {m.reasoning && (
+                                  <Group gap={4} style={{ cursor: 'pointer' }} onClick={() => setSidebarChatActiveTab(prev => ({ ...prev, [msgKey]: activeTab === 'brain' ? null : 'brain' }))}>
+                                    <IconBrain size={12} />
+                                    <Text size="xs" fw={500}>{activeTab === 'brain' ? 'Hide Reasoning' : 'Show Reasoning'}</Text>
+                                  </Group>
+                                )}
+                                {hasSources && (
+                                  <Group gap={4} style={{ cursor: 'pointer' }} onClick={() => setSidebarChatActiveTab(prev => ({ ...prev, [msgKey]: activeTab === 'sources' ? null : 'sources' }))}>
+                                    <IconFileText size={12} />
+                                    <Text size="xs" fw={500}>{activeTab === 'sources' ? 'Hide Sources' : 'Sources'}</Text>
+                                  </Group>
+                                )}
+                                {m.id && (
+                                  <Popover opened={sidebarChatRateOpened[msgKey]} onChange={(o) => setSidebarChatRateOpened(prev => ({ ...prev, [msgKey]: o }))} position="top" withArrow shadow="md">
+                                    <Popover.Target>
+                                      <Group gap={4} style={{ cursor: 'pointer' }} onClick={() => setSidebarChatRateOpened(prev => ({ ...prev, [msgKey]: !prev[msgKey] }))}>
+                                        <IconStar size={12} />
+                                        <Text size="xs" fw={500}>Rate</Text>
+                                      </Group>
+                                    </Popover.Target>
+                                    <Popover.Dropdown>
+                                      <Stack gap="xs">
+                                        <Text size="xs" fw={500}>Rate this answer</Text>
+                                        <Rating value={m.rating || 0} onChange={(val) => handleSidebarRate(m.id, val, msgKey)} size="sm" />
+                                        <Textarea placeholder="Leave a comment..." size="xs" value={sidebarChatComment[msgKey] || ''} onChange={(e) => setSidebarChatComment(prev => ({ ...prev, [msgKey]: e.currentTarget.value }))} minRows={2} />
+                                        <Button size="compact-xs" fullWidth onClick={() => handleSidebarRate(m.id, m.rating || 5, msgKey)}>Submit</Button>
+                                      </Stack>
+                                    </Popover.Dropdown>
+                                  </Popover>
+                                )}
+                                <Group gap={4} style={{ cursor: 'pointer' }} onClick={() => setSidebarChatActiveTab(prev => ({ ...prev, [msgKey]: activeTab === 'info' ? null : 'info' }))}>
+                                  <IconInfoCircle size={12} />
+                                  <Text size="xs" fw={500}>Info</Text>
+                                </Group>
+                                <Group gap={4} style={{ cursor: 'pointer' }} onClick={() => { const prevMsg = sidebarChatMessages[i - 1]; if (prevMsg) sendSidebarChatMessage(prevMsg.message); }}>
+                                  <IconRefresh size={12} />
+                                  <Text size="xs" fw={500}>Retry</Text>
+                                </Group>
+                              </Group>
+                              {activeTab === 'brain' && m.reasoning && (
+                                <Box mt="xs" p="xs" bg="gray.0" style={{ borderRadius: 4, fontSize: '12px', color: '#666', lineHeight: 1.5 }}>
+                                  <Text size="xs" fw={600} mb={4}><IconBrain size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Reasoning</Text>
+                                  <Text size="xs">{m.reasoning}</Text>
+                                </Box>
+                              )}
+                              {activeTab === 'info' && (
+                                <Box mt="xs" p="xs" bg="gray.0" style={{ borderRadius: 4, fontSize: '12px' }}>
+                                  <Text size="xs" fw={600} mb="xs" c="teal"><IconInfoCircle size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Request Details</Text>
+                                  {m.ai_mode && <Text size="xs" mb={2}><IconWand size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Mode: {modeLabels[m.ai_mode] || m.ai_mode}</Text>}
+                                  {m.output_format && <Text size="xs" mb={2}><IconFileText size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Format: {formatLabels[m.output_format] || m.output_format}</Text>}
+                                  {m.ai_model && <Text size="xs" mb={2}><IconRobot size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Model: {m.ai_model}</Text>}
+                                  {m.timings?.total_ms && <Text size="xs"><IconClock size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> Total: {Number(m.timings.total_ms).toFixed(0)}ms</Text>}
+                                </Box>
+                              )}
+                              {activeTab === 'sources' && hasSources && (
+                                <Box mt="xs">
+                                  {isWebSearch && <Badge mb="xs" size="xs" leftSection={<IconWorld size={10}/>}>Included Web Search Results</Badge>}
+                                  <Stack spacing="xs">
+                                    {filteredSources.map((src, idx) => (
+                                      <Paper key={idx} p="xs" withBorder bg="white" style={{ cursor: 'pointer' }}
+                                        onClick={() => { if (src.is_web && src.url) window.open(src.url, '_blank'); }}>
+                                        {src.is_web ? (
+                                          <Box>
+                                            <Text size="xs" fw={600}><IconWorld size={10} style={{ verticalAlign: 'middle', marginRight: 4 }}/> [{idx + 1}] Web Reference</Text>
+                                            <Text size="xs" c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.url}</Text>
+                                          </Box>
+                                        ) : (
+                                          <Box>
+                                            <Text size="xs" fw={600}><IconFileText size={10} style={{ verticalAlign: 'middle', marginRight: 4 }}/> [{idx + 1}] Reference ({src.score}% match)</Text>
+                                            <Text size="xs" c="dimmed">"{src.text_preview}"</Text>
+                                          </Box>
+                                        )}
+                                      </Paper>
+                                    ))}
+                                  </Stack>
+                                </Box>
+                              )}
                             </Box>
                           )}
                         </Box>
-                      ))}
+                      );})}
                       {sidebarChatLoading && (
                         <Group gap="xs">
-                          <Loader size="xs" />
-                          <Text size="sm" c="dimmed">Thinking...</Text>
+                          <Loader size="xs" type="dots" />
+                          <Text size="sm" c="dimmed" style={{ fontStyle: 'italic' }}>Thinking...</Text>
                         </Group>
                       )}
                     </Stack>

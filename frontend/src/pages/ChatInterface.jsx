@@ -96,7 +96,7 @@ const parseAiMessage = (text) => {
 
 const MetadataBlock = ({ msg, messageIndex, setMessages, handleRepeat }) => {
   const { reasoning } = parseAiMessage(msg.text);
-  if (!msg.detailed_sources && !msg.timings && !msg.ai_model && !reasoning) return null;
+  if (!msg.id && !msg.detailed_sources && !msg.timings && !msg.ai_model && !reasoning) return null;
   
   const filteredSources = msg.detailed_sources ? msg.detailed_sources.filter(s => s.is_web || s.score >= 50) : [];
   const hasSources = filteredSources.length > 0;
