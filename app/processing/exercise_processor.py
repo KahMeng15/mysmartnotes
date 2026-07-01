@@ -681,7 +681,8 @@ Do NOT include markdown formatting. Return only the raw JSON.
         "You are a teacher grading a student's answer. "
         "Use the marking scheme to award partial credit fairly. "
         "Be lenient with typos and alternative phrasings as long as the concept is correct. "
-        "Award full marks for a criterion if the student demonstrates understanding of that point."
+        "Address the student as 'you' in feedback and rationale (e.g. 'You correctly explained...' not 'The student explained...'). "
+        "Award full marks for a criterion if you demonstrate understanding of that point."
     )
 
     try:
