@@ -1427,7 +1427,7 @@ export default function ExerciseView() {
                       {sidebarChatMessages.map((m, i) => {
                         const hasSources = m.detailed_sources?.length > 0;
                         const isWebSearch = m.detailed_sources?.some(s => s.is_web);
-                        const filteredSources = m.detailed_sources?.filter(s => s.is_web || s.score >= 50) || [];
+                        const filteredSources = m.detailed_sources?.filter(s => s.is_web || s.score >= 30) || [];
                         const msgKey = m.id || i;
                         const activeTab = sidebarChatActiveTab[msgKey];
                         return (
