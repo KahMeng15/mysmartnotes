@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments, IconSend, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconLayoutCards, IconFileText, IconList, IconListNumbers, IconTable, IconStar, IconInfoCircle } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments, IconSend, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconLayoutCards, IconFileText, IconList, IconListNumbers, IconTable, IconStar, IconInfoCircle, IconPin, IconPinFilled } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 import ReactMarkdown from 'react-markdown';
@@ -110,6 +110,7 @@ export default function ExerciseView() {
   const [showTimeUpModal, setShowTimeUpModal] = useState(initialExamState?.examActive && initialExamState?.examTimeRemaining <= 0);
   const [customMinutes, setCustomMinutes] = useState(5);
   const timerRef = useRef(null);
+  const sidebarChatRef = useRef(null);
 
   // User input and feedback state
   const [userAnswers, setUserAnswers] = useState(initialExamState?.userAnswers ?? {});
@@ -223,6 +224,12 @@ export default function ExerciseView() {
       sidebarSettingsOpen,
     }));
   }, [id, sidebarOpen, sidebarChatActive, sidebarChatConversationId, sidebarChatMessages, sidebarChatInput, sidebarAiMode, sidebarOutputFormat, sidebarSettingsOpen]);
+
+  useEffect(() => {
+    if (sidebarChatRef.current) {
+      sidebarChatRef.current.scrollTop = sidebarChatRef.current.scrollHeight;
+    }
+  }, [sidebarChatMessages]);
 
   // Sidebar chat action button state
   const [sidebarChatActiveTab, setSidebarChatActiveTab] = useState({});
@@ -1410,16 +1417,80 @@ export default function ExerciseView() {
         <Box w={sidebarOpen ? 280 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 200ms ease, min-width 200ms ease', minWidth: sidebarOpen ? 280 : 80, overflow: 'hidden' }} p="md">
           <Box style={{ flex: 1, overflowY: 'auto' }}>
             {sidebarChatActive && sidebarOpen ? (
-              /* Chat Pane */
+              showConvList ? (
+                /* Conversation List View */
+                <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                  <Group mb="sm">
+                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setShowConvList(false)}>
+                      <IconArrowLeft size={16} />
+                    </ActionIcon>
+                    <Text fw={600} size="sm">Conversations</Text>
+                  </Group>
+                  <Divider mb="sm" />
+                  <Box style={{ flex: 1, overflowY: 'auto' }}>
+                    {exerciseConversations.length === 0 ? (
+                      <Center h={100}>
+                        <Text size="sm" c="dimmed">No past conversations</Text>
+                      </Center>
+                    ) : (
+                      <Stack gap={2}>
+                        {exerciseConversations.map((conv) => (
+                          <Paper key={conv.conversation_id} p={6} radius="sm"
+                            style={{
+                              cursor: 'pointer',
+                              backgroundColor: sidebarChatConversationId === conv.conversation_id ? '#eef2ff' : 'transparent',
+                              border: sidebarChatConversationId === conv.conversation_id ? '1px solid #c7d2fe' : '1px solid transparent',
+                              transition: 'all 0.2s'
+                            }}
+                            onClick={() => { setShowConvList(false); openSidebarChat(conv.conversation_id); }}
+                          >
+                            <Group justify="space-between" wrap="nowrap">
+                              <Group gap="xs" style={{ flex: 1, overflow: 'hidden' }} wrap="nowrap">
+                                {conv.is_pinned && <IconPinFilled size={12} style={{ flexShrink: 0, color: '#f59f00' }} />}
+                                <Text size="sm" fw={sidebarChatConversationId === conv.conversation_id ? 600 : 500} lineClamp={1}>
+                                  {conv.title}
+                                </Text>
+                              </Group>
+                              <Menu shadow="md" width={150} position="bottom-end" withinPortal>
+                                <Menu.Target>
+                                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
+                                    <IconDotsVertical size={16} />
+                                  </ActionIcon>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                  <Menu.Item leftSection={<IconPencil size={14} />} onClick={(e) => { e.stopPropagation(); }}>
+                                    Rename
+                                  </Menu.Item>
+                                  <Menu.Item leftSection={<IconPin size={14} />} onClick={(e) => { e.stopPropagation(); }}>
+                                    {conv.is_pinned ? 'Unpin' : 'Pin'}
+                                  </Menu.Item>
+                                  <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); }}>
+                                    Delete
+                                  </Menu.Item>
+                                </Menu.Dropdown>
+                              </Menu>
+                            </Group>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
+                </Box>
+              ) : (
               <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Group justify="space-between" mb="sm">
-                  <Text fw={600} size="sm">Quick Chat</Text>
-                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeSidebarChat}>
-                    <IconLayoutSidebarRightCollapse size={16} />
+                  <Group gap={4}>
+                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeSidebarChat}>
+                      <IconArrowLeft size={16} />
+                    </ActionIcon>
+                    <Text fw={600} size="sm">Quick Chat</Text>
+                  </Group>
+                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={loadExerciseConversations}>
+                    <IconMessageDots size={16} />
                   </ActionIcon>
                 </Group>
                 <Divider mb="sm" />
-                <Box style={{ flex: 1, overflowY: 'auto' }} mb="sm">
+                <Box style={{ flex: 1, overflowY: 'auto' }} mb="sm" ref={sidebarChatRef}>
                   {sidebarChatMessages.length === 0 ? (
                     <Text size="sm" c="dimmed" ta="center" mt="xl">Ask a question about this exercise.</Text>
                   ) : (
@@ -1431,10 +1502,10 @@ export default function ExerciseView() {
                         const msgKey = m.id || i;
                         const activeTab = sidebarChatActiveTab[msgKey];
                         return (
-                        <Box key={msgKey}>
+                        <Box key={msgKey} mb="md">
                           <Group align="flex-start" justify="flex-end" wrap="nowrap">
-                            <Paper p="sm" radius="xl" style={{ backgroundColor: '#171738', color: '#fff', maxWidth: '80%', borderBottomRightRadius: '4px' }}>
-                              <Text size="sm" style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{m.message}</Text>
+                            <Paper p="md" radius="xl" style={{ backgroundColor: '#171738', color: '#fff', maxWidth: '80%', borderBottomRightRadius: '4px' }}>
+                              <Text size="sm" style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{m.message}</Text>
                             </Paper>
                           </Group>
                           {m.response && (
@@ -1452,7 +1523,7 @@ export default function ExerciseView() {
                                 {hasSources && (
                                   <Group gap={4} style={{ cursor: 'pointer' }} onClick={() => setSidebarChatActiveTab(prev => ({ ...prev, [msgKey]: activeTab === 'sources' ? null : 'sources' }))}>
                                     <IconFileText size={12} />
-                                    <Text size="xs" fw={500}>{activeTab === 'sources' ? 'Hide Sources' : 'Sources'}</Text>
+                                    <Text size="xs" fw={500}>Sources</Text>
                                   </Group>
                                 )}
                                 {m.id && (
@@ -1598,6 +1669,7 @@ export default function ExerciseView() {
                   </ActionIcon>
                 </Group>
               </Box>
+              )
             ) : (
               <Stack gap={0} align="stretch">
               {sidebarOpen && (
@@ -1922,40 +1994,6 @@ export default function ExerciseView() {
             </Button>
           </Group>
         </Stack>
-      </Modal>
-
-      {/* Conversations Modal */}
-      <Modal
-        opened={showConvList}
-        onClose={() => setShowConvList(false)}
-        title={<Text fw={700} size="lg">Exercise Conversations</Text>}
-        size="md"
-        radius="md"
-        padding="xl"
-      >
-        {exerciseConversations.length === 0 ? (
-          <Text size="sm" c="dimmed" ta="center" py="xl">No conversations yet. Start a chat to begin one.</Text>
-        ) : (
-          <Stack spacing="xs">
-            {exerciseConversations.map((conv) => (
-              <Paper
-                key={conv.conversation_id}
-                p="sm"
-                withBorder
-                style={{ cursor: 'pointer' }}
-                onClick={() => {
-                  setShowConvList(false);
-                  openSidebarChat(conv.conversation_id);
-                }}
-              >
-                <Group justify="space-between" wrap="nowrap">
-                  <Text size="sm" fw={500} lineClamp={1}>{conv.title}</Text>
-                  <Text size="xs" c="dimmed">{conv.message_count} msgs</Text>
-                </Group>
-              </Paper>
-            ))}
-          </Stack>
-        )}
       </Modal>
 
       {/* History Modal */}
