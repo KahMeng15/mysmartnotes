@@ -40,7 +40,7 @@ const modeLabels = {
     simple: 'Simple',
     normal: 'Normal',
     elaborate: 'Elaborate',
-    eli5: 'Explain like I am 5'
+    eli5: 'ELI5'
   };
 
 const formatIcons = {
@@ -1122,7 +1122,7 @@ export default function ChatInterface() {
                     <Badge 
                       component="button" 
                       onClick={toggleSettings} 
-                      variant="light" size="sm" tt="capitalize" fw={600}
+                      variant="light" size="sm" fw={600} tt="none"
                       leftSection={contextIcons[contextType]}
                       style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible', alignSelf: 'flex-start' }}
                     >
@@ -1132,7 +1132,7 @@ export default function ChatInterface() {
                       <Badge 
                         component="button" 
                         onClick={toggleSettings} 
-                        variant="light" size="sm" tt="capitalize" fw={600}
+                        variant="light" size="sm" fw={600} tt="none"
                         leftSection={modeIcons[aiMode]}
                         style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
                       >
@@ -1141,7 +1141,7 @@ export default function ChatInterface() {
                       <Badge 
                         component="button" 
                         onClick={toggleSettings} 
-                        variant="light" color="teal" size="sm" tt="capitalize" fw={600}
+                        variant="light" color="teal" size="sm" fw={600} tt="none"
                         leftSection={formatIcons[outputFormat]}
                         style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
                       >
@@ -1154,7 +1154,7 @@ export default function ChatInterface() {
                   <Badge 
                     component="button" 
                     onClick={toggleSettings} 
-                    variant="light" size="sm" tt="capitalize" fw={600}
+                    variant="light" size="sm" fw={600} tt="none"
                     leftSection={contextIcons[contextType]}
                     style={{ cursor: 'pointer', transition: 'transform 0.1s' }}
                   >
@@ -1163,7 +1163,7 @@ export default function ChatInterface() {
                   <Badge 
                     component="button" 
                     onClick={toggleSettings} 
-                    variant="light" size="sm" tt="capitalize" fw={600}
+                    variant="light" size="sm" fw={600} tt="none"
                     leftSection={modeIcons[aiMode]}
                     style={{ cursor: 'pointer', transition: 'transform 0.1s' }}
                   >
@@ -1172,7 +1172,7 @@ export default function ChatInterface() {
                   <Badge 
                     component="button" 
                     onClick={toggleSettings} 
-                    variant="light" color="teal" size="sm" tt="capitalize" fw={600}
+                    variant="light" color="teal" size="sm" fw={600} tt="none"
                     leftSection={formatIcons[outputFormat]}
                     style={{ cursor: 'pointer', transition: 'transform 0.1s' }}
                   >
@@ -1220,7 +1220,7 @@ export default function ChatInterface() {
                             }}
                             variant={contextType === value ? "filled" : "light"}
                             size="md"
-                            fw={600}
+                            fw={600} tt="none"
                             style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                             leftSection={contextIcons[value]}
                           >
@@ -1297,14 +1297,14 @@ export default function ChatInterface() {
                       <Box>
                         <Text size="sm" fw={600} mb="xs" c="dimmed">AI Mode</Text>
                         <Group gap="xs" wrap="wrap">
-                          {['quick', 'simple', 'normal', 'elaborate', 'eli5'].map(mode => (
+                           {['quick', 'simple', 'normal', 'elaborate', 'eli5'].map(mode => (
                             <Badge 
                               key={mode}
                               component="button"
                               onClick={() => handleAiModeChange(mode)}
                               variant={aiMode === mode ? "filled" : "light"}
                               size="md"
-                              fw={600}
+                              fw={600} tt="none"
                               style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                               leftSection={modeIcons[mode]}
                             >
@@ -1332,7 +1332,7 @@ export default function ChatInterface() {
                               variant={outputFormat === format.value ? "filled" : "light"}
                               color="teal"
                               size="md"
-                              fw={600}
+                              fw={600} tt="none"
                               style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                               leftSection={formatIcons[format.value]}
                             >
@@ -1353,7 +1353,7 @@ export default function ChatInterface() {
                               onClick={() => handleAiModeChange(mode)}
                               variant={aiMode === mode ? "filled" : "light"}
                               size="md"
-                              fw={600}
+                              fw={600} tt="none"
                               style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                               leftSection={modeIcons[mode]}
                             >
@@ -1379,7 +1379,7 @@ export default function ChatInterface() {
                               variant={outputFormat === format.value ? "filled" : "light"}
                               color="teal"
                               size="md"
-                              fw={600}
+                              fw={600} tt="none"
                               style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                               leftSection={formatIcons[format.value]}
                             >
@@ -1418,30 +1418,30 @@ export default function ChatInterface() {
                 <Box>
                   <Text size="sm" fw={600} mb="xs" c="dimmed">Context Scope</Text>
                   <Group gap="xs" wrap="wrap">
-                    {[
-                      { value: 'global', label: 'Global' },
-                      { value: 'group', label: 'Group' },
-                      { value: 'subject', label: 'Subject' },
-                      { value: 'note', label: 'Note' }
-                    ].map(({ value, label }) => (
-                      <Badge 
-                        key={value}
-                        component="button"
-                        onClick={() => {
-                          handleContextTypeChange(value);
-                          setSelectedGroupId(null);
-                          setSelectedSubjectId(null);
-                          setSelectedNoteId(null);
-                        }}
-                        variant={contextType === value ? "filled" : "light"}
-                        size="md"
-                        fw={600}
-                        style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
-                        leftSection={contextIcons[value]}
-                      >
-                        {label}
-                      </Badge>
-                    ))}
+                      {[
+                        { value: 'global', label: 'Global Scope' },
+                        { value: 'group', label: 'Group' },
+                        { value: 'subject', label: 'Subject' },
+                        { value: 'note', label: 'Note' }
+                      ].map(({ value, label }) => (
+                        <Badge 
+                          key={value}
+                          component="button"
+                          onClick={() => {
+                            handleContextTypeChange(value);
+                            setSelectedGroupId(null);
+                            setSelectedSubjectId(null);
+                            setSelectedNoteId(null);
+                          }}
+                          variant={contextType === value ? "filled" : "light"}
+                          size="md"
+                          fw={600} tt="none"
+                          style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
+                          leftSection={contextIcons[value]}
+                        >
+                          {label}
+                        </Badge>
+                      ))}
                   </Group>
                   
                   {/* Cascading Context Dropdowns */}
@@ -1521,7 +1521,7 @@ export default function ChatInterface() {
                         onClick={() => handleAiModeChange(mode)}
                         variant={aiMode === mode ? "filled" : "light"}
                         size="md"
-                        fw={600}
+                        fw={600} tt="none"
                         style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                         leftSection={modeIcons[mode]}
                       >
@@ -1549,7 +1549,7 @@ export default function ChatInterface() {
                         variant={outputFormat === format.value ? "filled" : "light"}
                         color="teal"
                         size="md"
-                        fw={600}
+                        fw={600} tt="none"
                         style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
                         leftSection={formatIcons[format.value]}
                       >

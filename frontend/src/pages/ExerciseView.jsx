@@ -160,7 +160,7 @@ export default function ExerciseView() {
   // Chat param labels/icons
   const modeLabels = { quick: 'Quick', simple: 'Simple', normal: 'Normal', elaborate: 'Elaborate', eli5: 'ELI5' };
   const modeIcons = { quick: <IconBolt size={14} />, simple: <IconWand size={14} />, normal: <IconBrain size={14} />, elaborate: <IconSchool size={14} />, eli5: <IconBabyCarriage size={14} /> };
-  const formatLabels = { sentence: 'Sentence', pointform: 'Pointform', numbered_list: 'Numbered', table: 'Table', mix: 'Mix' };
+  const formatLabels = { sentence: 'Sentence', pointform: 'Pointform', numbered_list: 'Numbered List', table: 'Table', mix: 'Mix' };
   const formatIcons = { mix: <IconLayoutCards size={14} />, sentence: <IconFileText size={14} />, pointform: <IconList size={14} />, numbered_list: <IconListNumbers size={14} />, table: <IconTable size={14} /> };
 
   // Sidebar chat
@@ -1416,7 +1416,8 @@ export default function ExerciseView() {
                       {['quick', 'simple', 'normal', 'elaborate', 'eli5'].map(mode => (
                         <Badge key={mode} component="button" onClick={() => setSidebarAiMode(mode)}
                           variant={sidebarAiMode === mode ? "filled" : "light"} size="sm" fw={600}
-                          style={{ cursor: 'pointer' }}>
+                          style={{ cursor: 'pointer' }} tt="none"
+                          leftSection={modeIcons[mode]}>
                           {modeLabels[mode]}
                         </Badge>
                       ))}
@@ -1426,7 +1427,8 @@ export default function ExerciseView() {
                       {['sentence', 'pointform', 'numbered_list', 'table', 'mix'].map(fmt => (
                         <Badge key={fmt} color="teal" component="button" onClick={() => setSidebarOutputFormat(fmt)}
                           variant={sidebarOutputFormat === fmt ? "filled" : "light"} size="sm" fw={600}
-                          style={{ cursor: 'pointer' }}>
+                          style={{ cursor: 'pointer' }} tt="none"
+                          leftSection={formatIcons[fmt]}>
                           {formatLabels[fmt]}
                         </Badge>
                       ))}
@@ -1434,12 +1436,12 @@ export default function ExerciseView() {
                   </Box>
                 ) : (
                   <Group gap={4} mb="xs" wrap="wrap">
-                    <Badge variant="light" size="sm" tt="capitalize" fw={600}
+                    <Badge variant="light" size="sm" fw={600} tt="none"
                       style={{ cursor: 'pointer' }} onClick={() => setSidebarSettingsOpen(true)}
                       leftSection={modeIcons[sidebarAiMode]}>
                       {modeLabels[sidebarAiMode]}
                     </Badge>
-                    <Badge color="teal" variant="light" size="sm" tt="capitalize" fw={600}
+                    <Badge color="teal" variant="light" size="sm" fw={600} tt="none"
                       style={{ cursor: 'pointer' }} onClick={() => setSidebarSettingsOpen(true)}
                       leftSection={formatIcons[sidebarOutputFormat]}>
                       {formatLabels[sidebarOutputFormat]}
