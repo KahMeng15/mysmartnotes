@@ -81,6 +81,15 @@ class ImageTextMapper:
                 for img in unplaced:
                     result.append(self._format_image_ref(img))
 
+        # Ensure all images are placed even if no slides/headings were detected
+        all_placed = set(slide_images_placed)
+        for s_num, s_images in images_by_slide.items():
+            for img in s_images:
+                img_id = img.get("id") if isinstance(img, dict) else getattr(img, "id", "")
+                if img_id not in all_placed:
+                    result.append(self._format_image_ref(img))
+                    all_placed.add(img_id)
+
         return "\n".join(result)
 
     def _insert_pdf_images(self, markdown: str, images: list) -> str:
@@ -127,6 +136,15 @@ class ImageTextMapper:
                 ]
                 for img in unplaced:
                     result.append(self._format_image_ref(img))
+
+        # Ensure all images are placed even if no pages were detected
+        all_placed = set(page_images_placed)
+        for p_num, p_images in images_by_page.items():
+            for img in p_images:
+                img_id = img.get("id") if isinstance(img, dict) else getattr(img, "id", "")
+                if img_id not in all_placed:
+                    result.append(self._format_image_ref(img))
+                    all_placed.add(img_id)
 
         return "\n".join(result)
 

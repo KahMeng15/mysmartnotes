@@ -973,6 +973,11 @@ class SmartPipeline:
                     except ValueError:
                         pass
 
+            # Inject a markdown divider between major topics (slides starting with an h2)
+            if slide_num > 1 and slide_blocks and any(b["type"] == "h2" for b in slide_blocks[:2]):
+                md_parts.append("---")
+                md_parts.append("")
+
             # Emit markdown for this slide's blocks
             in_code_block = False
             for _i, block in enumerate(slide_blocks):
@@ -988,13 +993,25 @@ class SmartPipeline:
                         lang = ""
                         if any(
                             kw in text_lower
-                            for kw in ("public", "class", "void", "static", "println", "system.out")
+                            for kw in ("public class", "public static void", "system.out", "string[] args")
                         ):
                             lang = "java"
+                        elif any(
+                            kw in text_lower for kw in ("#include", "using namespace", "int main(", "cout <<", "cin >>", "std::")
+                        ):
+                            lang = "cpp"
                         elif any(
                             kw in text_lower for kw in ("def ", "import ", "print(", "if __name__")
                         ):
                             lang = "python"
+                        elif any(
+                            kw in text_lower for kw in ("select ", "insert into ", "update ", "delete from ", "create table ")
+                        ):
+                            lang = "sql"
+                        elif any(
+                            kw in text_lower for kw in ("mov ", "add ", "sub ", "jmp ", "cmp ", "eax", "ebx")
+                        ):
+                            lang = "assembly"
                         elif any(c in text for c in ("→", "∨", "∧", "¬", "↔", "≡")):
                             lang = "logic"
 

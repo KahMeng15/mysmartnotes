@@ -50,7 +50,12 @@ def find_files(target: str = "") -> list[Path]:
 
     files = []
     for f in sorted(input_dir.rglob("*")):
-        if f.is_file() and not f.name.startswith(".") and f.suffix.lower() in SUPPORTED_EXTS:
+        if (
+            f.is_file()
+            and not f.name.startswith(".")
+            and not f.name.startswith("~$")
+            and f.suffix.lower() in SUPPORTED_EXTS
+        ):
             files.append(f)
     return files
 
@@ -236,7 +241,7 @@ Examples:
     parser.add_argument("--interactive", "-i", action="store_true", help="Prompt before each file, offer correction")
     parser.add_argument("--polish", "-p", action="store_true", help="Enable AI polish pass")
     parser.add_argument("--skip-analysis", action="store_true", help="Skip self-improvement analysis")
-    parser.add_argument("--output", "-o", help="Custom output markdown path")
+    parser.add_argument("--workers", "-w", type=int, default=1, help="Number of parallel workers (default: 1)")
     args = parser.parse_args()
 
     files = find_files(args.input)
@@ -251,16 +256,30 @@ Examples:
 
     results = []
 
-    for file_path in files:
-        if args.interactive:
-            resp = input(f"\nProcess {file_path.name}? [Y/n/q]: ").strip().lower()
-            if resp == "q":
-                break
-            if resp == "n":
-                continue
-
-        result = process_and_report(file_path, polish=args.polish)
-        results.append(result)
+    if args.workers > 1 and not args.interactive and not args.correct:
+        import concurrent.futures
+        print(f"Running in parallel with {args.workers} workers... (Console output may be interleaved)")
+        
+        with concurrent.futures.ProcessPoolExecutor(max_workers=args.workers) as executor:
+            future_to_file = {executor.submit(process_and_report, f, args.polish): f for f in files}
+            for future in concurrent.futures.as_completed(future_to_file):
+                file_path = future_to_file[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as exc:
+                    print(f"File {file_path.name} generated an exception: {exc}")
+    else:
+        for file_path in files:
+            if args.interactive:
+                resp = input(f"\nProcess {file_path.name}? [Y/n/q]: ").strip().lower()
+                if resp == "q":
+                    break
+                if resp == "n":
+                    continue
+    
+            result = process_and_report(file_path, polish=args.polish)
+            results.append(result)
 
         if args.correct and result["score"] < 0.9:
             resp = input(f"\n  Score {result['score']:.2f} is below threshold. Open correction tool? [Y/n]: ").strip().lower()

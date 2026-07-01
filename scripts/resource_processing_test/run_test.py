@@ -58,7 +58,7 @@ def get_files(input_dir: Path, target: str = "", format_filter: str = "") -> lis
 
     files = []
     for f in sorted(input_dir.rglob("*")):
-        if not f.is_file() or f.name.startswith("."):
+        if not f.is_file() or f.name.startswith(".") or f.name.startswith("~$"):
             continue
         if f.suffix.lower() in SUPPORTED_EXTS:
             if format_filter:

@@ -197,6 +197,19 @@ class ScannedDocHandler:
         return text
 
     def _clean_ocr_artifacts(self, text: str) -> str:
+        lines = text.split("\n")
+        cleaned_lines = []
+        for line in lines:
+            stripped = line.strip()
+            # 1. Drop graph axes: lines with 3 or more isolated numbers separated by spaces
+            if re.match(r"^([\d.]+\s+){3,}[\d.]+$", stripped):
+                continue
+            # 2. Drop pure symbol noise (e.g., ">}", "+", "-", "|", "<") 
+            if stripped and not any(c.isalnum() for c in stripped) and len(stripped) <= 4:
+                continue
+            cleaned_lines.append(line)
+            
+        text = "\n".join(cleaned_lines)
         text = re.sub(r"\n{3,}", "\n\n", text)
         text = re.sub(r"[|¦]{2,}", "|", text)
         text = re.sub(r"[_]{4,}", "", text)

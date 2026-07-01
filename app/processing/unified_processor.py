@@ -122,20 +122,32 @@ class UnifiedContentProcessor:
             timings["scanned_detection"] = time.time() - t0
 
             if is_scanned:
-                return self._process_scanned_pdf(file_path, resource_id, progress_callback, timings)
+                bundle = self._process_scanned_pdf(file_path, resource_id, progress_callback, timings)
             else:
-                return self._process_native_pdf(file_path, resource_id, progress_callback, timings)
+                bundle = self._process_native_pdf(file_path, resource_id, progress_callback, timings)
 
         elif ext == ".pptx":
-            return self._process_pptx(file_path, resource_id, progress_callback)
+            bundle = self._process_pptx(file_path, resource_id, progress_callback)
 
         elif ext == ".docx":
-            return self._process_docx(file_path, resource_id, progress_callback)
-
-        return ContentBundle(
-            markdown=f"Error: Unsupported format: {ext}",
-            warnings=[f"Unsupported: {ext}"],
-        )
+            bundle = self._process_docx(file_path, resource_id, progress_callback)
+        else:
+            bundle = ContentBundle(
+                markdown=f"Error: Unsupported format: {ext}",
+                warnings=[f"Unsupported: {ext}"],
+            )
+            
+        # Global fallback: Enforce single H1 if missing
+        if bundle and bundle.markdown and not bundle.markdown.startswith("Error:"):
+            lines = bundle.markdown.split("\n")
+            has_h1 = any(l.startswith("# ") for l in lines)
+            if not has_h1:
+                title = resource_id.replace("_", " ").title() if resource_id else "Document"
+                bundle.markdown = f"# {title}\n\n" + bundle.markdown
+                if "missing_h1" in bundle.warnings:
+                    bundle.warnings.remove("missing_h1")
+                    
+        return bundle
 
     def _process_text(self, file_path: str) -> ContentBundle:
         try:
