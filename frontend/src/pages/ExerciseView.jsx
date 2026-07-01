@@ -272,19 +272,34 @@ export default function ExerciseView() {
     setSidebarChatTaskId(null);
   };
 
-  const sendSidebarChatMessage = async (message) => {
+  const startNewSidebarChat = () => {
+    setSidebarChatConversationId(null);
+    setSidebarChatMessages([]);
+    setSidebarChatActive(true);
+    setShowConvList(false);
+    setSidebarSettingsOpen(false);
+  };
+
+  const sendSidebarChatMessage = async (message, startNew = false, apiMessage) => {
     const msg = (message || sidebarChatInput).trim();
     if (!msg) return;
+    if (startNew) {
+      setSidebarChatActive(true);
+      setShowConvList(false);
+      setSidebarSettingsOpen(false);
+    }
     setSidebarChatInput('');
     setSidebarChatMessages(prev => [...prev, { id: 'temp', message: msg, response: '', created_at: new Date().toISOString() }]);
     setSidebarChatLoading(true);
+    const activeConvId = sidebarChatConversationId;
+    const apiMsg = (apiMessage || msg).trim();
     try {
       const res = await fetchApi('/chat/ask', {
         method: 'POST',
         body: JSON.stringify({
-          message: msg,
+          message: apiMsg,
           exercise_id: id,
-          conversation_id: sidebarChatConversationId,
+          conversation_id: activeConvId,
           ai_mode: sidebarAiMode,
           output_format: sidebarOutputFormat,
           auto_detect_conversation: true,
@@ -299,10 +314,10 @@ export default function ExerciseView() {
               clearInterval(interval);
               setSidebarChatLoading(false);
               setSidebarChatTaskId(null);
-              const convId = statusRes.result?.conversation_id || sidebarChatConversationId;
-              if (convId) {
-                setSidebarChatConversationId(convId);
-                const msgs = await fetchApi(`/chat/conversations/${convId}/messages`);
+              const newConvId = statusRes.result?.conversation_id || activeConvId;
+              if (newConvId) {
+                setSidebarChatConversationId(newConvId);
+                const msgs = await fetchApi(`/chat/conversations/${newConvId}/messages`);
                 setSidebarChatMessages(msgs || []);
               }
             } else if (statusRes.status === 'failed') {
@@ -331,6 +346,17 @@ export default function ExerciseView() {
     } catch (e) {
       setExerciseConversations([]);
     }
+  };
+
+  const buildExplanationContext = (q, explanation, userAnswer, correctAnswer, followUp) => {
+    const qText = q.question || q.question_text || '';
+    const ref = qText.length > 80 ? qText.slice(0, 80) + '...' : qText;
+    return `[referring to explanation: ${ref}]\n${followUp}`;
+  };
+
+  const sendExplanationFollowUp = (q, explanation, userAnswer, correctAnswer, followUp) => {
+    const displayMsg = buildExplanationContext(q, explanation, userAnswer, correctAnswer, followUp);
+    sendSidebarChatMessage(displayMsg, true, followUp);
   };
 
   // History modal
@@ -1223,7 +1249,7 @@ export default function ExerciseView() {
                                           <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
                                             Hide Explanation
                                           </Menu.Item>
-                                          <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); openSidebarChat(); setTimeout(() => sendSidebarChatMessage('Can you elaborate on this explanation?'), 0); }}>
+                                          <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); sendExplanationFollowUp(q, explanation, userAnswers[q.id], grade?.correct_answer, 'Can you elaborate on this explanation?'); }}>
                                             Ask Follow-up
                                           </Menu.Item>
                                           <Menu.Divider />
@@ -1246,8 +1272,7 @@ export default function ExerciseView() {
                                             const val = e.currentTarget.value.trim();
                                             if (val) {
                                               e.currentTarget.value = '';
-                                              openSidebarChat();
-                                              setTimeout(() => sendSidebarChatMessage(val), 0);
+                                              sendExplanationFollowUp(q, explanation, userAnswers[q.id], grade?.correct_answer, val);
                                             }
                                           }
                                         }}
@@ -1257,8 +1282,7 @@ export default function ExerciseView() {
                                         if (input && input.value.trim()) {
                                           const val = input.value.trim();
                                           input.value = '';
-                                          openSidebarChat();
-                                          setTimeout(() => sendSidebarChatMessage(val), 0);
+                                          sendExplanationFollowUp(q, explanation, userAnswers[q.id], grade?.correct_answer, val);
                                         }
                                       }}>Ask</Button>
                                     </Group>
@@ -1320,7 +1344,7 @@ export default function ExerciseView() {
                                                       <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
                                                         Hide
                                                       </Menu.Item>
-                                                      <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); openSidebarChat(); setTimeout(() => sendSidebarChatMessage('Can you elaborate on this explanation?'), 0); }}>
+                                          <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); sendExplanationFollowUp(q, explanation, userAnswers[q.id], grade?.correct_answer, 'Can you elaborate on this explanation?'); }}>
                                                         Ask Follow-up
                                                       </Menu.Item>
                                                       <Menu.Divider />
@@ -1343,8 +1367,7 @@ export default function ExerciseView() {
                                                         const val = e.currentTarget.value.trim();
                                                         if (val) {
                                                           e.currentTarget.value = '';
-                                                          openSidebarChat();
-                                                          setTimeout(() => sendSidebarChatMessage(val), 0);
+                                                          sendExplanationFollowUp(q, explanation, userAnswers[q.id], grade?.correct_answer, val);
                                                         }
                                                       }
                                                     }}
@@ -1354,8 +1377,7 @@ export default function ExerciseView() {
                                                     if (input && input.value.trim()) {
                                                       const val = input.value.trim();
                                                       input.value = '';
-                                                      openSidebarChat();
-                                                      setTimeout(() => sendSidebarChatMessage(val), 0);
+                                                      sendExplanationFollowUp(q, explanation, userAnswers[q.id], grade?.correct_answer, val);
                                                     }
                                                   }}>Ask</Button>
                                                 </Group>
@@ -1485,9 +1507,14 @@ export default function ExerciseView() {
                     </ActionIcon>
                     <Text fw={600} size="sm">Quick Chat</Text>
                   </Group>
-                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={loadExerciseConversations}>
-                    <IconMessageDots size={16} />
-                  </ActionIcon>
+                  <Group gap={4}>
+                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={startNewSidebarChat}>
+                      <IconPlus size={16} />
+                    </ActionIcon>
+                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={loadExerciseConversations}>
+                      <IconMessageDots size={16} />
+                    </ActionIcon>
+                  </Group>
                 </Group>
                 <Divider mb="sm" />
                 <Box style={{ flex: 1, overflowY: 'auto' }} mb="sm" ref={sidebarChatRef}>
@@ -1501,11 +1528,30 @@ export default function ExerciseView() {
                         const filteredSources = m.detailed_sources?.filter(s => s.is_web || s.score >= 30) || [];
                         const msgKey = m.id || i;
                         const activeTab = sidebarChatActiveTab[msgKey];
+                        const refMatch = m.message?.match(/^\[referring to explanation: ([^\]]+)\]\n([\s\S]*)$/);
                         return (
                         <Box key={msgKey} mb="md">
                           <Group align="flex-start" justify="flex-end" wrap="nowrap">
-                            <Paper p="md" radius="xl" style={{ backgroundColor: '#171738', color: '#fff', maxWidth: '80%', borderBottomRightRadius: '4px' }}>
-                              <Text size="sm" style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{m.message}</Text>
+                             <Paper p={refMatch ? 'sm' : 'md'} radius="xl" style={{ backgroundColor: '#171738', color: '#fff', maxWidth: '80%', borderBottomRightRadius: '4px' }}>
+                              {refMatch ? (
+                                <Box>
+                                  <Box style={{
+                                    borderLeft: '3px solid #6c757d',
+                                    paddingLeft: 10,
+                                    marginBottom: 4,
+                                    fontSize: 12,
+                                    color: '#adb5bd',
+                                    lineHeight: 1.3
+                                  }}>
+                                    {refMatch[1]}
+                                  </Box>
+                                  <Text size="sm" style={{ lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{refMatch[2]}</Text>
+                                </Box>
+                              ) : (
+                                <Box className="markdown-content" size="sm" style={{ color: '#fff', lineHeight: 1.6 }}>
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.message}</ReactMarkdown>
+                                </Box>
+                              )}
                             </Paper>
                           </Group>
                           {m.response && (
