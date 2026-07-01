@@ -27,6 +27,7 @@ import { ImageUploadExtension, handleImageUploadFlow } from '../lib/tiptapImageU
 export default function ExerciseView() {
   const { id, mode } = useParams();
   const navigate = useNavigate();
+  const { tasks } = useTaskContext();
   const [exercise, setExercise] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -369,7 +370,9 @@ export default function ExerciseView() {
 
   // Processing state
   const [processingStatus, setProcessingStatus] = useState(null);
-  const { tasks } = useTaskContext();
+  const viewportRef = useRef(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
+
   const prevExerciseTaskStatus = useRef(null);
 
   // Fetch exercise data and check for existing task on mount (one-time, no 404s)
@@ -1199,6 +1202,14 @@ export default function ExerciseView() {
           <ScrollArea 
             style={{ flex: 1, backgroundColor: '#fff' }} 
             p={0}
+            viewportRef={viewportRef}
+            onScrollPositionChange={({ y }) => {
+              if (viewportRef.current) {
+                const { scrollHeight, clientHeight } = viewportRef.current;
+                const maxScroll = scrollHeight - clientHeight;
+                setScrollProgress(maxScroll > 0 ? Math.min(100, Math.round((y / maxScroll) * 100)) : 0);
+              }
+            }}
           >
           <Container size="md" p={0} pt={0} pb="xl">
             <Box px="md">
@@ -1909,6 +1920,7 @@ export default function ExerciseView() {
             </Box>
           </Container>
         </ScrollArea>
+        <Progress value={scrollProgress} size="sm" color="indigo.5" style={{ flexShrink: 0 }} />
       </Box>
 
         {/* Right Sidebar */}
