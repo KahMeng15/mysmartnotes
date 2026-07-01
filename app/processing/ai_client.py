@@ -682,10 +682,10 @@ class AIClient:
     ) -> str:
         if system_prompt:
             return await self.generate_text(
-                prompt=question, max_tokens=8192, system_instruction=system_prompt
+                prompt=question, max_tokens=8192, system_instruction=system_prompt, raw_output=True
             )
         prompt = f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"
-        return await self.generate_text(prompt, max_tokens=8192)
+        return await self.generate_text(prompt, max_tokens=8192, raw_output=True)
 
     async def generate_summary(
         self,

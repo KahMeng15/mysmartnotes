@@ -217,7 +217,7 @@ export default function ExerciseView() {
         setSidebarChatTaskId(res.task_id);
         const interval = setInterval(async () => {
           try {
-            const statusRes = await fetchApi(`/search/task/${res.task_id}`);
+            const statusRes = await fetchApi(`/search/tasks/${res.task_id}`);
             if (statusRes.status === 'completed') {
               clearInterval(interval);
               setSidebarChatLoading(false);
