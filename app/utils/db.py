@@ -124,6 +124,7 @@ def init_db():
         apply_note_exercise_ids_migration()
         apply_backup_settings_migration()
         apply_invitation_label_migration()
+        apply_chat_exercise_id_migration()
     except Exception as e:
         logger.error(f"Failed to apply PostgreSQL migrations: {e}")
 
@@ -588,3 +589,28 @@ def apply_invitation_label_migration():
             conn.commit()
     except Exception as e:
         logger.error(f"Failed to apply invitation label migration: {e}", exc_info=True)
+
+
+def apply_chat_exercise_id_migration():
+    """Add exercise_id column to chat_messages table"""
+    from sqlalchemy import text
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'chat_messages' AND column_name = 'exercise_id'"
+                )
+            )
+            if not result.fetchone():
+                conn.execute(
+                    text(
+                        "ALTER TABLE chat_messages ADD COLUMN exercise_id VARCHAR(16) "
+                        "REFERENCES exercises(id) ON DELETE SET NULL"
+                    )
+                )
+                logger.info("Added exercise_id column to chat_messages table")
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to apply chat exercise_id migration: {e}", exc_info=True)

@@ -521,7 +521,9 @@ User's Answer: {user_answer}
 
 
 def explain_answer(
-    user: User, question: dict[str, Any], user_answer: str | None = None, view_mode: str = "hide"
+    user: User, question: dict[str, Any], user_answer: str | None = None,
+    view_mode: str = "hide", ai_mode: str = "elaborate",
+    output_format: str = "markdown", scope: str = "source"
 ) -> str:
     """Generates an explanation for the correct answer
 
@@ -530,6 +532,9 @@ def explain_answer(
         question: The question dict containing question_text and answer_text
         user_answer: Optional user's attempt at the question
         view_mode: The current viewing mode ('hide', 'show', 'interactive', 'exam', 'conversation')
+        ai_mode: AI mode (quick, simple, normal, elaborate, eli5)
+        output_format: Output format preference
+        scope: Context scope (source, web, both)
     """
     client = AIClient()
 
@@ -547,25 +552,33 @@ Correct Answer: {answer_text}
     if has_user_answer and is_interactive_mode:
         prompt += f"\nUser's Attempt: {user_answer}"
 
-    # Tailor system prompt based on view mode
+    # Determine length/style based on ai_mode
+    length_instructions = {
+        "quick": "Keep it VERY brief — 1-2 short sentences. No formatting.",
+        "simple": "Keep it concise — 2-3 sentences. Simple language, no fluff.",
+        "normal": "Write a brief paragraph covering the key point. Use plain markdown.",
+        "elaborate": "Explain thoroughly with detail. Use markdown formatting freely.",
+        "eli5": "Explain like I'm 5 — short analogy or simple terms, 2-3 sentences.",
+    }
+    length_instr = length_instructions.get(ai_mode, length_instructions["quick"])
+
     if is_interactive_mode and has_user_answer:
-        # Interactive/exam modes with user answer: provide personalized feedback
         system_prompt = (
-            "Evaluate the user's attempt and explain why it is correct or incorrect. "
-            "Be concise and directly address the user. State clearly if the answer is right or wrong, "
-            "then briefly explain the key concept. Keep response to 1-3 sentences."
+            f"{length_instr} "
+            "Evaluate the user's attempt and state if it is correct or wrong, "
+            "then briefly explain the key concept."
         )
     else:
-        # View modes (hide, show) or interactive without answer: just explain the answer
         system_prompt = (
-            "Explain the correct answer to this question in 1-3 concise sentences. "
-            "Address the reader directly. Be extremely brief and straight to the point. "
-            "Focus on why this is the correct answer and the key concept."
+            f"{length_instr} "
+            "Briefly explain the correct answer and the key concept."
         )
 
-    return _run_async(
-        client.generate_text, prompt=prompt, system_instruction=system_prompt, max_tokens=4000
-    ).strip()
+    result = _run_async(
+        client.generate_text, prompt=prompt, system_instruction=system_prompt,
+        max_tokens=4000, raw_output=True
+    )
+    return (result or "").strip()
 
 
 def generate_exercise_task(

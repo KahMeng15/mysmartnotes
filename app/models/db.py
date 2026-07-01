@@ -350,6 +350,9 @@ class ChatMessage(Base):
     group_id = Column(
         String(16), ForeignKey("subject_groups.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    exercise_id = Column(
+        String(16), ForeignKey("exercises.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     message = Column(Text, nullable=False)
     response = Column(Text, nullable=False)
     sources = Column(Text)  # JSON array of sources
@@ -387,6 +390,7 @@ class ChatMessage(Base):
     resource = relationship("Resource", back_populates="chat_messages")
     subject = relationship("Subject", back_populates="chat_messages")
     group = relationship("SubjectGroup", back_populates="chat_messages")
+    exercise = relationship("Exercise")
 
 
 class ResourceSnapshot(Base):

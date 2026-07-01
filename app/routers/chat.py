@@ -35,6 +35,7 @@ class ChatRequest(BaseModel):
     resource_id: str | None = None
     subject_id: str | None = None
     group_id: str | None = None
+    exercise_id: str | None = None
     message: str
     ai_mode: str = "elaborate"
     output_format: str = "sentence"
@@ -53,6 +54,7 @@ class ChatMessageResponse(BaseModel):
     resource_id: str | None = None
     subject_id: str | None = None
     group_id: str | None = None
+    exercise_id: str | None = None
     ai_mode: str | None = None
     output_format: str | None = None
     ai_model: str | None = None
@@ -79,6 +81,7 @@ class ConversationSummary(BaseModel):
     resource_id: str | None = None
     subject_id: str | None = None
     group_id: str | None = None
+    exercise_id: str | None = None
     scope_type: str | None = None
     is_pinned: bool = False
     is_favourite: bool = False
@@ -679,6 +682,7 @@ async def ask_question(
         resource_id=request.resource_id,
         subject_id=request.subject_id,
         group_id=request.group_id,
+        exercise_id=request.exercise_id,
         ai_mode=request.ai_mode,
         output_format=request.output_format,
         conversation_id=request.conversation_id,
@@ -700,6 +704,7 @@ async def ask_question_logic(**kwargs) -> dict:
         resource_id = kwargs.get("resource_id")
         subject_id = kwargs.get("subject_id")
         group_id = kwargs.get("group_id")
+        exercise_id = kwargs.get("exercise_id")
         ai_mode = kwargs.get("ai_mode", "elaborate")
         output_format = kwargs.get("output_format", "sentence")
         conversation_id = kwargs.get("conversation_id")
@@ -812,6 +817,7 @@ async def ask_question_logic(**kwargs) -> dict:
             resource_id=resource_id,
             subject_id=subject_id,
             group_id=group_id,
+            exercise_id=exercise_id,
             message=message,
             response="",
             sources="[]",
@@ -1129,6 +1135,46 @@ async def get_conversations(
                 scope_type=scope_type,
                 is_pinned=bool(row.is_pinned),
                 is_favourite=bool(row.is_favourite),
+            )
+        )
+
+    return result
+
+
+@router.get("/exercise/{exercise_id}/conversations", response_model=list[ConversationSummary])
+async def get_exercise_conversations(
+    exercise_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List conversations for a specific exercise."""
+    rows = (
+        db.query(
+            ChatMessage.conversation_id,
+            func.max(ChatMessage.conversation_title).label("title"),
+            func.count(ChatMessage.id).label("message_count"),
+            func.max(ChatMessage.created_at).label("last_message_at"),
+        )
+        .filter(
+            ChatMessage.user_id == current_user.id,
+            ChatMessage.conversation_id.isnot(None),
+            ChatMessage.exercise_id == exercise_id,
+        )
+        .group_by(ChatMessage.conversation_id)
+        .order_by(func.max(ChatMessage.created_at).desc())
+        .all()
+    )
+
+    result = []
+    for row in rows:
+        result.append(
+            ConversationSummary(
+                conversation_id=row.conversation_id,
+                title=row.title or "Untitled Conversation",
+                message_count=row.message_count,
+                last_message_at=row.last_message_at.isoformat(),
+                exercise_id=exercise_id,
+                scope_type="exercise",
             )
         )
 

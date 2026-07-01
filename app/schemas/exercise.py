@@ -10,6 +10,7 @@ class ExerciseQuestionBase(BaseModel):
     question_text: str
     answer_text: str
     question_type: str = "subjective"
+    score_type: str = ""
     options: Any | None = None
     order: int = 0
     explanation: str | None = None
@@ -88,7 +89,7 @@ class ExerciseCheckResponse(BaseModel):
 
 class ExerciseExplainRequest(BaseModel):
     scope: str = "source"  # source, web, both
-    ai_mode: str = "elaborate"
+    ai_mode: str = "quick"
     output_format: str = "sentence"
     user_answer: str | None = None
     view_mode: str | None = "hide"  # hide, show, interactive, exam, conversation
@@ -99,6 +100,7 @@ class BulkExerciseQuestionUpdate(BaseModel):
     question_text: str
     answer_text: str
     question_type: str
+    score_type: str = ""
     options: Any | None = None
     order: int
     explanation: str | None = None
@@ -108,6 +110,14 @@ class BulkExerciseQuestionUpdate(BaseModel):
 
 class BulkExerciseUpdate(BaseModel):
     questions: list[BulkExerciseQuestionUpdate]
+
+
+class ExerciseStateSave(BaseModel):
+    userAnswers: dict = {}
+    gradingResults: dict = {}
+    explanations: dict = {}
+    revealedAnswers: dict = {}
+    showExplanations: dict = {}
 
 
 class ExerciseGenerateRequest(BaseModel):

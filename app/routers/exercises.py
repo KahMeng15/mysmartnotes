@@ -27,9 +27,13 @@ from app.processing.exercise_processor import (
 from app.schemas.exercise import (
     ExerciseCheckRequest,
     ExerciseCheckResponse,
+    ExerciseCreate,
     ExerciseExplainRequest,
     ExerciseGenerateRequest,
     ExerciseResponse,
+    ExerciseStateSave,
+    ExerciseUpdate,
+    BulkExerciseUpdate,
 )
 from app.utils.auth import get_current_user
 from app.utils.db import generate_random_id, get_db
@@ -311,7 +315,14 @@ def explain_exercise_answer(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
 
-    explanation = explain_answer(current_user, question, req.user_answer, req.view_mode)
+    explanation = explain_answer(
+        current_user, question,
+        user_answer=req.user_answer,
+        view_mode=req.view_mode or "hide",
+        ai_mode=req.ai_mode,
+        output_format=req.output_format,
+        scope=req.scope,
+    )
 
     # Save the generated explanation back to JSON so it persists
     question["explanation"] = explanation
@@ -861,3 +872,141 @@ async def download_export(
         filename=f"{safe_title}.{export_format}",
         media_type=mime_types.get(export_format, "application/octet-stream"),
     )
+
+
+@router.get("/{exercise_id}/state")
+def get_exercise_state(
+    exercise_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Load saved exercise state (answers, grades, explanations)"""
+    exercise = (
+        db.query(Exercise)
+        .filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id)
+        .first()
+    )
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+
+    state = StorageManager.get_exercise_json(exercise_id, suffix="state")
+    if state is None:
+        state = {}
+    return state
+
+
+@router.put("/{exercise_id}/state")
+def save_exercise_state(
+    exercise_id: str,
+    req: ExerciseStateSave,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Save exercise state (answers, grades, explanations)"""
+    exercise = (
+        db.query(Exercise)
+        .filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id)
+        .first()
+    )
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+
+    StorageManager.save_exercise_json(
+        exercise_id, req.model_dump(), suffix="state"
+    )
+    return {"status": "ok"}
+
+
+@router.delete("/{exercise_id}/state")
+def delete_exercise_state(
+    exercise_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete saved exercise state"""
+    exercise = (
+        db.query(Exercise)
+        .filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id)
+        .first()
+    )
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+
+    path = StorageManager._get_exercise_path(exercise_id, suffix="state")
+    if os.path.exists(path):
+        os.remove(path)
+    return {"status": "ok"}
+
+
+@router.post("/{exercise_id}/upload-image")
+async def upload_exercise_image(
+    exercise_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id, Exercise.user_id == current_user.id).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+
+    import filetype
+    kind = filetype.guess(contents)
+    if not kind or not kind.mime.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    if kind.mime in ["image/gif", "image/svg+xml"]:
+        raise HTTPException(status_code=400, detail="GIF and SVG formats are not allowed")
+
+    upload_dir = StorageManager.get_user_images_dir(current_user.id, exercise_id)
+    ext = kind.extension
+
+    import io
+    from PIL import Image
+
+    try:
+        img = Image.open(io.BytesIO(contents))
+        if img.mode == 'P':
+            img = img.convert('RGBA')
+        elif img.mode not in ('RGB', 'RGBA'):
+            img = img.convert('RGBA')
+        max_size = (1920, 1080)
+        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+        filename = f"img_{uuid.uuid4().hex}.webp"
+        filepath = os.path.join(upload_dir, filename)
+        img.save(filepath, 'WEBP', quality=80, method=6)
+    except Exception as e:
+        logger.error(f"Image compression failed: {e}")
+        filename = f"img_{uuid.uuid4().hex}.{ext}"
+        filepath = os.path.join(upload_dir, filename)
+        with open(filepath, "wb") as f:
+            f.write(contents)
+
+    return {"url": f"/api/exercises/{exercise_id}/user-images/{filename}"}
+
+
+@router.get("/{exercise_id}/user-images/{image_path:path}")
+def serve_exercise_user_image(
+    exercise_id: str,
+    image_path: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from fastapi.responses import FileResponse
+
+    exercise = db.query(Exercise).filter(Exercise.id == exercise_id).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
+    if exercise.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    safe_path = os.path.basename(image_path)
+    full_path = os.path.join(
+        StorageManager.get_user_images_dir(current_user.id, exercise_id), safe_path
+    )
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(full_path)

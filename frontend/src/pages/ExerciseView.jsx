@@ -7,9 +7,22 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Markdown } from 'tiptap-markdown';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { Link } from '@tiptap/extension-link';
+import { Image } from '@tiptap/extension-image';
+import { ResizableImageExtension } from '../lib/ResizableImageExtension';
+import { ImageUploadExtension, handleImageUploadFlow } from '../lib/tiptapImageUpload';
 
 export default function ExerciseView() {
   const { id, mode } = useParams();
@@ -97,6 +110,7 @@ export default function ExerciseView() {
   const [explainLoading, setExplainLoading] = useState({});
   const [revealedAnswers, setRevealedAnswers] = useState(initialExamState?.revealedAnswers ?? {});
   const [showExplanations, setShowExplanations] = useState(initialExamState?.showExplanations ?? {});
+  const [answerTimestamps, setAnswerTimestamps] = useState({});
 
   // Sync state to localStorage
   useEffect(() => {
@@ -113,6 +127,129 @@ export default function ExerciseView() {
     };
     localStorage.setItem(`exercise_exam_${id}`, JSON.stringify(stateToSave));
   }, [id, examActive, examCompleted, examTimeRemaining, userAnswers, gradingResults, explanations, revealedAnswers, showExplanations]);
+
+  // Question order
+  const [questionOrder, setQuestionOrder] = useState('original');
+  const [shuffledIndices, setShuffledIndices] = useState([]);
+
+  const shuffleQuestions = () => {
+    const n = exercise?.questions?.length || 0;
+    const indices = Array.from({ length: n }, (_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    setShuffledIndices(indices);
+    setQuestionOrder('randomized');
+  };
+
+  const restoreQuestionOrder = () => {
+    setShuffledIndices([]);
+    setQuestionOrder('original');
+  };
+
+  // Sidebar chat
+  const [sidebarChatActive, setSidebarChatActive] = useState(false);
+  const [sidebarChatConversationId, setSidebarChatConversationId] = useState(null);
+  const [sidebarChatMessages, setSidebarChatMessages] = useState([]);
+  const [sidebarChatInput, setSidebarChatInput] = useState('');
+  const [sidebarChatLoading, setSidebarChatLoading] = useState(false);
+  const [sidebarChatTaskId, setSidebarChatTaskId] = useState(null);
+  const [sidebarChatPollInterval, setSidebarChatPollInterval] = useState(null);
+  const [exerciseConversations, setExerciseConversations] = useState([]);
+  const [showConvList, setShowConvList] = useState(false);
+
+  const openSidebarChat = async (conversationId = null) => {
+    setSidebarChatActive(true);
+    setShowConvList(false);
+    if (conversationId) {
+      setSidebarChatConversationId(conversationId);
+      try {
+        const msgs = await fetchApi(`/chat/conversations/${conversationId}/messages`);
+        setSidebarChatMessages(msgs || []);
+      } catch (e) {
+        setSidebarChatMessages([]);
+      }
+    } else {
+      setSidebarChatConversationId(null);
+      setSidebarChatMessages([]);
+    }
+  };
+
+  const closeSidebarChat = () => {
+    setSidebarChatActive(false);
+    setSidebarChatConversationId(null);
+    setSidebarChatMessages([]);
+    setSidebarChatInput('');
+    if (sidebarChatPollInterval) clearInterval(sidebarChatPollInterval);
+    setSidebarChatTaskId(null);
+  };
+
+  const sendSidebarChatMessage = async () => {
+    const msg = sidebarChatInput.trim();
+    if (!msg) return;
+    setSidebarChatInput('');
+    setSidebarChatMessages(prev => [...prev, { id: 'temp', message: msg, response: '', created_at: new Date().toISOString() }]);
+    setSidebarChatLoading(true);
+    try {
+      const res = await fetchApi('/chat/ask', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: msg,
+          exercise_id: id,
+          conversation_id: sidebarChatConversationId,
+          ai_mode: 'elaborate',
+          output_format: 'markdown',
+          auto_detect_conversation: true,
+        })
+      });
+      if (res.task_id) {
+        setSidebarChatTaskId(res.task_id);
+        const interval = setInterval(async () => {
+          try {
+            const statusRes = await fetchApi(`/search/task/${res.task_id}`);
+            if (statusRes.status === 'completed') {
+              clearInterval(interval);
+              setSidebarChatLoading(false);
+              setSidebarChatTaskId(null);
+              // Reload conversation messages
+              const convId = statusRes.result?.conversation_id || sidebarChatConversationId;
+              if (convId) {
+                setSidebarChatConversationId(convId);
+                const msgs = await fetchApi(`/chat/conversations/${convId}/messages`);
+                setSidebarChatMessages(msgs || []);
+              }
+            } else if (statusRes.status === 'failed') {
+              clearInterval(interval);
+              setSidebarChatLoading(false);
+              setSidebarChatTaskId(null);
+            }
+          } catch (e) {
+            clearInterval(interval);
+            setSidebarChatLoading(false);
+            setSidebarChatTaskId(null);
+          }
+        }, 2000);
+        setSidebarChatPollInterval(interval);
+      }
+    } catch (e) {
+      setSidebarChatLoading(false);
+    }
+  };
+
+  const loadExerciseConversations = async () => {
+    try {
+      const convs = await fetchApi(`/chat/exercise/${id}/conversations`);
+      setExerciseConversations(convs || []);
+      setShowConvList(true);
+    } catch (e) {
+      setExerciseConversations([]);
+    }
+  };
+
+  // History modal
+  const [historyModalQuestion, setHistoryModalQuestion] = useState(null);
+  const [historyModalOpened, setHistoryModalOpened] = useState(false);
 
   // Editing state
   const [editedQuestions, setEditedQuestions] = useState([]);
@@ -135,6 +272,18 @@ export default function ExerciseView() {
         setEditedQuestions(JSON.parse(JSON.stringify(data.questions || [])));
         setLoading(false);
 
+        // Load saved state
+        const stateData = await fetchApi(`/exercises/${id}/state`).catch(() => null);
+        if (!active) return;
+        if (stateData && Object.keys(stateData).length > 0) {
+          if (stateData.userAnswers) setUserAnswers(stateData.userAnswers);
+          if (stateData.gradingResults) setGradingResults(stateData.gradingResults);
+          if (stateData.explanations) setExplanations(stateData.explanations);
+          if (stateData.revealedAnswers) setRevealedAnswers(stateData.revealedAnswers);
+          if (stateData.showExplanations) setShowExplanations(stateData.showExplanations);
+          if (stateData.answerTimestamps) setAnswerTimestamps(stateData.answerTimestamps);
+        }
+
         const taskData = await fetchApi(`/search/task?exercise_id=${id}`).catch(() => null);
         if (!active) return;
         if (taskData && taskData.status && taskData.status !== 'completed') {
@@ -156,6 +305,29 @@ export default function ExerciseView() {
 
     return () => { active = false; };
   }, [id]);
+
+  // Auto-save exercise state on changes
+  const saveTimeoutRef = useRef(null);
+  useEffect(() => {
+    if (!exercise) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      fetchApi(`/exercises/${id}/state`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          userAnswers,
+          gradingResults,
+          explanations,
+          revealedAnswers,
+          showExplanations,
+          answerTimestamps,
+        })
+      }).catch(() => {});
+    }, 1000);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [id, userAnswers, gradingResults, explanations, revealedAnswers, showExplanations, answerTimestamps]);
 
   // Watch TaskContext for task updates (replaces polling)
   useEffect(() => {
@@ -208,6 +380,8 @@ export default function ExerciseView() {
     const question = exercise.questions.find(q => q.id === qId);
     if (!question) return;
 
+    setAnswerTimestamps(prev => ({ ...prev, [qId]: Date.now() }));
+
     // Client-side auto-grade for objective only
     if (question.question_type === 'objective') {
       const correctAns = question.answer_text.trim().toLowerCase();
@@ -217,6 +391,9 @@ export default function ExerciseView() {
         ...prev, 
         [qId]: { is_correct: isCorrect, feedback: isCorrect ? "Correct!" : "Incorrect.", correct_answer: question.answer_text } 
       }));
+      if (question.score_type === 'both') {
+        handleExplain(qId);
+      }
       return;
     }
 
@@ -228,6 +405,9 @@ export default function ExerciseView() {
         body: JSON.stringify({ user_answer: answer })
       });
       setGradingResults(prev => ({ ...prev, [qId]: res }));
+      if (question.score_type === 'both') {
+        handleExplain(qId);
+      }
     } catch (e) {
       alert("Failed to grade answer: " + e.message);
     } finally {
@@ -355,6 +535,7 @@ export default function ExerciseView() {
     setExamTimeRemaining(null);
     if (timerRef.current) clearInterval(timerRef.current);
     localStorage.removeItem(`exercise_exam_${id}`);
+    fetchApi(`/exercises/${id}/state`, { method: 'DELETE' }).catch(() => {});
   };
 
   const handleSaveEdits = async () => {
@@ -384,8 +565,68 @@ export default function ExerciseView() {
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
+
+  function QEditor({ value, onChange, label, placeholder, minRows = 2 }) {
+    const editor = useEditor({
+      extensions: [
+        StarterKit,
+        Markdown,
+        Table.configure({ resizable: true }),
+        TableRow,
+        TableHeader,
+        TableCell,
+        Link,
+        Image,
+        ResizableImageExtension.configure({ inline: true, allowBase64: true }),
+      ],
+      content: value || '',
+      onUpdate: ({ editor }) => {
+        onChange(editor.getHTML());
+      },
+      editorProps: {
+        attributes: { class: 'prose prose-sm max-w-none focus:outline-none' }
+      }
+    });
+
+    return (
+      <Box>
+        {label && <Text size="sm" fw={500} mb={4}>{label}</Text>}
+        <Box
+          style={{
+            border: '1px solid var(--mantine-color-gray-3)',
+            borderRadius: 'var(--mantine-radius-sm)',
+            overflow: 'hidden'
+          }}
+        >
+          <Group gap={4} p={4} style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', background: 'var(--mantine-color-gray-0)' }}>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => editor?.chain().focus().toggleBold().run()}>
+              <Text fw={700} size="xs">B</Text>
+            </ActionIcon>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => editor?.chain().focus().toggleItalic().run()}>
+              <Text fs="italic" size="xs">I</Text>
+            </ActionIcon>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => editor?.chain().focus().toggleBulletList().run()}>
+              <Text size="xs">•</Text>
+            </ActionIcon>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => editor?.chain().focus().toggleOrderedList().run()}>
+              <Text size="xs">1.</Text>
+            </ActionIcon>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}>
+              <Text size="xs" fw={700}>H2</Text>
+            </ActionIcon>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}>
+              <Text size="xs" fw={700}>H3</Text>
+            </ActionIcon>
+          </Group>
+          <Box p="sm" style={{ minHeight: minRows * 24 }}>
+            <EditorContent editor={editor} />
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
 
   const taskActive = processingStatus && (processingStatus.status === 'pending' || processingStatus.status === 'processing' || processingStatus.status === 'running');
   const taskFailed = processingStatus && (processingStatus.status === 'failed' || processingStatus.status === 'cancelled');
@@ -588,59 +829,150 @@ export default function ExerciseView() {
                       <Card key={idx} withBorder mb="sm" shadow="xs">
                         <Group justify="space-between" mb="xs">
                           <Text fw={500}>Question {idx + 1}</Text>
-                          <ActionIcon color="red" variant="subtle" onClick={() => {
-                            const newQs = [...editedQuestions];
-                            newQs.splice(idx, 1);
-                            setEditedQuestions(newQs);
-                          }}><IconTrash size={16} /></ActionIcon>
+                          <Group gap={4}>
+                            <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => {
+                              // Auto-fill topic and reference_quote using AI
+                              const text = q.question_text?.replace(/<[^>]*>/g, '') || '';
+                              const answer = q.answer_text?.replace(/<[^>]*>/g, '') || '';
+                              if (text.length > 10) {
+                                // Use basic extraction: first meaningful words
+                                const words = text.split(/\s+/).filter(w => w.length > 2);
+                                const topic = words.slice(0, 5).join(' ');
+                                const newQs = [...editedQuestions];
+                                if (!newQs[idx].topic) {
+                                  newQs[idx].topic = topic;
+                                }
+                                if (!newQs[idx].reference_quote) {
+                                  newQs[idx].reference_quote = text.slice(0, 200);
+                                }
+                                setEditedQuestions(newQs);
+                              }
+                            }}>
+                              <IconBolt size={16} />
+                            </ActionIcon>
+                            <ActionIcon color="red" variant="subtle" onClick={() => {
+                              const newQs = [...editedQuestions];
+                              newQs.splice(idx, 1);
+                              setEditedQuestions(newQs);
+                            }}><IconTrash size={16} /></ActionIcon>
+                          </Group>
                         </Group>
                         <Stack spacing="xs">
-                          <Select 
-                            label="Type" 
-                            data={['subjective', 'objective', 'fill_in_the_blank']} 
-                            value={q.question_type} 
-                            onChange={(v) => {
+                          <Group grow>
+                            <Select 
+                              label="Type" 
+                              data={['subjective', 'objective', 'fill_in_the_blank']} 
+                              value={q.question_type} 
+                              onChange={(v) => {
+                                const newQs = [...editedQuestions];
+                                newQs[idx].question_type = v;
+                                setEditedQuestions(newQs);
+                              }}
+                            />
+                            <Select 
+                              label="Score Display" 
+                              data={[
+                                { value: '', label: 'Auto' },
+                                { value: 'objective', label: 'Objective' },
+                                { value: 'subjective', label: 'Subjective' },
+                                { value: 'both', label: 'Both' },
+                              ]}
+                              value={q.score_type || ''}
+                              onChange={(v) => {
+                                const newQs = [...editedQuestions];
+                                newQs[idx].score_type = v;
+                                setEditedQuestions(newQs);
+                              }}
+                            />
+                          </Group>
+                          <QEditor
+                            label="Question Text"
+                            value={q.question_text || ''}
+                            onChange={(html) => {
                               const newQs = [...editedQuestions];
-                              newQs[idx].question_type = v;
+                              newQs[idx].question_text = html;
                               setEditedQuestions(newQs);
                             }}
                           />
-                          <Textarea label="Question Text" value={q.question_text} onChange={(e) => {
-                            const newQs = [...editedQuestions];
-                            newQs[idx].question_text = e.currentTarget.value;
-                            setEditedQuestions(newQs);
-                          }} />
-                          <Textarea label="Correct Answer" value={q.answer_text} onChange={(e) => {
-                            const newQs = [...editedQuestions];
-                            newQs[idx].answer_text = e.currentTarget.value;
-                            setEditedQuestions(newQs);
-                          }} />
-                          <TextInput label="Topic" value={q.topic || ''} onChange={(e) => {
-                            const newQs = [...editedQuestions];
-                            newQs[idx].topic = e.currentTarget.value;
-                            setEditedQuestions(newQs);
-                          }} />
-                          <Textarea label="Reference Quote" value={q.reference_quote || ''} onChange={(e) => {
-                            const newQs = [...editedQuestions];
-                            newQs[idx].reference_quote = e.currentTarget.value;
-                            setEditedQuestions(newQs);
-                          }} />
-                          {q.question_type === 'objective' && (
-                            <Textarea label="Options (JSON Array)" value={typeof q.options === 'string' ? q.options : JSON.stringify(q.options || [])} onChange={(e) => {
+                          <QEditor
+                            label="Correct Answer"
+                            value={q.answer_text || ''}
+                            onChange={(html) => {
                               const newQs = [...editedQuestions];
-                              newQs[idx].options = e.currentTarget.value;
+                              newQs[idx].answer_text = html;
                               setEditedQuestions(newQs);
-                            }} />
+                            }}
+                          />
+                          {q.question_type === 'objective' && (
+                            <QEditor
+                              label="Options (one per line)"
+                              value={typeof q.options === 'string' ? q.options : (Array.isArray(q.options) ? q.options.join('\n') : '')}
+                              onChange={(html) => {
+                                const newQs = [...editedQuestions];
+                                const text = html.replace(/<[^>]*>/g, '').trim();
+                                newQs[idx].options = text ? text.split('\n').filter(Boolean) : [];
+                                setEditedQuestions(newQs);
+                              }}
+                              minRows={3}
+                            />
                           )}
+                          <Box>
+                            <Group gap="xs" align="flex-end">
+                              <TextInput
+                                label="Topic"
+                                value={q.topic || ''}
+                                onChange={(e) => {
+                                  const newQs = [...editedQuestions];
+                                  newQs[idx].topic = e.currentTarget.value;
+                                  setEditedQuestions(newQs);
+                                }}
+                                style={{ flex: 1 }}
+                                placeholder={q.question_text ? 'Auto-detected from question' : 'Enter topic'}
+                              />
+                              <Group gap={4}>
+                                <ActionIcon variant="subtle" color="gray" size="sm" onClick={async () => {
+                                  try {
+                                    const fileInput = document.createElement('input');
+                                    fileInput.type = 'file';
+                                    fileInput.accept = 'image/*';
+                                    fileInput.onchange = async () => {
+                                      const file = fileInput.files?.[0];
+                                      if (!file) return;
+                                      const url = await handleImageUploadFlow(file, id, 'exercises');
+                                      if (url) {
+                                        // Insert image into the question text editor
+                                        // For simplicity, show the URL
+                                        const newQs = [...editedQuestions];
+                                        newQs[idx].reference_quote = (newQs[idx].reference_quote || '') + `\n![image](${url})`;
+                                        setEditedQuestions(newQs);
+                                      }
+                                    };
+                                    fileInput.click();
+                                  } catch (e) {
+                                    console.error(e);
+                                  }
+                                }}>
+                                  <IconPhotoPlus size={16} />
+                                </ActionIcon>
+                              </Group>
+                            </Group>
+                            <Text size="xs" c="dimmed" mt={2}>Leave empty to auto-detect. Click ⚡ to auto-fill topic and reference quote.</Text>
+                          </Box>
                         </Stack>
                       </Card>
                     ))}
                     <Button variant="light" fullWidth leftSection={<IconPlus size={16} />} onClick={() => {
-                      setEditedQuestions([...editedQuestions, { id: String(Date.now()), question_type: 'subjective', question_text: '', answer_text: '' }]);
+                      setEditedQuestions([...editedQuestions, { id: String(Date.now()), question_type: 'subjective', score_type: '', question_text: '', answer_text: '' }]);
                     }}>Add Question</Button>
                   </Box>
                 ) : (
-                  (exercise.questions || []).map((q, idx) => {
+                  (() => {
+                    const questions = exercise.questions || [];
+                    const orderedQuestions = questionOrder === 'randomized'
+                      ? shuffledIndices.map(i => ({ q: questions[i], displayIdx: i, orderIdx: i }))
+                      : questions.map((q, i) => ({ q, displayIdx: i, orderIdx: i }));
+                    return orderedQuestions.map(({ q, displayIdx }) => {
+                    const idx = displayIdx;
                     const isExam = viewMode === 'exam';
                     const isInteractive = viewMode === 'interactive' || isExam;
                     const hasGraded = !!gradingResults[q.id];
@@ -785,13 +1117,19 @@ export default function ExerciseView() {
                             )}
                             
                             {explanation && showExplanations[q.id] && (
+                              <Box>
                                 <Paper mt="md" p="md" bg="var(--mantine-color-white)" radius="sm" withBorder>
                                   <Group justify="space-between" align="flex-start" wrap="nowrap">
                                     {explainLoading[q.id] ? (
-                                       <Group gap="xs"><Loader size="xs" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
+                                       <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
                                     ) : (
                                       <>
-                                        <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b> {explanation}</Text>
+                                        <Box style={{ flex: 1, minWidth: 0 }}>
+                                          <Text size="sm" mb={4}><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b></Text>
+                                          <Box className="markdown-content" size="sm">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{explanation}</ReactMarkdown>
+                                          </Box>
+                                        </Box>
                                         <Menu position="bottom-end" shadow="sm">
                                           <Menu.Target>
                                             <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
@@ -805,6 +1143,9 @@ export default function ExerciseView() {
                                             <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
                                               Hide Explanation
                                             </Menu.Item>
+                                            <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); setSidebarChatInput('Can you elaborate on this explanation?'); openSidebarChat(); }}>
+                                              Ask Follow-up
+                                            </Menu.Item>
                                             <Menu.Divider />
                                             <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(q.id); }}>
                                               Delete Explanation
@@ -815,6 +1156,30 @@ export default function ExerciseView() {
                                     )}
                                   </Group>
                                 </Paper>
+                                <Group mt="xs" gap="xs">
+                                  <TextInput
+                                    placeholder="Ask a follow-up question..."
+                                    size="xs"
+                                    style={{ flex: 1 }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        const val = e.currentTarget.value.trim();
+                                        if (val) {
+                                          setSidebarChatInput(val);
+                                          openSidebarChat();
+                                        }
+                                      }
+                                    }}
+                                  />
+                                  <Button size="xs" variant="light" onClick={(e) => {
+                                    const input = e.currentTarget.parentElement?.querySelector('input');
+                                    if (input && input.value.trim()) {
+                                      setSidebarChatInput(input.value.trim());
+                                      openSidebarChat();
+                                    }
+                                  }}>Ask</Button>
+                                </Group>
+                              </Box>
                             )}
                           </Box>
                         ) : (
@@ -850,36 +1215,69 @@ export default function ExerciseView() {
                                     
                                     <Box mt="md">
                                       {explanation && showExplanations[q.id] && (
-                                        <Paper p="md" bg="var(--mantine-color-white)" radius="sm" mb="sm">
-                                          <Group justify="space-between" align="flex-start" wrap="nowrap">
-                                            {explainLoading[q.id] ? (
-                                               <Group gap="xs"><Loader size="xs" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
-                                            ) : (
-                                              <>
-                                                <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b> {explanation}</Text>
-                                                <Menu position="bottom-end" shadow="sm">
-                                                  <Menu.Target>
-                                                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
-                                                      <IconDotsVertical size={14} />
-                                                    </ActionIcon>
-                                                  </Menu.Target>
-                                                  <Menu.Dropdown>
-                                                    <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }}>
-                                                      Regenerate
-                                                    </Menu.Item>
-                                                    <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
-                                                      Hide
-                                                    </Menu.Item>
-                                                    <Menu.Divider />
-                                                    <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(q.id); }}>
-                                                      Delete
-                                                    </Menu.Item>
-                                                  </Menu.Dropdown>
-                                                </Menu>
-                                              </>
-                                            )}
+                                        <Box>
+                                          <Paper p="md" bg="var(--mantine-color-white)" radius="sm" mb="sm">
+                                            <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                              {explainLoading[q.id] ? (
+                                                 <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
+                                              ) : (
+                                                <>
+                                                  <Box style={{ flex: 1, minWidth: 0 }}>
+                                                    <Text size="sm" mb={4}><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b></Text>
+                                                    <Box className="markdown-content" size="sm">
+                                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{explanation}</ReactMarkdown>
+                                                    </Box>
+                                                  </Box>
+                                                  <Menu position="bottom-end" shadow="sm">
+                                                    <Menu.Target>
+                                                      <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
+                                                        <IconDotsVertical size={14} />
+                                                      </ActionIcon>
+                                                    </Menu.Target>
+                                                    <Menu.Dropdown>
+                                                      <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }}>
+                                                        Regenerate
+                                                      </Menu.Item>
+                                                      <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
+                                                        Hide
+                                                      </Menu.Item>
+                                                      <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); setSidebarChatInput('Can you elaborate on this explanation?'); openSidebarChat(); }}>
+                                                        Ask Follow-up
+                                                      </Menu.Item>
+                                                      <Menu.Divider />
+                                                      <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(q.id); }}>
+                                                        Delete
+                                                      </Menu.Item>
+                                                    </Menu.Dropdown>
+                                                  </Menu>
+                                                </>
+                                              )}
+                                            </Group>
+                                          </Paper>
+                                          <Group mt="xs" gap="xs" mb="sm">
+                                            <TextInput
+                                              placeholder="Ask a follow-up question..."
+                                              size="xs"
+                                              style={{ flex: 1 }}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  const val = e.currentTarget.value.trim();
+                                                  if (val) {
+                                                    setSidebarChatInput(val);
+                                                    openSidebarChat();
+                                                  }
+                                                }
+                                              }}
+                                            />
+                                            <Button size="xs" variant="light" onClick={(e) => {
+                                              const input = e.currentTarget.parentElement?.querySelector('input');
+                                              if (input && input.value.trim()) {
+                                                setSidebarChatInput(input.value.trim());
+                                                openSidebarChat();
+                                              }
+                                            }}>Ask</Button>
                                           </Group>
-                                        </Paper>
+                                        </Box>
                                       )}
                                       
                                       <Group gap="xs" mt="xs">
@@ -908,7 +1306,8 @@ export default function ExerciseView() {
                         )}
                       </Card>
                     );
-                  })
+                  });
+                })()
                 )}
 
                 {!editMode && viewMode === 'interactive' && exercise.questions?.length > 0 && (
@@ -933,7 +1332,67 @@ export default function ExerciseView() {
         {!taskActive && (
         <Box w={sidebarOpen ? 280 : 80} visibleFrom="sm" style={{ borderLeft: '1px solid #eaeaea', backgroundColor: '#ffffff', display: 'flex', flexDirection: 'column', transition: 'width 200ms ease, min-width 200ms ease', minWidth: sidebarOpen ? 280 : 80, overflow: 'hidden' }} p="md">
           <Box style={{ flex: 1, overflowY: 'auto' }}>
-            <Stack gap={0} align="stretch">
+            {sidebarChatActive && sidebarOpen ? (
+              /* Chat Pane */
+              <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <Group justify="space-between" mb="sm">
+                  <Text fw={600} size="sm">Quick Chat</Text>
+                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeSidebarChat}>
+                    <IconLayoutSidebarRightCollapse size={16} />
+                  </ActionIcon>
+                </Group>
+                <Divider mb="sm" />
+                <Box style={{ flex: 1, overflowY: 'auto' }} mb="sm">
+                  {sidebarChatMessages.length === 0 ? (
+                    <Text size="sm" c="dimmed" ta="center" mt="xl">Ask a question about this exercise.</Text>
+                  ) : (
+                    <Stack spacing="sm">
+                      {sidebarChatMessages.map((m, i) => (
+                        <Box key={m.id || i}>
+                          <Paper p="xs" bg="var(--mantine-color-blue-0)" radius="sm" mb={4}>
+                            <Text size="xs" fw={600} c="blue.8">You</Text>
+                            <Text size="sm">{m.message}</Text>
+                          </Paper>
+                          {m.response && (
+                            <Paper p="xs" bg="var(--mantine-color-gray-0)" radius="sm">
+                              <Text size="xs" fw={600} c="dimmed">AI</Text>
+                              <Box className="markdown-content" size="sm">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.response}</ReactMarkdown>
+                              </Box>
+                            </Paper>
+                          )}
+                        </Box>
+                      ))}
+                      {sidebarChatLoading && (
+                        <Group gap="xs">
+                          <Loader size="xs" />
+                          <Text size="sm" c="dimmed">Thinking...</Text>
+                        </Group>
+                      )}
+                    </Stack>
+                  )}
+                </Box>
+                <Group gap="xs">
+                  <Textarea
+                    placeholder="Ask a follow-up..."
+                    value={sidebarChatInput}
+                    onChange={(e) => setSidebarChatInput(e.currentTarget.value)}
+                    minRows={1}
+                    maxRows={3}
+                    style={{ flex: 1 }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendSidebarChatMessage();
+                      }
+                    }}
+                    disabled={sidebarChatLoading}
+                  />
+                  <Button size="sm" onClick={sendSidebarChatMessage} loading={sidebarChatLoading}>Send</Button>
+                </Group>
+              </Box>
+            ) : (
+              <Stack gap={0} align="stretch">
               {sidebarOpen && (
                 <Box mb="md">
                   <Title order={5} fw={600} c="dimmed" mb="xs">Exercise Info</Title>
@@ -1004,6 +1463,14 @@ export default function ExerciseView() {
                     />
                   </Tooltip>
 
+                  <Tooltip label="Quick Chat" disabled={sidebarOpen} position="left">
+                    <MantineNavLink
+                      label={sidebarOpen ? "Quick Chat" : ""}
+                      leftSection={<IconMessageDots size="1.2rem" stroke={1.5} color="var(--mantine-color-grape-6)" />}
+                      onClick={() => openSidebarChat()}
+                    />
+                  </Tooltip>
+
                   <Tooltip label="Reset Exercise" disabled={sidebarOpen} position="left">
                     <MantineNavLink
                       label={sidebarOpen ? "Reset Exercise" : ""}
@@ -1011,6 +1478,24 @@ export default function ExerciseView() {
                       onClick={handleResetExercise}
                     />
                   </Tooltip>
+
+                  {questionOrder === 'original' ? (
+                    <Tooltip label="Randomize Question Order" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Randomize Order" : ""}
+                        leftSection={<IconArrowsShuffle size="1.2rem" stroke={1.5} />}
+                        onClick={shuffleQuestions}
+                      />
+                    </Tooltip>
+                  ) : (
+                    <Tooltip label="Restore Original Order" disabled={sidebarOpen} position="left">
+                      <MantineNavLink
+                        label={sidebarOpen ? "Restore Order" : ""}
+                        leftSection={<IconSortAscending size="1.2rem" stroke={1.5} color="var(--mantine-color-blue-6)" />}
+                        onClick={restoreQuestionOrder}
+                      />
+                    </Tooltip>
+                  )}
 
                   <Menu position="left-start" withArrow>
                     <Menu.Target>
@@ -1080,6 +1565,60 @@ export default function ExerciseView() {
                       )}
                     </Box>
                   )}
+
+                  {sidebarOpen && (
+                    <Box mt="md">
+                      <Divider my="sm" />
+                      <Text fw={500} size="sm" mb="xs">Recent Activity</Text>
+                      {(() => {
+                        const questions = exercise.questions || [];
+                        const answeredQuestions = questions
+                          .map((q, idx) => ({
+                            q,
+                            idx,
+                            hasAnswer: !!userAnswers[q.id],
+                            grade: gradingResults[q.id],
+                            answerTime: answerTimestamps[q.id] || 0,
+                          }))
+                          .filter(a => a.hasAnswer || a.grade)
+                          .sort((a, b) => (b.answerTime || 0) - (a.answerTime || 0))
+                          .slice(0, 5);
+                        if (answeredQuestions.length === 0) {
+                          return <Text size="xs" c="dimmed" fs="italic">No questions attempted yet.</Text>;
+                        }
+                        return answeredQuestions.map(({ q, idx, hasAnswer, grade }) => {
+                          let statusColor = 'gray';
+                          let statusIcon = '—';
+                          let statusLabel = 'Unanswered';
+                          if (grade) {
+                            if (grade.is_correct) { statusColor = 'green'; statusIcon = '✓'; statusLabel = 'Correct'; }
+                            else { statusColor = 'red'; statusIcon = '✗'; statusLabel = 'Wrong'; }
+                          } else if (hasAnswer) {
+                            statusColor = 'yellow'; statusIcon = '○'; statusLabel = 'Pending';
+                          }
+                          return (
+                            <Paper
+                              key={q.id}
+                              p="xs"
+                              withBorder
+                              bg="white"
+                              mb={4}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => {
+                                setHistoryModalQuestion({ ...q, idx, userAnswer: userAnswers[q.id], grade });
+                                setHistoryModalOpened(true);
+                              }}
+                            >
+                              <Group justify="space-between" wrap="nowrap">
+                                <Text size="xs" lineClamp={1} style={{ flex: 1 }}>Q{idx + 1}. {q.question_text}</Text>
+                                <Badge size="xs" color={statusColor} variant="light">{statusIcon} {statusLabel}</Badge>
+                              </Group>
+                            </Paper>
+                          );
+                        });
+                      })()}
+                    </Box>
+                  )}
                 </>
               ) : (
                 <>
@@ -1101,6 +1640,7 @@ export default function ExerciseView() {
                 </>
               )}
             </Stack>
+            )}
           </Box>
           <Box mt="auto" pt="sm">
             <Tooltip label={sidebarOpen ? "Hide Sidebar" : "Show Sidebar"} position="left">
@@ -1177,6 +1717,99 @@ export default function ExerciseView() {
         </Stack>
       </Modal>
 
+      {/* Conversations Modal */}
+      <Modal
+        opened={showConvList}
+        onClose={() => setShowConvList(false)}
+        title={<Text fw={700} size="lg">Exercise Conversations</Text>}
+        size="md"
+        radius="md"
+        padding="xl"
+      >
+        {exerciseConversations.length === 0 ? (
+          <Text size="sm" c="dimmed" ta="center" py="xl">No conversations yet. Start a chat to begin one.</Text>
+        ) : (
+          <Stack spacing="xs">
+            {exerciseConversations.map((conv) => (
+              <Paper
+                key={conv.conversation_id}
+                p="sm"
+                withBorder
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  setShowConvList(false);
+                  openSidebarChat(conv.conversation_id);
+                }}
+              >
+                <Group justify="space-between" wrap="nowrap">
+                  <Text size="sm" fw={500} lineClamp={1}>{conv.title}</Text>
+                  <Text size="xs" c="dimmed">{conv.message_count} msgs</Text>
+                </Group>
+              </Paper>
+            ))}
+          </Stack>
+        )}
+      </Modal>
+
+      {/* History Modal */}
+      <Modal
+        opened={historyModalOpened}
+        onClose={() => setHistoryModalOpened(false)}
+        title={<Text fw={700} size="lg">Question Review</Text>}
+        size="lg"
+        radius="md"
+        padding="xl"
+      >
+        {historyModalQuestion && (
+          <Stack spacing="md">
+            <Text fw={600} size="lg">Q{historyModalQuestion.idx + 1}. {historyModalQuestion.question_text}</Text>
+
+            {historyModalQuestion.userAnswer ? (
+              <Box>
+                <Text fw={500} size="sm" c="dimmed">Your Answer:</Text>
+                <Paper p="sm" bg="var(--mantine-color-gray-0)" radius="sm" withBorder>
+                  <Text>{historyModalQuestion.userAnswer}</Text>
+                </Paper>
+              </Box>
+            ) : (
+              <Text size="sm" c="dimmed" fs="italic">You did not answer this question.</Text>
+            )}
+
+            <Box>
+              <Text fw={500} size="sm" c="dimmed">Correct Answer:</Text>
+              <Paper p="sm" bg="var(--mantine-color-blue-0)" radius="sm" withBorder>
+                <Text>{historyModalQuestion.answer_text || "No answer provided."}</Text>
+              </Paper>
+            </Box>
+
+            {historyModalQuestion.grade && (
+              <Alert
+                color={historyModalQuestion.grade.is_correct ? 'green' : 'red'}
+                icon={historyModalQuestion.grade.is_correct ? <IconCheck /> : <IconX />}
+              >
+                <Text fw={500}>{historyModalQuestion.grade.is_correct ? 'Correct!' : 'Incorrect'}</Text>
+                {historyModalQuestion.grade.feedback && (
+                  <Text size="sm" mt={4}>{historyModalQuestion.grade.feedback}</Text>
+                )}
+              </Alert>
+            )}
+
+            {(historyModalQuestion.explanation || explanations[historyModalQuestion.id]) && (
+              <Box>
+                <Text fw={500} size="sm" c="dimmed" mb={4}>Explanation:</Text>
+                <Paper p="md" bg="var(--mantine-color-white)" radius="sm" withBorder>
+                  <Box className="markdown-content">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {historyModalQuestion.explanation || explanations[historyModalQuestion.id]}
+                    </ReactMarkdown>
+                  </Box>
+                </Paper>
+              </Box>
+            )}
+          </Stack>
+        )}
+      </Modal>
+
       {/* Mobile Smart Actions Drawer */}
       <Drawer
         opened={mobileActionsOpened}
@@ -1242,10 +1875,28 @@ export default function ExerciseView() {
                     onClick={() => { closeMobileActions(); setEditMode(true); }}
                   />
                   <MantineNavLink
+                    label="Quick Chat"
+                    leftSection={<IconMessageDots size="1.2rem" stroke={1.5} color="var(--mantine-color-grape-6)" />}
+                    onClick={() => { closeMobileActions(); openSidebarChat(); }}
+                  />
+                  <MantineNavLink
                     label="Reset Exercise"
                     leftSection={<IconRefresh size="1.2rem" stroke={1.5} color="var(--mantine-color-orange-6)" />}
                     onClick={() => { closeMobileActions(); handleResetExercise(); }}
                   />
+                  {questionOrder === 'original' ? (
+                    <MantineNavLink
+                      label="Randomize Order"
+                      leftSection={<IconArrowsShuffle size="1.2rem" stroke={1.5} />}
+                      onClick={() => { closeMobileActions(); shuffleQuestions(); }}
+                    />
+                  ) : (
+                    <MantineNavLink
+                      label="Restore Order"
+                      leftSection={<IconSortAscending size="1.2rem" stroke={1.5} color="var(--mantine-color-blue-6)" />}
+                      onClick={() => { closeMobileActions(); restoreQuestionOrder(); }}
+                    />
+                  )}
                   <Menu position="right-start" withArrow>
                     <Menu.Target>
                       <MantineNavLink
@@ -1308,6 +1959,58 @@ export default function ExerciseView() {
                       )}
                     </Box>
                   )}
+
+                  <Divider my="sm" mx="sm" />
+                  <Text size="xs" fw={600} c="dimmed" tt="uppercase" mb="xs" px="sm">Recent Activity</Text>
+                  <Box px="sm">
+                    {(() => {
+                      const questions = exercise.questions || [];
+                      const answeredQuestions = questions
+                        .map((q, idx) => ({
+                          q, idx,
+                          hasAnswer: !!userAnswers[q.id],
+                          grade: gradingResults[q.id],
+                          answerTime: answerTimestamps[q.id] || 0,
+                        }))
+                        .filter(a => a.hasAnswer || a.grade)
+                        .sort((a, b) => (b.answerTime || 0) - (a.answerTime || 0))
+                        .slice(0, 5);
+                      if (answeredQuestions.length === 0) {
+                        return <Text size="xs" c="dimmed" fs="italic">No questions attempted yet.</Text>;
+                      }
+                      return answeredQuestions.map(({ q, idx, hasAnswer, grade }) => {
+                        let statusColor = 'gray';
+                        let statusIcon = '—';
+                        let statusLabel = 'Unanswered';
+                        if (grade) {
+                          if (grade.is_correct) { statusColor = 'green'; statusIcon = '✓'; statusLabel = 'Correct'; }
+                          else { statusColor = 'red'; statusIcon = '✗'; statusLabel = 'Wrong'; }
+                        } else if (hasAnswer) {
+                          statusColor = 'yellow'; statusIcon = '○'; statusLabel = 'Pending';
+                        }
+                        return (
+                          <Paper
+                            key={q.id}
+                            p="xs"
+                            withBorder
+                            bg="white"
+                            mb={4}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => {
+                              closeMobileActions();
+                              setHistoryModalQuestion({ ...q, idx, userAnswer: userAnswers[q.id], grade });
+                              setHistoryModalOpened(true);
+                            }}
+                          >
+                            <Group justify="space-between" wrap="nowrap">
+                              <Text size="xs" lineClamp={1} style={{ flex: 1 }}>Q{idx + 1}. {q.question_text}</Text>
+                              <Badge size="xs" color={statusColor} variant="light">{statusIcon} {statusLabel}</Badge>
+                            </Group>
+                          </Paper>
+                        );
+                      });
+                    })()}
+                  </Box>
                 </>
               ) : (
                 <>
