@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments, IconSend, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconLayoutCards, IconFileText, IconList, IconListNumbers, IconTable } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 import ReactMarkdown from 'react-markdown';
@@ -50,7 +50,16 @@ export default function ExerciseView() {
   const [viewMode, setViewMode] = useState(mode && urlToMode[mode] ? urlToMode[mode] : 'hide');
   const [editMode, setEditMode] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`exercise_chat_state_${id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.sidebarOpen === 'boolean') return parsed.sidebarOpen;
+      }
+    } catch {}
+    return true;
+  });
   const [mobileActionsOpened, { open: openMobileActions, close: closeMobileActions }] = useDisclosure(false);
 
   useEffect(() => {
@@ -150,23 +159,44 @@ export default function ExerciseView() {
 
   // Chat param labels/icons
   const modeLabels = { quick: 'Quick', simple: 'Simple', normal: 'Normal', elaborate: 'Elaborate', eli5: 'ELI5' };
-  const modeIcons = { quick: '⚡', simple: '📝', normal: '⚖️', elaborate: '🔬', eli5: '🧒' };
+  const modeIcons = { quick: <IconBolt size={14} />, simple: <IconWand size={14} />, normal: <IconBrain size={14} />, elaborate: <IconSchool size={14} />, eli5: <IconBabyCarriage size={14} /> };
   const formatLabels = { sentence: 'Sentence', pointform: 'Pointform', numbered_list: 'Numbered', table: 'Table', mix: 'Mix' };
-  const formatIcons = { sentence: '📄', pointform: '•', numbered_list: '🔢', table: '📊', mix: '🔀' };
+  const formatIcons = { mix: <IconLayoutCards size={14} />, sentence: <IconFileText size={14} />, pointform: <IconList size={14} />, numbered_list: <IconListNumbers size={14} />, table: <IconTable size={14} /> };
 
   // Sidebar chat
-  const [sidebarChatActive, setSidebarChatActive] = useState(false);
-  const [sidebarChatConversationId, setSidebarChatConversationId] = useState(null);
-  const [sidebarChatMessages, setSidebarChatMessages] = useState([]);
-  const [sidebarChatInput, setSidebarChatInput] = useState('');
+  const getSavedChat = () => {
+    try {
+      const saved = localStorage.getItem(`exercise_chat_state_${id}`);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  };
+  const savedChat = getSavedChat();
+  const [sidebarChatActive, setSidebarChatActive] = useState(savedChat.sidebarChatActive ?? false);
+  const [sidebarChatConversationId, setSidebarChatConversationId] = useState(savedChat.sidebarChatConversationId ?? null);
+  const [sidebarChatMessages, setSidebarChatMessages] = useState(savedChat.sidebarChatMessages ?? []);
+  const [sidebarChatInput, setSidebarChatInput] = useState(savedChat.sidebarChatInput ?? '');
   const [sidebarChatLoading, setSidebarChatLoading] = useState(false);
   const [sidebarChatTaskId, setSidebarChatTaskId] = useState(null);
   const [sidebarChatPollInterval, setSidebarChatPollInterval] = useState(null);
   const [exerciseConversations, setExerciseConversations] = useState([]);
   const [showConvList, setShowConvList] = useState(false);
-  const [sidebarAiMode, setSidebarAiMode] = useState('quick');
-  const [sidebarOutputFormat, setSidebarOutputFormat] = useState('sentence');
-  const [sidebarSettingsOpen, setSidebarSettingsOpen] = useState(false);
+  const [sidebarAiMode, setSidebarAiMode] = useState(savedChat.sidebarAiMode ?? 'quick');
+  const [sidebarOutputFormat, setSidebarOutputFormat] = useState(savedChat.sidebarOutputFormat ?? 'sentence');
+  const [sidebarSettingsOpen, setSidebarSettingsOpen] = useState(savedChat.sidebarSettingsOpen ?? false);
+
+  useEffect(() => {
+    localStorage.setItem(`exercise_chat_state_${id}`, JSON.stringify({
+      sidebarOpen,
+      sidebarChatActive,
+      sidebarChatConversationId,
+      sidebarChatMessages,
+      sidebarChatInput,
+      sidebarAiMode,
+      sidebarOutputFormat,
+      sidebarSettingsOpen,
+    }));
+  }, [id, sidebarOpen, sidebarChatActive, sidebarChatConversationId, sidebarChatMessages, sidebarChatInput, sidebarAiMode, sidebarOutputFormat, sidebarSettingsOpen]);
 
   const openSidebarChat = async (conversationId = null) => {
     setSidebarChatActive(true);
@@ -1344,44 +1374,10 @@ export default function ExerciseView() {
               <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Group justify="space-between" mb="sm">
                   <Text fw={600} size="sm">Quick Chat</Text>
-                  <Group gap={4}>
-                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setSidebarSettingsOpen(!sidebarSettingsOpen)}>
-                      <IconAdjustments size={16} />
-                    </ActionIcon>
-                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeSidebarChat}>
-                      <IconLayoutSidebarRightCollapse size={16} />
-                    </ActionIcon>
-                  </Group>
+                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeSidebarChat}>
+                    <IconLayoutSidebarRightCollapse size={16} />
+                  </ActionIcon>
                 </Group>
-                {sidebarSettingsOpen ? (
-                  <Box mb="sm">
-                    <Text size="xs" fw={600} c="dimmed" mb={4}>AI Mode</Text>
-                    <Group gap={4} mb="xs" wrap="wrap">
-                      {['quick', 'simple', 'normal', 'elaborate', 'eli5'].map(mode => (
-                        <Badge key={mode} component="button" onClick={() => setSidebarAiMode(mode)}
-                          variant={sidebarAiMode === mode ? "filled" : "light"} size="sm" fw={600}
-                          style={{ cursor: 'pointer' }}>
-                          {modeLabels[mode]}
-                        </Badge>
-                      ))}
-                    </Group>
-                    <Text size="xs" fw={600} c="dimmed" mb={4}>Output Format</Text>
-                    <Group gap={4} mb="xs" wrap="wrap">
-                      {['sentence', 'pointform', 'numbered_list', 'table', 'mix'].map(fmt => (
-                        <Badge key={fmt} color="teal" component="button" onClick={() => setSidebarOutputFormat(fmt)}
-                          variant={sidebarOutputFormat === fmt ? "filled" : "light"} size="sm" fw={600}
-                          style={{ cursor: 'pointer' }}>
-                          {formatLabels[fmt]}
-                        </Badge>
-                      ))}
-                    </Group>
-                  </Box>
-                ) : (
-                  <Group gap={4} mb="sm" wrap="wrap">
-                    <Badge variant="light" size="sm" tt="capitalize" fw={600}>{modeIcons[sidebarAiMode]} {modeLabels[sidebarAiMode]}</Badge>
-                    <Badge color="teal" variant="light" size="sm" tt="capitalize" fw={600}>{formatIcons[sidebarOutputFormat]} {formatLabels[sidebarOutputFormat]}</Badge>
-                  </Group>
-                )}
                 <Divider mb="sm" />
                 <Box style={{ flex: 1, overflowY: 'auto' }} mb="sm">
                   {sidebarChatMessages.length === 0 ? (
@@ -1413,7 +1409,44 @@ export default function ExerciseView() {
                     </Stack>
                   )}
                 </Box>
-                <Group gap="xs">
+                {sidebarSettingsOpen ? (
+                  <Box mb="xs">
+                    <Text size="xs" fw={600} c="dimmed" mb={4}>AI Mode</Text>
+                    <Group gap={4} mb="xs" wrap="wrap">
+                      {['quick', 'simple', 'normal', 'elaborate', 'eli5'].map(mode => (
+                        <Badge key={mode} component="button" onClick={() => setSidebarAiMode(mode)}
+                          variant={sidebarAiMode === mode ? "filled" : "light"} size="sm" fw={600}
+                          style={{ cursor: 'pointer' }}>
+                          {modeLabels[mode]}
+                        </Badge>
+                      ))}
+                    </Group>
+                    <Text size="xs" fw={600} c="dimmed" mb={4}>Output Format</Text>
+                    <Group gap={4} mb="xs" wrap="wrap">
+                      {['sentence', 'pointform', 'numbered_list', 'table', 'mix'].map(fmt => (
+                        <Badge key={fmt} color="teal" component="button" onClick={() => setSidebarOutputFormat(fmt)}
+                          variant={sidebarOutputFormat === fmt ? "filled" : "light"} size="sm" fw={600}
+                          style={{ cursor: 'pointer' }}>
+                          {formatLabels[fmt]}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </Box>
+                ) : (
+                  <Group gap={4} mb="xs" wrap="wrap">
+                    <Badge variant="light" size="sm" tt="capitalize" fw={600}
+                      style={{ cursor: 'pointer' }} onClick={() => setSidebarSettingsOpen(true)}
+                      leftSection={modeIcons[sidebarAiMode]}>
+                      {modeLabels[sidebarAiMode]}
+                    </Badge>
+                    <Badge color="teal" variant="light" size="sm" tt="capitalize" fw={600}
+                      style={{ cursor: 'pointer' }} onClick={() => setSidebarSettingsOpen(true)}
+                      leftSection={formatIcons[sidebarOutputFormat]}>
+                      {formatLabels[sidebarOutputFormat]}
+                    </Badge>
+                  </Group>
+                )}
+                <Group gap={4} align="stretch">
                   <Textarea
                     placeholder="Ask a follow-up..."
                     value={sidebarChatInput}
@@ -1429,7 +1462,14 @@ export default function ExerciseView() {
                     }}
                     disabled={sidebarChatLoading}
                   />
-                  <Button size="sm" onClick={sendSidebarChatMessage} loading={sidebarChatLoading}>Send</Button>
+                  <ActionIcon variant="filled" color="blue"
+                    onClick={sendSidebarChatMessage}
+                    disabled={!sidebarChatInput.trim() || sidebarChatLoading}
+                    loading={sidebarChatLoading}
+                    style={{ height: '100%', width: 36, minHeight: 36 }}
+                  >
+                    <IconSend size={16} />
+                  </ActionIcon>
                 </Group>
               </Box>
             ) : (
