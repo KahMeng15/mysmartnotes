@@ -311,7 +311,7 @@ class SignalMerger:
 
         # Rank them descending (largest = rank 1)
         sorted_sizes = sorted(heading_sizes, reverse=True)
-        size_to_level = {size: f"h{min(i + 1, 6)}" for i, size in enumerate(sorted_sizes)}
+        size_to_level = {size: (f"h{i + 1}" if i < 3 else "body") for i, size in enumerate(sorted_sizes)}
 
         # Pass 2: Apply semantic overrides and size-based levels
         for block in blocks:
@@ -367,6 +367,11 @@ class SignalMerger:
                 else:
                     seen_first_h1 = True
 
+        if not seen_first_h1:
+            for block in blocks:
+                if block.block_type.startswith("h"):
+                    block.block_type = "h1"
+                    break
         # Pass 5: Remove consecutive duplicate/empty headers
         final_blocks = []
         for block in blocks:
@@ -813,10 +818,16 @@ class SignalMerger:
 
         # Track if we've seen a module-level heading already
         seen_module_heading = False
+        seen_first_h1 = False
 
         cleaned = []
         for block in blocks:
             text = block.text.strip()
+            
+            if block.block_type == "h1" and not seen_first_h1:
+                seen_first_h1 = True
+                cleaned.append(block)
+                continue
 
             # Handle combined "Module Title: X Module Objective: Y" lines
             # Match "Module Title: X" or "Module Title: X Module Objective: Y"

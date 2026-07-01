@@ -1515,3 +1515,5 @@ docker-test-env/*
 scripts/resource_processing_test/input/*
 scripts/resource_processing_test/output/*
 scripts/resource_processing_test/temp_input/*
+
+scripts/resource_processing_test/quality_reports/*

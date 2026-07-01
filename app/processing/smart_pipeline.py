@@ -711,6 +711,8 @@ class SmartPipeline:
         md_parts = []
         BULLET_CHARS = set("•‣◦⁃∙‐‑–—►▪▸➤➢")
         last_slide_title = ""
+        seen_document_h1 = False
+        last_heading_level = 0
 
         # Tracking content for cross-slide deduplication
         for slide_num, slide in enumerate(prs.slides, 1):
@@ -936,6 +938,14 @@ class SmartPipeline:
                             b["type"] = "h2" if word_count <= 8 else "body"
                         else:
                             seen_h1 = True
+                            
+            # Document-level H1 enforcement
+            for b in slide_blocks:
+                if b["type"] == "h1":
+                    if seen_document_h1:
+                        b["type"] = "h2"
+                    else:
+                        seen_document_h1 = True
 
             # Demote h2/h3 blocks if they dominate (>35% of total blocks)
             h23_count = sum(1 for b in slide_blocks if b["type"] in ("h2", "h3"))
@@ -947,6 +957,21 @@ class SmartPipeline:
                 for b in slide_blocks:
                     if b["type"] in ("h2", "h3"):
                         b["type"] = "body"
+
+            # Fix heading jumps (h1 -> h3 becomes h1 -> h2)
+            for b in slide_blocks:
+                btype = b["type"]
+                if btype.startswith("h"):
+                    try:
+                        level = int(btype[1])
+                        if last_heading_level > 0 and level > last_heading_level + 1:
+                            corrected = last_heading_level + 1
+                            logger.debug(f"PPTX: Fixing heading jump h{level}->h{corrected}")
+                            b["type"] = f"h{corrected}"
+                            level = corrected
+                        last_heading_level = level
+                    except ValueError:
+                        pass
 
             # Emit markdown for this slide's blocks
             in_code_block = False

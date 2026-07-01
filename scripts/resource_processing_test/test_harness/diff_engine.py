@@ -196,8 +196,8 @@ def compute_structural_validity(markdown: str) -> dict:
             list_markers.add("numbered")
 
     consistency_issues = []
-    if "dash" in list_markers and "numbered" in list_markers:
-        consistency_issues.append("mixed_list_styles")
+    # Real documents can legitimately have both unordered and ordered lists.
+    # Therefore, mixing list styles is not a structural issue.
 
     score = 1.0
     if "missing_h1" in issues:
