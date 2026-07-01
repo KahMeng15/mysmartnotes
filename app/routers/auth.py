@@ -226,7 +226,7 @@ def validate_invitation_token(db: Session, token: str | None, email: str) -> Use
 
     invitation = (
         db.query(UserInvitation)
-        .filter(UserInvitation.token == token, not UserInvitation.is_used)
+        .filter(UserInvitation.token == token, UserInvitation.is_used == False)
         .first()
     )
     if not invitation:
@@ -286,7 +286,7 @@ def get_invitation(token: str, db: Session = Depends(get_db)):
     """Return invitation details for a valid token (public, no auth required)"""
     invite = (
         db.query(UserInvitation)
-        .filter(UserInvitation.token == token, not UserInvitation.is_used)
+        .filter(UserInvitation.token == token, UserInvitation.is_used == False)
         .first()
     )
     if not invite:
@@ -342,7 +342,7 @@ def register(
 
         invitation = (
             db.query(UserInvitation)
-            .filter(UserInvitation.token == token, not UserInvitation.is_used)
+            .filter(UserInvitation.token == token, UserInvitation.is_used == False)
             .first()
         )
         if not invitation:
@@ -1388,7 +1388,7 @@ async def request_password_change(
         db.query(PasswordChangeConfirmation)
         .filter(
             PasswordChangeConfirmation.user_id == current_user.id,
-            not PasswordChangeConfirmation.is_used,
+            PasswordChangeConfirmation.is_used == False,
             PasswordChangeConfirmation.expires_at > datetime.utcnow(),
         )
         .all()
@@ -1460,7 +1460,7 @@ async def confirm_password_change(
         .filter(
             PasswordChangeConfirmation.user_id == current_user.id,
             PasswordChangeConfirmation.confirmation_code == request_data.confirmation_code,
-            not PasswordChangeConfirmation.is_used,
+            PasswordChangeConfirmation.is_used == False,
         )
         .first()
     )
@@ -1584,7 +1584,7 @@ def request_password_reset(
         db.query(PasswordResetToken)
         .filter(
             PasswordResetToken.email == email,
-            not PasswordResetToken.is_used,
+            PasswordResetToken.is_used == False,
             PasswordResetToken.expires_at > datetime.utcnow(),
         )
         .all()
@@ -1647,7 +1647,7 @@ def reset_password(
     # Find the reset token
     reset_token = (
         db.query(PasswordResetToken)
-        .filter(PasswordResetToken.token == reset_data.token, not PasswordResetToken.is_used)
+        .filter(PasswordResetToken.token == reset_data.token, PasswordResetToken.is_used == False)
         .first()
     )
 
@@ -1706,7 +1706,7 @@ def check_reset_token_validity(token: str, db: Session = Depends(get_db)):
     """Check if a password reset token is still valid"""
     reset_token = (
         db.query(PasswordResetToken)
-        .filter(PasswordResetToken.token == token, not PasswordResetToken.is_used)
+        .filter(PasswordResetToken.token == token, PasswordResetToken.is_used == False)
         .first()
     )
 
@@ -1745,7 +1745,7 @@ def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session =
         update(EmailVerificationToken)
         .where(
             EmailVerificationToken.token == verify_data.token,
-            not EmailVerificationToken.is_used,
+            EmailVerificationToken.is_used == False,
         )
         .values(is_used=True)
     )
@@ -1814,7 +1814,7 @@ def check_verification_token_validity(token: str, db: Session = Depends(get_db))
     """Check if an email verification token is still valid"""
     verify_token = (
         db.query(EmailVerificationToken)
-        .filter(EmailVerificationToken.token == token, not EmailVerificationToken.is_used)
+        .filter(EmailVerificationToken.token == token, EmailVerificationToken.is_used == False)
         .first()
     )
 
@@ -1854,7 +1854,7 @@ def resend_verification(
         db.query(EmailVerificationToken)
         .filter(
             EmailVerificationToken.email == email,
-            not EmailVerificationToken.is_used,
+            EmailVerificationToken.is_used == False,
             EmailVerificationToken.expires_at > datetime.utcnow(),
         )
         .all()

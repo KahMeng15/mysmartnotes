@@ -680,9 +680,9 @@ export default function Login() {
 
               <Box mt="md" ref={turnstile.containerRef} />
 
-              <Group mt="md">
+              <Group mt="lg" gap="xs" justify="center">
                 <Text size="sm" c="dimmed">Already have an account?</Text>
-                <Anchor component="button" type="button" size="sm" fw={600} onClick={() => switchPanel('login')}>
+                <Anchor component="button" type="button" size="sm" c="blue" onClick={() => switchPanel('login')}>
                   Log in
                 </Anchor>
               </Group>
@@ -810,8 +810,8 @@ export default function Login() {
                 Send Reset Link
               </Button>
               <Box mt="md" ref={turnstile.containerRef} />
-              <Group mt="xl">
-                <Anchor component="button" type="button" size="sm" fw={600} onClick={() => switchPanel('login')}>
+              <Group mt="lg" gap="xs" justify="center">
+                <Anchor component="button" type="button" size="sm" c="blue" onClick={() => switchPanel('login')}>
                   Back to Login
                 </Anchor>
               </Group>
