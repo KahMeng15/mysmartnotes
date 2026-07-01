@@ -38,7 +38,7 @@ export default function TaskQueueModal() {
     if (status === 'completed') return <IconCheck size={16} color="green" />;
     if (status === 'failed') return <IconAlertCircle size={16} color="red" />;
     if (status === 'pending') return <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#fcc419' }} />;
-    return <Loader size={14} color="blue" />;
+    return <Loader size={14} />;
   };
 
   const activeTasksForProgress = visibleTasks.filter(t => t.status === 'pending' || t.status === 'processing' || t.status === 'running');
@@ -66,7 +66,7 @@ export default function TaskQueueModal() {
               label={
                 <Center>
                   {hasActiveTasks ? (
-                    <Text size="xs" fw={700} c="blue">{Math.round(overallProgress)}%</Text>
+                    <Text size="xs" fw={700}>{Math.round(overallProgress)}%</Text>
                   ) : (
                     <IconCheck size={18} color="green" />
                   )}

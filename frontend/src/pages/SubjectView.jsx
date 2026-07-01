@@ -1383,11 +1383,11 @@ export default function SubjectView() {
                       </Group>
                       {isProcessed && (
                         <Group gap="xs" mt="xs" wrap="wrap">
-                          <Badge variant="light" color="indigo" size="xs" fw={500}>
+                          <Badge variant="light" size="xs" fw={500}>
                              {ex.questions.length} Questions
                           </Badge>
                           {qTypes.length > 0 && (
-                            <Badge variant="light" color="blue" size="xs" fw={500}>
+                            <Badge variant="light" size="xs" fw={500}>
                               {qTypes.map(t => t.charAt(0).toUpperCase() + t.replace(/_/g, ' ').slice(1)).join(', ')}
                             </Badge>
                           )}
@@ -1980,7 +1980,6 @@ export default function SubjectView() {
               </div>
               <Button 
                 variant="light" 
-                color="indigo" 
                 onClick={generatePrompt} 
                 loading={generatingNewPrompt} 
                 disabled={!newPromptInput.trim()}
@@ -2094,7 +2093,6 @@ export default function SubjectView() {
           <Divider mt="md" />
           <Button
             variant="light"
-            color="blue"
             leftSection={<IconClipboardList size={16} />}
             onClick={async () => { 
               const exId = infoModalExercise.id;
@@ -2276,7 +2274,6 @@ export default function SubjectView() {
             <Divider mt="md" />
             <Button
               variant="light"
-              color="blue"
               leftSection={<IconClipboardList size={16} />}
               onClick={() => { setInfoModalNote(null); fetchProcessingLogs(infoModalNote.id); }}
               fullWidth

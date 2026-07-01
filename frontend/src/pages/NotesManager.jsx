@@ -355,7 +355,7 @@ export default function NotesManager() {
               </Text>
 
               <Group mt="md" justify="space-between">
-                <Badge leftSection={<IconFiles size={12} />} color="blue" variant="light">
+                <Badge leftSection={<IconFiles size={12} />} variant="light">
                   View Subjects
                 </Badge>
                 {group.id !== 'ungrouped' && (

@@ -676,7 +676,7 @@ export default function NoteView() {
                   Our AI is currently extracting text, analyzing the content, and preparing your smart notes. This usually takes a few seconds.
                 </Text>
                 <Box maw={400} mx="auto">
-                  <Progress value={processingProgress} animated striped color="blue" size="xl" radius="xl" />
+                  <Progress value={processingProgress} animated striped size="xl" radius="xl" />
                   <Text size="sm" c="dimmed" mt="xs" ta="right">{processingProgress}%</Text>
                 </Box>
               </Box>
@@ -826,7 +826,6 @@ export default function NoteView() {
                         label={sidebarOpen ? "Save Changes" : ""}
                         leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
                         onClick={() => setSaveModalOpened(true)}
-                        color="blue"
                         variant="filled"
                         active
                       />
@@ -936,7 +935,7 @@ export default function NoteView() {
                         >
                           <Group gap="xs" wrap="nowrap" align="center">
                             <Text size="sm" fw={500} lineClamp={1} style={{ flex: 1 }}>{rn.title}</Text>
-                            <Badge size="sm" color="blue" variant="light">Note</Badge>
+                            <Badge size="sm" variant="light">Note</Badge>
                           </Group>
                         </Card>
                       ))}
@@ -985,7 +984,7 @@ export default function NoteView() {
             <ActionIcon variant="subtle" color="gray" size="md" onClick={() => handleFormat('table')}><IconTable size={18} /></ActionIcon>
             <ActionIcon variant={isRawMode ? 'light' : 'subtle'} color={isRawMode ? 'blue' : 'gray'} size="md" onClick={handleToggleRaw}>{isRawMode ? <IconEye size={18} /> : <IconCode size={18} />}</ActionIcon>
             <Box w={2} />
-            <ActionIcon variant="filled" color="blue" size="md" onClick={() => setSaveModalOpened(true)}><IconDeviceFloppy size={18} /></ActionIcon>
+            <ActionIcon variant="filled" size="md" onClick={() => setSaveModalOpened(true)}><IconDeviceFloppy size={18} /></ActionIcon>
             <ActionIcon variant="outline" color="red" size="md" onClick={() => setCancelModalOpened(true)}><IconX size={18} /></ActionIcon>
           </Group>
         </Box>
@@ -1051,7 +1050,6 @@ export default function NoteView() {
                     label="Save Changes"
                     leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
                     onClick={() => { closeMobileActions(); setSaveModalOpened(true); }}
-                    color="blue"
                     variant="filled"
                     active
                   />
@@ -1087,7 +1085,7 @@ export default function NoteView() {
                       >
                         <Group gap="xs" wrap="nowrap" align="center">
                           <Text size="sm" fw={500} lineClamp={1} style={{ flex: 1 }}>{rn.title}</Text>
-                          <Badge size="sm" color="blue" variant="light">Note</Badge>
+                          <Badge size="sm" variant="light">Note</Badge>
                         </Group>
                       </Card>
                     ))}
@@ -1121,7 +1119,7 @@ export default function NoteView() {
           <Text size="sm" mb="md">Are you sure you want to save these changes?</Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setSaveModalOpened(false)}>Cancel</Button>
-            <Button type="submit" color="blue" data-autofocus>Confirm Save</Button>
+            <Button type="submit" data-autofocus>Confirm Save</Button>
           </Group>
         </form>
       </Modal>

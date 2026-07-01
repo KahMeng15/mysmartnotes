@@ -804,7 +804,7 @@ export default function SummaryView() {
           <Text size="sm" mb="md">Are you sure you want to save these changes?</Text>
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setSaveModalOpened(false)}>Cancel</Button>
-            <Button type="submit" color="blue" data-autofocus loading={saving}>Confirm Save</Button>
+            <Button type="submit" data-autofocus loading={saving}>Confirm Save</Button>
           </Group>
         </form>
       </Modal>
@@ -1023,14 +1023,14 @@ export default function SummaryView() {
                     {selectedSummary?.prompt_name ? (() => {
                       const IconComp = getIconComponent(selectedSummary.prompt_icon);
                       return (
-                        <Badge leftSection={<IconComp size={12} />} variant="light" color="indigo" size="md" tt="capitalize" fw={600}>
+                        <Badge leftSection={<IconComp size={12} />} variant="light" size="md" tt="capitalize" fw={600}>
                           {selectedSummary.prompt_name}
                         </Badge>
                       );
                     })() : (
                       <>
                         {selectedSummary?.mode && (
-                          <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" color="blue" size="md" tt="capitalize" fw={600}>
+                          <Badge leftSection={MODE_ICONS[selectedSummary.mode] || <IconBrain size={12} />} variant="light" size="md" tt="capitalize" fw={600}>
                             {selectedSummary.mode}
                           </Badge>
                         )}
@@ -1040,7 +1040,7 @@ export default function SummaryView() {
                           </Badge>
                         )}
                         {selectedSummary?.processing_method && (
-                          <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" color="grape" size="md" tt="capitalize" fw={600}>
+                          <Badge leftSection={METHOD_ICONS[selectedSummary.processing_method] || <IconCpu size={12} />} variant="light" size="md" tt="capitalize" fw={600}>
                             {selectedSummary.processing_method}
                           </Badge>
                         )}
@@ -1255,7 +1255,6 @@ export default function SummaryView() {
                       label={sidebarOpen ? "Save Changes" : ""}
                       leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
                       onClick={() => setSaveModalOpened(true)}
-                      color="blue"
                       variant="filled"
                       active
                     />
@@ -1367,7 +1366,7 @@ export default function SummaryView() {
             <ActionIcon variant="subtle" color="gray" size="md" onClick={() => handleFormat('table')}><IconTable size={18} /></ActionIcon>
             <ActionIcon variant={isRawMode ? 'light' : 'subtle'} color={isRawMode ? 'blue' : 'gray'} size="md" onClick={handleToggleRaw}>{isRawMode ? <IconEye size={18} /> : <IconCode size={18} />}</ActionIcon>
             <Box w={2} />
-            <ActionIcon variant="filled" color="blue" size="md" onClick={() => setSaveModalOpened(true)}><IconDeviceFloppy size={18} /></ActionIcon>
+            <ActionIcon variant="filled" size="md" onClick={() => setSaveModalOpened(true)}><IconDeviceFloppy size={18} /></ActionIcon>
             <ActionIcon variant="outline" color="red" size="md" onClick={() => setCancelModalOpened(true)}><IconX size={18} /></ActionIcon>
           </Group>
         </Box>
@@ -1418,7 +1417,6 @@ export default function SummaryView() {
                     label="Save Changes"
                     leftSection={<IconDeviceFloppy size="1.2rem" stroke={1.5} />}
                     onClick={() => { closeMobileActions(); setSaveModalOpened(true); }}
-                    color="blue"
                     variant="filled"
                     active
                   />

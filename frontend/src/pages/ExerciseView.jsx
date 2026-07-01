@@ -484,7 +484,7 @@ export default function ExerciseView() {
               <Text c="dimmed" size="sm" style={{ maxWidth: '360px' }} mb="xl">
                 The questions and answer choices are hidden to ensure a fair test. Start the exam to activate the timer and reveal the questions.
               </Text>
-              <Button size="md" radius="md" color="indigo" onClick={handleStartExam} style={{ boxShadow: '0 4px 12px rgba(76, 110, 245, 0.2)' }}>
+              <Button size="md" radius="md" onClick={handleStartExam} style={{ boxShadow: '0 4px 12px rgba(76, 110, 245, 0.2)' }}>
                 Start Exam & Timer
               </Button>
             </Paper>
@@ -543,7 +543,7 @@ export default function ExerciseView() {
                     Our AI is generating questions based on your resources. This usually takes a few seconds.
                   </Text>
                   <Box maw={400} mx="auto">
-                    <Progress value={processingStatus.progress || 10} animated striped color="blue" size="xl" radius="xl" />
+                    <Progress value={processingStatus.progress || 10} animated striped size="xl" radius="xl" />
                     <Text size="sm" c="dimmed" mt="xs" ta="right">{processingStatus.progress || 10}%</Text>
                   </Box>
                 </Box>
@@ -757,12 +757,12 @@ export default function ExerciseView() {
                                       Reset
                                     </Button>
                                     {!explanation && (
-                                      <Button variant="light" color="grape" loading={explainLoading[q.id]} onClick={() => handleExplain(q.id)} leftSection={<IconBulb size={16} />}>
+                                      <Button variant="light" loading={explainLoading[q.id]} onClick={() => handleExplain(q.id)} leftSection={<IconBulb size={16} />}>
                                         Ask AI to Explain
                                       </Button>
                                     )}
                                     {explanation && !showExplanations[q.id] && (
-                                      <Button variant="light" color="grape" onClick={() => setShowExplanations(prev => ({...prev, [q.id]: true}))} leftSection={<IconBulb size={16} />}>
+                                      <Button variant="light" onClick={() => setShowExplanations(prev => ({...prev, [q.id]: true}))} leftSection={<IconBulb size={16} />}>
                                         Show AI Explanation
                                       </Button>
                                     )}
@@ -788,7 +788,7 @@ export default function ExerciseView() {
                                 <Paper mt="md" p="md" bg="var(--mantine-color-white)" radius="sm" withBorder>
                                   <Group justify="space-between" align="flex-start" wrap="nowrap">
                                     {explainLoading[q.id] ? (
-                                       <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
+                                       <Group gap="xs"><Loader size="xs" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
                                     ) : (
                                       <>
                                         <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b> {explanation}</Text>
@@ -839,7 +839,7 @@ export default function ExerciseView() {
                                 >
                                   {!showAns && (
                                     <Center style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10, background: 'rgba(231, 245, 255, 0.3)' }}>
-                                      <Badge size="lg" variant="light" color="blue" style={{ pointerEvents: 'none' }}>
+                                      <Badge size="lg" variant="light" style={{ pointerEvents: 'none' }}>
                                         Click to reveal answer
                                       </Badge>
                                     </Center>
@@ -853,7 +853,7 @@ export default function ExerciseView() {
                                         <Paper p="md" bg="var(--mantine-color-white)" radius="sm" mb="sm">
                                           <Group justify="space-between" align="flex-start" wrap="nowrap">
                                             {explainLoading[q.id] ? (
-                                               <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
+                                               <Group gap="xs"><Loader size="xs" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
                                             ) : (
                                               <>
                                                 <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b> {explanation}</Text>
@@ -884,12 +884,12 @@ export default function ExerciseView() {
                                       
                                       <Group gap="xs" mt="xs">
                                         {explanation && !showExplanations[q.id] && (
-                                          <Button size="xs" variant="light" color="grape" onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: true })); }} leftSection={<IconBulb size={14} />}>
+                                          <Button size="xs" variant="light" onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: true })); }} leftSection={<IconBulb size={14} />}>
                                             Show AI Explanation
                                           </Button>
                                         )}
                                         {!explanation && (
-                                          <Button size="xs" variant="light" color="grape" loading={explainLoading[q.id]} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }} leftSection={<IconBulb size={14} />}>
+                                          <Button size="xs" variant="light" loading={explainLoading[q.id]} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }} leftSection={<IconBulb size={14} />}>
                                             Ask AI to Explain
                                           </Button>
                                         )}
@@ -912,7 +912,7 @@ export default function ExerciseView() {
                 )}
 
                 {!editMode && viewMode === 'interactive' && exercise.questions?.length > 0 && (
-                  <Button size="lg" color="blue" onClick={handleCheckAll} mb="xl">
+                  <Button size="lg" onClick={handleCheckAll} mb="xl">
                     Check All Answers
                   </Button>
                 )}
@@ -1025,7 +1025,7 @@ export default function ExerciseView() {
                       <Menu.Item leftSection={<IconFileTypePdf size={14} color="red" />} onClick={() => handleExport('pdf')}>
                         Export as PDF
                       </Menu.Item>
-                      <Menu.Item leftSection={<IconFileTypeDocx size={14} color="blue" />} onClick={() => handleExport('docx')}>
+                      <Menu.Item leftSection={<IconFileTypeDocx size={14} />} onClick={() => handleExport('docx')}>
                         Export as DOCX
                       </Menu.Item>
                     </Menu.Dropdown>
@@ -1067,7 +1067,7 @@ export default function ExerciseView() {
                         disabled={examActive}
                       />
                       {!examActive ? (
-                        <Button fullWidth mt="md" color="indigo" onClick={handleStartExam}>
+                        <Button fullWidth mt="md" onClick={handleStartExam}>
                           Start Exam
                         </Button>
                       ) : (
@@ -1133,7 +1133,6 @@ export default function ExerciseView() {
           <Group grow style={{ width: '100%' }} mt="xs">
             <Button 
               variant="outline" 
-              color="indigo" 
               onClick={() => {
                 setExamTimeRemaining(5 * 60);
                 setExamActive(true);
@@ -1166,7 +1165,6 @@ export default function ExerciseView() {
               onChange={(val) => setCustomMinutes(val || 5)}
             />
             <Button 
-              color="indigo" 
               onClick={() => {
                 setExamTimeRemaining((customMinutes || 5) * 60);
                 setExamActive(true);
@@ -1259,7 +1257,7 @@ export default function ExerciseView() {
                       <Menu.Item leftSection={<IconFileTypePdf size={14} color="red" />} onClick={() => { closeMobileActions(); handleExport('pdf'); }}>
                         Export as PDF
                       </Menu.Item>
-                      <Menu.Item leftSection={<IconFileTypeDocx size={14} color="blue" />} onClick={() => { closeMobileActions(); handleExport('docx'); }}>
+                      <Menu.Item leftSection={<IconFileTypeDocx size={14} />} onClick={() => { closeMobileActions(); handleExport('docx'); }}>
                         Export as DOCX
                       </Menu.Item>
                     </Menu.Dropdown>
@@ -1300,7 +1298,7 @@ export default function ExerciseView() {
                         disabled={examActive}
                       />
                       {!examActive ? (
-                        <Button fullWidth mt="md" color="indigo" onClick={() => { closeMobileActions(); handleStartExam(); }}>
+                        <Button fullWidth mt="md" onClick={() => { closeMobileActions(); handleStartExam(); }}>
                           Start Exam
                         </Button>
                       ) : (

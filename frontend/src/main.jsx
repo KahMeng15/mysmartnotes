@@ -9,21 +9,7 @@ import { MantineProvider, createTheme } from '@mantine/core'
 const theme = createTheme({
   fontFamily: 'Instrument Sans, sans-serif',
   headings: { fontFamily: 'Instrument Sans, sans-serif' },
-  primaryColor: 'smartpurple',
-  colors: {
-    smartpurple: [
-      '#f2f0f8',
-      '#e2dcf0',
-      '#c4b5e2',
-      '#a38cd3',
-      '#866bc6',
-      '#7354be',
-      '#6847ba',
-      '#593c8f', // Index 7: main primary
-      '#4f3481',
-      '#432b73',
-    ]
-  }
+  primaryColor: 'blue',
 });
 
 createRoot(document.getElementById('root')).render(

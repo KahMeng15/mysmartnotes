@@ -366,7 +366,7 @@ export default function Settings() {
                     <Table.Td>{prompt.name}</Table.Td>
                     <Table.Td>
                       <Group gap="xs" wrap="nowrap">
-                        <ActionIcon variant="subtle" color="blue" onClick={() => handleEditPrompt(prompt)}>
+                        <ActionIcon variant="subtle" onClick={() => handleEditPrompt(prompt)}>
                           <IconEdit size={16} />
                         </ActionIcon>
                         <ActionIcon variant="subtle" color="red" onClick={() => handleDeletePrompt(prompt.id)}>
@@ -512,7 +512,6 @@ export default function Settings() {
               </div>
               <Button 
                 variant="light" 
-                color="indigo" 
                 onClick={generatePrompt} 
                 loading={generatingNewPrompt} 
                 disabled={!newPromptInput.trim()}

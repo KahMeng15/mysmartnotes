@@ -136,9 +136,9 @@ function AdminUsers() {
                 <Table.Td><Badge color={u.tier === 'pro' ? 'blue' : u.tier === 'unlimited' ? 'grape' : 'gray'}>{u.tier}</Badge></Table.Td>
                 <Table.Td>
                   {u.is_active ? <Text c="green" size="sm">Active</Text> : <Text c="red" size="sm">Inactive</Text>}
-                  {u.is_admin && <Text c="grape" size="xs">Admin</Text>}
+                  {u.is_admin && <Text size="xs">Admin</Text>}
                   {!u.is_approved && <Badge color="yellow" size="sm" mt={2}>Pending</Badge>}
-                  {u.google_oauth_id && <Badge color="blue" size="sm" mt={2} variant="outline">Google</Badge>}
+                  {u.google_oauth_id && <Badge size="sm" mt={2} variant="outline">Google</Badge>}
                 </Table.Td>
                 <Table.Td>
                   <Group gap={isMobile ? 4 : 'xs'} wrap="wrap">
@@ -1246,7 +1246,7 @@ function AdminUserContent() {
                   {renderTable(
                     [{ key: 'id', label: 'ID' }, { key: 'title', label: 'Title' }, { key: 'file_type', label: 'Type' }, { key: 'file_size', label: 'Size', render: (r) => r.file_size ? `${(r.file_size / 1024).toFixed(0)}KB` : '-' }, { key: 'page_count', label: 'Pages' }, { key: 'processing_time_ms', label: 'Proc ms' }, { key: 'notes_count', label: 'Notes' }, { key: 'created_at', label: 'Created' }],
                     resources,
-                    (r) => (<><Tooltip label="View"><Button size="xs" variant="outline" onClick={() => viewResource(r.id)}><IconEye size={14} /></Button></Tooltip><Tooltip label="Reprocess"><Button size="xs" color="blue" variant="light" onClick={() => reprocessItem('resources', r.id)}><IconRefresh size={14} /></Button></Tooltip><Tooltip label="Delete"><Button size="xs" color="red" variant="light" onClick={() => deleteItem('resources', r.id)}><IconTrash size={14} /></Button></Tooltip></>)
+                    (r) => (<><Tooltip label="View"><Button size="xs" variant="outline" onClick={() => viewResource(r.id)}><IconEye size={14} /></Button></Tooltip><Tooltip label="Reprocess"><Button size="xs" variant="light" onClick={() => reprocessItem('resources', r.id)}><IconRefresh size={14} /></Button></Tooltip><Tooltip label="Delete"><Button size="xs" color="red" variant="light" onClick={() => deleteItem('resources', r.id)}><IconTrash size={14} /></Button></Tooltip></>)
                   )}
                 </Tabs.Panel>
 
@@ -1254,7 +1254,7 @@ function AdminUserContent() {
                   {renderTable(
                     [{ key: 'id', label: 'ID' }, { key: 'title', label: 'Title' }, { key: 'question_count', label: 'Questions' }, { key: 'model', label: 'Model' }, { key: 'created_at', label: 'Created' }],
                     exercises,
-                    (r) => (<><Tooltip label="View"><Button size="xs" variant="outline" onClick={() => viewExercise(r.id)}><IconEye size={14} /></Button></Tooltip><Tooltip label="Reprocess"><Button size="xs" color="blue" variant="light" onClick={() => reprocessItem('exercises', r.id)}><IconRefresh size={14} /></Button></Tooltip><Tooltip label="Delete"><Button size="xs" color="red" variant="light" onClick={() => deleteItem('exercises', r.id)}><IconTrash size={14} /></Button></Tooltip></>)
+                    (r) => (<><Tooltip label="View"><Button size="xs" variant="outline" onClick={() => viewExercise(r.id)}><IconEye size={14} /></Button></Tooltip><Tooltip label="Reprocess"><Button size="xs" variant="light" onClick={() => reprocessItem('exercises', r.id)}><IconRefresh size={14} /></Button></Tooltip><Tooltip label="Delete"><Button size="xs" color="red" variant="light" onClick={() => deleteItem('exercises', r.id)}><IconTrash size={14} /></Button></Tooltip></>)
                   )}
                 </Tabs.Panel>
 
@@ -1332,7 +1332,7 @@ function AdminUserContent() {
                         <Paper key={q.id || i} p="sm" withBorder mb="xs">
                           <Text size="sm" fw={500}>Q{i + 1}: {q.question_text}</Text>
                           <Text size="sm" c="dimmed">Answer: {q.answer_text}</Text>
-                          {q.explanation && <Text size="sm" c="blue">Explanation: {q.explanation}</Text>}
+                          {q.explanation && <Text size="sm">Explanation: {q.explanation}</Text>}
                         </Paper>
                       ))}
                     </ScrollArea>
@@ -1434,7 +1434,7 @@ export default function AdminPage() {
     <Container fluid p={0}>
       <Box px="md" pt="md" pb="xs">
         <Group mb="md">
-          <IconShieldCheck size={28} color="purple" />
+          <IconShieldCheck size={28} />
           <Title order={2}>Admin Dashboard</Title>
         </Group>
       </Box>

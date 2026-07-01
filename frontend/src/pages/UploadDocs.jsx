@@ -235,7 +235,7 @@ export default function UploadDocs() {
           {uploading && (
             <Box mt="sm">
               <Text size="sm" mb={5}>Uploading...</Text>
-              <Progress value={progress} animated striped color="blue" />
+              <Progress value={progress} animated striped />
             </Box>
           )}
 

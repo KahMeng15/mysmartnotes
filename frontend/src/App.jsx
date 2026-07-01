@@ -224,7 +224,7 @@ function AppLayout({ children }) {
           </Tooltip>
           {user?.is_admin && (
             <Tooltip label="Admin" disabled={navOpen} position="right">
-              <MantineNavLink component={NavLink} to="/admin" label={navOpen ? "Admin" : ""} leftSection={<IconShieldCheck size="1.2rem" stroke={1.5} color="purple" />} />
+              <MantineNavLink component={NavLink} to="/admin" label={navOpen ? "Admin" : ""} leftSection={<IconShieldCheck size="1.2rem" stroke={1.5} />} />
             </Tooltip>
           )}
         </AppShell.Section>
@@ -235,7 +235,7 @@ function AppLayout({ children }) {
               <Menu.Target>
                 <UnstyledButton p="xs" style={{ borderRadius: '8px', flex: navOpen ? 1 : 'unset', transition: 'background-color 150ms ease' }}>
                   <Group gap="sm" wrap="nowrap">
-                    <Avatar radius="xl" color="blue" size="sm">{user ? (user.nickname || user.username || 'U').substring(0, 2).toUpperCase() : 'U'}</Avatar>
+                    <Avatar radius="xl" size="sm">{user ? (user.nickname || user.username || 'U').substring(0, 2).toUpperCase() : 'U'}</Avatar>
                     {navOpen && (
                       <div style={{ flex: 1, overflow: 'hidden' }}>
                         <Text size="sm" fw={500} truncate>{user?.nickname || user?.username || 'User'}</Text>
@@ -298,7 +298,7 @@ function AppLayout({ children }) {
             <Menu.Target>
               <UnstyledButton>
                 <Stack gap={2} align="center">
-                  <Avatar radius="xl" color="blue" size="sm">{user ? (user.nickname || user.username || 'U').substring(0, 2).toUpperCase() : 'U'}</Avatar>
+                  <Avatar radius="xl" size="sm">{user ? (user.nickname || user.username || 'U').substring(0, 2).toUpperCase() : 'U'}</Avatar>
                   <Text size={10}>Profile</Text>
                 </Stack>
               </UnstyledButton>

@@ -269,7 +269,7 @@ export default function GroupView() {
               </ActionIcon>
             </>
           )}
-          <Button leftSection={<IconPlus size={16} />} onClick={handleAddSubjectClick} variant="light" color="blue" size="sm">
+          <Button leftSection={<IconPlus size={16} />} onClick={handleAddSubjectClick} variant="light" size="sm">
             Add Subject
           </Button>
         </Group>
@@ -317,7 +317,7 @@ export default function GroupView() {
       <Box hiddenFrom="sm" mb="lg">
         <Title order={1} style={{ fontSize: 'clamp(1.8rem, 7vw, 2.8rem)', marginBottom: 16 }}>{group.name}</Title>
         <Group gap="xs" mb="md" justify="flex-start">
-          <Button leftSection={<IconPlus size={16} />} onClick={handleAddSubjectClick} variant="light" color="blue" size="sm">
+          <Button leftSection={<IconPlus size={16} />} onClick={handleAddSubjectClick} variant="light" size="sm">
             Create
           </Button>
           {id !== 'ungrouped' && (

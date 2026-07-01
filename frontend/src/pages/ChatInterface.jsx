@@ -130,7 +130,7 @@ const MetadataBlock = ({ msg, messageIndex, setMessages, handleRepeat }) => {
     <Box mt="sm" pt="xs" style={{ fontSize: '12px' }}>
       <Group gap="md" style={{ color: '#888' }}>
         {reasoning && (
-          <Button variant="light" color="grape" size="compact-xs" leftSection={<IconBrain size={12} />} onClick={() => setActiveTab(prev => prev === 'brain' ? null : 'brain')}>
+          <Button variant="light" size="compact-xs" leftSection={<IconBrain size={12} />} onClick={() => setActiveTab(prev => prev === 'brain' ? null : 'brain')}>
             {activeTab === 'brain' ? 'Hide Reasoning' : 'Show Reasoning'}
           </Button>
         )}
@@ -182,7 +182,7 @@ const MetadataBlock = ({ msg, messageIndex, setMessages, handleRepeat }) => {
         <Paper p="sm" mt="sm" withBorder bg="#f8f9fa" radius="md">
           {activeTab === 'brain' && reasoning && (
             <Box>
-              <Text size="xs" fw={600} mb="xs" c="grape"><IconBrain size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> AI Thought Process</Text>
+              <Text size="xs" fw={600} mb="xs"><IconBrain size={12} style={{ verticalAlign: 'middle', marginRight: 4 }}/> AI Thought Process</Text>
               <Text size="xs" c="dimmed" style={{ fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{reasoning}</Text>
             </Box>
           )}
@@ -232,7 +232,7 @@ const MetadataBlock = ({ msg, messageIndex, setMessages, handleRepeat }) => {
           {activeTab === 'sources' && hasSources && (
             <Box>
               {isWebSearch && (
-                <Badge color="indigo" mb="sm" leftSection={<IconWorld size={10}/>}>Included Web Search Results</Badge>
+                <Badge mb="sm" leftSection={<IconWorld size={10}/>}>Included Web Search Results</Badge>
               )}
               <Stack spacing="xs">
                 {filteredSources.map((src, idx) => (
@@ -255,12 +255,12 @@ const MetadataBlock = ({ msg, messageIndex, setMessages, handleRepeat }) => {
                   >
                     {src.is_web ? (
                       <Box>
-                        <Text size="xs" fw={600} c="blue"><IconWorld size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} /> [{idx + 1}] Web Reference</Text>
+                        <Text size="xs" fw={600}><IconWorld size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} /> [{idx + 1}] Web Reference</Text>
                         <Text size="xs" c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.url}</Text>
                       </Box>
                     ) : (
                       <Box>
-                        <Text size="xs" fw={600} c="blue"><IconFileText size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} /> [{idx + 1}] Reference ({src.score}% match)</Text>
+                        <Text size="xs" fw={600}><IconFileText size={10} style={{ verticalAlign: 'middle', marginRight: 4 }} /> [{idx + 1}] Reference ({src.score}% match)</Text>
                         <Text size="xs" c="dimmed">"{src.text_preview}"</Text>
                       </Box>
                     )}
@@ -1037,7 +1037,7 @@ export default function ChatInterface() {
         {/* Chat Messages */}
         {loading && messages.length === 0 ? (
           <Flex flex={1} align="center" justify="center" direction="column" style={{ minHeight: 0 }}>
-            <Loader color="blue" size="md" type="dots" />
+            <Loader size="md" type="dots" />
             <Text mt="md" size="sm" c="dimmed">Loading conversation...</Text>
           </Flex>
         ) : messages.length === 0 ? (
@@ -1070,7 +1070,7 @@ export default function ChatInterface() {
                   ) : (
                     <Box style={{ width: '100%', padding: '0 8px' }}>
                       {msg.detailed_sources?.some(s => s.is_web) && (
-                        <Badge color="grape" variant="light" mb="sm" size="sm" style={{ textTransform: 'none' }} leftSection={<IconWorld size={12}/>}>
+                        <Badge variant="light" mb="sm" size="sm" style={{ textTransform: 'none' }} leftSection={<IconWorld size={12}/>}>
                           Used Web Search
                         </Badge>
                       )}
@@ -1086,8 +1086,8 @@ export default function ChatInterface() {
                 <Group key={`queue-${index}`} align="flex-start" justify="flex-end" wrap="nowrap" mb="md">
                   <Paper p="md" radius="lg" style={{ backgroundColor: '#eef2ff', color: '#333', maxWidth: '85%', alignSelf: 'flex-end', borderBottomRightRadius: 4, opacity: 0.7 }}>
                     <Group gap="sm" mb={4}>
-                      <Text size="sm" fw={600} c="indigo">You (Queued)</Text>
-                      <Loader color="indigo" size="xs" type="dots" />
+                      <Text size="sm" fw={600}>You (Queued)</Text>
+                      <Loader size="xs" type="dots" />
                     </Group>
                     <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>{msg}</Text>
                   </Paper>
@@ -1097,7 +1097,7 @@ export default function ChatInterface() {
                 <Group align="flex-start" wrap="nowrap" mt="md">
                   <Box style={{ padding: '0 8px' }}>
                     <Group gap="xs">
-                      <Loader size="xs" type="dots" color="indigo" />
+                      <Loader size="xs" type="dots" />
                       <Text size="sm" c="dimmed" style={{ fontStyle: 'italic' }}>
                         {taskStatus?.progress_message || 'Thinking...'}
                       </Text>
@@ -1122,7 +1122,7 @@ export default function ChatInterface() {
                     <Badge 
                       component="button" 
                       onClick={toggleSettings} 
-                      variant="light" color="grape" size="sm" tt="capitalize" fw={600}
+                      variant="light" size="sm" tt="capitalize" fw={600}
                       leftSection={contextIcons[contextType]}
                       style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible', alignSelf: 'flex-start' }}
                     >
@@ -1132,7 +1132,7 @@ export default function ChatInterface() {
                       <Badge 
                         component="button" 
                         onClick={toggleSettings} 
-                        variant="light" color="blue" size="sm" tt="capitalize" fw={600}
+                        variant="light" size="sm" tt="capitalize" fw={600}
                         leftSection={modeIcons[aiMode]}
                         style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
                       >
@@ -1154,7 +1154,7 @@ export default function ChatInterface() {
                   <Badge 
                     component="button" 
                     onClick={toggleSettings} 
-                    variant="light" color="grape" size="sm" tt="capitalize" fw={600}
+                    variant="light" size="sm" tt="capitalize" fw={600}
                     leftSection={contextIcons[contextType]}
                     style={{ cursor: 'pointer', transition: 'transform 0.1s' }}
                   >
@@ -1163,7 +1163,7 @@ export default function ChatInterface() {
                   <Badge 
                     component="button" 
                     onClick={toggleSettings} 
-                    variant="light" color="blue" size="sm" tt="capitalize" fw={600}
+                    variant="light" size="sm" tt="capitalize" fw={600}
                     leftSection={modeIcons[aiMode]}
                     style={{ cursor: 'pointer', transition: 'transform 0.1s' }}
                   >
@@ -1219,7 +1219,6 @@ export default function ChatInterface() {
                               setSelectedNoteId(null);
                             }}
                             variant={contextType === value ? "filled" : "light"}
-                            color="grape"
                             size="md"
                             fw={600}
                             style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
@@ -1304,7 +1303,6 @@ export default function ChatInterface() {
                               component="button"
                               onClick={() => handleAiModeChange(mode)}
                               variant={aiMode === mode ? "filled" : "light"}
-                              color="blue"
                               size="md"
                               fw={600}
                               style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
@@ -1354,7 +1352,6 @@ export default function ChatInterface() {
                               component="button"
                               onClick={() => handleAiModeChange(mode)}
                               variant={aiMode === mode ? "filled" : "light"}
-                              color="blue"
                               size="md"
                               fw={600}
                               style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
@@ -1437,7 +1434,6 @@ export default function ChatInterface() {
                           setSelectedNoteId(null);
                         }}
                         variant={contextType === value ? "filled" : "light"}
-                        color="grape"
                         size="md"
                         fw={600}
                         style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
@@ -1524,7 +1520,6 @@ export default function ChatInterface() {
                         component="button"
                         onClick={() => handleAiModeChange(mode)}
                         variant={aiMode === mode ? "filled" : "light"}
-                        color="blue"
                         size="md"
                         fw={600}
                         style={{ cursor: 'pointer', whiteSpace: 'normal', overflow: 'visible' }}
@@ -1580,7 +1575,7 @@ export default function ChatInterface() {
               }}
               onKeyPress={(e) => e.key === 'Enter' && handleSend()}
               rightSection={
-                <ActionIcon size="md" color="indigo" variant="filled" radius="xl" onClick={() => handleSend()} disabled={!input.trim()} mr="sm">
+                <ActionIcon size="md" variant="filled" radius="xl" onClick={() => handleSend()} disabled={!input.trim()} mr="sm">
                   <IconSend size={16} />
                 </ActionIcon>
               }

@@ -821,7 +821,7 @@ export default function Dashboard() {
         <Card withBorder radius="md" padding="xl">
           <Center style={{ height: 150 }}>
             <Stack align="center" spacing="xs">
-              <Loader color="blue" type="bars" />
+              <Loader type="bars" />
               <Text c="dimmed">Loading recent items...</Text>
             </Stack>
           </Center>

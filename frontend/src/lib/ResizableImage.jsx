@@ -85,7 +85,6 @@ export const ResizableImageComponent = (props) => {
               <ActionIcon
                 size="sm"
                 variant={currentSize === 'small' ? 'filled' : 'subtle'}
-                color="blue"
                 onClick={() => setSize('small')}
               >
                 <Text size="xs" fw={700}>S</Text>
@@ -95,7 +94,6 @@ export const ResizableImageComponent = (props) => {
               <ActionIcon
                 size="sm"
                 variant={currentSize === 'medium' ? 'filled' : 'subtle'}
-                color="blue"
                 onClick={() => setSize('medium')}
               >
                 <Text size="xs" fw={700}>M</Text>
@@ -105,7 +103,6 @@ export const ResizableImageComponent = (props) => {
               <ActionIcon
                 size="sm"
                 variant={currentSize === 'large' ? 'filled' : 'subtle'}
-                color="blue"
                 onClick={() => setSize('large')}
               >
                 <Text size="xs" fw={700}>L</Text>

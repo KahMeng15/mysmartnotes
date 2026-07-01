@@ -563,7 +563,7 @@ export default function Login() {
               )}
 
               {signupConfig === 'approval' && !maintenanceMode && (
-                <Alert icon={<IconInfoCircle size={16} />} color="blue" py="xs" mt="md">
+                <Alert icon={<IconInfoCircle size={16} />} py="xs" mt="md">
                   <Text size="sm">Account registration requires approval from an administrator.</Text>
                 </Alert>
               )}
@@ -576,14 +576,14 @@ export default function Login() {
                 ) : maintenanceMode ? null : (
                   <>
                   <Text size="sm" c="dimmed">Don't have an account? </Text>
-                  <Anchor component="button" type="button" size="sm" c="blue" onClick={() => switchPanel('register')}>
+                  <Anchor component="button" type="button" size="sm" onClick={() => switchPanel('register')}>
                     Sign Up
                   </Anchor>
                   </>
                 )}
               </Group>
               <Group mt={5} justify="center">
-                <Anchor component="button" type="button" size="sm" c="blue" onClick={() => switchPanel('forgot')}>
+                <Anchor component="button" type="button" size="sm" onClick={() => switchPanel('forgot')}>
                   Forgot password?
                 </Anchor>
               </Group>
@@ -673,7 +673,7 @@ export default function Login() {
               </Button>
 
               {signupConfig === 'approval' && (
-                <Alert icon={<IconInfoCircle size={16} />} color="blue" py="xs" mt="md">
+                <Alert icon={<IconInfoCircle size={16} />} py="xs" mt="md">
                   <Text size="sm">After verifying your email, your account will need to be approved by an administrator before you can log in.</Text>
                 </Alert>
               )}
@@ -682,7 +682,7 @@ export default function Login() {
 
               <Group mt="lg" gap="xs" justify="center">
                 <Text size="sm" c="dimmed">Already have an account?</Text>
-                <Anchor component="button" type="button" size="sm" c="blue" onClick={() => switchPanel('login')}>
+                <Anchor component="button" type="button" size="sm" onClick={() => switchPanel('login')}>
                   Log in
                 </Anchor>
               </Group>
@@ -811,7 +811,7 @@ export default function Login() {
               </Button>
               <Box mt="md" ref={turnstile.containerRef} />
               <Group mt="lg" gap="xs" justify="center">
-                <Anchor component="button" type="button" size="sm" c="blue" onClick={() => switchPanel('login')}>
+                <Anchor component="button" type="button" size="sm" onClick={() => switchPanel('login')}>
                   Back to Login
                 </Anchor>
               </Group>
