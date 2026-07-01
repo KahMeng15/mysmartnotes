@@ -181,8 +181,34 @@ export default function ExerciseView() {
   const [sidebarChatPollInterval, setSidebarChatPollInterval] = useState(null);
   const [exerciseConversations, setExerciseConversations] = useState([]);
   const [showConvList, setShowConvList] = useState(false);
-  const [sidebarAiMode, setSidebarAiMode] = useState(savedChat.sidebarAiMode ?? 'quick');
-  const [sidebarOutputFormat, setSidebarOutputFormat] = useState(savedChat.sidebarOutputFormat ?? 'sentence');
+  const [sidebarAiMode, setSidebarAiModeInner] = useState(() => {
+    try {
+      const ls = JSON.parse(localStorage.getItem('lastChatSettings') || '{}');
+      return ls.aiMode || 'quick';
+    } catch { return 'quick'; }
+  });
+  const [sidebarOutputFormat, setSidebarOutputFormatInner] = useState(() => {
+    try {
+      const ls = JSON.parse(localStorage.getItem('lastChatSettings') || '{}');
+      return ls.outputFormat || 'sentence';
+    } catch { return 'sentence'; }
+  });
+  const setSidebarAiMode = (mode) => {
+    setSidebarAiModeInner(mode);
+    try {
+      const ls = JSON.parse(localStorage.getItem('lastChatSettings') || '{}');
+      ls.aiMode = mode;
+      localStorage.setItem('lastChatSettings', JSON.stringify(ls));
+    } catch {}
+  };
+  const setSidebarOutputFormat = (fmt) => {
+    setSidebarOutputFormatInner(fmt);
+    try {
+      const ls = JSON.parse(localStorage.getItem('lastChatSettings') || '{}');
+      ls.outputFormat = fmt;
+      localStorage.setItem('lastChatSettings', JSON.stringify(ls));
+    } catch {}
+  };
   const [sidebarSettingsOpen, setSidebarSettingsOpen] = useState(savedChat.sidebarSettingsOpen ?? false);
 
   useEffect(() => {
@@ -1414,7 +1440,7 @@ export default function ExerciseView() {
                     <Text size="xs" fw={600} c="dimmed" mb={4}>AI Mode</Text>
                     <Group gap={4} mb="xs" wrap="wrap">
                       {['quick', 'simple', 'normal', 'elaborate', 'eli5'].map(mode => (
-                        <Badge key={mode} component="button" onClick={() => setSidebarAiMode(mode)}
+                        <Badge key={mode} component="button" onClick={() => { setSidebarAiMode(mode); setSidebarSettingsOpen(false); }}
                           variant={sidebarAiMode === mode ? "filled" : "light"} size="sm" fw={600}
                           style={{ cursor: 'pointer' }} tt="none"
                           leftSection={modeIcons[mode]}>
@@ -1425,7 +1451,7 @@ export default function ExerciseView() {
                     <Text size="xs" fw={600} c="dimmed" mb={4}>Output Format</Text>
                     <Group gap={4} mb="xs" wrap="wrap">
                       {['sentence', 'pointform', 'numbered_list', 'table', 'mix'].map(fmt => (
-                        <Badge key={fmt} color="teal" component="button" onClick={() => setSidebarOutputFormat(fmt)}
+                        <Badge key={fmt} color="teal" component="button" onClick={() => { setSidebarOutputFormat(fmt); setSidebarSettingsOpen(false); }}
                           variant={sidebarOutputFormat === fmt ? "filled" : "light"} size="sm" fw={600}
                           style={{ cursor: 'pointer' }} tt="none"
                           leftSection={formatIcons[fmt]}>
