@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 import ReactMarkdown from 'react-markdown';
@@ -148,6 +148,12 @@ export default function ExerciseView() {
     setQuestionOrder('original');
   };
 
+  // Chat param labels/icons
+  const modeLabels = { quick: 'Quick', simple: 'Simple', normal: 'Normal', elaborate: 'Elaborate', eli5: 'ELI5' };
+  const modeIcons = { quick: '⚡', simple: '📝', normal: '⚖️', elaborate: '🔬', eli5: '🧒' };
+  const formatLabels = { sentence: 'Sentence', pointform: 'Pointform', numbered_list: 'Numbered', table: 'Table', mix: 'Mix' };
+  const formatIcons = { sentence: '📄', pointform: '•', numbered_list: '🔢', table: '📊', mix: '🔀' };
+
   // Sidebar chat
   const [sidebarChatActive, setSidebarChatActive] = useState(false);
   const [sidebarChatConversationId, setSidebarChatConversationId] = useState(null);
@@ -158,10 +164,14 @@ export default function ExerciseView() {
   const [sidebarChatPollInterval, setSidebarChatPollInterval] = useState(null);
   const [exerciseConversations, setExerciseConversations] = useState([]);
   const [showConvList, setShowConvList] = useState(false);
+  const [sidebarAiMode, setSidebarAiMode] = useState('quick');
+  const [sidebarOutputFormat, setSidebarOutputFormat] = useState('sentence');
+  const [sidebarSettingsOpen, setSidebarSettingsOpen] = useState(false);
 
   const openSidebarChat = async (conversationId = null) => {
     setSidebarChatActive(true);
     setShowConvList(false);
+    setSidebarSettingsOpen(false);
     if (conversationId) {
       setSidebarChatConversationId(conversationId);
       try {
@@ -185,8 +195,8 @@ export default function ExerciseView() {
     setSidebarChatTaskId(null);
   };
 
-  const sendSidebarChatMessage = async () => {
-    const msg = sidebarChatInput.trim();
+  const sendSidebarChatMessage = async (message) => {
+    const msg = (message || sidebarChatInput).trim();
     if (!msg) return;
     setSidebarChatInput('');
     setSidebarChatMessages(prev => [...prev, { id: 'temp', message: msg, response: '', created_at: new Date().toISOString() }]);
@@ -198,8 +208,8 @@ export default function ExerciseView() {
           message: msg,
           exercise_id: id,
           conversation_id: sidebarChatConversationId,
-          ai_mode: 'elaborate',
-          output_format: 'markdown',
+          ai_mode: sidebarAiMode,
+          output_format: sidebarOutputFormat,
           auto_detect_conversation: true,
         })
       });
@@ -212,7 +222,6 @@ export default function ExerciseView() {
               clearInterval(interval);
               setSidebarChatLoading(false);
               setSidebarChatTaskId(null);
-              // Reload conversation messages
               const convId = statusRes.result?.conversation_id || sidebarChatConversationId;
               if (convId) {
                 setSidebarChatConversationId(convId);
@@ -1117,69 +1126,68 @@ export default function ExerciseView() {
                             )}
                             
                             {explanation && showExplanations[q.id] && (
-                              <Box>
-                                <Paper mt="md" p="md" bg="var(--mantine-color-white)" radius="sm" withBorder>
-                                  <Group justify="space-between" align="flex-start" wrap="nowrap">
-                                    {explainLoading[q.id] ? (
-                                       <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
-                                    ) : (
-                                      <>
-                                        <Box style={{ flex: 1, minWidth: 0 }}>
-                                          <Text size="sm" mb={4}><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b></Text>
-                                          <Box className="markdown-content" size="sm">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{explanation}</ReactMarkdown>
-                                          </Box>
-                                        </Box>
-                                        <Menu position="bottom-end" shadow="sm">
-                                          <Menu.Target>
-                                            <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
-                                              <IconDotsVertical size={14} />
-                                            </ActionIcon>
-                                          </Menu.Target>
-                                          <Menu.Dropdown>
-                                            <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }}>
-                                              Regenerate Explanation
-                                            </Menu.Item>
-                                            <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
-                                              Hide Explanation
-                                            </Menu.Item>
-                                            <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); setSidebarChatInput('Can you elaborate on this explanation?'); openSidebarChat(); }}>
-                                              Ask Follow-up
-                                            </Menu.Item>
-                                            <Menu.Divider />
-                                            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(q.id); }}>
-                                              Delete Explanation
-                                            </Menu.Item>
-                                          </Menu.Dropdown>
-                                        </Menu>
-                                      </>
-                                    )}
-                                  </Group>
-                                </Paper>
-                                <Group mt="xs" gap="xs">
-                                  <TextInput
-                                    placeholder="Ask a follow-up question..."
-                                    size="xs"
-                                    style={{ flex: 1 }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        const val = e.currentTarget.value.trim();
-                                        if (val) {
-                                          setSidebarChatInput(val);
+                              <Paper mt="md" p="md" bg="var(--mantine-color-white)" radius="sm" withBorder>
+                                {explainLoading[q.id] ? (
+                                  <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
+                                ) : (
+                                  <>
+                                    <Group justify="space-between" align="center" wrap="nowrap" mb={8}>
+                                      <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation</b></Text>
+                                      <Menu position="bottom-end" shadow="sm">
+                                        <Menu.Target>
+                                          <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
+                                            <IconDotsVertical size={14} />
+                                          </ActionIcon>
+                                        </Menu.Target>
+                                        <Menu.Dropdown>
+                                          <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); handleExplain(q.id); }}>
+                                            Regenerate Explanation
+                                          </Menu.Item>
+                                          <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
+                                            Hide Explanation
+                                          </Menu.Item>
+                                          <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); openSidebarChat(); setTimeout(() => sendSidebarChatMessage('Can you elaborate on this explanation?'), 0); }}>
+                                            Ask Follow-up
+                                          </Menu.Item>
+                                          <Menu.Divider />
+                                          <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(q.id); }}>
+                                            Delete Explanation
+                                          </Menu.Item>
+                                        </Menu.Dropdown>
+                                      </Menu>
+                                    </Group>
+                                    <Box className="markdown-content" size="sm">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{explanation}</ReactMarkdown>
+                                    </Box>
+                                    <Group mt="sm" gap="xs" wrap="nowrap">
+                                      <TextInput
+                                        placeholder="Ask a follow-up question..."
+                                        size="xs"
+                                        style={{ flex: 1 }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            const val = e.currentTarget.value.trim();
+                                            if (val) {
+                                              e.currentTarget.value = '';
+                                              openSidebarChat();
+                                              setTimeout(() => sendSidebarChatMessage(val), 0);
+                                            }
+                                          }
+                                        }}
+                                      />
+                                      <Button size="xs" variant="light" onClick={(e) => {
+                                        const input = e.currentTarget.parentElement?.querySelector('input');
+                                        if (input && input.value.trim()) {
+                                          const val = input.value.trim();
+                                          input.value = '';
                                           openSidebarChat();
+                                          setTimeout(() => sendSidebarChatMessage(val), 0);
                                         }
-                                      }
-                                    }}
-                                  />
-                                  <Button size="xs" variant="light" onClick={(e) => {
-                                    const input = e.currentTarget.parentElement?.querySelector('input');
-                                    if (input && input.value.trim()) {
-                                      setSidebarChatInput(input.value.trim());
-                                      openSidebarChat();
-                                    }
-                                  }}>Ask</Button>
-                                </Group>
-                              </Box>
+                                      }}>Ask</Button>
+                                    </Group>
+                                  </>
+                                )}
+                              </Paper>
                             )}
                           </Box>
                         ) : (
@@ -1213,21 +1221,15 @@ export default function ExerciseView() {
                                     <Text fw={500} c="blue.9">Answer:</Text>
                                     <Text c="blue.9">{q.answer_text || "No answer provided."}</Text>
                                     
-                                    <Box mt="md">
-                                      {explanation && showExplanations[q.id] && (
-                                        <Box>
+                                      <Box mt="md">
+                                        {explanation && showExplanations[q.id] && (
                                           <Paper p="md" bg="var(--mantine-color-white)" radius="sm" mb="sm">
-                                            <Group justify="space-between" align="flex-start" wrap="nowrap">
-                                              {explainLoading[q.id] ? (
-                                                 <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
-                                              ) : (
-                                                <>
-                                                  <Box style={{ flex: 1, minWidth: 0 }}>
-                                                    <Text size="sm" mb={4}><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation:</b></Text>
-                                                    <Box className="markdown-content" size="sm">
-                                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{explanation}</ReactMarkdown>
-                                                    </Box>
-                                                  </Box>
+                                            {explainLoading[q.id] ? (
+                                              <Group gap="xs"><Loader size="xs" color="grape" /><Text size="sm" c="dimmed">Regenerating explanation...</Text></Group>
+                                            ) : (
+                                              <>
+                                                <Group justify="space-between" align="center" wrap="nowrap" mb={8}>
+                                                  <Text size="sm"><IconBulb size={14} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--mantine-color-grape-6)' }}/><b>Explanation</b></Text>
                                                   <Menu position="bottom-end" shadow="sm">
                                                     <Menu.Target>
                                                       <ActionIcon variant="subtle" color="gray" size="sm" onClick={(e) => e.stopPropagation()}>
@@ -1241,7 +1243,7 @@ export default function ExerciseView() {
                                                       <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={(e) => { e.stopPropagation(); setShowExplanations(prev => ({ ...prev, [q.id]: false })); }}>
                                                         Hide
                                                       </Menu.Item>
-                                                      <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); setSidebarChatInput('Can you elaborate on this explanation?'); openSidebarChat(); }}>
+                                                      <Menu.Item leftSection={<IconMessageDots size={14} />} onClick={(e) => { e.stopPropagation(); openSidebarChat(); setTimeout(() => sendSidebarChatMessage('Can you elaborate on this explanation?'), 0); }}>
                                                         Ask Follow-up
                                                       </Menu.Item>
                                                       <Menu.Divider />
@@ -1250,35 +1252,40 @@ export default function ExerciseView() {
                                                       </Menu.Item>
                                                     </Menu.Dropdown>
                                                   </Menu>
-                                                </>
-                                              )}
-                                            </Group>
+                                                </Group>
+                                                <Box className="markdown-content" size="sm">
+                                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{explanation}</ReactMarkdown>
+                                                </Box>
+                                                <Group mt="sm" gap="xs" wrap="nowrap">
+                                                  <TextInput
+                                                    placeholder="Ask a follow-up question..."
+                                                    size="xs"
+                                                    style={{ flex: 1 }}
+                                                    onKeyDown={(e) => {
+                                                      if (e.key === 'Enter') {
+                                                        const val = e.currentTarget.value.trim();
+                                                        if (val) {
+                                                          e.currentTarget.value = '';
+                                                          openSidebarChat();
+                                                          setTimeout(() => sendSidebarChatMessage(val), 0);
+                                                        }
+                                                      }
+                                                    }}
+                                                  />
+                                                  <Button size="xs" variant="light" onClick={(e) => {
+                                                    const input = e.currentTarget.parentElement?.querySelector('input');
+                                                    if (input && input.value.trim()) {
+                                                      const val = input.value.trim();
+                                                      input.value = '';
+                                                      openSidebarChat();
+                                                      setTimeout(() => sendSidebarChatMessage(val), 0);
+                                                    }
+                                                  }}>Ask</Button>
+                                                </Group>
+                                              </>
+                                            )}
                                           </Paper>
-                                          <Group mt="xs" gap="xs" mb="sm">
-                                            <TextInput
-                                              placeholder="Ask a follow-up question..."
-                                              size="xs"
-                                              style={{ flex: 1 }}
-                                              onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                  const val = e.currentTarget.value.trim();
-                                                  if (val) {
-                                                    setSidebarChatInput(val);
-                                                    openSidebarChat();
-                                                  }
-                                                }
-                                              }}
-                                            />
-                                            <Button size="xs" variant="light" onClick={(e) => {
-                                              const input = e.currentTarget.parentElement?.querySelector('input');
-                                              if (input && input.value.trim()) {
-                                                setSidebarChatInput(input.value.trim());
-                                                openSidebarChat();
-                                              }
-                                            }}>Ask</Button>
-                                          </Group>
-                                        </Box>
-                                      )}
+                                        )}
                                       
                                       <Group gap="xs" mt="xs">
                                         {explanation && !showExplanations[q.id] && (
@@ -1337,29 +1344,63 @@ export default function ExerciseView() {
               <Box style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <Group justify="space-between" mb="sm">
                   <Text fw={600} size="sm">Quick Chat</Text>
-                  <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeSidebarChat}>
-                    <IconLayoutSidebarRightCollapse size={16} />
-                  </ActionIcon>
+                  <Group gap={4}>
+                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={() => setSidebarSettingsOpen(!sidebarSettingsOpen)}>
+                      <IconAdjustments size={16} />
+                    </ActionIcon>
+                    <ActionIcon variant="subtle" color="gray" size="sm" onClick={closeSidebarChat}>
+                      <IconLayoutSidebarRightCollapse size={16} />
+                    </ActionIcon>
+                  </Group>
                 </Group>
+                {sidebarSettingsOpen ? (
+                  <Box mb="sm">
+                    <Text size="xs" fw={600} c="dimmed" mb={4}>AI Mode</Text>
+                    <Group gap={4} mb="xs" wrap="wrap">
+                      {['quick', 'simple', 'normal', 'elaborate', 'eli5'].map(mode => (
+                        <Badge key={mode} component="button" onClick={() => setSidebarAiMode(mode)}
+                          variant={sidebarAiMode === mode ? "filled" : "light"} size="sm" fw={600}
+                          style={{ cursor: 'pointer' }}>
+                          {modeLabels[mode]}
+                        </Badge>
+                      ))}
+                    </Group>
+                    <Text size="xs" fw={600} c="dimmed" mb={4}>Output Format</Text>
+                    <Group gap={4} mb="xs" wrap="wrap">
+                      {['sentence', 'pointform', 'numbered_list', 'table', 'mix'].map(fmt => (
+                        <Badge key={fmt} color="teal" component="button" onClick={() => setSidebarOutputFormat(fmt)}
+                          variant={sidebarOutputFormat === fmt ? "filled" : "light"} size="sm" fw={600}
+                          style={{ cursor: 'pointer' }}>
+                          {formatLabels[fmt]}
+                        </Badge>
+                      ))}
+                    </Group>
+                  </Box>
+                ) : (
+                  <Group gap={4} mb="sm" wrap="wrap">
+                    <Badge variant="light" size="sm" tt="capitalize" fw={600}>{modeIcons[sidebarAiMode]} {modeLabels[sidebarAiMode]}</Badge>
+                    <Badge color="teal" variant="light" size="sm" tt="capitalize" fw={600}>{formatIcons[sidebarOutputFormat]} {formatLabels[sidebarOutputFormat]}</Badge>
+                  </Group>
+                )}
                 <Divider mb="sm" />
                 <Box style={{ flex: 1, overflowY: 'auto' }} mb="sm">
                   {sidebarChatMessages.length === 0 ? (
                     <Text size="sm" c="dimmed" ta="center" mt="xl">Ask a question about this exercise.</Text>
                   ) : (
-                    <Stack spacing="sm">
+                    <Stack spacing="md">
                       {sidebarChatMessages.map((m, i) => (
                         <Box key={m.id || i}>
-                          <Paper p="xs" bg="var(--mantine-color-blue-0)" radius="sm" mb={4}>
-                            <Text size="xs" fw={600} c="blue.8">You</Text>
-                            <Text size="sm">{m.message}</Text>
-                          </Paper>
+                          <Group align="flex-start" justify="flex-end" wrap="nowrap">
+                            <Paper p="sm" radius="xl" style={{ backgroundColor: '#171738', color: '#fff', maxWidth: '80%', borderBottomRightRadius: '4px' }}>
+                              <Text size="sm" style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{m.message}</Text>
+                            </Paper>
+                          </Group>
                           {m.response && (
-                            <Paper p="xs" bg="var(--mantine-color-gray-0)" radius="sm">
-                              <Text size="xs" fw={600} c="dimmed">AI</Text>
-                              <Box className="markdown-content" size="sm">
+                            <Box mt="xs" style={{ width: '100%', fontSize: '14px', lineHeight: 1.5, color: '#171738' }}>
+                              <Box className="markdown-content" style={{ fontSize: '14px', lineHeight: 1.5 }}>
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.response}</ReactMarkdown>
                               </Box>
-                            </Paper>
+                            </Box>
                           )}
                         </Box>
                       ))}
