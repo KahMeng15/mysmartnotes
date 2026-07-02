@@ -128,11 +128,25 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
     else startRecording();
   };
 
+  // Ensure microphone is released when component unmounts
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current) {
+        if (mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+        if (mediaRecorderRef.current.stream) {
+          mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+        }
+      }
+    };
+  }, []);
+
   const hasPrev = currentConvIdx > 0;
   const hasNext = currentConvIdx < totalQuestions - 1;
 
   return (
-    <Stack spacing={0} style={{ height: 'calc(100vh - 260px)', overflow: 'hidden' }}>
+    <Stack spacing={0} style={{ height: 'calc(100vh - 240px)', overflow: 'hidden' }}>
       <Divider mb="md" />
       {/* First Div: Question Context & Conversation Log */}
       <Box py="md" px={0} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
@@ -219,7 +233,8 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
 
       {/* Second Div: Controls */}
       <Box 
-        py="md"
+        pt="md"
+        pb={0}
         px={0}
         style={{ 
           display: 'flex', 

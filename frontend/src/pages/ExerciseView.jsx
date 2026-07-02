@@ -1247,9 +1247,10 @@ export default function ExerciseView() {
                 setScrollProgress(maxScroll > 0 ? Math.min(100, Math.round((y / maxScroll) * 100)) : 0);
               }
             }}
+            viewportProps={{ style: viewMode === 'conversation' ? { display: 'flex', flexDirection: 'column' } : {} }}
           >
-          <Container size="md" p={0} pt={0} pb="xl">
-            <Box px="md">
+          <Container size="md" p={0} pt={0} pb={viewMode === 'conversation' ? 0 : "xl"} style={viewMode === 'conversation' ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: '100%' } : {}}>
+            <Box px="md" style={viewMode === 'conversation' ? { display: 'flex', flexDirection: 'column', flex: 1 } : {}}>
               {!taskActive && (
               <div className="summary-header" style={{ marginBottom: '1.5rem', marginTop: '1.5rem' }}>
                 <Group justify="space-between">
@@ -1303,7 +1304,10 @@ export default function ExerciseView() {
                     filter: (!editMode && viewMode === 'exam' && !examActive && !examCompleted) ? 'blur(10px)' : 'none', 
                     pointerEvents: (!editMode && viewMode === 'exam' && !examActive && !examCompleted) ? 'none' : 'auto',
                     userSelect: (!editMode && viewMode === 'exam' && !examActive && !examCompleted) ? 'none' : 'auto',
-                    transition: 'filter 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+                    transition: 'filter 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                    display: viewMode === 'conversation' ? 'flex' : undefined,
+                    flexDirection: viewMode === 'conversation' ? 'column' : undefined,
+                    flex: viewMode === 'conversation' ? 1 : undefined
                   }}
                 >
                   {editMode ? (
