@@ -35,6 +35,9 @@ async def voice_stream(websocket: WebSocket, exercise_id: str, question_id: str,
     context = ""
     if question:
         context = f"Question: {question.get('question_text')}\nCorrect Answer/Rubric: {question.get('answer_text')}"
+        if question.get("marking_scheme"):
+            scheme_str = "\n".join([f"- {c.get('criterion')} ({c.get('max_points')} points)" for c in question.get("marking_scheme", [])])
+            context += f"\nMarking Scheme:\n{scheme_str}\nMax Marks: {question.get('max_marks', 1)}"
 
     audio_chunks = []
     
@@ -66,7 +69,13 @@ async def voice_stream(websocket: WebSocket, exercise_id: str, question_id: str,
                         history = msg.get("history", [])
                         print(f"DEBUG VOICE HISTORY: {history}", flush=True)
                         evaluation = await voice_engine.evaluate_context(transcription, context, grading_mode, history)
-                        await websocket.send_json({"type": "evaluation", "status": evaluation.get("status"), "message": evaluation.get("message")})
+                        await websocket.send_json({
+                            "type": "evaluation", 
+                            "status": evaluation.get("status"), 
+                            "message": evaluation.get("message"),
+                            "awarded_marks": evaluation.get("awarded_marks"),
+                            "max_marks": evaluation.get("max_marks")
+                        })
                         
                         # 4. Synthesize TTS if requested
                         if msg.get("response_mode") == "voice":

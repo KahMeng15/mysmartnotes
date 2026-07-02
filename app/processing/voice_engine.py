@@ -91,7 +91,9 @@ class VoiceEngine:
         - Do not try to rigidly drag them back to the original topic if they ask a valid follow-up question.
         - Keep it brief, punchy, conversational, and directly to the point.
         
-        Always respond in JSON format: {{"status": "...", "message": "..."}}
+        If a Marking Scheme is provided in the topic, and the student is answering, evaluate their answer against the scheme and provide an `awarded_marks` and `max_marks` integer in the JSON. If it's just a chat/follow-up or no scheme is provided, you can omit them.
+
+        Always respond in JSON format: {{"status": "...", "message": "...", "awarded_marks": 0, "max_marks": 0}}
         """
         
         # Call global 3-tier AI System

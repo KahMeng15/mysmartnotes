@@ -1652,8 +1652,8 @@ export default function ExerciseView() {
                               [q.id]: {
                                 ...val,
                                 status: overallStatus,
-                                total_awarded: overallStatus === 'Correct' ? 1 : 0,
-                                total_max: 1
+                                total_awarded: val.awarded_marks !== undefined ? val.awarded_marks : (overallStatus === 'Correct' ? 1 : 0),
+                                total_max: val.max_marks !== undefined ? val.max_marks : 1
                               }
                             }));
                             saveSession();
@@ -1664,8 +1664,8 @@ export default function ExerciseView() {
 
                     return (
                       <Card key={q.id} shadow="sm" padding="lg" radius="md" withBorder>
-                        <Box mb="xs">
-                          <Group gap={8} wrap="nowrap">
+                        <Group justify="space-between" align="center" mb="xs" wrap="nowrap">
+                          <Group gap={8} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
                             {q.difficulty && (
                               <Text size="xs" c="dimmed" fw={500}>
                                 {q.difficulty}
@@ -1706,7 +1706,19 @@ export default function ExerciseView() {
                               </Text>
                             )}
                           </Group>
-                        </Box>
+                          {totalMarks > 0 && (
+                            <Badge 
+                              size="xs" 
+                              variant="light" 
+                              color={grade?.total_awarded !== undefined ? (grade.total_awarded >= totalMarks ? "teal" : (grade.total_awarded > 0 ? "yellow" : "red")) : "blue"} 
+                              radius="sm" 
+                              ml="xs"
+                              style={{ flexShrink: 0 }}
+                            >
+                              {grade?.total_awarded !== undefined ? `${grade.total_awarded} / ` : ''}{totalMarks} {totalMarks === 1 ? 'mark' : 'marks'}
+                            </Badge>
+                          )}
+                        </Group>
                         <Group justify="space-between" align="flex-start" mb="sm" wrap="nowrap">
                           <Box style={{ flex: 1, minWidth: 0 }}>
                             <Box fw={600} size="lg">
@@ -1714,11 +1726,6 @@ export default function ExerciseView() {
                               <HtmlContent html={q.question_text} style={{ display: 'inline' }} />
                             </Box>
                           </Box>
-                          {totalMarks > 0 && (
-                            <Badge size="sm" variant="light" color="blue" radius="sm" ml="xs" style={{ flexShrink: 0 }}>
-                              {totalMarks} {totalMarks === 1 ? 'mark' : 'marks'}
-                            </Badge>
-                          )}
                         </Group>
 
                         {q.sub_parts?.length > 0 && (

@@ -73,7 +73,14 @@ export default function ConversationMode({ exercise, question, convActive, curre
           const newTurnUser = { role: 'user', text: latestTranscriptionRef.current || '' };
           const newTurnAi = { role: 'ai', text: data.message, status: data.status };
           const updatedConv = [...(evaluationRef.current?.conversation || []), newTurnUser, newTurnAi];
-          setEvaluation({ ...evaluationRef.current, conversation: updatedConv, status: data.status, message: data.message });
+          setEvaluation({ 
+            ...evaluationRef.current, 
+            conversation: updatedConv, 
+            status: data.status, 
+            message: data.message,
+            awarded_marks: data.awarded_marks,
+            max_marks: data.max_marks
+          });
           setTranscription('');
           latestTranscriptionRef.current = '';
         }
@@ -212,8 +219,8 @@ export default function ConversationMode({ exercise, question, convActive, curre
       <Divider mb="md" />
       {/* First Div: Question Context & Conversation Log */}
       <Box py="md" px={0} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <Box mb="xs">
-          <Group gap={8} wrap="nowrap">
+        <Group justify="space-between" align="center" mb="xs" wrap="nowrap">
+          <Group gap={8} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
             {question.difficulty && (
               <Text size="xs" c="dimmed" fw={500}>
                 {question.difficulty}
@@ -254,7 +261,19 @@ export default function ConversationMode({ exercise, question, convActive, curre
               </Text>
             )}
           </Group>
-        </Box>
+          {question.max_marks > 0 && (
+            <Badge 
+              size="xs" 
+              variant="light" 
+              color={evaluation?.total_awarded !== undefined ? (evaluation.total_awarded >= question.max_marks ? "teal" : (evaluation.total_awarded > 0 ? "yellow" : "red")) : "blue"} 
+              radius="sm" 
+              ml="xs"
+              style={{ flexShrink: 0 }}
+            >
+              {evaluation?.total_awarded !== undefined ? `${evaluation.total_awarded} / ` : ''}{question.max_marks} {question.max_marks === 1 ? 'mark' : 'marks'}
+            </Badge>
+          )}
+        </Group>
 
         <Group justify="space-between" mb="xl" align="flex-start">
           <Box fw={600} size="lg" style={{ flex: 1 }}>
