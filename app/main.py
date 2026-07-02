@@ -34,7 +34,6 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 
@@ -57,8 +56,8 @@ from app.routers import (
     subjects,
     support,
     templates,
-    ws,
     voice,
+    ws,
 )
 from app.utils.db import init_db
 from app.utils.observability import record_request

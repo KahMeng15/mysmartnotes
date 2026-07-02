@@ -560,13 +560,13 @@ class SmartPipeline:
                     for idx, table in enumerate(raw_tables):
                         if not table:
                             continue
-                            
+
                         # Heuristic: Skip tables that are too small or too sparse (like slide layouts)
                         if len(table) < 2:
                             continue
                         if all(len(row) < 2 for row in table):
                             continue
-                            
+
                         # Calculate density of empty cells
                         total_cells = sum(len(row) for row in table)
                         empty_cells = sum(1 for row in table for cell in row if not str(cell or "").strip())
@@ -951,7 +951,7 @@ class SmartPipeline:
                             b["type"] = "h2" if word_count <= 8 else "body"
                         else:
                             seen_h1 = True
-                            
+
             # Document-level H1 enforcement
             for b in slide_blocks:
                 if b["type"] == "h1":

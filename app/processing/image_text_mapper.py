@@ -194,7 +194,6 @@ class ImageTextMapper:
     def _to_relative_path(self, file_path: str) -> str:
         if not file_path:
             return ""
-        import os
         from pathlib import Path
         path_obj = Path(file_path)
         filename = path_obj.name

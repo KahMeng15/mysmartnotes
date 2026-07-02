@@ -7,13 +7,9 @@ from typing import Any
 from app.utils.cache import delete_cache_sync, get_cache_sync, set_cache_sync
 from app.utils.db import SessionLocal
 from app.utils.paths import (
-    BASE_DIR,
-    DATA_DIR,
     LEGACY_EXTRACTED_IMAGES_DIR,
     LEGACY_GENERATED_DIR,
     LEGACY_OUTPUT_DIR,
-    LEGACY_RESOURCES_DIR,
-    LEGACY_UPLOADS_DIR,
     USERS_DIR,
 )
 

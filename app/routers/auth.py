@@ -349,7 +349,7 @@ def register(
 
         invitation = (
             db.query(UserInvitation)
-            .filter(UserInvitation.token == token, UserInvitation.is_used == False)
+            .filter(UserInvitation.token == token, ~UserInvitation.is_used)
             .first()
         )
         if not invitation:
@@ -1599,7 +1599,7 @@ def request_password_reset(
         db.query(PasswordResetToken)
         .filter(
             PasswordResetToken.email == email,
-            PasswordResetToken.is_used == False,
+            ~PasswordResetToken.is_used,
             PasswordResetToken.expires_at > datetime.utcnow(),
         )
         .all()
@@ -1662,7 +1662,7 @@ def reset_password(
     # Find the reset token
     reset_token = (
         db.query(PasswordResetToken)
-        .filter(PasswordResetToken.token == reset_data.token, PasswordResetToken.is_used == False)
+        .filter(PasswordResetToken.token == reset_data.token, ~PasswordResetToken.is_used)
         .first()
     )
 
@@ -1721,7 +1721,7 @@ def check_reset_token_validity(token: str, db: Session = Depends(get_db)):
     """Check if a password reset token is still valid"""
     reset_token = (
         db.query(PasswordResetToken)
-        .filter(PasswordResetToken.token == token, PasswordResetToken.is_used == False)
+        .filter(PasswordResetToken.token == token, ~PasswordResetToken.is_used)
         .first()
     )
 
@@ -1829,7 +1829,7 @@ def check_verification_token_validity(token: str, db: Session = Depends(get_db))
     """Check if an email verification token is still valid"""
     verify_token = (
         db.query(EmailVerificationToken)
-        .filter(EmailVerificationToken.token == token, EmailVerificationToken.is_used == False)
+        .filter(EmailVerificationToken.token == token, ~EmailVerificationToken.is_used)
         .first()
     )
 

@@ -26,15 +26,12 @@ from app.processing.exercise_processor import (
 )
 from app.schemas.exercise import (
     ExerciseCheckRequest,
-    ExerciseCreate,
     ExerciseExplainRequest,
     ExerciseGenerateRequest,
     ExerciseResponse,
     ExerciseSessionSubmit,
     ExerciseStateSave,
-    ExerciseUpdate,
     GradeResponse,
-    BulkExerciseUpdate,
 )
 from app.utils.auth import get_current_user
 from app.utils.db import generate_random_id, get_db
@@ -1080,6 +1077,7 @@ async def upload_exercise_image(
     ext = kind.extension
 
     import io
+
     from PIL import Image
 
     try:

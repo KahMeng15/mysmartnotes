@@ -242,7 +242,7 @@ def compute_and_store_embeddings(resource_id: str, text: str, db) -> int:
         # Clean text to remove huge base64 images or markdown images before embedding
         import re
         clean_text = re.sub(r'!\[.*?\]\(.*?\)', '', text)
-        
+
         # Split text into chunks
         chunks = []
         positions = []

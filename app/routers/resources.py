@@ -917,9 +917,9 @@ async def update_resource_content(
     # Update embeddings to stay in sync
     if new_text and new_text.strip():
         def background_update_embeddings(res_id: str, txt: str):
-            from app.utils.db import SessionLocal
             from app.processing.embeddings import update_resource_embeddings
-            
+            from app.utils.db import SessionLocal
+
             local_db = SessionLocal()
             try:
                 update_resource_embeddings(res_id, txt, local_db)
@@ -928,7 +928,7 @@ async def update_resource_content(
                 logger.error(f"Error updating embeddings: {e}", exc_info=True)
             finally:
                 local_db.close()
-                
+
         background_tasks.add_task(background_update_embeddings, note.id, new_text)
 
     logger.info(f"Updated content for note {resource_id}: {len(new_text)} chars")
@@ -1237,22 +1237,23 @@ async def upload_resource_image(
     upload_dir = StorageManager.get_user_images_dir(current_user.id, resource_id)
 
     ext = kind.extension
-    
+
     # Process and compress image using PIL
     import io
+
     from PIL import Image
-    
+
     try:
         img = Image.open(io.BytesIO(contents))
         if img.mode == 'P':
             img = img.convert('RGBA')
         elif img.mode not in ('RGB', 'RGBA'):
             img = img.convert('RGBA')
-            
+
         # Max dimensions to prevent massive resolutions
         max_size = (1920, 1080)
         img.thumbnail(max_size, Image.Resampling.LANCZOS)
-        
+
         # Save compressed as webp
         filename = f"img_{uuid.uuid4().hex}.webp"
         filepath = os.path.join(upload_dir, filename)
@@ -1279,12 +1280,12 @@ def serve_user_image(
     resource = db.query(Resource).filter(Resource.id == resource_id).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
-        
+
     has_access = False
     if resource.user_id == current_user.id:
         has_access = True
     elif resource.subject_id:
-        from app.models.db import Subject, GroupMember
+        from app.models.db import GroupMember, Subject
         subject = db.query(Subject).filter(Subject.id == resource.subject_id).first()
         if subject and subject.group_id:
             member = db.query(GroupMember).filter(
@@ -1293,7 +1294,7 @@ def serve_user_image(
             ).first()
             if member:
                 has_access = True
-                
+
     if not has_access:
         raise HTTPException(status_code=403, detail="Not authorized to access this resource")
 

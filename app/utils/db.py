@@ -148,19 +148,19 @@ def apply_conversation_preferences_migration():
             if not res.fetchone():
                 logger.info("Adding conv_response_mode to users table")
                 conn.execute(text("ALTER TABLE users ADD COLUMN conv_response_mode VARCHAR(50) DEFAULT 'voice'"))
-                
+
             # Check for conv_input_mode
             res = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='conv_input_mode'"))
             if not res.fetchone():
                 logger.info("Adding conv_input_mode to users table")
                 conn.execute(text("ALTER TABLE users ADD COLUMN conv_input_mode VARCHAR(50) DEFAULT 'push'"))
-                
+
             # Check for conv_transcription_enabled
             res = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='conv_transcription_enabled'"))
             if not res.fetchone():
                 logger.info("Adding conv_transcription_enabled to users table")
                 conn.execute(text("ALTER TABLE users ADD COLUMN conv_transcription_enabled BOOLEAN DEFAULT true"))
-                
+
             # Check for conv_grading_mode
             res = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='conv_grading_mode'"))
             if not res.fetchone():

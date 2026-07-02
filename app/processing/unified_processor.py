@@ -136,7 +136,7 @@ class UnifiedContentProcessor:
                 markdown=f"Error: Unsupported format: {ext}",
                 warnings=[f"Unsupported: {ext}"],
             )
-            
+
         # Global fallback: Enforce single H1 if missing
         if bundle and bundle.markdown and not bundle.markdown.startswith("Error:"):
             lines = bundle.markdown.split("\n")
@@ -146,7 +146,7 @@ class UnifiedContentProcessor:
                 bundle.markdown = f"# {title}\n\n" + bundle.markdown
                 if "missing_h1" in bundle.warnings:
                     bundle.warnings.remove("missing_h1")
-                    
+
         return bundle
 
     def _process_text(self, file_path: str) -> ContentBundle:

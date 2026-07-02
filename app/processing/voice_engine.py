@@ -1,18 +1,19 @@
 import os
 import sys
-import asyncio
-from pydub import AudioSegment
 from unittest.mock import MagicMock
+
+from pydub import AudioSegment
 
 # Mock deprecated TensorFlow estimator which malaya_boilerplate requires
 sys.modules['tensorflow.python.estimator'] = MagicMock()
 sys.modules['tensorflow.python.estimator.run_config'] = MagicMock()
 sys.modules['tensorflow.python.training.training_ops'] = MagicMock()
 
-from pywhispercpp.model import Model as WhisperModel
-import malaya_speech
-from app.processing.ai_client import AIClient
 from io import BytesIO
+
+from pywhispercpp.model import Model as WhisperModel
+
+from app.processing.ai_client import AIClient
 
 MODELS_DIR = os.path.join(os.getcwd(), "models")
 os.makedirs(MODELS_DIR, exist_ok=True)
@@ -24,13 +25,13 @@ class VoiceEngine:
         self.gemini_client = None
 
     async def initialize(self):
-        # Initialize pywhispercpp (will auto-download to ~/.pywhispercpp, but we can set model path if needed, 
+        # Initialize pywhispercpp (will auto-download to ~/.pywhispercpp, but we can set model path if needed,
         # for now let pywhispercpp handle its own download of 'base' or 'tiny')
         if not self.stt_model:
             print("Loading Whisper STT model...")
             # We use 'base' instead of 'tiny' for significantly better transcription accuracy
             self.stt_model = WhisperModel('base', models_dir=MODELS_DIR)
-        
+
         # Initialize edge-tts (no loading required as it's an API, but we'll mark tts_model as initialized)
         if not self.tts_model:
             print("Using edge-tts for TTS...")
@@ -96,7 +97,7 @@ class VoiceEngine:
 
         Always respond in JSON format: {{"status": "...", "message": "...", "awarded_marks": 0, "max_marks": 0}}
         """
-        
+
         # Call global 3-tier AI System
         client = AIClient()
         try:
@@ -106,7 +107,7 @@ class VoiceEngine:
                 max_tokens=150,
                 raw_output=True
             )
-            
+
             # Clean possible markdown wrap from the JSON
             import json
             cleaned = response_text.replace("```json", "").replace("```", "").strip()
@@ -116,16 +117,17 @@ class VoiceEngine:
             return {"status": "Vague", "message": "Sorry, I couldn't evaluate that locally."}
 
     async def synthesize(self, text: str) -> bytes:
-        import edge_tts
         import uuid
-        
+
+        import edge_tts
+
         # We use a natural-sounding US English voice
         communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
-        
+
         # Use a unique filename to prevent race conditions and file truncation bugs
         unique_id = str(uuid.uuid4())
         out_path = os.path.join(MODELS_DIR, f"temp_out_{unique_id}.mp3")
-        
+
         try:
             await communicate.save(out_path)
             with open(out_path, "rb") as f:

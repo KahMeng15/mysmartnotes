@@ -7,7 +7,6 @@ import logging
 import os
 import re
 from datetime import datetime
-from pathlib import Path
 
 from docx import Document
 from docx.enum.section import WD_ORIENT

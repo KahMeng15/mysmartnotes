@@ -823,7 +823,7 @@ class SignalMerger:
         cleaned = []
         for block in blocks:
             text = block.text.strip()
-            
+
             if block.block_type == "h1" and not seen_first_h1:
                 seen_first_h1 = True
                 cleaned.append(block)
@@ -1110,14 +1110,14 @@ def blocks_to_markdown(blocks: list[MergedBlock]) -> str:
     # Clean up
     result = "\n".join(lines)
     result = re.sub(r"\n{3,}", "\n\n", result)
-    
+
     # Escape < and > for Java generic types so React doesn't crash,
     # except when it's part of our own HTML comments like <!-- Page X -->
     import re as regex
     # Replace any < with &lt; unless it's part of an HTML comment like <!-- Page X -->
     # This prevents React from crashing on stray < characters or Java generics like < T >
     result = regex.sub(r'<(?!!--)', r'&lt;', result)
-    
+
     result = result.strip() + "\n"
 
     return result
