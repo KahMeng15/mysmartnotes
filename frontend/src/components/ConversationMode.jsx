@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, Switch, Group, Text, Card, Center, ActionIcon, Badge, Stack, Divider } from '@mantine/core';
-import { IconMicrophone, IconMicrophoneOff, IconChevronLeft, IconChevronRight, IconMessage, IconHandClick, IconEye, IconEyeOff } from '@tabler/icons-react';
+import { IconMicrophone, IconMicrophoneOff, IconChevronLeft, IconChevronRight, IconMessage, IconHandClick, IconEye, IconEyeOff, IconShieldLock, IconShieldCheck } from '@tabler/icons-react';
 
 function HtmlContent({ html, ...props }) {
   if (!html) return null;
@@ -9,10 +9,11 @@ function HtmlContent({ html, ...props }) {
   );
 }
 
-export default function ConversationMode({ exercise, question, currentConvIdx, totalQuestions, onNext, onPrev, onCorrect }) {
+export default function ConversationMode({ exercise, question, convActive, currentConvIdx, totalQuestions, hasNext, hasPrev, onNext, onPrev }) {
   const [responseMode, setResponseMode] = useState('voice'); // 'voice' or 'text'
   const [micMode, setMicMode] = useState('push'); // 'push' or 'toggle'
   const [showLiveTranscription, setShowLiveTranscription] = useState(true);
+  const [gradingMode, setGradingMode] = useState('lenient'); // 'lenient' or 'strict'
   
   const [isRecording, setIsRecording] = useState(false);
   const [transcription, setTranscription] = useState('');
@@ -22,6 +23,31 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
+  // Ref to keep track of the current question audio so we can stop it if they navigate away
+  const currentAudioRef = useRef(null);
+
+  // Read question out when conversation mode is active
+  useEffect(() => {
+    if (convActive && question?.question_text) {
+      // Strip HTML tags for clean reading
+      const textToRead = question.question_text.replace(/<[^>]+>/g, '').trim();
+      if (textToRead) {
+        if (currentAudioRef.current) {
+          currentAudioRef.current.pause();
+        }
+        const audio = new Audio(`/api/voice/tts?text=${encodeURIComponent(textToRead)}`);
+        currentAudioRef.current = audio;
+        audio.play().catch(e => console.error("Auto-play prevented", e));
+      }
+    }
+    return () => {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+    };
+  }, [convActive, question]);
+
   useEffect(() => {
     // Setup websocket
     if (!exercise || !question?.id) return;
@@ -29,23 +55,22 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
     const websocket = new WebSocket(wsUrl);
     
     websocket.onmessage = async (event) => {
-      if (event.data instanceof Blob) {
-        // Received TTS audio byte stream
-        const url = URL.createObjectURL(event.data);
-        const audio = new Audio(url);
-        audio.play();
-      } else {
+      if (typeof event.data === 'string') {
         const data = JSON.parse(event.data);
         if (data.type === 'transcription') {
           setTranscription(data.text);
         } else if (data.type === 'evaluation') {
           setEvaluation({ status: data.status, message: data.message });
-          if (data.status === 'Correct' && onCorrect) {
-            setTimeout(() => {
-              onCorrect();
-            }, 3000); // Auto progress after 3 seconds
-          }
         }
+      } else if (event.data instanceof Blob) {
+         // handle audio bytes
+         const url = URL.createObjectURL(event.data);
+         const audio = new Audio(url);
+         if (currentAudioRef.current) {
+           currentAudioRef.current.pause();
+         }
+         currentAudioRef.current = audio;
+         audio.play();
       }
     };
     
@@ -57,6 +82,14 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
   }, [exercise, question?.id]);
 
   const startRecording = async () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') return;
+    
+    // Stop any playing TTS audio immediately when the user starts speaking
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
@@ -75,7 +108,7 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
         if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ action: "process", response_mode: responseMode }));
+          ws.send(JSON.stringify({ action: "process", response_mode: responseMode, grading_mode: gradingMode }));
         }
       };
       
@@ -90,7 +123,7 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
@@ -101,16 +134,20 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
     if (micMode !== 'push') return;
     
     const handleKeyDown = (e) => {
-      if (e.code === 'Space' && !e.repeat && !isRecording) {
+      if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
-        startRecording();
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
+          startRecording();
+        }
       }
     };
     
     const handleKeyUp = (e) => {
-      if (e.code === 'Space' && isRecording) {
+      if (e.code === 'Space') {
         e.preventDefault();
-        stopRecording();
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          stopRecording();
+        }
       }
     };
     
@@ -121,7 +158,7 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [micMode, isRecording]);
+  }, [micMode, ws, responseMode, gradingMode]);
 
   const toggleRecording = () => {
     if (isRecording) stopRecording();
@@ -142,8 +179,7 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
     };
   }, []);
 
-  const hasPrev = currentConvIdx > 0;
-  const hasNext = currentConvIdx < totalQuestions - 1;
+  // hasPrev and hasNext are now provided via props
 
   return (
     <Stack spacing={0} style={{ height: 'calc(100vh - 240px)', overflow: 'hidden' }}>
@@ -298,6 +334,19 @@ export default function ConversationMode({ exercise, question, currentConvIdx, t
             onClick={() => setShowLiveTranscription(!showLiveTranscription)}
           >
             Transcription {showLiveTranscription ? 'On' : 'Off'}
+          </Badge>
+          <Badge 
+            component="button"
+            variant="light" 
+            color="orange"
+            size="sm" 
+            fw={600} 
+            tt="none"
+            leftSection={gradingMode === 'strict' ? <IconShieldLock size={14} /> : <IconShieldCheck size={14} />}
+            style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
+            onClick={() => setGradingMode(gradingMode === 'strict' ? 'lenient' : 'strict')}
+          >
+            {gradingMode === 'strict' ? 'Strict Grading' : 'Lenient Grading'}
           </Badge>
         </Group>
       </Box>

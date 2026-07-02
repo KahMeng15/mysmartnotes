@@ -28,14 +28,13 @@ class VoiceEngine:
         # for now let pywhispercpp handle its own download of 'base' or 'tiny')
         if not self.stt_model:
             print("Loading Whisper STT model...")
-            # We use a small model for speed and memory limit
-            self.stt_model = WhisperModel('tiny', models_dir=MODELS_DIR)
+            # We use 'base' instead of 'tiny' for significantly better transcription accuracy
+            self.stt_model = WhisperModel('base', models_dir=MODELS_DIR)
         
-        # Initialize malaya-speech VITS
+        # Initialize edge-tts (no loading required as it's an API, but we'll mark tts_model as initialized)
         if not self.tts_model:
-            print("Loading Malaya Speech TTS model...")
-            # Using a fast quantized model if possible, or default vits
-            self.tts_model = malaya_speech.tts.vits(model='mesolitica/VITS-osman', quantized=True)
+            print("Using edge-tts for TTS...")
+            self.tts_model = "edge-tts"
 
         # We don't initialize gemini anymore
         print("Voice Engine Initialized.")
@@ -49,17 +48,23 @@ class VoiceEngine:
         return temp_path
 
     async def transcribe(self, audio_path: str) -> str:
-        # Transcribe with MS language hint if pywhispercpp supports it, else default
-        # pywhispercpp API: model.transcribe(audio_path, language='ms')
-        segments = self.stt_model.transcribe(audio_path, language='ms')
+        # Allow pywhispercpp to auto-detect language to better handle English/Malay code-switching
+        segments = self.stt_model.transcribe(audio_path)
         text = " ".join([seg.text for seg in segments])
         return text.strip()
 
-    async def evaluate_context(self, transcription: str, context: str) -> dict:
+    async def evaluate_context(self, transcription: str, context: str, grading_mode: str = 'lenient') -> dict:
+        if grading_mode == 'strict':
+            strict_text = "Grade STRICTLY. Require exact terminology and complete lists. Do not accept partial matches or missing items."
+        else:
+            strict_text = "Grade LENIENTLY. If the user captures the basic conceptual essence or provides a partial correct answer, mark it as 'Correct'. Do not penalize for missing terminology, missing items in a list, or loose phrasing."
+
         prompt = f"""
         You are an educational evaluator. The user provided an answer aloud.
         Target Concept/Context: {context}
         User's Answer (Transcribed): {transcription}
+        
+        {strict_text}
 
         Classify the user's answer into one of: 'Correct', 'Inaccurate', or 'Vague'.
         Also provide a short coaching response (1-2 sentences) in a conversational, supportive tone.
@@ -85,14 +90,16 @@ class VoiceEngine:
             return {"status": "Vague", "message": "Sorry, I couldn't evaluate that locally."}
 
     async def synthesize(self, text: str) -> bytes:
-        # Generate TTS audio
-        # malaya-speech returns numpy array
-        y = self.tts_model(text)
-        # Convert numpy array to WAV bytes
-        import soundfile as sf
-        import io
-        out_f = io.BytesIO()
-        sf.write(out_f, y['y'], 22050, format='WAV')
-        return out_f.getvalue()
+        import edge_tts
+        
+        # We use a natural-sounding US English voice
+        communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
+        out_path = os.path.join(MODELS_DIR, "temp_out.mp3")
+        
+        await communicate.save(out_path)
+        
+        with open(out_path, "rb") as f:
+            audio_bytes = f.read()
+        return audio_bytes
 
 voice_engine = VoiceEngine()

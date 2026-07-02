@@ -1,6 +1,7 @@
 import os
 import json
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from app.utils.db import get_db
 from app.models.db import Exercise
@@ -8,6 +9,15 @@ from app.utils.storage import StorageManager
 from app.processing.voice_engine import voice_engine
 
 router = APIRouter(prefix="/voice", tags=["Voice"])
+
+@router.get("/tts")
+async def get_tts(text: str = Query(...)):
+    # Initialize engine if not already done
+    if not voice_engine.tts_model:
+        await voice_engine.initialize()
+    
+    audio_bytes = await voice_engine.synthesize(text)
+    return Response(content=audio_bytes, media_type="audio/mpeg")
 
 @router.websocket("/stream/{exercise_id}/{question_id}")
 async def voice_stream(websocket: WebSocket, exercise_id: str, question_id: str, db: Session = Depends(get_db)):
@@ -52,7 +62,8 @@ async def voice_stream(websocket: WebSocket, exercise_id: str, question_id: str,
                         await websocket.send_json({"type": "transcription", "text": transcription})
                         
                         # 3. Evaluate
-                        evaluation = await voice_engine.evaluate_context(transcription, context)
+                        grading_mode = msg.get("grading_mode", "lenient")
+                        evaluation = await voice_engine.evaluate_context(transcription, context, grading_mode)
                         await websocket.send_json({"type": "evaluation", "status": evaluation.get("status"), "message": evaluation.get("message")})
                         
                         # 4. Synthesize TTS if requested

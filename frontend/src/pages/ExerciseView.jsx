@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments, IconSend, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconLayoutCards, IconFileText, IconList, IconListNumbers, IconTable, IconStar, IconInfoCircle, IconPin, IconPinFilled } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments, IconSend, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconLayoutCards, IconFileText, IconList, IconListNumbers, IconTable, IconStar, IconInfoCircle, IconPin, IconPinFilled, IconMicrophone } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 import ReactMarkdown from 'react-markdown';
@@ -108,6 +108,7 @@ export default function ExerciseView() {
   const [examTimerMinutes, setExamTimerMinutes] = useState(15);
   const [examTimeRemaining, setExamTimeRemaining] = useState(initialExamState?.examTimeRemaining ?? null); // seconds
   const [examActive, setExamActive] = useState(initialExamState?.examActive ?? false);
+  const [convActive, setConvActive] = useState(false);
   const [examCompleted, setExamCompleted] = useState(initialExamState?.examCompleted ?? false);
   const [showTimeUpModal, setShowTimeUpModal] = useState(initialExamState?.examActive && initialExamState?.examTimeRemaining <= 0);
   const [customMinutes, setCustomMinutes] = useState(5);
@@ -1207,6 +1208,38 @@ export default function ExerciseView() {
             </Paper>
           )}
 
+          {!editMode && viewMode === 'conversation' && !convActive && (
+            <Paper
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 100,
+                background: 'rgba(255, 255, 255, 0.75)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                padding: '40px',
+                textAlign: 'center',
+                userSelect: 'none',
+              }}
+            >
+              <IconMicrophone size={64} stroke={1.2} style={{ color: 'var(--mantine-color-teal-6)', marginBottom: '16px' }} />
+              <Title order={2} mb="xs" style={{ fontFamily: 'Instrument Sans, sans-serif' }}>Conversation Mode</Title>
+              <Text c="dimmed" size="sm" style={{ maxWidth: '360px' }} mb="xl">
+                Ready to practice your knowledge out loud? You'll be asked questions verbally and can respond using your microphone.
+              </Text>
+              <Button size="md" radius="md" color="teal" onClick={() => setConvActive(true)} style={{ boxShadow: '0 4px 12px rgba(18, 184, 134, 0.2)' }}>
+                Start Conversation
+              </Button>
+            </Paper>
+          )}
+
           {examActive && (
             <Box
               style={{
@@ -1301,9 +1334,9 @@ export default function ExerciseView() {
                 <Stack 
                   spacing="xl"
                   style={{ 
-                    filter: (!editMode && viewMode === 'exam' && !examActive && !examCompleted) ? 'blur(10px)' : 'none', 
-                    pointerEvents: (!editMode && viewMode === 'exam' && !examActive && !examCompleted) ? 'none' : 'auto',
-                    userSelect: (!editMode && viewMode === 'exam' && !examActive && !examCompleted) ? 'none' : 'auto',
+                    filter: (!editMode && ((viewMode === 'exam' && !examActive && !examCompleted) || (viewMode === 'conversation' && !convActive))) ? 'blur(10px)' : 'none', 
+                    pointerEvents: (!editMode && ((viewMode === 'exam' && !examActive && !examCompleted) || (viewMode === 'conversation' && !convActive))) ? 'none' : 'auto',
+                    userSelect: (!editMode && ((viewMode === 'exam' && !examActive && !examCompleted) || (viewMode === 'conversation' && !convActive))) ? 'none' : 'auto',
                     transition: 'filter 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
                     display: viewMode === 'conversation' ? 'flex' : undefined,
                     flexDirection: viewMode === 'conversation' ? 'column' : undefined,
@@ -1586,18 +1619,13 @@ export default function ExerciseView() {
                           key={q.id}
                           exercise={exercise} 
                           question={q}
+                          convActive={convActive}
                           currentConvIdx={currentConvIdx}
                           totalQuestions={orderedQuestions.length}
                           hasNext={currentConvIdx < orderedQuestions.length - 1}
                           hasPrev={currentConvIdx > 0}
                           onNext={() => setCurrentConvIdx(i => Math.min(i + 1, orderedQuestions.length - 1))}
                           onPrev={() => setCurrentConvIdx(i => Math.max(i - 1, 0))}
-                          onCorrect={() => {
-                            handleGrade(q.id); // Or auto-next
-                            if (currentConvIdx < orderedQuestions.length - 1) {
-                              setCurrentConvIdx(i => i + 1);
-                            }
-                          }}
                         />
                       );
                     }
