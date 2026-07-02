@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, Switch, Group, Text, Card, Center, ActionIcon, Badge, Stack, Divider, ScrollArea } from '@mantine/core';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { Box, Button, Switch, Group, Text, Card, Center, ActionIcon, Badge, Stack, Divider, ScrollArea, Paper } from '@mantine/core';
 import { IconMicrophone, IconMicrophoneOff, IconChevronLeft, IconChevronRight, IconMessage, IconHandClick, IconEye, IconEyeOff, IconShieldLock, IconShieldCheck, IconRefresh, IconUser, IconRobot } from '@tabler/icons-react';
+import { fetchApi } from '../lib/api';
 
 function HtmlContent({ html, ...props }) {
   if (!html) return null;
@@ -14,6 +15,42 @@ export default function ConversationMode({ exercise, question, convActive, curre
   const [micMode, setMicMode] = useState('push'); // 'push' or 'toggle'
   const [showLiveTranscription, setShowLiveTranscription] = useState(true);
   const [gradingMode, setGradingMode] = useState('lenient'); // 'lenient' or 'strict'
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load preferences from DB on mount
+  useEffect(() => {
+    fetchApi('/auth/me', { quietFail: true }).then(data => {
+      if (data) {
+        if (data.conv_response_mode) setResponseMode(data.conv_response_mode);
+        if (data.conv_input_mode) setMicMode(data.conv_input_mode);
+        if (data.conv_transcription_enabled !== undefined) setShowLiveTranscription(data.conv_transcription_enabled);
+        if (data.conv_grading_mode) setGradingMode(data.conv_grading_mode);
+      }
+    }).catch(() => {}).finally(() => setIsLoaded(true));
+  }, []);
+
+  // Sync state changes back to DB
+  useEffect(() => {
+    if (isLoaded) {
+      const updates = {
+        conv_response_mode: responseMode,
+        conv_input_mode: micMode,
+        conv_transcription_enabled: showLiveTranscription,
+        conv_grading_mode: gradingMode
+      };
+      
+      fetchApi('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+        quietFail: true
+      }).catch(err => console.error("Failed to save conversation preferences", err));
+    }
+  }, [responseMode, micMode, showLiveTranscription, gradingMode, isLoaded]);
+
+  useEffect(() => {
+    setShowAnswer(false);
+  }, [question.id]);
   
   const [isRecording, setIsRecording] = useState(false);
   const evaluationRef = useRef(evaluation);
@@ -280,20 +317,55 @@ export default function ConversationMode({ exercise, question, convActive, curre
             <Text component="span" fw={600} size="lg">{currentConvIdx + 1}. </Text>
             <HtmlContent html={question.question_text} style={{ display: 'inline' }} />
           </Box>
-          <ActionIcon 
-            variant="light" 
-            color="red" 
-            size="lg" 
-            title="Reset Conversation"
-            onClick={() => {
-              setEvaluation(null);
-              setTranscription('');
-              latestTranscriptionRef.current = '';
-            }}
-          >
-            <IconRefresh size={20} />
-          </ActionIcon>
+          <Group gap="xs">
+            <ActionIcon 
+              variant={showAnswer ? "filled" : "light"} 
+              color="blue" 
+              size="lg"
+              onClick={() => setShowAnswer(!showAnswer)}
+              title={showAnswer ? "Hide Answer" : "Show Answer"}
+            >
+              {showAnswer ? <IconEyeOff size={20} /> : <IconEye size={20} />}
+            </ActionIcon>
+            <ActionIcon 
+              variant="light" 
+              color="red" 
+              size="lg" 
+              title="Reset Conversation"
+              onClick={() => {
+                setEvaluation(null);
+                setTranscription('');
+                latestTranscriptionRef.current = '';
+              }}
+            >
+              <IconRefresh size={20} />
+            </ActionIcon>
+          </Group>
         </Group>
+
+        {showAnswer && (
+          <Paper p="md" bg="var(--mantine-color-blue-0)" radius="sm" mb="xl">
+            <Text fw={500} c="blue.9">Answer:</Text>
+            <Box c="blue.9"><HtmlContent html={question.answer_text || "No answer provided."} /></Box>
+            
+            {question.marking_scheme && question.marking_scheme.length > 0 && (
+              <Paper mt="md" p="sm" withBorder radius="md" bg="white">
+                <Text size="xs" fw={600} mb="xs" c="dimmed">Marking Scheme</Text>
+                {question.marking_scheme.map((c, i) => (
+                  <Group key={i} justify="space-between" wrap="nowrap" py={4}
+                    style={{borderBottom: i < question.marking_scheme.length - 1 ? '1px solid #f0f0f0' : 'none'}}>
+                    <Box style={{flex: 1}}>
+                      <Text size="xs" fw={500}>{c.criterion}</Text>
+                    </Box>
+                    <Badge size="sm" variant="light" color="blue" style={{ flexShrink: 0 }}>
+                      {c.max_points} {c.max_points === 1 ? 'mark' : 'marks'}
+                    </Badge>
+                  </Group>
+                ))}
+              </Paper>
+            )}
+          </Paper>
+        )}
 
         <ScrollArea style={{ flex: 1, paddingRight: '12px' }} offsetScrollbars>
           {evaluation?.conversation && evaluation.conversation.map((turn, idx) => (

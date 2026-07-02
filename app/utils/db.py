@@ -126,6 +126,7 @@ def init_db():
         apply_invitation_label_migration()
         apply_chat_exercise_id_migration()
         apply_exercise_marks_migration()
+        apply_conversation_preferences_migration()
     except Exception as e:
         logger.error(f"Failed to apply PostgreSQL migrations: {e}")
 
@@ -137,6 +138,36 @@ def init_db():
 
     logger.info("Database initialized successfully")
 
+
+def apply_conversation_preferences_migration():
+    from sqlalchemy import text
+    try:
+        with engine.begin() as conn:
+            # Check for conv_response_mode
+            res = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='conv_response_mode'"))
+            if not res.fetchone():
+                logger.info("Adding conv_response_mode to users table")
+                conn.execute(text("ALTER TABLE users ADD COLUMN conv_response_mode VARCHAR(50) DEFAULT 'voice'"))
+                
+            # Check for conv_input_mode
+            res = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='conv_input_mode'"))
+            if not res.fetchone():
+                logger.info("Adding conv_input_mode to users table")
+                conn.execute(text("ALTER TABLE users ADD COLUMN conv_input_mode VARCHAR(50) DEFAULT 'push'"))
+                
+            # Check for conv_transcription_enabled
+            res = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='conv_transcription_enabled'"))
+            if not res.fetchone():
+                logger.info("Adding conv_transcription_enabled to users table")
+                conn.execute(text("ALTER TABLE users ADD COLUMN conv_transcription_enabled BOOLEAN DEFAULT true"))
+                
+            # Check for conv_grading_mode
+            res = conn.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='conv_grading_mode'"))
+            if not res.fetchone():
+                logger.info("Adding conv_grading_mode to users table")
+                conn.execute(text("ALTER TABLE users ADD COLUMN conv_grading_mode VARCHAR(50) DEFAULT 'lenient'"))
+    except Exception as e:
+        logger.error(f"Failed to migrate conversation preferences: {e}")
 
 def apply_content_dissociation_migrations():
     """Programmatically alter constraints and nullability for account deletion logic"""

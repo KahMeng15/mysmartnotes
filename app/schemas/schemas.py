@@ -51,6 +51,10 @@ class UserUpdate(BaseModel):
     last_chat_context: str | None = None
     last_chat_ai_mode: str | None = None
     last_chat_output_format: str | None = None
+    conv_response_mode: str | None = None
+    conv_input_mode: str | None = None
+    conv_transcription_enabled: bool | None = None
+    conv_grading_mode: str | None = None
 
 
 class User(UserBase):
@@ -71,6 +75,10 @@ class User(UserBase):
     last_chat_context: str = "global"
     last_chat_ai_mode: str = "elaborate"
     last_chat_output_format: str = "sentence"
+    conv_response_mode: str = "voice"
+    conv_input_mode: str = "push"
+    conv_transcription_enabled: bool = True
+    conv_grading_mode: str = "lenient"
     created_at: datetime | None = None
 
     class Config:

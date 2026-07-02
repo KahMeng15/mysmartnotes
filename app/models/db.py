@@ -73,6 +73,12 @@ class User(Base):
     last_chat_ai_mode = Column(String(50), default="normal")
     last_chat_output_format = Column(String(50), default="mix")
 
+    # Conversation Preferences
+    conv_response_mode = Column(String(50), default="voice")
+    conv_input_mode = Column(String(50), default="push")
+    conv_transcription_enabled = Column(Boolean, default=True)
+    conv_grading_mode = Column(String(50), default="lenient")
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

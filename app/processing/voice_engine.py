@@ -90,6 +90,7 @@ class VoiceEngine:
         - Be highly tolerant of speech-to-text transcription errors (e.g., if the transcription is "explain like I'm in like this old", safely assume they meant "explain like I'm five years old").
         - Do not try to rigidly drag them back to the original topic if they ask a valid follow-up question.
         - Keep it brief, punchy, conversational, and directly to the point.
+        - If the student is answering the question and they do not get full marks based on the marking scheme, you MUST explain concisely what they missed or got wrong so they can improve.
         
         If a Marking Scheme is provided in the topic, and the student is answering, evaluate their answer against the scheme and provide an `awarded_marks` and `max_marks` integer in the JSON. If it's just a chat/follow-up or no scheme is provided, you can omit them.
 

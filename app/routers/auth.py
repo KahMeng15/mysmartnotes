@@ -1178,6 +1178,14 @@ async def update_profile(
         current_user.last_chat_ai_mode = user_update.last_chat_ai_mode
     if getattr(user_update, "last_chat_output_format", None) is not None:
         current_user.last_chat_output_format = user_update.last_chat_output_format
+    if getattr(user_update, "conv_response_mode", None) is not None:
+        current_user.conv_response_mode = user_update.conv_response_mode
+    if getattr(user_update, "conv_input_mode", None) is not None:
+        current_user.conv_input_mode = user_update.conv_input_mode
+    if getattr(user_update, "conv_transcription_enabled", None) is not None:
+        current_user.conv_transcription_enabled = user_update.conv_transcription_enabled
+    if getattr(user_update, "conv_grading_mode", None) is not None:
+        current_user.conv_grading_mode = user_update.conv_grading_mode
 
     db.commit()
     db.refresh(current_user)
