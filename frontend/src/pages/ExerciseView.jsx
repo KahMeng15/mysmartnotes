@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useParams, useNavigate } from 'react-router-dom';
-import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments, IconSend, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconLayoutCards, IconFileText, IconList, IconListNumbers, IconTable, IconStar, IconInfoCircle, IconPin, IconPinFilled, IconMicrophone } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconX, IconBulb, IconBook, IconDownload, IconFileTypePdf, IconFileTypeDocx, IconEdit, IconTrash, IconPlus, IconClock, IconDeviceFloppy, IconChevronLeft, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconPencil, IconEyeOff, IconEye, IconMessageDots, IconDotsVertical, IconRefresh, IconRobot, IconAlertCircle, IconArrowsShuffle, IconSortAscending, IconBolt, IconPhotoPlus, IconAdjustments, IconSend, IconWand, IconBrain, IconSchool, IconBabyCarriage, IconLayoutCards, IconFileText, IconList, IconListNumbers, IconTable, IconStar, IconInfoCircle, IconPin, IconPinFilled, IconMicrophone, IconCode } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 import ReactMarkdown from 'react-markdown';
@@ -772,7 +772,27 @@ export default function ExerciseView() {
               <Text size="xs" fw={700}>H3</Text>
             </ActionIcon>
             <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => editor?.chain().focus().toggleCodeBlock().run()}>
-              <Text size="xs" fw={700} style={{ fontFamily: 'monospace' }}>{'</>'}</Text>
+              <IconCode size={16} />
+            </ActionIcon>
+            <ActionIcon size="sm" variant="subtle" color="gray" onClick={async () => {
+              try {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'image/*';
+                fileInput.onchange = async () => {
+                  const file = fileInput.files?.[0];
+                  if (!file) return;
+                  const url = await handleImageUploadFlow(file, id, 'exercises');
+                  if (url) {
+                    editor?.chain().focus().setImage({ src: url }).run();
+                  }
+                };
+                fileInput.click();
+              } catch (e) {
+                console.error(e);
+              }
+            }}>
+              <IconPhotoPlus size={16} />
             </ActionIcon>
           </Group>
           <Box p="sm" style={{ minHeight: minRows * 24 }}>
@@ -1144,6 +1164,19 @@ export default function ExerciseView() {
         .clickable-crumb:hover {
           text-decoration: underline;
         }
+        .markdown-content img {
+          max-width: 66%;
+          height: auto;
+          display: block;
+          margin: 1rem 0;
+          border-radius: 8px;
+        }
+        .markdown-content img[src$="#small"] {
+          max-width: 33%;
+        }
+        .markdown-content img[src$="#large"] {
+          max-width: 100%;
+        }
       `}</style>
       {/* Sticky Header */}
       <Box py="xs" px="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)', backgroundColor: '#fff', zIndex: 20 }}>
@@ -1276,13 +1309,6 @@ export default function ExerciseView() {
             style={{ flex: 1, backgroundColor: '#fff' }} 
             p={0}
             viewportRef={viewportRef}
-            onScrollPositionChange={({ y }) => {
-              if (viewportRef.current) {
-                const { scrollHeight, clientHeight } = viewportRef.current;
-                const maxScroll = scrollHeight - clientHeight;
-                setScrollProgress(maxScroll > 0 ? Math.min(100, Math.round((y / maxScroll) * 100)) : 0);
-              }
-            }}
             viewportProps={{ style: viewMode === 'conversation' ? { display: 'flex', flexDirection: 'column' } : {} }}
           >
           <Container size="md" p={0} pt={0} pb={viewMode === 'conversation' ? 0 : "xl"} style={viewMode === 'conversation' ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: '100%' } : {}}>
@@ -1550,32 +1576,6 @@ export default function ExerciseView() {
                                 style={{ flex: 1 }}
                                 placeholder={q.question_text ? 'Auto-detected from question' : 'Enter topic'}
                               />
-                              <Group gap={4}>
-                                <ActionIcon variant="subtle" color="gray" size="sm" onClick={async () => {
-                                  try {
-                                    const fileInput = document.createElement('input');
-                                    fileInput.type = 'file';
-                                    fileInput.accept = 'image/*';
-                                    fileInput.onchange = async () => {
-                                      const file = fileInput.files?.[0];
-                                      if (!file) return;
-                                      const url = await handleImageUploadFlow(file, id, 'exercises');
-                                      if (url) {
-                                        // Insert image into the question text editor
-                                        // For simplicity, show the URL
-                                        const newQs = [...editedQuestions];
-                                        newQs[idx].reference_quote = (newQs[idx].reference_quote || '') + `\n![image](${url})`;
-                                        setEditedQuestions(newQs);
-                                      }
-                                    };
-                                    fileInput.click();
-                                  } catch (e) {
-                                    console.error(e);
-                                  }
-                                }}>
-                                  <IconPhotoPlus size={16} />
-                                </ActionIcon>
-                              </Group>
                             </Group>
                             <Text size="xs" c="dimmed" mt={2}>Leave empty to auto-detect. Click ⚡ to auto-fill topic and reference quote.</Text>
                           </Box>
@@ -2065,9 +2065,7 @@ export default function ExerciseView() {
             </Box>
           </Container>
         </ScrollArea>
-        {viewMode !== 'conversation' && (
-          <Progress value={scrollProgress} size="sm" color="indigo.5" style={{ flexShrink: 0 }} />
-        )}
+        {/* Removed Progress bar to prevent scroll-induced re-renders */}
       </Box>
 
         {/* Right Sidebar */}
