@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { Box, Button, Switch, Group, Text, Card, Center, ActionIcon, Badge, Stack, Divider, ScrollArea, Paper, SegmentedControl } from '@mantine/core';
+import { Box, Button, Switch, Group, Text, Card, Center, ActionIcon, Badge, Stack, Divider, ScrollArea, Paper, SegmentedControl, Menu } from '@mantine/core';
 import { IconMicrophone, IconMicrophoneOff, IconChevronLeft, IconChevronRight, IconMessage, IconHandClick, IconEye, IconEyeOff, IconShieldLock, IconShieldCheck, IconRefresh, IconUser, IconRobot } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 
@@ -17,6 +17,32 @@ export default function ConversationMode({ exercise, question, convActive, curre
   const [gradingMode, setGradingMode] = useState('lenient'); // 'lenient' or 'strict'
   const [showAnswer, setShowAnswer] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  
+  const [audioDevices, setAudioDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
+
+  // Fetch audio devices
+  useEffect(() => {
+    const updateDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(device => device.kind === 'audioinput');
+        setAudioDevices(audioInputs);
+        if (audioInputs.length > 0 && !selectedDeviceId) {
+          setSelectedDeviceId(audioInputs[0].deviceId);
+        }
+      } catch (err) {
+        console.error('Error fetching devices', err);
+      }
+    };
+    
+    // We ask for permission silently if possible to get labels, or enumerate directly
+    updateDevices();
+    navigator.mediaDevices.addEventListener('devicechange', updateDevices);
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', updateDevices);
+    };
+  }, [selectedDeviceId]);
 
   // Load preferences from DB on mount
   useEffect(() => {
@@ -152,7 +178,13 @@ export default function ConversationMode({ exercise, question, convActive, curre
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const constraints = {
+        audio: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Re-fetch devices to ensure we have labels now that we have permission
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setAudioDevices(devices.filter(d => d.kind === 'audioinput'));
       if (micMode === 'push' && !isPushingRef.current) {
         stream.getTracks().forEach(track => track.stop());
         return;
@@ -519,6 +551,35 @@ export default function ConversationMode({ exercise, question, convActive, curre
           >
             {gradingMode === 'strict' ? 'Strict Grading' : 'Lenient Grading'}
           </Badge>
+          
+          <Menu shadow="md" width={250} position="top" withinPortal>
+            <Menu.Target>
+              <Badge 
+                component="button"
+                variant="light" 
+                color="gray"
+                size="sm" 
+                fw={600} 
+                tt="none"
+                leftSection={<IconMicrophone size={14} />}
+                style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
+              >
+                {audioDevices.find(d => d.deviceId === selectedDeviceId)?.label || 'Default Mic'}
+              </Badge>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>Select Microphone</Menu.Label>
+              {audioDevices.map(device => (
+                <Menu.Item 
+                  key={device.deviceId} 
+                  onClick={() => setSelectedDeviceId(device.deviceId)}
+                  style={{ fontWeight: selectedDeviceId === device.deviceId ? 600 : 400 }}
+                >
+                  {device.label || `Microphone ${audioDevices.indexOf(device) + 1}`}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
         </Group>
       </Box>
     </Stack>
