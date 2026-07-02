@@ -49,7 +49,32 @@ export default function ExerciseView() {
 
   // Layout & Mode state
   const [viewMode, setViewMode] = useState(mode && urlToMode[mode] ? urlToMode[mode] : 'hide');
-  const [currentConvIdx, setCurrentConvIdx] = useState(0);
+  // Load initial exam state from localStorage if it exists
+  const getInitialExamState = () => {
+    try {
+      const saved = localStorage.getItem(`exercise_exam_${id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.examActive && parsed.savedAt) {
+          const elapsedSeconds = Math.floor((Date.now() - parsed.savedAt) / 1000);
+          const remaining = Math.max(0, parsed.examTimeRemaining - elapsedSeconds);
+          return {
+            ...parsed,
+            examTimeRemaining: remaining,
+            examActive: remaining > 0 ? parsed.examActive : false,
+            examCompleted: remaining <= 0 ? true : parsed.examCompleted
+          };
+        }
+        return parsed;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return null;
+  };
+  const initialExamState = getInitialExamState();
+
+  const [currentConvIdx, setCurrentConvIdx] = useState(initialExamState?.currentConvIdx ?? 0);
   const [editMode, setEditMode] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -78,31 +103,7 @@ export default function ExerciseView() {
     }
   }, [mode, id]);
 
-  // Load initial exam state from localStorage if it exists
-  const getInitialExamState = () => {
-    try {
-      const saved = localStorage.getItem(`exercise_exam_${id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.examActive && parsed.savedAt) {
-          const elapsedSeconds = Math.floor((Date.now() - parsed.savedAt) / 1000);
-          const remaining = Math.max(0, parsed.examTimeRemaining - elapsedSeconds);
-          return {
-            ...parsed,
-            examTimeRemaining: remaining,
-            examActive: remaining > 0 ? parsed.examActive : false,
-            examCompleted: remaining <= 0 ? true : parsed.examCompleted
-          };
-        }
-        return parsed;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return null;
-  };
 
-  const initialExamState = getInitialExamState();
 
   // Exam state
   const [examTimerMinutes, setExamTimerMinutes] = useState(15);
@@ -136,10 +137,11 @@ export default function ExerciseView() {
       explanations,
       revealedAnswers,
       showExplanations,
+      currentConvIdx,
       savedAt: Date.now()
     };
     localStorage.setItem(`exercise_exam_${id}`, JSON.stringify(stateToSave));
-  }, [id, examActive, examCompleted, examTimeRemaining, userAnswers, gradingResults, explanations, revealedAnswers, showExplanations]);
+  }, [id, examActive, examCompleted, examTimeRemaining, userAnswers, gradingResults, explanations, revealedAnswers, showExplanations, currentConvIdx]);
 
   // Question order
   const [questionOrder, setQuestionOrder] = useState('original');
@@ -1616,7 +1618,6 @@ export default function ExerciseView() {
                     if (viewMode === 'conversation') {
                       return (
                         <ConversationMode 
-                          key={q.id}
                           exercise={exercise} 
                           question={q}
                           convActive={convActive}

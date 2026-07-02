@@ -74,7 +74,8 @@ export default function ConversationMode({ exercise, question, convActive, curre
 
   // Read question out when conversation mode is active
   useEffect(() => {
-    if (convActive && question?.question_text) {
+    if (!isLoaded) return;
+    if (convActive && question?.question_text && responseMode === 'voice') {
       // Strip HTML tags for clean reading
       const textToRead = question.question_text.replace(/<[^>]+>/g, '').trim();
       if (textToRead) {
@@ -92,7 +93,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
         currentAudioRef.current = null;
       }
     };
-  }, [convActive, question]);
+  }, [convActive, question, responseMode, isLoaded]);
 
   useEffect(() => {
     // Setup websocket
