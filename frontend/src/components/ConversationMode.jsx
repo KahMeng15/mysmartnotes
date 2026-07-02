@@ -98,7 +98,8 @@ export default function ConversationMode({ exercise, question, convActive, curre
   useEffect(() => {
     // Setup websocket
     if (!exercise || !question?.id) return;
-    const wsUrl = `ws://localhost:8000/voice/stream/${exercise.id}/${question.id}`;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/voice/stream/${exercise.id}/${question.id}`;
     const websocket = new WebSocket(wsUrl);
     
     websocket.onmessage = async (event) => {
