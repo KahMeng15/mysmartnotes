@@ -1420,7 +1420,8 @@ export default function SubjectView() {
                           <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); openReprocessExercise(ex); }}>Reprocess</Menu.Item>
                           <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={(e) => { e.stopPropagation(); setInfoModalExercise(ex); }}>System Info</Menu.Item>
                           {(isProcessing || reprocessingExerciseIds.includes(ex.id)) ? (
-                            <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async () => {
+                            <Menu.Item color="orange" leftSection={<IconX size={14} />} onClick={async (e) => {
+                              e.stopPropagation();
                               const cancelTask = tasks.find(t =>
                                 (t.task_type === 'exercise_extraction' || t.task_type === 'exercise_generation') &&
                                 (t.task_id === `extract_${ex.id}` || t.task_id === `generate_${ex.id}`)
@@ -1439,7 +1440,7 @@ export default function SubjectView() {
                               }
                             }}>Cancel Processing</Menu.Item>
                           ) : (
-                            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => openDeleteExercise(ex)}>Delete</Menu.Item>
+                            <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={(e) => { e.stopPropagation(); openDeleteExercise(ex); }}>Delete</Menu.Item>
                           )}
                         </Menu.Dropdown>
                       </Menu>
