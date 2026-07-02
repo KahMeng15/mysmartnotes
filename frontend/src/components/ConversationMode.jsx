@@ -9,15 +9,13 @@ function HtmlContent({ html, ...props }) {
   );
 }
 
-export default function ConversationMode({ exercise, question, convActive, currentConvIdx, totalQuestions, hasNext, hasPrev, onNext, onPrev }) {
+export default function ConversationMode({ exercise, question, convActive, currentConvIdx, totalQuestions, hasNext, hasPrev, onNext, onPrev, transcription, setTranscription, evaluation, setEvaluation }) {
   const [responseMode, setResponseMode] = useState('voice'); // 'voice' or 'text'
   const [micMode, setMicMode] = useState('push'); // 'push' or 'toggle'
   const [showLiveTranscription, setShowLiveTranscription] = useState(true);
   const [gradingMode, setGradingMode] = useState('lenient'); // 'lenient' or 'strict'
   
   const [isRecording, setIsRecording] = useState(false);
-  const [transcription, setTranscription] = useState('');
-  const [evaluation, setEvaluation] = useState(null);
   const [ws, setWs] = useState(null);
   
   const mediaRecorderRef = useRef(null);

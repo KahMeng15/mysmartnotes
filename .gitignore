@@ -1519,3 +1519,4 @@ scripts/resource_processing_test/temp_input/*
 scripts/resource_processing_test/quality_reports/*
 models/ggml-tiny.bin
 models/*
+models/temp_input.wav

@@ -1626,6 +1626,29 @@ export default function ExerciseView() {
                           hasPrev={currentConvIdx > 0}
                           onNext={() => setCurrentConvIdx(i => Math.min(i + 1, orderedQuestions.length - 1))}
                           onPrev={() => setCurrentConvIdx(i => Math.max(i - 1, 0))}
+                          transcription={userAnswers[q.id] || ''}
+                          setTranscription={(val) => setUserAnswers(prev => ({ ...prev, [q.id]: val }))}
+                          evaluation={gradingResults[q.id] ? { status: gradingResults[q.id].status || (gradingResults[q.id].total_awarded > 0 ? 'Correct' : 'Inaccurate'), message: gradingResults[q.id].feedback } : null}
+                          setEvaluation={(val) => {
+                            if (!val) {
+                               setGradingResults(prev => {
+                                 const next = { ...prev };
+                                 delete next[q.id];
+                                 return next;
+                               });
+                               return;
+                            }
+                            setGradingResults(prev => ({
+                              ...prev,
+                              [q.id]: {
+                                status: val.status,
+                                feedback: val.message,
+                                total_awarded: val.status === 'Correct' ? 1 : 0,
+                                total_max: 1
+                              }
+                            }));
+                            saveSession();
+                          }}
                         />
                       );
                     }
