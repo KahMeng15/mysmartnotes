@@ -47,6 +47,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
 logger = logging.getLogger(__name__)
 
+
+@router.get("/config")
+async def get_auth_config():
+    """Return public auth configuration for the frontend (no authentication required)."""
+    return {
+        "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
+        "turnstile_enabled": bool(settings.TURNSTILE_SITE_KEY and settings.TURNSTILE_SECRET_KEY),
+    }
+
 # Firebase project config
 
 FIREBASE_VERIFY_URL = "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken"
