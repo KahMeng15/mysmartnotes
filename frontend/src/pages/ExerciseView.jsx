@@ -49,6 +49,7 @@ export default function ExerciseView() {
 
   // Layout & Mode state
   const [viewMode, setViewMode] = useState(mode && urlToMode[mode] ? urlToMode[mode] : 'hide');
+  const [currentConvIdx, setCurrentConvIdx] = useState(0);
   const [editMode, setEditMode] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -1551,7 +1552,11 @@ export default function ExerciseView() {
                     const orderedQuestions = questionOrder === 'randomized'
                       ? shuffledIndices.map(i => ({ q: questions[i], displayIdx: i, orderIdx: i }))
                       : questions.map((q, i) => ({ q, displayIdx: i, orderIdx: i }));
-                    return orderedQuestions.map(({ q, displayIdx }) => {
+                    const questionsToRender = viewMode === 'conversation' 
+                      ? [orderedQuestions[currentConvIdx]].filter(Boolean) 
+                      : orderedQuestions;
+                    
+                    return questionsToRender.map(({ q, displayIdx }, arrayIdx) => {
                     const idx = displayIdx;
                     const isExam = viewMode === 'exam';
                     const isInteractive = viewMode === 'interactive' || isExam;
@@ -1570,6 +1575,29 @@ export default function ExerciseView() {
                     } catch(e) { parsedOptions = []; }
 
                     const totalMarks = q.max_marks || (q.sub_parts?.length > 0 ? q.sub_parts.reduce((s, sp) => s + (sp.max_marks || 0), 0) : 0);
+                    
+                    if (viewMode === 'conversation') {
+                      return (
+                        <ConversationMode 
+                          key={q.id}
+                          exercise={exercise} 
+                          question={q}
+                          currentConvIdx={currentConvIdx}
+                          totalQuestions={orderedQuestions.length}
+                          hasNext={currentConvIdx < orderedQuestions.length - 1}
+                          hasPrev={currentConvIdx > 0}
+                          onNext={() => setCurrentConvIdx(i => Math.min(i + 1, orderedQuestions.length - 1))}
+                          onPrev={() => setCurrentConvIdx(i => Math.max(i - 1, 0))}
+                          onCorrect={() => {
+                            handleGrade(q.id); // Or auto-next
+                            if (currentConvIdx < orderedQuestions.length - 1) {
+                              setCurrentConvIdx(i => i + 1);
+                            }
+                          }}
+                        />
+                      );
+                    }
+
                     return (
                       <Card key={q.id} shadow="sm" padding="lg" radius="md" withBorder>
                         <Box mb="xs">
@@ -1660,11 +1688,7 @@ export default function ExerciseView() {
                           </Box>
                         )}
 
-                        {viewMode === 'conversation' && !q.sub_parts?.length && (
-                          <Box mt="md">
-                            <ConversationMode exercise={exercise} questionId={q.id} />
-                          </Box>
-                        )}
+
 
                         {isInteractive ? (
                           <Box mt="md">
@@ -1928,7 +1952,7 @@ export default function ExerciseView() {
 
                 {(() => {
                   const gradeEntries = Object.entries(gradingResults);
-                  if (gradeEntries.length === 0) return null;
+                  if (gradeEntries.length === 0 || viewMode === 'conversation') return null;
                   const totalMax = gradeEntries.reduce((s, [, g]) => s + ((g.total_max || (g.is_correct !== undefined ? 1 : 0))), 0);
                   const totalAwarded = gradeEntries.reduce((s, [, g]) => s + ((g.total_awarded !== undefined ? g.total_awarded : (g.is_correct ? 1 : 0))), 0);
                   const pct = totalMax > 0 ? Math.round((totalAwarded / totalMax) * 100) : 0;
@@ -1966,7 +1990,9 @@ export default function ExerciseView() {
             </Box>
           </Container>
         </ScrollArea>
-        <Progress value={scrollProgress} size="sm" color="indigo.5" style={{ flexShrink: 0 }} />
+        {viewMode !== 'conversation' && (
+          <Progress value={scrollProgress} size="sm" color="indigo.5" style={{ flexShrink: 0 }} />
+        )}
       </Box>
 
         {/* Right Sidebar */}
