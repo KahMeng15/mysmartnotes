@@ -45,11 +45,11 @@ class ExtractedImage:
 class ImageClassifier:
     """Classifies extracted images as diagram, photo, logo, background, or decorative."""
 
-    MIN_IMAGE_SIZE = 80
+    MIN_IMAGE_SIZE = 150
     CORNER_MARGIN_RATIO = 0.05
     FULL_BLEED_RATIO = 0.85
     LOW_VARIANCE_THRESHOLD = 15
-    EXTREME_ASPECT = 15
+    EXTREME_ASPECT = 5
 
     def __init__(self, knowledge: PipelineKnowledge | None = None):
         self._knowledge = knowledge or PipelineKnowledge()

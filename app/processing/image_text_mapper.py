@@ -192,7 +192,15 @@ class ImageTextMapper:
         return f"![{caption}]({rel_path})"
 
     def _to_relative_path(self, file_path: str) -> str:
-        return file_path
+        if not file_path:
+            return ""
+        import os
+        from pathlib import Path
+        path_obj = Path(file_path)
+        filename = path_obj.name
+        # The parent directory is the resource ID (e.g. rs_0c06969e)
+        resource_id = path_obj.parent.name
+        return f"/api/resources/{resource_id}/images/{filename}"
 
     def _find_slide_boundaries(self, lines: list[str]) -> list[int]:
         boundaries = []
@@ -235,6 +243,9 @@ class ImageTextMapper:
         return None
 
     def _detect_page_number(self, line: str) -> int | None:
+        m = re.match(r"<!--\s*Page\s+(\d+)\s*-->", line)
+        if m:
+            return int(m.group(1))
         m = re.match(r"\[Page\s+(\d+)\]", line)
         if m:
             return int(m.group(1))
@@ -251,6 +262,8 @@ class ImageTextMapper:
 
     def _is_page_boundary(self, line: str, all_lines: list[str], idx: int) -> bool:
         if idx >= len(all_lines) - 1:
+            return True
+        if idx < len(all_lines) - 1 and re.match(r"<!--\s*Page\s+\d+\s*-->", all_lines[idx + 1]):
             return True
         if line.strip() == "" and all_lines[idx + 1].startswith("#"):
             return True

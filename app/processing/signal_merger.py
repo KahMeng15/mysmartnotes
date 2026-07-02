@@ -1022,6 +1022,7 @@ def blocks_to_markdown(blocks: list[MergedBlock]) -> str:
     lines = []
     prev_type = None
     in_list = False
+    current_page = None
 
     for block in blocks:
         if block.block_type == "skip":
@@ -1030,6 +1031,13 @@ def blocks_to_markdown(blocks: list[MergedBlock]) -> str:
         text = block.text.strip()
         if not text and not block.markdown_overrides:
             continue
+
+        if block.page != current_page:
+            current_page = block.page
+            if lines and lines[-1] != "":
+                lines.append("")
+            lines.append(f"<!-- Page {current_page} -->")
+            lines.append("")
 
         # Close list if switching to non-list
         if in_list and block.block_type not in ("list", "ordered_list"):
@@ -1102,6 +1110,14 @@ def blocks_to_markdown(blocks: list[MergedBlock]) -> str:
     # Clean up
     result = "\n".join(lines)
     result = re.sub(r"\n{3,}", "\n\n", result)
+    
+    # Escape < and > for Java generic types so React doesn't crash,
+    # except when it's part of our own HTML comments like <!-- Page X -->
+    import re as regex
+    # Replace any < with &lt; unless it's part of an HTML comment like <!-- Page X -->
+    # This prevents React from crashing on stray < characters or Java generics like < T >
+    result = regex.sub(r'<(?!!--)', r'&lt;', result)
+    
     result = result.strip() + "\n"
 
     return result

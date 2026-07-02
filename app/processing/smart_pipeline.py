@@ -560,6 +560,19 @@ class SmartPipeline:
                     for idx, table in enumerate(raw_tables):
                         if not table:
                             continue
+                            
+                        # Heuristic: Skip tables that are too small or too sparse (like slide layouts)
+                        if len(table) < 2:
+                            continue
+                        if all(len(row) < 2 for row in table):
+                            continue
+                            
+                        # Calculate density of empty cells
+                        total_cells = sum(len(row) for row in table)
+                        empty_cells = sum(1 for row in table for cell in row if not str(cell or "").strip())
+                        if total_cells > 0 and empty_cells / total_cells > 0.6:
+                            # Too sparse to be a real table (e.g. layout grid)
+                            continue
 
                         # Convert table to markdown format
                         markdown_table = self._table_to_markdown(table)
@@ -1247,8 +1260,8 @@ class SmartPipeline:
             polished_chunks = [None] * num_chunks
             completed_chunks = 0
 
-            # Reduced max_workers to 2 to prevent overwhelming reasoning models
-            with ThreadPoolExecutor(max_workers=min(num_chunks, 2)) as executor:
+            # Run polish on all chunks sequentially to avoid rate limits (TPM limits on Groq)
+            with ThreadPoolExecutor(max_workers=1) as executor:
                 futures = {
                     executor.submit(_run_polish_async, i, chunk, (i == 0)): i
                     for i, chunk in enumerate(chunks)
