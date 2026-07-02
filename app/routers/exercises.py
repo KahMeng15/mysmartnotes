@@ -116,7 +116,7 @@ def get_exercises_by_subject(
             ex_data.parameters = params
         questions = StorageManager.get_exercise_json(ex.id)
         if questions:
-            ex_data.questions = questions
+            ex_data.questions = _ensure_question_defaults(questions)
         response_exercises.append(ex_data)
     return response_exercises
 
@@ -318,6 +318,9 @@ def grade_exercise_answer(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
 
+    from app.processing.exercise_processor import _normalize_question_structure
+
+    question = _normalize_question_structure(question)
     return grade_answer(current_user, question, req.user_answer)
 
 

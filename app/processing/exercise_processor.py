@@ -195,6 +195,18 @@ def _normalize_question_structure(q: dict) -> dict:
     if q["max_marks"] == 0:
         q["max_marks"] = 1
 
+    # If the AI produced no marking scheme for a subjective/fill_in_blank question,
+    # synthesise a single fallback criterion so grading always has a structured scheme.
+    q_type = str(q.get("question_type", "subjective"))
+    if not q["marking_scheme"] and q_type not in {"objective", "multiple_choice", "mcq"}:
+        q["marking_scheme"] = [
+            {
+                "criterion": "Overall correctness",
+                "max_points": q["max_marks"],
+                "description": "Award marks based on accuracy and completeness of the answer.",
+            }
+        ]
+
     return q
 
 
@@ -969,10 +981,11 @@ Each object must have the following keys:
     - "sub_parts": Nested sub-parts for further decomposition (max 3 levels).
     - "question_type": Classification for this sub-part.
     - "options": For objective sub-parts.
-- "marking_scheme": Array of marking criteria, each with:
-    - "criterion": Short name (e.g., "Correct formula").
-    - "max_points": Points for this criterion.
-    - "description": What the student must demonstrate.
+- "marking_scheme": **REQUIRED for subjective and fill_in_the_blank questions.** Array of 1–4 marking criteria. MUST NOT be empty for these types. Each criterion:
+    - "criterion": Short name (e.g., "Correct formula", "Key term used", "Explanation quality").
+    - "max_points": Points for this criterion. All criterion max_points MUST sum to the question's max_marks.
+    - "description": What the student must demonstrate to earn these points.
+  For objective questions, set "marking_scheme" to [].
 - "resource_title": The exact title of the resource (from the --- Title --- headers above) that this question was derived from.
 - "reference_quote": A short, exact excerpt or line from the content that supports the answer.
 
