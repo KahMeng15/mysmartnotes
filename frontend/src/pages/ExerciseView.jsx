@@ -23,7 +23,7 @@ import { Link } from '@tiptap/extension-link';
 import { Image } from '@tiptap/extension-image';
 import { ResizableImageExtension } from '../lib/ResizableImageExtension';
 import { ImageUploadExtension, handleImageUploadFlow } from '../lib/tiptapImageUpload';
-
+import ConversationMode from '../components/ConversationMode';
 export default function ExerciseView() {
   const { id, mode } = useParams();
   const navigate = useNavigate();
@@ -1660,6 +1660,12 @@ export default function ExerciseView() {
                           </Box>
                         )}
 
+                        {viewMode === 'conversation' && !q.sub_parts?.length && (
+                          <Box mt="md">
+                            <ConversationMode exercise={exercise} questionId={q.id} />
+                          </Box>
+                        )}
+
                         {isInteractive ? (
                           <Box mt="md">
                             {!q.sub_parts?.length && (
@@ -2409,7 +2415,6 @@ export default function ExerciseView() {
                         fullWidth
                         value={viewMode}
                         onChange={(v) => {
-                          if (v === 'conversation') return;
                           navigate(`/exercises/${id}/${modeToUrl[v]}`);
                         }}
                         data={[
@@ -2417,7 +2422,7 @@ export default function ExerciseView() {
                           { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEye size={16} stroke={1.5} /><Text size="sm">Show All Answers</Text></Group>, value: 'show' },
                           { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEdit size={16} stroke={1.5} /><Text size="sm">Interactive</Text></Group>, value: 'interactive' },
                           { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconClock size={16} stroke={1.5} /><Text size="sm">Exam Mode</Text></Group>, value: 'exam' },
-                          { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconMessageDots size={16} stroke={1.5} /><Text size="sm" c="dimmed">Conversation</Text></Group>, value: 'conversation', disabled: true }
+                          { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconMessageDots size={16} stroke={1.5} /><Text size="sm">Conversation</Text></Group>, value: 'conversation' }
                         ]}
                       />
                     </Box>
@@ -2799,7 +2804,6 @@ export default function ExerciseView() {
                       fullWidth
                       value={viewMode}
                       onChange={(v) => {
-                        if (v === 'conversation') return;
                         closeMobileActions();
                         navigate(`/exercises/${id}/${modeToUrl[v]}`);
                       }}
@@ -2808,7 +2812,7 @@ export default function ExerciseView() {
                         { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEye size={16} stroke={1.5} /><Text size="sm">Show All Answers</Text></Group>, value: 'show' },
                         { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconEdit size={16} stroke={1.5} /><Text size="sm">Interactive</Text></Group>, value: 'interactive' },
                         { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconClock size={16} stroke={1.5} /><Text size="sm">Exam Mode</Text></Group>, value: 'exam' },
-                        { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconMessageDots size={16} stroke={1.5} /><Text size="sm" c="dimmed">Conversation</Text></Group>, value: 'conversation', disabled: true }
+                        { label: <Group gap="xs" justify="flex-start" wrap="nowrap"><IconMessageDots size={16} stroke={1.5} /><Text size="sm">Conversation</Text></Group>, value: 'conversation' }
                       ]}
                     />
                   </Box>

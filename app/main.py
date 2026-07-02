@@ -58,6 +58,7 @@ from app.routers import (
     support,
     templates,
     ws,
+    voice,
 )
 from app.utils.db import init_db
 from app.utils.observability import record_request
@@ -501,7 +502,7 @@ app.include_router(admin.router)
 app.include_router(support.router)
 app.include_router(ws.router)
 app.include_router(exercises.router)
-
+app.include_router(voice.router)
 
 
 
