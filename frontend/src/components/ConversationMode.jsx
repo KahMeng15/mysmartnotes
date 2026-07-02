@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, Switch, Group, Text, Card, Center, ActionIcon, Badge, Stack, Divider } from '@mantine/core';
-import { IconMicrophone, IconMicrophoneOff, IconChevronLeft, IconChevronRight, IconMessage, IconHandClick, IconEye, IconEyeOff, IconShieldLock, IconShieldCheck } from '@tabler/icons-react';
+import { Box, Button, Switch, Group, Text, Card, Center, ActionIcon, Badge, Stack, Divider, ScrollArea } from '@mantine/core';
+import { IconMicrophone, IconMicrophoneOff, IconChevronLeft, IconChevronRight, IconMessage, IconHandClick, IconEye, IconEyeOff, IconShieldLock, IconShieldCheck, IconRefresh, IconUser, IconRobot } from '@tabler/icons-react';
 
 function HtmlContent({ html, ...props }) {
   if (!html) return null;
@@ -16,6 +16,16 @@ export default function ConversationMode({ exercise, question, convActive, curre
   const [gradingMode, setGradingMode] = useState('lenient'); // 'lenient' or 'strict'
   
   const [isRecording, setIsRecording] = useState(false);
+  const evaluationRef = useRef(evaluation);
+  useEffect(() => {
+    evaluationRef.current = evaluation;
+  }, [evaluation]);
+
+  const latestTranscriptionRef = useRef(transcription);
+  useEffect(() => {
+    latestTranscriptionRef.current = transcription;
+  }, [transcription]);
+
   const [ws, setWs] = useState(null);
   
   const mediaRecorderRef = useRef(null);
@@ -23,6 +33,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
 
   // Ref to keep track of the current question audio so we can stop it if they navigate away
   const currentAudioRef = useRef(null);
+  const isPushingRef = useRef(false);
 
   // Read question out when conversation mode is active
   useEffect(() => {
@@ -57,8 +68,14 @@ export default function ConversationMode({ exercise, question, convActive, curre
         const data = JSON.parse(event.data);
         if (data.type === 'transcription') {
           setTranscription(data.text);
+          latestTranscriptionRef.current = data.text;
         } else if (data.type === 'evaluation') {
-          setEvaluation({ status: data.status, message: data.message });
+          const newTurnUser = { role: 'user', text: latestTranscriptionRef.current || '' };
+          const newTurnAi = { role: 'ai', text: data.message, status: data.status };
+          const updatedConv = [...(evaluationRef.current?.conversation || []), newTurnUser, newTurnAi];
+          setEvaluation({ ...evaluationRef.current, conversation: updatedConv, status: data.status, message: data.message });
+          setTranscription('');
+          latestTranscriptionRef.current = '';
         }
       } else if (event.data instanceof Blob) {
          // handle audio bytes
@@ -90,6 +107,11 @@ export default function ConversationMode({ exercise, question, convActive, curre
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (micMode === 'push' && !isPushingRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -106,7 +128,12 @@ export default function ConversationMode({ exercise, question, convActive, curre
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
         if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ action: "process", response_mode: responseMode, grading_mode: gradingMode }));
+          ws.send(JSON.stringify({ 
+             action: "process", 
+             response_mode: responseMode, 
+             grading_mode: gradingMode, 
+             history: evaluationRef.current?.conversation || []
+          }));
         }
       };
       
@@ -114,7 +141,6 @@ export default function ConversationMode({ exercise, question, convActive, curre
       mediaRecorder.start(500);
       setIsRecording(true);
       setTranscription('');
-      setEvaluation(null);
     } catch (err) {
       console.error("Error accessing microphone:", err);
     }
@@ -134,6 +160,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
     const handleKeyDown = (e) => {
       if (e.code === 'Space' && !e.repeat) {
         e.preventDefault();
+        isPushingRef.current = true;
         if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') {
           startRecording();
         }
@@ -143,6 +170,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
     const handleKeyUp = (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
+        isPushingRef.current = false;
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
           stopRecording();
         }
@@ -228,30 +256,60 @@ export default function ConversationMode({ exercise, question, convActive, curre
           </Group>
         </Box>
 
-        <Box fw={600} size="lg" mb="xl">
-          <Text component="span" fw={600} size="lg">{currentConvIdx + 1}. </Text>
-          <HtmlContent html={question.question_text} style={{ display: 'inline' }} />
-        </Box>
-
-        {showLiveTranscription && (
-          <Box mb="md">
-            <Text weight={500} size="sm" c="dimmed" mb="xs">Transcription</Text>
-            <Card withBorder p="sm" style={{ minHeight: '60px', backgroundColor: '#f8f9fa' }}>
-              <Text c={!transcription ? "dimmed" : undefined}>
-                {transcription || (isRecording ? "Listening..." : "Ready (Press microphone to talk)")}
-              </Text>
-            </Card>
+        <Group justify="space-between" mb="xl" align="flex-start">
+          <Box fw={600} size="lg" style={{ flex: 1 }}>
+            <Text component="span" fw={600} size="lg">{currentConvIdx + 1}. </Text>
+            <HtmlContent html={question.question_text} style={{ display: 'inline' }} />
           </Box>
-        )}
+          <ActionIcon 
+            variant="light" 
+            color="red" 
+            size="lg" 
+            title="Reset Conversation"
+            onClick={() => {
+              setEvaluation(null);
+              setTranscription('');
+              latestTranscriptionRef.current = '';
+            }}
+          >
+            <IconRefresh size={20} />
+          </ActionIcon>
+        </Group>
 
-        {evaluation && (
-          <Box mb="md">
-            <Text weight={500} size="sm" c="dimmed" mb="xs">AI Feedback</Text>
-            <Card withBorder p="sm" style={{ backgroundColor: evaluation.status === 'Correct' ? '#e6ffee' : '#ffe6e6' }}>
-              <Text>{evaluation.message}</Text>
-            </Card>
-          </Box>
-        )}
+        <ScrollArea style={{ flex: 1, paddingRight: '12px' }} offsetScrollbars>
+          {evaluation?.conversation && evaluation.conversation.map((turn, idx) => (
+             <Box key={idx} mb="md">
+               <Group gap="xs" mb={4}>
+                 {turn.role === 'user' ? <IconUser size={14} style={{ color: 'var(--mantine-color-gray-6)' }} /> : <IconRobot size={14} style={{ color: 'var(--mantine-color-blue-6)' }} />}
+                 <Text size="xs" c="dimmed" fw={500}>{turn.role === 'user' ? 'You' : 'AI'}</Text>
+               </Group>
+               <Card 
+                 withBorder 
+                 p="sm" 
+                 radius="md"
+                 style={{ 
+                   backgroundColor: turn.role === 'user' ? '#f8f9fa' : (turn.status === 'Correct' ? '#e6ffee' : (turn.status === 'Chat' ? '#e6f7ff' : '#ffe6e6')),
+                   marginLeft: turn.role === 'user' ? '24px' : '0',
+                   marginRight: turn.role === 'user' ? '0' : '24px'
+                 }}
+               >
+                 <Text size="sm">{turn.text}</Text>
+               </Card>
+             </Box>
+          ))}
+
+          {(isRecording || transcription) && (
+            <Box mb="md">
+               <Group gap="xs" mb={4}>
+                 <IconUser size={14} style={{ color: 'var(--mantine-color-gray-6)' }} />
+                 <Text size="xs" c="dimmed" fw={500}>You (Listening...)</Text>
+               </Group>
+               <Card withBorder p="sm" radius="md" style={{ backgroundColor: '#f8f9fa', marginLeft: '24px' }}>
+                 <Text size="sm" c={!transcription ? "dimmed" : undefined}>{transcription || "..."}</Text>
+               </Card>
+            </Box>
+          )}
+        </ScrollArea>
 
         {/* Navigation / Counter at the very bottom of the first div */}
         <Group justify="space-between" mt="auto" pt="xl">
@@ -286,8 +344,9 @@ export default function ConversationMode({ exercise, question, convActive, curre
           radius="xl"
           mb="xl"
           leftSection={isRecording ? <IconMicrophone size={24} /> : <IconMicrophoneOff size={24} />}
-          onMouseDown={micMode === 'push' ? startRecording : null}
-          onMouseUp={micMode === 'push' ? stopRecording : null}
+          onMouseDown={micMode === 'push' ? () => { isPushingRef.current = true; startRecording(); } : null}
+          onMouseUp={micMode === 'push' ? () => { isPushingRef.current = false; stopRecording(); } : null}
+          onMouseLeave={micMode === 'push' ? () => { isPushingRef.current = false; stopRecording(); } : null}
           onClick={micMode === 'toggle' ? toggleRecording : null}
           style={{ transition: 'background-color 0.2s' }}
         >

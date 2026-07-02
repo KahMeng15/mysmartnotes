@@ -63,7 +63,9 @@ async def voice_stream(websocket: WebSocket, exercise_id: str, question_id: str,
                         
                         # 3. Evaluate
                         grading_mode = msg.get("grading_mode", "lenient")
-                        evaluation = await voice_engine.evaluate_context(transcription, context, grading_mode)
+                        history = msg.get("history", [])
+                        print(f"DEBUG VOICE HISTORY: {history}", flush=True)
+                        evaluation = await voice_engine.evaluate_context(transcription, context, grading_mode, history)
                         await websocket.send_json({"type": "evaluation", "status": evaluation.get("status"), "message": evaluation.get("message")})
                         
                         # 4. Synthesize TTS if requested

@@ -1628,7 +1628,7 @@ export default function ExerciseView() {
                           onPrev={() => setCurrentConvIdx(i => Math.max(i - 1, 0))}
                           transcription={userAnswers[q.id] || ''}
                           setTranscription={(val) => setUserAnswers(prev => ({ ...prev, [q.id]: val }))}
-                          evaluation={gradingResults[q.id] ? { status: gradingResults[q.id].status || (gradingResults[q.id].total_awarded > 0 ? 'Correct' : 'Inaccurate'), message: gradingResults[q.id].feedback } : null}
+                          evaluation={gradingResults[q.id] || null}
                           setEvaluation={(val) => {
                             if (!val) {
                                setGradingResults(prev => {
@@ -1638,12 +1638,21 @@ export default function ExerciseView() {
                                });
                                return;
                             }
+                            // Evaluate overall status based on conversation if provided
+                            let overallStatus = 'Inaccurate';
+                            if (val.conversation) {
+                               const correctTurn = val.conversation.find(t => t.status === 'Correct');
+                               if (correctTurn) overallStatus = 'Correct';
+                            } else {
+                               overallStatus = val.status === 'Correct' ? 'Correct' : 'Inaccurate';
+                            }
+
                             setGradingResults(prev => ({
                               ...prev,
                               [q.id]: {
-                                status: val.status,
-                                feedback: val.message,
-                                total_awarded: val.status === 'Correct' ? 1 : 0,
+                                ...val,
+                                status: overallStatus,
+                                total_awarded: overallStatus === 'Correct' ? 1 : 0,
                                 total_max: 1
                               }
                             }));

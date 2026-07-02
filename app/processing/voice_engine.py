@@ -53,22 +53,45 @@ class VoiceEngine:
         text = " ".join([seg.text for seg in segments])
         return text.strip()
 
-    async def evaluate_context(self, transcription: str, context: str, grading_mode: str = 'lenient') -> dict:
+    async def evaluate_context(self, transcription: str, context: str, grading_mode: str = 'lenient', history: list = None) -> dict:
         if grading_mode == 'strict':
             strict_text = "Grade STRICTLY. Require exact terminology and complete lists. Do not accept partial matches or missing items."
         else:
             strict_text = "Grade LENIENTLY. If the user captures the basic conceptual essence or provides a partial correct answer, mark it as 'Correct'. Do not penalize for missing terminology, missing items in a list, or loose phrasing."
 
+        history_text = ""
+        if history:
+            history_text = "--- ONGOING CONVERSATION HISTORY ---\n"
+            for h in history:
+                role = "Student" if h.get('role') == 'user' else "Tutor (You)"
+                history_text += f"{role}: {h.get('text')}\n"
+            history_text += "------------------------------------\n"
+
         prompt = f"""
-        You are an educational evaluator. The user provided an answer aloud.
-        Target Concept/Context: {context}
-        User's Answer (Transcribed): {transcription}
+        You are a friendly, casual human tutor engaging in a natural voice conversation with a student.
+        You are currently discussing the following question/topic:
+        Topic: {context}
+        
+        {history_text}
+
+        Student's latest speech (Note: may contain speech-to-text transcription errors, so interpret charitably): {transcription}
         
         {strict_text}
 
-        Classify the user's answer into one of: 'Correct', 'Inaccurate', or 'Vague'.
-        Also provide a short coaching response (1-2 sentences) in a conversational, supportive tone.
-        Respond in JSON format: {{"status": "...", "message": "..."}}
+        Your Task:
+        Look at the Student's latest speech.
+        If it's an answer to the original topic, classify into 'Correct', 'Inaccurate', or 'Vague' and coach them naturally.
+        If they are asking a follow-up question, chatting, or asking for an explanation (e.g. "explain like I'm 5"), classify as 'Chat' and directly answer them in a helpful, conversational way.
+        
+        CRITICAL RULES FOR YOUR VOICE:
+        - Speak exactly like a real human tutor having a casual voice call.
+        - NEVER use AI boilerplate like "I'd be happy to continue that conversation", "As a tutor", or "It looks like you're...".
+        - NEVER summarize what was just said unless explicitly asked.
+        - Be highly tolerant of speech-to-text transcription errors (e.g., if the transcription is "explain like I'm in like this old", safely assume they meant "explain like I'm five years old").
+        - Do not try to rigidly drag them back to the original topic if they ask a valid follow-up question.
+        - Keep it brief, punchy, conversational, and directly to the point.
+        
+        Always respond in JSON format: {{"status": "...", "message": "..."}}
         """
         
         # Call global 3-tier AI System
