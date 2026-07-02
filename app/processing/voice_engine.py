@@ -54,7 +54,7 @@ class VoiceEngine:
         text = " ".join([seg.text for seg in segments])
         return text.strip()
 
-    async def evaluate_context(self, transcription: str, context: str, grading_mode: str = 'lenient', history: list = None) -> dict:
+    async def evaluate_context(self, transcription: str, context: str, grading_mode: str = 'lenient', history: list | None = None) -> dict:
         if grading_mode == 'strict':
             strict_text = "Grade STRICTLY. Require exact terminology and complete lists. Do not accept partial matches or missing items."
         else:
@@ -72,18 +72,18 @@ class VoiceEngine:
         You are a friendly, casual human tutor engaging in a natural voice conversation with a student.
         You are currently discussing the following question/topic:
         Topic: {context}
-        
+
         {history_text}
 
         Student's latest speech (Note: may contain speech-to-text transcription errors, so interpret charitably): {transcription}
-        
+
         {strict_text}
 
         Your Task:
         Look at the Student's latest speech.
         If it's an answer to the original topic, classify into 'Correct', 'Inaccurate', or 'Vague' and coach them naturally.
         If they are asking a follow-up question, chatting, or asking for an explanation (e.g. "explain like I'm 5"), classify as 'Chat' and directly answer them in a helpful, conversational way.
-        
+
         CRITICAL RULES FOR YOUR VOICE:
         - Speak exactly like a real human tutor having a casual voice call.
         - NEVER use AI boilerplate like "I'd be happy to continue that conversation", "As a tutor", or "It looks like you're...".
@@ -92,7 +92,7 @@ class VoiceEngine:
         - Do not try to rigidly drag them back to the original topic if they ask a valid follow-up question.
         - Keep it brief, punchy, conversational, and directly to the point.
         - If the student is answering the question and they do not get full marks based on the marking scheme, you MUST explain concisely what they missed or got wrong so they can improve.
-        
+
         If a Marking Scheme is provided in the topic, and the student is answering, evaluate their answer against the scheme and provide an `awarded_marks` and `max_marks` integer in the JSON. If it's just a chat/follow-up or no scheme is provided, you can omit them.
 
         Always respond in JSON format: {{"status": "...", "message": "...", "awarded_marks": 0, "max_marks": 0}}
