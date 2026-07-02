@@ -317,6 +317,27 @@ export default function ConversationMode({ exercise, question, convActive, curre
           <Box fw={600} size="lg" style={{ flex: 1 }}>
             <Text component="span" fw={600} size="lg">{currentConvIdx + 1}. </Text>
             <HtmlContent html={question.question_text} style={{ display: 'inline' }} />
+            {(() => {
+              let parsedOptions = [];
+              try {
+                parsedOptions = typeof question.options === 'string' ? JSON.parse(question.options) : (question.options || []);
+              } catch(e) { parsedOptions = []; }
+              if (parsedOptions && parsedOptions.length > 0) {
+                return (
+                  <Stack gap="xs" mt="md">
+                    {parsedOptions.map((opt, i) => (
+                      <Group key={i} gap="sm" wrap="nowrap">
+                        <Badge size="md" variant="light" color="blue" radius="xl" style={{ flexShrink: 0 }}>
+                          {String.fromCharCode(65 + i)}
+                        </Badge>
+                        <Text size="sm">{opt}</Text>
+                      </Group>
+                    ))}
+                  </Stack>
+                );
+              }
+              return null;
+            })()}
           </Box>
           <Group gap="xs">
             <ActionIcon 
