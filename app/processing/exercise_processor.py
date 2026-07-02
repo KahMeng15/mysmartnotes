@@ -480,7 +480,7 @@ Respond with ONLY the JSON object.
         if not questions_data:
             raise ValueError("AI failed to structure the imported content properly.")
 
-            normalized_questions = []
+        normalized_questions = []
         for q_data in questions_data:
             if not isinstance(q_data, dict):
                 continue
