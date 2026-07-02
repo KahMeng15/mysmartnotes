@@ -111,6 +111,13 @@ def _prepare_user_for_response(user: User) -> dict:
         "nav_sidebar_open": getattr(user, "nav_sidebar_open", True),
         "action_sidebar_open": getattr(user, "action_sidebar_open", True),
         "sort_preference": getattr(user, "sort_preference", "name_asc"),
+        "last_chat_context": getattr(user, "last_chat_context", "global"),
+        "last_chat_ai_mode": getattr(user, "last_chat_ai_mode", "elaborate"),
+        "last_chat_output_format": getattr(user, "last_chat_output_format", "sentence"),
+        "conv_response_mode": getattr(user, "conv_response_mode", "voice"),
+        "conv_input_mode": getattr(user, "conv_input_mode", "push"),
+        "conv_transcription_enabled": getattr(user, "conv_transcription_enabled", True),
+        "conv_grading_mode": getattr(user, "conv_grading_mode", "lenient"),
         "created_at": user.created_at,
     }
 

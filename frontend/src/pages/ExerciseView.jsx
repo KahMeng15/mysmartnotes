@@ -853,7 +853,8 @@ export default function ExerciseView() {
                 autosize
                 size="xs"
                 disabled={partHasGraded || (isExam && !examActive)}
-                styles={{ input: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '12px' } }}
+                autosize
+                minRows={2}
               />
             )}
 
@@ -1618,6 +1619,7 @@ export default function ExerciseView() {
                     if (viewMode === 'conversation') {
                       return (
                         <ConversationMode 
+                          key="conversation-mode"
                           exercise={exercise} 
                           question={q}
                           convActive={convActive}
@@ -1792,7 +1794,8 @@ export default function ExerciseView() {
                                     }
                                   }
                                 }}
-                                styles={{ input: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: '13px' } }}
+                                autosize
+                                minRows={2}
                               />
                             )}
                             

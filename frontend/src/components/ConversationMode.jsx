@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { Box, Button, Switch, Group, Text, Card, Center, ActionIcon, Badge, Stack, Divider, ScrollArea, Paper } from '@mantine/core';
+import { Box, Button, Switch, Group, Text, Card, Center, ActionIcon, Badge, Stack, Divider, ScrollArea, Paper, SegmentedControl } from '@mantine/core';
 import { IconMicrophone, IconMicrophoneOff, IconChevronLeft, IconChevronRight, IconMessage, IconHandClick, IconEye, IconEyeOff, IconShieldLock, IconShieldCheck, IconRefresh, IconUser, IconRobot } from '@tabler/icons-react';
 import { fetchApi } from '../lib/api';
 
@@ -30,23 +30,23 @@ export default function ConversationMode({ exercise, question, convActive, curre
     }).catch(() => {}).finally(() => setIsLoaded(true));
   }, []);
 
-  // Sync state changes back to DB
-  useEffect(() => {
+  const updatePreference = (key, value) => {
+    // Update local state
+    if (key === 'conv_response_mode') setResponseMode(value);
+    if (key === 'conv_input_mode') setMicMode(value);
+    if (key === 'conv_transcription_enabled') setShowLiveTranscription(value);
+    if (key === 'conv_grading_mode') setGradingMode(value);
+
+    // Sync to backend immediately
     if (isLoaded) {
-      const updates = {
-        conv_response_mode: responseMode,
-        conv_input_mode: micMode,
-        conv_transcription_enabled: showLiveTranscription,
-        conv_grading_mode: gradingMode
-      };
-      
+      const updates = { [key]: value };
       fetchApi('/auth/profile', {
         method: 'PUT',
         body: JSON.stringify(updates),
         quietFail: true
       }).catch(err => console.error("Failed to save conversation preferences", err));
     }
-  }, [responseMode, micMode, showLiveTranscription, gradingMode, isLoaded]);
+  };
 
   useEffect(() => {
     setShowAnswer(false);
@@ -475,7 +475,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
             tt="none"
             leftSection={<IconMessage size={14} />}
             style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
-            onClick={() => setResponseMode(responseMode === 'voice' ? 'text' : 'voice')}
+            onClick={() => updatePreference('conv_response_mode', responseMode === 'voice' ? 'text' : 'voice')}
           >
             {responseMode === 'voice' ? 'Voice Mode' : 'Text Mode'}
           </Badge>
@@ -488,7 +488,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
             tt="none"
             leftSection={<IconHandClick size={14} />}
             style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
-            onClick={() => setMicMode(micMode === 'push' ? 'toggle' : 'push')}
+            onClick={() => updatePreference('conv_input_mode', micMode === 'push' ? 'toggle' : 'push')}
           >
             {micMode === 'push' ? 'Push-to-Talk' : 'Toggle Mic'}
           </Badge>
@@ -501,7 +501,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
             tt="none"
             leftSection={showLiveTranscription ? <IconEye size={14} /> : <IconEyeOff size={14} />}
             style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
-            onClick={() => setShowLiveTranscription(!showLiveTranscription)}
+            onClick={() => updatePreference('conv_transcription_enabled', !showLiveTranscription)}
           >
             Transcription {showLiveTranscription ? 'On' : 'Off'}
           </Badge>
@@ -514,7 +514,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
             tt="none"
             leftSection={gradingMode === 'strict' ? <IconShieldLock size={14} /> : <IconShieldCheck size={14} />}
             style={{ cursor: 'pointer', transition: 'transform 0.1s', whiteSpace: 'normal', overflow: 'visible' }}
-            onClick={() => setGradingMode(gradingMode === 'strict' ? 'lenient' : 'strict')}
+            onClick={() => updatePreference('conv_grading_mode', gradingMode === 'lenient' ? 'strict' : 'lenient')}
           >
             {gradingMode === 'strict' ? 'Strict Grading' : 'Lenient Grading'}
           </Badge>

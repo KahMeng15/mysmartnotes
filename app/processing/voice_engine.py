@@ -117,15 +117,25 @@ class VoiceEngine:
 
     async def synthesize(self, text: str) -> bytes:
         import edge_tts
+        import uuid
         
         # We use a natural-sounding US English voice
         communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
-        out_path = os.path.join(MODELS_DIR, "temp_out.mp3")
         
-        await communicate.save(out_path)
+        # Use a unique filename to prevent race conditions and file truncation bugs
+        unique_id = str(uuid.uuid4())
+        out_path = os.path.join(MODELS_DIR, f"temp_out_{unique_id}.mp3")
         
-        with open(out_path, "rb") as f:
-            audio_bytes = f.read()
-        return audio_bytes
+        try:
+            await communicate.save(out_path)
+            with open(out_path, "rb") as f:
+                audio_bytes = f.read()
+            return audio_bytes
+        finally:
+            if os.path.exists(out_path):
+                try:
+                    os.remove(out_path)
+                except OSError:
+                    pass
 
 voice_engine = VoiceEngine()
