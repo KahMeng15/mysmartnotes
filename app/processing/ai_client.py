@@ -519,11 +519,19 @@ class AIClient:
         max_tokens: int = 500,
         system_instruction: str | None = None,
         raw_output: bool = False,
+        require_reasoning: bool = False,
     ) -> str:
-        """Unary generation with 3-tier fallback logic."""
+        """Unary generation with task-specific fallback logic."""
         last_error = None
 
-        for i, tier in enumerate(self.tiers):
+        tiers_to_use = self.tiers
+        if require_reasoning:
+            if len(self.tiers) == 3:
+                tiers_to_use = self.tiers[1:]
+            elif len(self.tiers) == 4:
+                tiers_to_use = [self.tiers[0]] + self.tiers[2:]
+
+        for i, tier in enumerate(tiers_to_use):
             try:
                 logger.info(
                     f"Attempting generation with Tier {i + 1} ({tier.provider}: {tier.model_name})"
@@ -540,12 +548,23 @@ class AIClient:
         raise Exception(f"All AI tiers failed. Last error: {last_error}")
 
     async def stream_text(
-        self, prompt: str, max_tokens: int = 500, system_instruction: str | None = None
+        self, 
+        prompt: str, 
+        max_tokens: int = 500, 
+        system_instruction: str | None = None,
+        require_reasoning: bool = False,
     ):
-        """Stream generation with 3-tier fallback logic."""
+        """Stream generation with task-specific fallback logic."""
         last_error = None
 
-        for i, tier in enumerate(self.tiers):
+        tiers_to_use = self.tiers
+        if require_reasoning:
+            if len(self.tiers) == 3:
+                tiers_to_use = self.tiers[1:]
+            elif len(self.tiers) == 4:
+                tiers_to_use = [self.tiers[0]] + self.tiers[2:]
+
+        for i, tier in enumerate(tiers_to_use):
             try:
                 logger.info(
                     f"Attempting stream with Tier {i + 1} ({tier.provider}: {tier.model_name})"
@@ -678,11 +697,15 @@ class AIClient:
         raise Exception(f"All AI tiers failed. Last error: {last_error}")
 
     async def answer_question(
-        self, context: str, question: str, system_prompt: str | None = None
+        self,
+        context: str,
+        question: str,
+        system_prompt: str | None = None,
+        require_reasoning: bool = False,
     ) -> str:
         if system_prompt:
             return await self.generate_text(
-                prompt=question, max_tokens=8192, system_instruction=system_prompt, raw_output=True
+                prompt=question, max_tokens=8192, system_instruction=system_prompt, raw_output=True, require_reasoning=require_reasoning
             )
         prompt = f"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"
         return await self.generate_text(prompt, max_tokens=8192, raw_output=True)

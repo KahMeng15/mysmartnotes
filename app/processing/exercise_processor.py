@@ -96,9 +96,9 @@ def _extract_fallback_questions(raw_text: str) -> list[dict[str, Any]]:
         return []
     extracted: list[dict[str, Any]] = []
     qa_pattern = _re.compile(
-        r"(?ims)(?:^|\n)\s*(?:q(?:uestion)?\s*[\d.\-)]*\s*[:\-])\s*(.+?)\s*"
-        r"(?:\n|\r\n)\s*(?:a(?:nswer)?\s*[\d.\-)]*\s*[:\-])\s*(.+?)"
-        r"(?=\n\s*(?:q(?:uestion)?\s*[\d.\-)]*\s*[:\-])|\Z)"
+        r"(?ims)(?:^|\n)\s*(?:#*\s*q(?:uestion)?\s*[\d.\-)]*[\s:\-]*)\n*(.+?)\s*"
+        r"(?:\n|\r\n)\s*(?:#*\s*(?:j(?:awapan)?\s*/?\s*)?a(?:nswer)?\s*[\d.\-)]*[\s:\-]*)\n*(.+?)"
+        r"(?=\n\s*(?:#*\s*q(?:uestion)?\s*[\d.\-)]*[\s:\-])|\Z)"
     )
     for match in qa_pattern.finditer(raw_text):
         q_text = " ".join(match.group(1).split())
@@ -398,14 +398,14 @@ Text to process:
 
 {resource_context}
 Rules:
-1. **Identify Questions and Answers**: Pair each question with its corresponding answer. Questions may start with numbers like "1.1", "Q1:", "a.", etc.
-2. **Generate Missing Answers**: If 'generate_missing_answers' is true, generate accurate answers for any questions that are missing them, based on context.
-3. **CRITICAL - Rejoin Broken Lines**: The input may be from a PDF or scanned document where sentences are broken mid-line. Rejoin them into complete, coherent sentences.
-4. **CRITICAL - No Orphaned Words**: Never leave a word or abbreviation stranded alone at the end of a sentence.
-5. **CRITICAL - Clean Question Clusters**: Extract the real question text that follows headers and only use the first number as the `original_number`.
-6. **CRITICAL - Remove Non-Content**: Strip out page numbers, chapter titles, etc.
-7. **NO Empty Strings**: Never include empty strings.
-8. **Preserve Rich Formatting**: Keep bullet points, and format inline list enumerations as proper Markdown lists.
+1. **Identify Questions and Answers**: Pair each question with its corresponding answer. Questions often follow headers like "# QUESTION 1", and answers often follow headers like "## Jawapan / Answer".
+2. **Bilingual Documents**: The text contains questions in BOTH Malay and English (e.g., "Dua hubungan..." followed by "Two relations..."). You MUST extract **ONLY the English questions and answers**. DO NOT include the Malay text in your output under any circumstances.
+3. **Generate Missing Answers**: If 'generate_missing_answers' is true, generate accurate answers for any questions that are missing them, based on context.
+4. **CRITICAL - Rejoin Broken Lines**: The input may be from a PDF or scanned document where sentences are broken mid-line. Rejoin them into complete, coherent sentences.
+5. **CRITICAL - No Orphaned Words**: Never leave a word or abbreviation stranded alone at the end of a sentence.
+6. **CRITICAL - Clean Question Clusters**: Extract the real question text that follows headers and only use the first number as the `original_number`.
+7. **CRITICAL - Remove Non-Content**: Strip out page numbers, chapter titles, etc.
+8. **NO Empty Strings**: Never include empty strings.
 9. **CRITICAL - Handle Squished Lists**: Split them onto SEPARATE LINES, keeping the original letter prefix. NEVER convert `a. / b. / c.` markers to `- `.
 10. **Nested Inline Lists**: Convert inline lists to numbered lines.
 11. **Question Extraction**: The `original_number` is the question label. The `question_text` must NOT start with the original number.
@@ -446,6 +446,7 @@ Respond with ONLY the JSON object.
             prompt=prompt,
             system_instruction="You are an expert educational content extractor.",
             max_tokens=8192,
+            require_reasoning=True,
         )
 
         provider_failed = _looks_like_provider_error(response)
@@ -532,6 +533,48 @@ Respond with ONLY the JSON object.
                     "reference_quote": q_data.get("reference_quote"),
                 }
             )
+
+        if not normalized_questions:
+            questions_data = _extract_fallback_questions(text)
+            for q_data in questions_data:
+                if not isinstance(q_data, dict):
+                    continue
+                q_text = str(q_data.get("question_text") or q_data.get("question") or "").strip()
+                if not q_text:
+                    continue
+                q_type = _normalize_type(str(q_data.get("question_type") or q_data.get("type") or "subjective"))
+                options = q_data.get("options") if q_type == "objective" else None
+
+                r_title = q_data.get("resource_title") or ""
+                r_title_clean = r_title.strip() if r_title else ""
+                mapped_id = None
+                if r_title_clean and title_to_id:
+                    mapped_id = title_to_id.get(r_title_clean)
+                    if not mapped_id:
+                        for t, rid in title_to_id.items():
+                            if t.lower() in r_title_clean.lower() or r_title_clean.lower() in t.lower():
+                                mapped_id = rid
+                                break
+
+                q_data = _normalize_question_structure(q_data)
+
+                normalized_questions.append(
+                    {
+                        "question_text": q_text,
+                        "original_number": q_data.get("original_number"),
+                        "answer_text": str(q_data.get("answer_text") or q_data.get("answer") or "").strip(),
+                        "question_type": q_type,
+                        "options": options,
+                        "topic": q_data.get("topic"),
+                        "difficulty": q_data.get("difficulty"),
+                        "max_marks": q_data.get("max_marks", 1),
+                        "sub_parts": q_data.get("sub_parts", []),
+                        "marking_scheme": q_data.get("marking_scheme", []),
+                        "reference_resource_id": mapped_id,
+                        "reference_resource_title": r_title_clean if r_title_clean else None,
+                        "reference_quote": q_data.get("reference_quote"),
+                    }
+                )
 
         if not normalized_questions:
             raise ValueError("No valid questions could be extracted.")
@@ -700,7 +743,7 @@ Do NOT include markdown formatting. Return only the raw JSON.
     try:
         response = _run_async(
             client.generate_text, prompt=prompt, system_instruction=system_prompt,
-            max_tokens=4000, raw_output=True
+            max_tokens=4000, raw_output=True, require_reasoning=True
         )
         if not response or not response.strip():
             raise ValueError("Empty response from AI")
@@ -805,7 +848,7 @@ Correct Answer: {answer_text}
 
     result = _run_async(
         client.generate_text, prompt=prompt, system_instruction=system_prompt,
-        max_tokens=4000, raw_output=True
+        max_tokens=4000, raw_output=True, require_reasoning=True
     )
     return (result or "").strip()
 
@@ -998,6 +1041,8 @@ Respond with ONLY the JSON array.
                 prompt=prompt,
                 system_instruction="You are an expert educational content generator.",
                 max_tokens=8192,
+                raw_output=True,
+                require_reasoning=True,
             )
 
             try:

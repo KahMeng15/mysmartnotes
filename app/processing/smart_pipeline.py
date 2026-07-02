@@ -1408,9 +1408,9 @@ INPUT TO PROCESS:
                 "Do not include any preamble, introduction, explanation, or reasoning.\n"
                 "Strictly adhere to the heading rules and keep the exact words from the source text."
             )
-            # Use a slightly higher max_tokens to ensure we don't cut off the content
+            # Using Tier 2 reasoning for high-quality content polishing
             async for text_segment in client.stream_text(
-                prompt, max_tokens=3000, system_instruction=system_instruction
+                prompt=prompt, max_tokens=8192, system_instruction=system_instruction, require_reasoning=True
             ):
                 full_text += text_segment
                 if debug_file:

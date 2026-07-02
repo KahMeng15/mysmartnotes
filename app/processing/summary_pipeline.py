@@ -266,7 +266,7 @@ SUMMARY:
 """
         try:
             full_text = ""
-            async for text_segment in self.ai_client.stream_text(prompt, max_tokens=1500):
+            async for text_segment in self.ai_client.stream_text(prompt, max_tokens=1500, require_reasoning=True):
                 full_text += text_segment
 
             if not full_text:
