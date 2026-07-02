@@ -64,15 +64,21 @@ The database consists of several key entities managed via SQLAlchemy:
 
 ## 4. Core Workflows
 
-### 4.1 Document Processing Pipeline (`SmartPipeline`)
-The extraction pipeline is designed to preserve the semantic structure of lecture slides.
+### 4.1 Document Processing Pipeline (`UnifiedContentProcessor`)
+The new unified pipeline replaces the legacy `SmartPipeline` and provides a single entry point for all supported document types (PDF, PPTX, DOCX, images). It automatically detects scanned PDFs and routes them through the appropriate OCR workflow, while also handling native documents with font‑aware heading detection and table extraction.
 
-1. **Submission**: When a user uploads a file, the API creates an `ocr` task in the database.
-2. **Extraction**:
-   - **PDF**: Uses `pdfplumber` for table extraction and a custom `FontAwareExtractor` to detect headings.
-   - **PPTX**: Uses `python-pptx` to extract text from shapes.
-3. **Worker Processing**: The Worker picks up the task, performs the extraction, and updates the task status.
-4. **AI Polish**: (Optional) Refines formatting and ensures logical consistency.
+1. **Submission**: User uploads a file → API creates a `process_resource` or `process_exercise` task in the `Task` table.
+2. **Unified Extraction** (`UnifiedContentProcessor.extract()`):
+   - Detects document type and whether it is scanned.
+   - **PDF**: Uses `pdfplumber` for tables, `FontAwareExtractor` for headings, and `ImageExtractorV2` for images.
+   - **PPTX**: Extracts text via `python-pptx` and images via `ImageExtractorV2`.
+   - **DOCX**: Parses text with `python-docx` and extracts inline images.
+   - **Images**: Directly processed as single‑page documents.
+   - Scanned PDFs are handed to `ScannedDocHandler` → Tesseract OCR with `ImagePreprocessor`.
+   - Extracted images are filtered by `ImageClassifier` and positioned inline by `ImageTextMapper`.
+3. **Worker Processing**: The worker executes the unified extraction, generates embeddings, and stores a `ContentBundle` (markdown, images, metadata).
+4. **AI Polish (Optional)**: The `AIClient` may be invoked to improve formatting, consistency, and add reasoning layers.
+5. **Result**: Clean markdown plus extracted assets are saved for downstream features (RAG, quizzes, exports).
 
 ### 4.2 Semantic Search & RAG
 velonote implements a "Zero-Config RAG" system:

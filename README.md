@@ -4,10 +4,16 @@ A scalable, AI-powered study companion that intelligently converts lecture slide
 
 ## ✨ Key Features
 
-* **Advanced Document Processing**: Font-aware text extraction + table detection from PDF/PPTX
-  - Preserves document structure with proper headings and formatting
-  - Automatically detects and converts tables to markdown format
-  - OCR support for scanned documents via dedicated background workers
+* **Unified Content Processor**: Single entry point (`UnifiedContentProcessor`) for all document types (PDF, PPTX, DOCX, images). Auto‑detects scanned PDFs and routes to appropriate OCR pipelines.
+* **Enhanced Image Extraction (ImageExtractorV2)**: Extracts images from PDF (PyMuPDF + OpenCV), PPTX (python‑pptx shapes), DOCX (inline), and image files. Includes `ImageClassifier` to filter logos, backgrounds, and decorations.
+* **Intelligent Image‑Text Mapping**: `ImageTextMapper` places extracted images inline near corresponding text, handling references like “as shown in the figure”.
+* **Scanned Document Detection & OCR**: `ScannedDocHandler` detects low‑text‑density PDFs and routes them to Tesseract with optimized PSM settings for printed, handwritten, or mixed content.
+* **Image Pre‑processing**: `ImagePreprocessor` applies deskew, CLAHE contrast enhancement, denoising, and binarization before OCR for higher accuracy.
+* **Comprehensive Test Harness**: `scripts/resource_processing_test/` provides end‑to‑end validation, structural diff, quality metrics, and historical trend tracking.
+* **Interactive Correction CLI**: `correction_tool.py` lets users correct headings, lists, images, and OCR errors interactively.
+* **Self‑Improvement Engine**: `analyze_corrections.py` analyses accumulated corrections and suggests pipeline parameter tweaks.
+* **UI Enhancements**: Updated ExerciseView processing screen to match NoteView, hidden sidebars during processing, and fixed infinite refetch loop.
+* **Robust AI Client**: 3‑tier fallback (Gemini → Gemini → Ollama) with dynamic model selection and reasoning level handling.
 * **Semantic Q&A Chat**: Ask questions about your notes with RAG (Retrieval Augmented Generation)
   - Pre-computed embeddings for fast semantic search
   - Vector storage integrated into the database
