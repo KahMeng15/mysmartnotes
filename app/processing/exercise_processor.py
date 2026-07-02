@@ -242,7 +242,7 @@ def _normalize_sub_parts(parts: list, parent_id: str, depth: int = 0) -> list:
             sp["marking_scheme"] = []
 
         sp["sub_parts"] = _normalize_sub_parts(
-            sp.get("sub_parts", []), sp["id"], depth + 1
+            sp.get("sub_parts") or [], sp["id"], depth + 1
         )
 
         if sp["sub_parts"]:
@@ -288,6 +288,12 @@ def _extract_title_from_text(raw_text: str) -> str | None:
         if not stripped or len(stripped) < 4:
             continue
         if stripped.isdigit():
+            continue
+        # Skip markdown image/link syntax (e.g. ![Figure](...) or [text](...))
+        if stripped.startswith("![") or stripped.startswith("["):
+            continue
+        # Skip lines that are mostly a URL or file path
+        if stripped.startswith("http") or stripped.startswith("/"):
             continue
         first_word = stripped.split()[0].lower().strip("()[].,:;!?")
         if stripped.endswith("?"):
@@ -384,38 +390,47 @@ def process_exercise_task(exercise_id: str, user_id: int, task_id: str | None = 
         progress_callback(40, "Using AI to parse questions and answers...")
 
         text = raw_text
+        # Groq free tier hard limit: 6,000 TPM (input+output tokens combined).
+        # The exercise extraction prompt template is ~3,500 tokens of overhead.
+        # To stay under 6,000 TPM we can only fit ~2,500 tokens of text (~4,000 chars).
+        # Cap tightly so Groq (Tier1) doesn't get a 413; Gemini (Tier2) handles the full text.
+        GROQ_SAFE_CHARS = 4000
         if len(text) > 25000:
             text = text[:25000] + "... [truncated]"
 
         text = _re.sub(r"(?<=[.!?])\s+(?=[b-z]\.\s)", "\n", text)
         text = _re.sub(r"(?<=\.)\s+(?=\([b-z]\)\s)", "\n", text)
 
-        prompt = f"""Extract and structure all quiz questions from the following text.
+
+        def _build_prompt(body_text: str) -> str:
+            return f"""Extract and structure all quiz questions from the following text.
 Text to process:
 ---
-{text}
+{body_text}
 ---
 
 {resource_context}
 Rules:
 1. **Identify Questions and Answers**: Pair each question with its corresponding answer. Questions often follow headers like "# QUESTION 1", and answers often follow headers like "## Jawapan / Answer".
-2. **Bilingual Documents**: The text contains questions in BOTH Malay and English (e.g., "Dua hubungan..." followed by "Two relations..."). You MUST extract **ONLY the English questions and answers**. DO NOT include the Malay text in your output under any circumstances.
+2. **STRICTLY ENGLISH ONLY**: The text contains questions in BOTH Malay and English (e.g., "Dua hubungan..." followed by "Two relations..."). You MUST extract **ONLY the English questions and answers**. DO NOT include the Malay text in your output under any circumstances. Ignore all Malay translations completely.
 3. **Generate Missing Answers**: If 'generate_missing_answers' is true, generate accurate answers for any questions that are missing them, based on context.
 4. **CRITICAL - Rejoin Broken Lines**: The input may be from a PDF or scanned document where sentences are broken mid-line. Rejoin them into complete, coherent sentences.
-5. **CRITICAL - No Orphaned Words**: Never leave a word or abbreviation stranded alone at the end of a sentence.
-6. **CRITICAL - Clean Question Clusters**: Extract the real question text that follows headers and only use the first number as the `original_number`.
-7. **CRITICAL - Remove Non-Content**: Strip out page numbers, chapter titles, etc.
-8. **NO Empty Strings**: Never include empty strings.
-9. **CRITICAL - Handle Squished Lists**: Split them onto SEPARATE LINES, keeping the original letter prefix. NEVER convert `a. / b. / c.` markers to `- `.
-10. **Nested Inline Lists**: Convert inline lists to numbered lines.
-11. **Question Extraction**: The `original_number` is the question label. The `question_text` must NOT start with the original number.
-12. **Marks Detection**: Detect marks/points for each question from patterns like "(4 marks)", "[4]", "4 points", "total: 5". If a question has labeled sub-parts (a, b, c or i, ii, iii), split them into `sub_parts`.
-13. **Format the output as a strict JSON object**. The JSON object must have:
+5. **CRITICAL - Math & Matrices Formatting**: Preserve all mathematical symbols, equations, superscripts, and subscripts exactly (e.g. `n^2 + n`, `R1 ∪ R2`). For matrices and multi-line equations, use explicit newline characters (`\\n`) within the string. NEVER flatten matrices or multi-line definitions into a single line.
+6. **CRITICAL - Image Preservation**: The source text may contain markdown image tags like `![image_0](...)`. You MUST preserve these exact tags inline within the `question_text` or `answer_text` exactly where they appear. DO NOT remove or modify them.
+7. **CRITICAL - No Orphaned Words**: Never leave a word or abbreviation stranded alone at the end of a sentence.
+8. **CRITICAL - Clean Question Clusters**: Extract the real question text that follows headers and only use the first number as the `original_number`.
+9. **CRITICAL - Remove Non-Content**: Strip out page numbers, chapter titles, etc. (But DO NOT strip out image tags).
+10. **NO Empty Strings**: Never include empty strings.
+11. **CRITICAL - Handle Squished Lists**: Split them onto SEPARATE LINES with `\\n`, keeping the original letter prefix. NEVER convert `a. / b. / c.` markers to `- `.
+12. **Nested Inline Lists**: Convert inline lists to numbered lines.
+13. **Question Extraction**: The `original_number` is the question label. The `question_text` must NOT start with the original number.
+14. **Marks Detection**: Detect marks/points for each question from patterns like "(4 marks)", "[4]", "4 points", "total: 5". If a question has labeled sub-parts (a, b, c or i, ii, iii), split them into `sub_parts`.
+15. **Format the output as a strict JSON object**. The JSON object must have:
     - `"suggested_title"`: A short, descriptive title.
     - `"questions"`: An array of objects, each with:
-        - `"question_text"`: Clean question text (no leading number).
+        - `"question_text"`: Clean question text (no leading number). Must include `\\n` for multi-line content. Must retain `![image...](...)` if present.
         - `"original_number"`: The original question label (e.g., "1.1"). `null` if not found.
-        - `"answer_text"`: The answer.
+        - `"answer_text"`: The answer. Must include `\\n` for multi-line content. Must retain `![image...](...)` if present.
         - `"question_type"`: One of `"objective"`, `"subjective"`, `"fill_in_the_blank"`.
         - `"options"`: For `"objective"`, an array of 4 options. `null` for others.
         - `"topic"`: A short 1-4 word description of the specific topic or concept this question covers.
@@ -440,13 +455,20 @@ Generate_missing_answers: True
 Respond with ONLY the JSON object.
 """
 
+        # Pass 1: Try Groq-safe truncated text (avoids 413 TPM error on free tier).
+        # Groq limit is 6,000 TPM (input+output). Prompt overhead is ~3,500 tokens,
+        # leaving ~2,500 tokens for text content (~4,000 chars).
+        groq_text = text[:GROQ_SAFE_CHARS] + ("... [truncated]" if len(text) > GROQ_SAFE_CHARS else "")
+        prompt = _build_prompt(groq_text)
+
         client = AIClient()
         response = _run_async(
             client.generate_text,
             prompt=prompt,
             system_instruction="You are an expert educational content extractor.",
             max_tokens=8192,
-            require_reasoning=True,
+            require_reasoning=False,
+            raw_output=True,
         )
 
         provider_failed = _looks_like_provider_error(response)
@@ -1042,7 +1064,7 @@ Respond with ONLY the JSON array.
                 system_instruction="You are an expert educational content generator.",
                 max_tokens=8192,
                 raw_output=True,
-                require_reasoning=True,
+                require_reasoning=False,
             )
 
             try:

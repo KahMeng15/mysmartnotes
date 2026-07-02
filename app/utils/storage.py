@@ -37,11 +37,15 @@ def _get_user_id_for_entity(entity_id: str) -> str:
         with SessionLocal() as db:
             entity = db.query(model_class).filter(model_class.id == entity_id).first()
             if entity:
-                if model_name in ["Note", "Exercise"]:
+                if model_name == "Note":
                     resource = db.query(Resource).filter(Resource.id == entity.resource_id).first()
                     if resource:
                         return str(resource.user_id)
+                    # Note might also have a direct user_id fallback
+                    if hasattr(entity, "user_id") and entity.user_id:
+                        return str(entity.user_id)
                 else:
+                    # Resource and Exercise both have a direct user_id column
                     return str(entity.user_id)
     except Exception as e:
         logger.error(f"Error fetching user_id for {entity_id}: {e}")

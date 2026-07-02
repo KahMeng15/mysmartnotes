@@ -70,6 +70,18 @@ class AIClient:
             ),
         ]
 
+        # Append optional Tier 4 if configured
+        if settings.GLOBAL_AI_TIER4_PROVIDER:
+            self.tiers.append(
+                AITier(
+                    provider=settings.GLOBAL_AI_TIER4_PROVIDER,
+                    model_name=settings.GLOBAL_AI_TIER4_MODEL,
+                    api_key=settings.GLOBAL_AI_TIER4_API_KEY,
+                    reasoning_level=settings.GLOBAL_AI_TIER4_REASONING_LEVEL,
+                    base_url=settings.GLOBAL_AI_TIER4_BASE_URL,
+                )
+            )
+
         # 3. User-specific override (Legacy/Personal)
         # If user has a personal provider configured and is NOT using global config,
         # we treat it as an additional Tier 0 (top priority).
@@ -493,8 +505,9 @@ class AIClient:
                     messages.append({"role": "system", "content": system_instruction})
                 messages.append({"role": "user", "content": modified_prompt})
 
-                # Cap max_tokens to 2000 for Groq to prevent exceeding the strict 6000 TPM free tier limits
-                safe_max_tokens = min(max_tokens, 2000)
+                # Cap max_tokens to avoid exceeding Groq free-tier TPM limits.
+                # 6000 is safe for most tasks; the 8192 hard limit is per-request.
+                safe_max_tokens = min(max_tokens, 6000)
 
                 res = await tier.model.chat.completions.create(
                     model=tier.model_name,
@@ -540,7 +553,13 @@ class AIClient:
                     tier, prompt, max_tokens, system_instruction, raw_output
                 )
             except Exception as e:
-                logger.error(f"Tier {i + 1} ({tier.provider}) failed: {e}")
+                err_str = str(e)
+                # 413 from Groq means the prompt is too large for the free TPM limit.
+                # No point retrying — skip immediately to next tier.
+                if tier.provider == "groq" and ("413" in err_str or "rate_limit_exceeded" in err_str or "Request too large" in err_str):
+                    logger.warning(f"Tier {i + 1} (groq) skipped: prompt too large for free TPM limit, falling through to next tier")
+                else:
+                    logger.error(f"Tier {i + 1} ({tier.provider}) failed: {e}")
                 last_error = e
                 continue  # Try next tier
 
@@ -650,8 +669,8 @@ class AIClient:
                             messages.append({"role": "system", "content": system_instruction})
                         messages.append({"role": "user", "content": modified_prompt})
 
-                        # Cap max_tokens to 2000 for Groq to prevent exceeding the strict 6000 TPM free tier limits
-                        safe_max_tokens = min(max_tokens, 2000)
+                        # Cap max_tokens to avoid exceeding Groq free-tier TPM limits.
+                        safe_max_tokens = min(max_tokens, 6000)
 
                         stream = await tier.model.chat.completions.create(
                             model=tier.model_name,

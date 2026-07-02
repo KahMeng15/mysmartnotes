@@ -217,6 +217,12 @@ class Settings(BaseSettings):
     GLOBAL_AI_TIER3_REASONING_LEVEL: str = "low"
     GLOBAL_AI_TIER3_BASE_URL: str = "http://localhost:11434"
 
+    GLOBAL_AI_TIER4_PROVIDER: str = ""
+    GLOBAL_AI_TIER4_MODEL: str = ""
+    GLOBAL_AI_TIER4_API_KEY: str = ""
+    GLOBAL_AI_TIER4_REASONING_LEVEL: str = "low"
+    GLOBAL_AI_TIER4_BASE_URL: str = ""
+
     # Legacy / individual AI fallbacks
     GEMINI_API_KEY: str = ""
     HUGGINGFACE_TOKEN: str = ""
