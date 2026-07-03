@@ -45,13 +45,16 @@ async def voice_stream(websocket: WebSocket, exercise_id: str, question_id: str,
     try:
         while True:
             data = await websocket.receive()
+            print(f"WS RECEIVED: type={data.get('type')}, keys={list(data.keys())}", flush=True)
             if "bytes" in data:
                 audio_chunks.append(data["bytes"])
                 # Could perform partial transcription here if needed, but for now we accumulate
             elif "text" in data:
                 msg = json.loads(data["text"])
+                print(f"WS TEXT MESSAGE: {msg}", flush=True)
                 if msg.get("action") == "process":
                     # Process the accumulated audio
+                    print(f"Processing audio: {len(audio_chunks)} chunks received.", flush=True)
                     full_audio = b"".join(audio_chunks)
                     if not full_audio:
                         await websocket.send_json({"error": "No audio received"})

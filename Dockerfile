@@ -38,8 +38,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install ONLY runtime system dependencies
-# We add gosu for secure privilege dropping
+# Install runtime dependencies (e.g., Tesseract for OCR, Poppler for PDF images, OpenCV deps, and FFmpeg for audio processing)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     poppler-utils \
@@ -48,6 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender-dev \
     curl \
     gosu \
+    ffmpeg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

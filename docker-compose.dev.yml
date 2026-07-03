@@ -69,8 +69,11 @@ services:
 
   api:
     image: ghcr.io/kahmeng15/velonote:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: velonote_api_dev
-    command: python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${API_PORT:-8000} --reload
+    command: python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${API_PORT:-8000} --reload --reload-dir app
     depends_on:
       db:
         condition: service_healthy
@@ -90,8 +93,11 @@ services:
 
   worker:
     image: ghcr.io/kahmeng15/velonote:dev
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: velonote_worker_dev
-    command: python -m watchfiles 'python -m app.worker_main' .
+    command: python -m watchfiles 'python -m app.worker_main' app/
     depends_on:
       db:
         condition: service_healthy
@@ -111,6 +117,9 @@ services:
 
   nginx:
     image: ghcr.io/kahmeng15/velonote:nginx-dev
+    build:
+      context: .
+      dockerfile: app/Dockerfile.nginx
     container_name: velonote_frontend_dev
     depends_on:
       - api
