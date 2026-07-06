@@ -366,6 +366,7 @@ export default function ExerciseView() {
   };
 
   // History modal
+  const [historyModalOpened, setHistoryModalOpened] = useState(false);
   const [historyModalQuestion, setHistoryModalQuestion] = useState(null);
   const [voiceSettingsOpened, setVoiceSettingsOpened] = useState(false);
   const [showProcessLog, setShowProcessLog] = useState(false);

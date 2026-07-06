@@ -215,6 +215,7 @@ class Settings(BaseSettings):
     GLOBAL_AI_TIER3_PROVIDER: str = "gemini"
     GLOBAL_AI_TIER3_MODEL: str = "models/gemma-4-26b-a4b-it"
     GLOBAL_AI_TIER3_API_KEY: str = ""
+    GLOBAL_AI_TIER3_BASE_URL: str = ""
     GLOBAL_AI_TIER3_REASONING_LEVEL: str = "high"
 
     GLOBAL_AI_TIER4_PROVIDER: str = ""
