@@ -263,6 +263,21 @@ class FontAwareExtractor:
         re.compile(r"^Lab\s*[-–—]\s*", re.IGNORECASE),
     ]
 
+    # Monospace font keywords for code detection
+    MONO_FONT_KEYWORDS = (
+        "mono", "courier", "consolas", "lucida console", "inconsolata",
+        "source code", "fira code", "jetbrains",
+    )
+
+    # Code detection keywords
+    CODE_KEYWORDS = (
+        "public", "private", "class", "void", "static", "System.out",
+        "println", "import", "def", "return", "function", "const", "let",
+        "var", "int ", "float ", "double ", "boolean ", "char ", "String",
+        "new ", "extends", "implements", "interface", "package",
+        "@Override", "@SuppressWarnings",
+    )
+
     def __init__(self):
         self.hierarchy = FontHierarchy()
 
@@ -729,9 +744,13 @@ class FontAwareExtractor:
             if gap > avg_line_height * 1.5:
                 should_split = True
 
-            # Font changed significantly → new block
+            # Font changed → new block (or moderate gap + bold change)
             if font_changed:
                 should_split = True
+            elif gap > avg_line_height * 0.8 and prev_font and curr_font:
+                # Moderate gap with any font difference → split
+                if prev_font.key != curr_font.key:
+                    should_split = True
 
             # Bullet or numbered item → new block
             line_text = line.text.strip()
@@ -832,6 +851,16 @@ class FontAwareExtractor:
                 block.block_type = "ordered_list"
                 continue
 
+                    # Check for monospace fonts (code)
+            if font and self._is_monospace(font.name):
+                block.block_type = "code"
+                continue
+
+            # Check for code-like content using heuristics
+            if len(text) > 15 and self._looks_like_code(text):
+                block.block_type = "code"
+                continue
+
             # Indented text: only classify as list if it has bullet-like characteristics
             if block.indent_level > 0:
                 # Check if it looks like a continuation of previous block (body text)
@@ -843,6 +872,23 @@ class FontAwareExtractor:
 
             # Default: body
             block.block_type = "body"
+
+    def _is_monospace(self, font_name: str) -> bool:
+        name_lower = (font_name or "").lower()
+        return any(kw in name_lower for kw in self.MONO_FONT_KEYWORDS)
+
+    def _looks_like_code(self, text: str) -> bool:
+        if not text or len(text) < 10 or len(text) > 500:
+            return False
+        has_brackets = "(" in text and ")" in text
+        has_braces = "{" in text and "}" in text
+        has_semicolon = ";" in text
+        has_assignment = "=" in text and not text.startswith("=")
+        if (has_braces and has_semicolon) or (has_brackets and has_semicolon and has_assignment):
+            return True
+        kw_count = sum(1 for kw in self.CODE_KEYWORDS if kw in text)
+        syntax_score = sum([has_brackets, has_braces, has_semicolon, has_assignment])
+        return kw_count >= 2 and syntax_score >= 2
 
 
 def extract_font_aware(pdf_path: str) -> list[dict[str, Any]]:

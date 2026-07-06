@@ -19,9 +19,49 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Python dependencies
 COPY requirements.txt .
+
+# Download and install torch separately (download-r2.pytorch.org CDN has SSL handshake failure)
+# Use Python's urllib which works with download.pytorch.org directly
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install certifi && \
-    pip install --default-timeout=1000 -r requirements.txt --trusted-host download.pytorch.org --trusted-host download-r2.pytorch.org
+    pip install --upgrade pip && \
+    pip install certifi
+# Download torch CPU wheel via urllib (download-r2.pytorch.org CDN has broken TLS)
+RUN python3 << 'PYEOF'
+import urllib.request, urllib.parse, os, sys, platform
+from html.parser import HTMLParser
+
+class Parser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+    def handle_starttag(self, tag, attrs):
+        if tag == 'a':
+            for name, value in attrs:
+                if name == 'href' and '.whl' in value:
+                    self.links.append(value.split('#')[0])
+
+resp = urllib.request.urlopen('https://download.pytorch.org/whl/cpu/torch/')
+p = Parser()
+p.feed(resp.read().decode())
+links = p.links
+
+tag = f'cp{sys.version_info.major}{sys.version_info.minor}-cp{sys.version_info.major}{sys.version_info.minor}'
+machine = platform.machine()
+match = [l for l in links if l.endswith('.whl') and tag in l and machine in l and 'manylinux' in l]
+if not match:
+    print(f'No torch wheel for {tag} on {machine}'); sys.exit(1)
+
+url = match[-1].replace('download-r2.pytorch.org', 'download.pytorch.org')
+name = urllib.parse.unquote(url.rsplit('/', 1)[-1])
+path = f'/tmp/torch-wheels/{name}'
+os.makedirs('/tmp/torch-wheels', exist_ok=True)
+if not os.path.exists(path):
+    print(f'Downloading {name}...')
+    urllib.request.urlretrieve(url, path)
+PYEOF
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install /tmp/torch-wheels/torch-*+cpu-*.whl && \
+    pip install --default-timeout=1000 -r requirements.txt
 
 
 # --- Stage 2: Runtime ---

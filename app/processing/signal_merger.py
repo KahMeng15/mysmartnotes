@@ -543,8 +543,8 @@ class SignalMerger:
         for block in blocks[1:]:
             prev = merged[-1]
 
-            # Skip merging tables or headings
-            if block.block_type in ("table",) or prev.block_type in ("table",):
+            # Skip merging tables, code blocks, or headings
+            if block.block_type in ("table", "code") or prev.block_type in ("table", "code"):
                 merged.append(block)
                 continue
 
@@ -1088,6 +1088,18 @@ def blocks_to_markdown(blocks: list[MergedBlock]) -> str:
             prev_type = block.block_type
             continue
 
+        # Code blocks
+        if block.block_type == "code":
+            if lines and lines[-1] != "":
+                lines.append("")
+            lang = "java" if any(kw in text for kw in ("public class", "public static void", "System.out", "String[] args", "import java")) else ""
+            lines.append(f"```{lang}")
+            lines.append(text)
+            lines.append("```")
+            lines.append("")
+            prev_type = "code"
+            continue
+
         # Body text
         if block.block_type == "body":
             if lines and prev_type and prev_type.startswith("h"):
@@ -1107,16 +1119,24 @@ def blocks_to_markdown(blocks: list[MergedBlock]) -> str:
             prev_type = "caption"
             continue
 
-    # Clean up
+    # Clean up — collapse excessive blank lines, then escape unescaped <
+    # characters ONLY outside fenced code blocks so React doesn't crash.
     result = "\n".join(lines)
     result = re.sub(r"\n{3,}", "\n\n", result)
 
-    # Escape < and > for Java generic types so React doesn't crash,
-    # except when it's part of our own HTML comments like <!-- Page X -->
-    import re as regex
-    # Replace any < with &lt; unless it's part of an HTML comment like <!-- Page X -->
-    # This prevents React from crashing on stray < characters or Java generics like < T >
-    result = regex.sub(r'<(?!!--)', r'&lt;', result)
+    out_lines = []
+    in_code_block = False
+    for line in result.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            out_lines.append(line)
+            continue
+        if not in_code_block:
+            # Escape < to &lt; unless it's part of an HTML comment
+            line = re.sub(r'<(?!!--)', r'&lt;', line)
+        out_lines.append(line)
+    result = "\n".join(out_lines)
 
     result = result.strip() + "\n"
 

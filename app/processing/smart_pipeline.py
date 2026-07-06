@@ -126,9 +126,19 @@ class SmartPipeline:
         tables = self._extract_tables_from_pdf(pdf_path)
         logger.info(f"  Found tables on {len([t for t in tables if t])} pages")
 
+        # Build table bboxes per page so font extractor can skip table regions
+        table_bboxes_per_page = {}
+        for page_idx, page_tables in enumerate(tables):
+            bboxes = []
+            for t in page_tables:
+                if t.get("bbox"):
+                    bboxes.append(t["bbox"])
+            if bboxes:
+                table_bboxes_per_page[page_idx + 1] = bboxes
+
         # Font-aware extraction (primary method)
         logger.info("Extracting text via font-aware method...")
-        font_results = self.font_extractor.extract(pdf_path, table_bboxes_per_page={})
+        font_results = self.font_extractor.extract(pdf_path, table_bboxes_per_page=table_bboxes_per_page)
         logger.info(
             f"  Extracted {sum(len(p['blocks']) for p in font_results)} blocks from {len(font_results)} pages"
         )
@@ -585,10 +595,12 @@ class SmartPipeline:
                             if table_rect:
                                 y_position = table_rect[1]  # top position
 
+                        bbox = table_settings[idx].bbox if idx < len(table_settings) else None
                         page_tables.append(
                             {
                                 "y_position": y_position,
                                 "markdown": markdown_table,
+                                "bbox": bbox,
                             }
                         )
 
