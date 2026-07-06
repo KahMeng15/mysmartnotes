@@ -137,7 +137,9 @@ class ImageTextMapper:
                 ]
                 for img in unplaced:
                     result.append(self._format_image_ref(img))
-                    all_placed.add(img.get("id") if isinstance(img, dict) else getattr(img, "id", ""))
+                    img_id = img.get("id") if isinstance(img, dict) else getattr(img, "id", "")
+                    all_placed.add(img_id)
+                    page_images_placed.add(img_id)
 
         # Ensure all images are placed even if no pages were detected
         for p_num, p_images in images_by_page.items():
@@ -265,7 +267,7 @@ class ImageTextMapper:
             return True
         if idx < len(all_lines) - 1 and re.match(r"<!--\s*Page\s+\d+\s*-->", all_lines[idx + 1]):
             return True
-        if line.strip() == "" and all_lines[idx + 1].startswith("#"):
+        if line.strip() == "" and all_lines[idx + 1].startswith("# "):
             return True
         return False
 

@@ -142,10 +142,8 @@ class UnifiedContentProcessor:
             lines = bundle.markdown.split("\n")
             has_h1 = any(l.startswith("# ") for l in lines)
             if not has_h1:
-                title = resource_id.replace("_", " ").title() if resource_id else "Document"
+                title = self._extract_title_from_file(file_path, resource_id)
                 bundle.markdown = f"# {title}\n\n" + bundle.markdown
-                if "missing_h1" in bundle.warnings:
-                    bundle.warnings.remove("missing_h1")
 
         return bundle
 
@@ -337,3 +335,41 @@ class UnifiedContentProcessor:
             for m in re.finditer(pattern, markdown, re.IGNORECASE):
                 refs.append(m.group(0))
         return refs
+
+    @staticmethod
+    def _extract_title_from_file(file_path: str, resource_id: str) -> str:
+        try:
+            ext = Path(file_path).suffix.lower()
+            if ext == ".pdf":
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(file_path) as pdf:
+                        if pdf.metadata and pdf.metadata.get("title"):
+                            t = pdf.metadata["title"].strip()
+                            if t and not t.startswith("Microsoft"):
+                                return t
+                except Exception:
+                    pass
+                fname = Path(file_path).stem
+                parts = re.split(r"[_\- ]+", fname)
+                noise = {"CCS", "CSC", "ICT", "MCS", "STUDENT", "STUDENTS", "LECTURE",
+                         "LECTURER", "NOTE", "NOTES", "SEM", "SLIDE", "SLIDES", "OF"}
+                filtered = []
+                for p in parts:
+                    p = p.strip()
+                    if not p:
+                        continue
+                    if re.match(r"^\d+$", p):
+                        continue
+                    if re.match(r"^[A-Za-z]{2,4}\d{3,4}$", p):
+                        continue
+                    if p.upper() in noise:
+                        continue
+                    if len(p) == 1:
+                        continue
+                    filtered.append(p)
+                if filtered:
+                    return " ".join(filtered)
+            return Path(file_path).stem
+        except Exception:
+            return resource_id.replace("_", " ").title()

@@ -117,6 +117,53 @@ class SmartPipeline:
         else:
             raise ValueError(f"Unsupported file format: {ext}")
 
+    @staticmethod
+    def _extract_pdf_title(pdf_path: str) -> str | None:
+        try:
+            import pdfplumber
+            with pdfplumber.open(pdf_path) as pdf:
+                if pdf.metadata and pdf.metadata.get("title"):
+                    title = pdf.metadata["title"].strip()
+                    if title and not title.startswith("Microsoft"):
+                        return title
+        except Exception:
+            pass
+        try:
+            import fitz
+            doc = fitz.open(pdf_path)
+            title = doc.metadata.get("title", "").strip()
+            doc.close()
+            if title and not title.startswith("Microsoft"):
+                return title
+        except Exception:
+            pass
+        fname = Path(pdf_path).stem
+        # Split on underscores, hyphens, and whitespace; filter out noise
+        parts = re.split(r"[_\- ]+", fname)
+        noise = {"CCS", "CSC", "ICT", "MCS", "STUDENT", "STUDENTS", "LECTURE",
+                 "LECTURER", "NOTE", "NOTES", "SEM", "SLIDE", "SLIDES", "OF"}
+        filtered = []
+        for p in parts:
+            p_stripped = p.strip()
+            if not p_stripped:
+                continue
+            # Skip pure number-only tokens (timestamps, years)
+            if re.match(r"^\d+$", p_stripped):
+                continue
+            # Skip course codes like CCS3101, ICT1234
+            if re.match(r"^[A-Za-z]{2,4}\d{3,4}$", p_stripped):
+                continue
+            # Skip known noise words
+            if p_stripped.upper() in noise:
+                continue
+            # Skip single characters
+            if len(p_stripped) == 1:
+                continue
+            filtered.append(p_stripped)
+        if filtered:
+            return " ".join(filtered)
+        return None
+
     def _process_pdf(self, pdf_path: str) -> str:
         """Process a PDF file through the pipeline."""
         logger.info(f"Processing PDF: {pdf_path}")
@@ -158,6 +205,24 @@ class SmartPipeline:
         markdown = self._normalize_pdf_bullets(markdown)
         markdown = self._deduplicate_pdf_blocks(markdown)
         markdown = self._fix_punctuation_spacing(markdown)
+
+        # Remove "End of Topic/Chapter/Note" headings
+        cleaned_lines = []
+        for l in markdown.split("\n"):
+            if re.match(
+                r"^#{1,3}\s+(End of|end of)\s+(Topic|Chapter|Note)", l, re.IGNORECASE
+            ):
+                continue
+            cleaned_lines.append(l)
+        markdown = "\n".join(cleaned_lines).strip()
+
+        # Inject H1 title from PDF metadata or filename if missing
+        has_valid_h1 = any(l.startswith("# ") for l in markdown.split("\n"))
+        if not has_valid_h1:
+            title = self._extract_pdf_title(pdf_path)
+            if title:
+                markdown = f"# {title}\n\n{markdown}"
+                logger.info(f"  Injected H1 title: '{title}'")
 
         return markdown
 
@@ -1238,13 +1303,6 @@ class SmartPipeline:
                 client.tiers[0].api_key = self.gemini_api_key
                 client._init_gemini_tier(client.tiers[0])
 
-            # Extract the original main title to enforce it later
-            original_title = None
-            for line in markdown.split("\n"):
-                if line.startswith("# "):
-                    original_title = line
-                    break
-
             chunks = self._split_into_chunks(markdown)
             num_chunks = len(chunks)
             polishing_model = client.tiers[0].model_name if client.tiers else "unknown"
@@ -1320,10 +1378,7 @@ class SmartPipeline:
             for line in lines:
                 # If this is the very first heading in the entire document, force it to be H1
                 if not first_heading_seen and re.match(r"^#{1,6}\s+", line):
-                    if original_title:
-                        line = original_title
-                    else:
-                        line = re.sub(r"^#{1,6}\s+", "# ", line)
+                    line = re.sub(r"^#{1,6}\s+", "# ", line)
                     first_heading_seen = True
                     seen_h1 = True
                 # Enforce only ONE H1
