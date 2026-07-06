@@ -178,11 +178,10 @@ class AIClient:
 
     def _init_groq_tier(self, tier: AITier):
         try:
-            from groq import AsyncGroq
-
+            import groq
             if not tier.api_key:
                 return
-            tier.model = AsyncGroq(api_key=tier.api_key)
+            tier.model = "lazy_init"
         except Exception as e:
             logger.error(f"Failed to init Groq tier ({tier.model_name}): {e}")
 
@@ -500,22 +499,27 @@ class AIClient:
                 raise ValueError(f"Groq model not initialized for {tier.model_name}")
 
             async def _groq_call():
-                messages = []
-                if system_instruction:
-                    messages.append({"role": "system", "content": system_instruction})
-                messages.append({"role": "user", "content": modified_prompt})
+                from groq import AsyncGroq
+                client = AsyncGroq(api_key=tier.api_key)
+                try:
+                    messages = []
+                    if system_instruction:
+                        messages.append({"role": "system", "content": system_instruction})
+                    messages.append({"role": "user", "content": modified_prompt})
 
-                # Cap max_tokens to avoid exceeding Groq free-tier TPM limits.
-                # 6000 is safe for most tasks; the 8192 hard limit is per-request.
-                safe_max_tokens = min(max_tokens, 6000)
+                    # Cap max_tokens to avoid exceeding Groq free-tier TPM limits.
+                    # 6000 is safe for most tasks; the 8192 hard limit is per-request.
+                    safe_max_tokens = min(max_tokens, 6000)
 
-                res = await tier.model.chat.completions.create(
-                    model=tier.model_name,
-                    messages=messages,
-                    max_tokens=safe_max_tokens,
-                    temperature=0.7,
-                )
-                return res.choices[0].message.content
+                    res = await client.chat.completions.create(
+                        model=tier.model_name,
+                        messages=messages,
+                        max_tokens=safe_max_tokens,
+                        temperature=0.7,
+                    )
+                    return res.choices[0].message.content
+                finally:
+                    await client.close()
 
             res = await self._with_retries_and_timeout(f"groq_{tier.model_name}", _groq_call)
             self.last_successful_tier = tier
@@ -664,34 +668,40 @@ class AIClient:
                         modified_prompt = prompt
 
                     async def _groq_stream():
-                        messages = []
-                        if system_instruction:
-                            messages.append({"role": "system", "content": system_instruction})
-                        messages.append({"role": "user", "content": modified_prompt})
+                        from groq import AsyncGroq
+                        client = AsyncGroq(api_key=tier.api_key)
+                        try:
+                            messages = []
+                            if system_instruction:
+                                messages.append({"role": "system", "content": system_instruction})
+                            messages.append({"role": "user", "content": modified_prompt})
 
-                        # Cap max_tokens to avoid exceeding Groq free-tier TPM limits.
-                        safe_max_tokens = min(max_tokens, 6000)
+                            # Cap max_tokens to avoid exceeding Groq free-tier TPM limits.
+                            safe_max_tokens = min(max_tokens, 6000)
 
-                        stream = await tier.model.chat.completions.create(
-                            model=tier.model_name,
-                            messages=messages,
-                            max_tokens=safe_max_tokens,
-                            temperature=0.7,
-                            stream=True,
-                        )
-                        return stream
+                            stream = await client.chat.completions.create(
+                                model=tier.model_name,
+                                messages=messages,
+                                max_tokens=safe_max_tokens,
+                                temperature=0.7,
+                                stream=True,
+                            )
+                            
+                            all_parts = []
+                            async for chunk in stream:
+                                if (
+                                    chunk.choices
+                                    and len(chunk.choices) > 0
+                                    and chunk.choices[0].delta.content is not None
+                                ):
+                                    all_parts.append(chunk.choices[0].delta.content)
+                            return all_parts
+                        finally:
+                            await client.close()
 
-                    response_stream = await self._with_retries_and_timeout(
+                    all_parts = await self._with_retries_and_timeout(
                         f"Tier{i + 1}_groq_stream", _groq_stream
                     )
-                    all_parts = []
-                    async for chunk in response_stream:
-                        if (
-                            chunk.choices
-                            and len(chunk.choices) > 0
-                            and chunk.choices[0].delta.content is not None
-                        ):
-                            all_parts.append(chunk.choices[0].delta.content)
 
                     self.last_successful_tier = tier
                     yield self._extract_polished_answer("".join(all_parts))

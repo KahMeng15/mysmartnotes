@@ -71,14 +71,19 @@ def _try_parse_import_payload(raw_response: str):
     candidates.append(text)
     fenced_blocks = _re.findall(r"```(?:json)?\s*([\s\S]*?)\s*```", text, flags=_re.IGNORECASE)
     candidates.extend([block.strip() for block in fenced_blocks if block.strip()])
-    obj_start = text.find("{")
     obj_end = text.rfind("}")
-    if obj_start != -1 and obj_end != -1 and obj_end > obj_start:
-        candidates.append(text[obj_start : obj_end + 1].strip())
-    arr_start = text.find("[")
+    if obj_end != -1:
+        start = text.find("{")
+        while start != -1 and start < obj_end:
+            candidates.append(text[start : obj_end + 1].strip())
+            start = text.find("{", start + 1)
+            
     arr_end = text.rfind("]")
-    if arr_start != -1 and arr_end != -1 and arr_end > arr_start:
-        candidates.append(text[arr_start : arr_end + 1].strip())
+    if arr_end != -1:
+        start = text.find("[")
+        while start != -1 and start < arr_end:
+            candidates.append(text[start : arr_end + 1].strip())
+            start = text.find("[", start + 1)
     seen = set()
     for candidate in candidates:
         if not candidate or candidate in seen:
