@@ -426,7 +426,7 @@ class AIClient:
             raise ValueError(f"Gemini model not initialized for {tier.model_name}")
 
         # Reasoning handling
-        is_reasoning = "gemma-4" in tier.model_name.lower() or tier.reasoning_level == "high"
+        is_reasoning = tier.reasoning_level == "high"
         if tier.provider == "gemini" and is_reasoning:
             instr = f"\nREASONING DEPTH: {tier.reasoning_level.upper()}\n"
             modified_prompt = (

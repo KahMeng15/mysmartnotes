@@ -13,10 +13,14 @@ export default function ProcessLoggerModal({ opened, onClose, entityId, tasks, e
   const pollTimerRef = useRef(null);
 
   // Determine if there is an active task for this entity
+  // Entity IDs are nested inside input_data.kwargs (e.g. resource_id, exercise_id, note_id)
   const hasActiveTask = tasks && tasks.some(
-    (t) =>
-      (t.resource_id === entityId || t.exercise_id === entityId || t.note_id === entityId) &&
-      (t.status === "pending" || t.status === "running" || t.status === "processing")
+    (t) => {
+      const kwargs = t.input_data?.kwargs || {};
+      const taskEntityId = kwargs.resource_id || kwargs.exercise_id || kwargs.note_id || kwargs.summary_id || "";
+      return taskEntityId === entityId &&
+        (t.status === "pending" || t.status === "running" || t.status === "processing");
+    }
   );
 
   const fetchLogs = useCallback(() => {

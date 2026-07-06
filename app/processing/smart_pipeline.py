@@ -1194,8 +1194,8 @@ class SmartPipeline:
         return markdown
 
     # ── chunk size for AI polish (characters) ──
-    # Reduced to 1500 to minimize "stream failed" errors with slow reasoning models
-    _POLISH_CHUNK_SIZE = 1500
+    # 800 chars → ~200 tokens input + 2000 output keeps total under Groq free-tier 6000 TPM
+    _POLISH_CHUNK_SIZE = 800
 
     def _ai_polish(
         self, markdown: str, progress_callback: Callable[[int], None] | None = None
@@ -1215,9 +1215,9 @@ class SmartPipeline:
             # Create a client which will automatically use the 3-tier fallback system
             client = AIClient()
 
-            # Apply the model configured for this pipeline (handles user personal overrides)
-            if client.tiers and self.gemini_model:
-                client.tiers[0].model_name = self.gemini_model
+            # Tier 1 (instant model) is for chat/exercises only — skip it for processing
+            if client.tiers:
+                client.tiers.pop(0)
 
             # Only override Tier 0 with a specific Gemini key if Tier 0 is actually a Gemini tier.
             # CRITICAL: Do NOT call _init_gemini_tier on a Groq/HuggingFace tier — it would
@@ -1235,8 +1235,9 @@ class SmartPipeline:
 
             chunks = self._split_into_chunks(markdown)
             num_chunks = len(chunks)
+            polishing_model = client.tiers[0].model_name if client.tiers else "unknown"
             logger.info(
-                f"Refining output with {self.gemini_model} ({num_chunks} chunk(s), sequential-ish)..."
+                f"Refining output with {polishing_model} ({num_chunks} chunk(s), sequential-ish)..."
             )
 
             # ── Parallel chunk processing ──
@@ -1415,8 +1416,9 @@ INPUT TO PROCESS:
                 "Do not include any preamble, introduction, explanation, or reasoning.\n"
                 "Strictly adhere to the heading rules and keep the exact words from the source text."
             )
+            # 2048 output tokens is plenty for a ≤800-char chunk; keeps total under 6000 TPM
             async for text_segment in client.stream_text(
-                prompt=prompt, max_tokens=8192, system_instruction=system_instruction
+                prompt=prompt, max_tokens=2048, system_instruction=system_instruction
             ):
                 full_text += text_segment
                 if debug_file:

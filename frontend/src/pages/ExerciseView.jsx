@@ -3028,6 +3028,7 @@ export default function ExerciseView() {
         opened={showProcessLog}
         onClose={() => setShowProcessLog(false)}
         entityId={id}
+        tasks={tasks}
       />
     </Box>
   );
