@@ -201,10 +201,10 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = True
 
     # Global AI Configuration (3-Tier Fallback)
-    GLOBAL_AI_TIER1_PROVIDER: str = "gemini"
-    GLOBAL_AI_TIER1_MODEL: str = "models/gemma-4-31b-it"
+    GLOBAL_AI_TIER1_PROVIDER: str = "groq"
+    GLOBAL_AI_TIER1_MODEL: str = "llama-3.1-8b-instant"
     GLOBAL_AI_TIER1_API_KEY: str = ""
-    GLOBAL_AI_TIER1_REASONING_LEVEL: str = "high"
+    GLOBAL_AI_TIER1_REASONING_LEVEL: str = "low"
 
     GLOBAL_AI_TIER2_PROVIDER: str = "gemini"
     GLOBAL_AI_TIER2_MODEL: str = "models/gemma-4-26b-a4b-it"
