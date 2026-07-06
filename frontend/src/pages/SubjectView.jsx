@@ -247,7 +247,7 @@ export default function SubjectView() {
 
   const handleCreateExercise = async () => {
     if (exerciseScope.length === 0) {
-      alert("Please select at least one resource or exercise.");
+      showError("Selection Required", "Please select at least one resource or exercise.");
       return;
     }
     setGeneratingExercise(true);
@@ -287,7 +287,7 @@ export default function SubjectView() {
       window.location.reload(); // Refresh to show new background task
     } catch (e) {
       console.error(e);
-      alert("Failed to generate exercise: " + e.message);
+      showError("Generation Failed", "Failed to generate exercise: " + e.message);
     } finally {
       setGeneratingExercise(false);
     }
@@ -568,6 +568,15 @@ export default function SubjectView() {
   const [processingLogs, setProcessingLogs] = useState(null);
   const [processingLogsLoading, setProcessingLogsLoading] = useState(false);
   const [processingLogsNoteId, setProcessingLogsNoteId] = useState(null);
+
+  // General Error Modal
+  const [errorModalOpened, { open: openErrorModal, close: closeErrorModal }] = useDisclosure(false);
+  const [errorModalData, setErrorModalData] = useState({ title: '', message: '' });
+
+  const showError = (title, message) => {
+    setErrorModalData({ title, message });
+    openErrorModal();
+  };
 
   const fetchProcessingLogs = async (noteId) => {
     setProcessingLogsNoteId(noteId);
@@ -1566,6 +1575,15 @@ export default function SubjectView() {
       </Tabs>
 
       {/* Modals */}
+      <Modal opened={errorModalOpened} onClose={closeErrorModal} title={<Text c="red" fw={500}>{errorModalData.title}</Text>} centered>
+        <Stack>
+          <Text size="sm">{errorModalData.message}</Text>
+          <Group justify="flex-end" mt="md">
+            <Button onClick={closeErrorModal}>Close</Button>
+          </Group>
+        </Stack>
+      </Modal>
+
       <Modal opened={editSubjectModalOpened} onClose={closeEditSubjectModal} title="Edit Subject" centered>
         <form onSubmit={(e) => { e.preventDefault(); handleUpdateSubject(); }}>
           <Stack>

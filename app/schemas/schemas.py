@@ -165,6 +165,11 @@ class ResourceCreate(ResourceBase):
     pass
 
 
+class ResourceUpdate(BaseModel):
+    title: str | None = None
+    subject_id: str | None = None
+
+
 class Resource(ResourceBase):
     id: str
     file_path: str

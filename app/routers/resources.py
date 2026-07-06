@@ -26,7 +26,7 @@ from app.processing.note_processor import (
     markdown_to_segments,
 )
 from app.processing.text_processor import ContentType
-from app.schemas.schemas import ResourceResponse
+from app.schemas.schemas import ResourceResponse, ResourceUpdate
 from app.utils.auth import get_current_user
 from app.utils.cache import cache_response, clear_cache_pattern_sync
 from app.utils.db import generate_random_id, get_db
@@ -226,8 +226,7 @@ async def get_resource(
 @router.put("/{resource_id}", response_model=ResourceResponse)
 async def update_resource(
     resource_id: str,
-    title: str = Form(None),
-    subject_id: str = Form(None),
+    resource: ResourceUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -241,19 +240,19 @@ async def update_resource(
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
 
-    if title:
-        note.title = title
+    if resource.title:
+        note.title = resource.title
 
-    if subject_id:
+    if resource.subject_id:
         # Verify subject exists and belongs to user
         subject = (
             db.query(Subject)
-            .filter(Subject.id == subject_id, Subject.user_id == current_user.id)
+            .filter(Subject.id == resource.subject_id, Subject.user_id == current_user.id)
             .first()
         )
         if not subject:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
-        note.subject_id = subject_id
+        note.subject_id = resource.subject_id
 
     note.updated_at = datetime.utcnow()
     db.commit()
