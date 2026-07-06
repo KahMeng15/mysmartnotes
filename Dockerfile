@@ -1,5 +1,5 @@
 # --- Stage 1: Builder ---
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.11-slim-bullseye AS builder
 
 # Prevent Python from writing .pyc files and enable unbuffered logging
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -24,7 +24,7 @@ RUN pip install --upgrade pip && \
 
 
 # --- Stage 2: Runtime ---
-FROM python:3.11-slim-bookworm
+FROM python:3.11-slim-bullseye
 
 LABEL org.opencontainers.image.source="https://github.com/kahmeng15/velonote"
 LABEL org.opencontainers.image.description="velonote - AI-Powered Study Companion"
