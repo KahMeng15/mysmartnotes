@@ -20,8 +20,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Install Python dependencies
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip && \
-    pip install -r requirements.txt --trusted-host download.pytorch.org --trusted-host download-r2.pytorch.org
+    pip install certifi && \
+    pip install --default-timeout=1000 -r requirements.txt --trusted-host download.pytorch.org --trusted-host download-r2.pytorch.org
 
 
 # --- Stage 2: Runtime ---
