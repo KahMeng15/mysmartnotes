@@ -2366,6 +2366,8 @@ export default function SubjectView() {
         opened={!!processLogEntityId}
         onClose={() => setProcessLogEntityId(null)}
         entityId={processLogEntityId}
+        tasks={tasks}
+        entityType="resource"
       />
     </Box>
   );

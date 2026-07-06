@@ -4,6 +4,7 @@ import { Box, Container, Title, Textarea, Group, Badge, Center, Loader, Text, Ac
 import { IconDeviceFloppy, IconRobot, IconCards, IconChevronLeft, IconPencil, IconX, IconMessageChatbot, IconFileText, IconAlertCircle, IconLayoutSidebarRightCollapse, IconLayoutSidebarRightExpand, IconH1, IconH2, IconH3, IconTypography, IconList, IconListNumbers, IconTable, IconCode, IconEye, IconDownload, IconBolt, IconPhotoPlus } from '@tabler/icons-react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi } from '../lib/api';
+import { useTaskContext } from '../lib/TaskContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkUnwrapImages from 'remark-unwrap-images';
@@ -36,6 +37,7 @@ export default function NoteView() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
+  const { tasks } = useTaskContext();
   const [isEditing, setIsEditing] = useState(false);
   const [isRawMode, setIsRawMode] = useState(false);
   const [showProcessLog, setShowProcessLog] = useState(false);
@@ -1161,6 +1163,8 @@ export default function NoteView() {
         opened={showProcessLog}
         onClose={() => setShowProcessLog(false)}
         entityId={id}
+        tasks={tasks}
+        entityType="resource"
       />
     </Box>
   );

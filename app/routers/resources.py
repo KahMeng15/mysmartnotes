@@ -982,7 +982,11 @@ async def get_resource_processing_logs(
 
     from app.logging_config import LOGS_DIR
 
-    log_files = ["backend.log", "errors.log"]
+    # Include the per-entity process log first (most relevant, written by EntityLogHandler)
+    per_entity_log = StorageManager.get_process_log(resource_id)
+
+    # Scan global log files for any lines mentioning this resource_id
+    log_files = ["processing.log", "worker.log", "backend.log", "errors.log"]
     entries = []
 
     for log_file in log_files:
@@ -1043,6 +1047,7 @@ async def get_resource_processing_logs(
         "resource_id": resource_id,
         "count": len(entries),
         "entries": entries,
+        "process_log": per_entity_log,
     }
 
 

@@ -171,6 +171,11 @@ class StorageManager:
         return _ensure_dir(os.path.join(USERS_DIR, user_id, "resources", filename))
 
     @staticmethod
+    def _get_resource_json_path(resource_id: str, suffix: str) -> str:
+        """Return the path where save_resource_json would write, without creating the file."""
+        return StorageManager._get_resource_path(resource_id, suffix=f"_{suffix}", extension="json")
+
+    @staticmethod
     def _get_note_path(note_id: str, suffix: str = "", extension: str = "md") -> str:
         user_id = _get_user_id_for_entity(note_id)
         filename = f"{note_id}{suffix}.{extension}"

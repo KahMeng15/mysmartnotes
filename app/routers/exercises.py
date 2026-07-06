@@ -731,8 +731,12 @@ async def get_exercise_processing_logs(
     import re
 
     from app.logging_config import LOGS_DIR
+    from app.utils.storage import StorageManager
 
-    log_files = ["backend.log", "errors.log"]
+    # Include the per-entity process log first (most relevant)
+    per_entity_log = StorageManager.get_process_log(exercise_id)
+
+    log_files = ["processing.log", "worker.log", "backend.log", "errors.log"]
     entries = []
 
     for log_file in log_files:
@@ -787,7 +791,7 @@ async def get_exercise_processing_logs(
     if limit > 0:
         entries = entries[:limit]
 
-    return {"entries": entries}
+    return {"entries": entries, "process_log": per_entity_log}
 
 
 @router.post("/{exercise_id}/export", response_model=dict)

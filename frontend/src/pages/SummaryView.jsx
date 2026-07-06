@@ -1507,6 +1507,8 @@ export default function SummaryView() {
         opened={showProcessLog}
         onClose={() => setShowProcessLog(false)}
         entityId={summaryId}
+        tasks={tasks}
+        entityType="summary"
       />
       </Box>
     </Box>
