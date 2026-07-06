@@ -17,6 +17,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
   const [gradingMode, setGradingMode] = useState('lenient'); // 'lenient' or 'strict'
   const [showAnswer, setShowAnswer] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const [audioDevices, setAudioDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
@@ -135,6 +136,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
           setTranscription(data.text);
           latestTranscriptionRef.current = data.text;
         } else if (data.type === 'evaluation') {
+          setIsProcessing(false);
           const newTurnUser = { role: 'user', text: latestTranscriptionRef.current || '' };
           const newTurnAi = { role: 'ai', text: data.message, status: data.status };
           const updatedConv = [...(evaluationRef.current?.conversation || []), newTurnUser, newTurnAi];
@@ -206,6 +208,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach(track => track.stop());
         if (ws && ws.readyState === WebSocket.OPEN) {
+          setIsProcessing(true);
           ws.send(JSON.stringify({ 
              action: "process", 
              response_mode: responseMode, 
@@ -218,6 +221,7 @@ export default function ConversationMode({ exercise, question, convActive, curre
       // stream data every 500ms
       mediaRecorder.start(500);
       setIsRecording(true);
+      setIsProcessing(false);
       setTranscription('');
     } catch (err) {
       console.error("Error accessing microphone:", err);
@@ -444,14 +448,26 @@ export default function ConversationMode({ exercise, question, convActive, curre
              </Box>
           ))}
 
-          {(isRecording || transcription) && (
+          {(isRecording || transcription || isProcessing) && (
             <Box mb="md">
                <Group gap="xs" mb={4}>
                  <IconUser size={14} style={{ color: 'var(--mantine-color-gray-6)' }} />
-                 <Text size="xs" c="dimmed" fw={500}>You (Listening...)</Text>
+                 <Text size="xs" c="dimmed" fw={500}>You {isRecording && '(Listening...)'}</Text>
                </Group>
                <Card withBorder p="sm" radius="md" style={{ backgroundColor: '#f8f9fa', marginLeft: '24px' }}>
                  <Text size="sm" c={!transcription ? "dimmed" : undefined}>{transcription || "..."}</Text>
+               </Card>
+            </Box>
+          )}
+
+          {isProcessing && (
+            <Box mb="md">
+               <Group gap="xs" mb={4}>
+                 <IconRobot size={14} style={{ color: 'var(--mantine-color-blue-6)' }} />
+                 <Text size="xs" c="dimmed" fw={500}>AI</Text>
+               </Group>
+               <Card withBorder p="sm" radius="md" style={{ backgroundColor: '#e6f7ff', marginRight: '24px' }}>
+                 <Text size="sm" c="dimmed">Thinking...</Text>
                </Card>
             </Box>
           )}
