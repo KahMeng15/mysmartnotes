@@ -29,6 +29,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN python3 << 'PYEOF'
 import urllib.request, urllib.parse, os, sys, platform
 from html.parser import HTMLParser
+from urllib.parse import urljoin
+
+BASE = 'https://download.pytorch.org'
 
 class Parser(HTMLParser):
     def __init__(self):
@@ -40,7 +43,7 @@ class Parser(HTMLParser):
                 if name == 'href' and '.whl' in value:
                     self.links.append(value.split('#')[0])
 
-resp = urllib.request.urlopen('https://download.pytorch.org/whl/cpu/torch/')
+resp = urllib.request.urlopen(f'{BASE}/whl/cpu/torch/')
 p = Parser()
 p.feed(resp.read().decode())
 links = p.links
@@ -51,7 +54,13 @@ match = [l for l in links if l.endswith('.whl') and tag in l and machine in l an
 if not match:
     print(f'No torch wheel for {tag} on {machine}'); sys.exit(1)
 
-url = match[-1].replace('download-r2.pytorch.org', 'download.pytorch.org')
+# Handle relative URLs from the directory listing
+raw_url = match[-1]
+if raw_url.startswith('/'):
+    raw_url = urljoin(BASE, raw_url)
+elif not raw_url.startswith('http'):
+    raw_url = urljoin(BASE + '/whl/cpu/torch/', raw_url)
+url = raw_url.replace('download-r2.pytorch.org', 'download.pytorch.org')
 name = urllib.parse.unquote(url.rsplit('/', 1)[-1])
 path = f'/tmp/torch-wheels/{name}'
 os.makedirs('/tmp/torch-wheels', exist_ok=True)
