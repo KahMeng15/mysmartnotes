@@ -23,6 +23,7 @@ import { Link } from '@tiptap/extension-link';
 import { Image } from '@tiptap/extension-image';
 import { ResizableImageExtension } from '../lib/ResizableImageExtension';
 import { ImageUploadExtension, handleImageUploadFlow } from '../lib/tiptapImageUpload';
+import ProcessLoggerModal from '../components/ProcessLoggerModal';
 import ConversationMode from '../components/ConversationMode';
 export default function ExerciseView() {
   const { id, mode } = useParams();
@@ -366,9 +367,10 @@ export default function ExerciseView() {
 
   // History modal
   const [historyModalQuestion, setHistoryModalQuestion] = useState(null);
-  const [historyModalOpened, setHistoryModalOpened] = useState(false);
+  const [voiceSettingsOpened, setVoiceSettingsOpened] = useState(false);
+  const [showProcessLog, setShowProcessLog] = useState(false);
 
-  // Editing state
+  // Poll for exercise and note statuse
   const [editedQuestions, setEditedQuestions] = useState([]);
   const [savingEdits, setSavingEdits] = useState(false);
 
@@ -1330,10 +1332,19 @@ export default function ExerciseView() {
                   <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
                     Our AI is generating questions based on your resources. This usually takes a few seconds.
                   </Text>
-                  <Box maw={400} mx="auto">
-                    <Progress value={processingStatus.progress || 10} animated striped size="xl" radius="xl" />
-                    <Text size="sm" c="dimmed" mt="xs" ta="right">{processingStatus.progress || 10}%</Text>
-                  </Box>
+                  
+                  {processingStatus && (
+                    <Box mx="auto" maw={400} mb="xl">
+                      <Group justify="space-between" mb={5}>
+                        <Text size="sm" fw={500}>{processingStatus.message || 'Processing...'}</Text>
+                        <Text size="sm" fw={500}>{processingStatus.progress || 0}%</Text>
+                      </Group>
+                      <Progress value={processingStatus.progress || 0} size="xl" radius="xl" striped animated />
+                      <Button variant="subtle" mt="sm" onClick={() => setShowProcessLog(true)}>
+                        View Live Logs
+                      </Button>
+                    </Box>
+                  )}
                 </Box>
               )}
 
@@ -3013,6 +3024,11 @@ export default function ExerciseView() {
           </ScrollArea>
         </Box>
       </Drawer>
+      <ProcessLoggerModal
+        opened={showProcessLog}
+        onClose={() => setShowProcessLog(false)}
+        entityId={id}
+      />
     </Box>
   );
 }

@@ -182,6 +182,40 @@ class StorageManager:
         filename = f"{exercise_id}{'_' + suffix if suffix else ''}.{extension}"
         return _ensure_dir(os.path.join(USERS_DIR, user_id, "exercises", filename))
 
+    @staticmethod
+    def _get_process_log_path(entity_id: str) -> str:
+        user_id = _get_user_id_for_entity(entity_id)
+        if entity_id.startswith("rs_"):
+            return _ensure_dir(os.path.join(USERS_DIR, str(user_id), "resources", f"{entity_id}_process.log"))
+        elif entity_id.startswith("ex_"):
+            return _ensure_dir(os.path.join(USERS_DIR, str(user_id), "exercises", f"{entity_id}_process.log"))
+        elif entity_id.startswith("nt_"):
+            return _ensure_dir(os.path.join(USERS_DIR, str(user_id), "notes", f"{entity_id}_process.log"))
+        else:
+            return _ensure_dir(os.path.join(USERS_DIR, "unowned", "logs", f"{entity_id}_process.log"))
+            
+    @staticmethod
+    def append_process_log(entity_id: str, log_entry: str, newline: bool = True):
+        if not entity_id or not log_entry:
+            return
+        path = StorageManager._get_process_log_path(entity_id)
+        try:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(log_entry + ("\n" if newline else ""))
+        except Exception as e:
+            logger.error(f"Failed to write process log for {entity_id}: {e}")
+
+    @staticmethod
+    def get_process_log(entity_id: str) -> str:
+        path = StorageManager._get_process_log_path(entity_id)
+        if not os.path.exists(path):
+            return ""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception:
+            return ""
+
     # --- Resource Content Methods ---
 
     @staticmethod

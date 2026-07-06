@@ -46,6 +46,7 @@ from app.routers import (
     chat,
     exercises,
     groups,
+    logs,
     notes,
     processing,
     prompts,
@@ -488,6 +489,7 @@ app.include_router(subjects.router)
 app.include_router(resources.router)
 app.include_router(notes.router)
 app.include_router(chat.router)
+app.include_router(logs.router)
 
 app.include_router(study_sessions.router)
 app.include_router(search.router)

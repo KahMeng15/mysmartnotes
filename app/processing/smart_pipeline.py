@@ -1245,17 +1245,21 @@ class SmartPipeline:
             chunk_debug_dir = Path("scripts/ProcessingAlgorithmTest/output/debug_chunks")
             chunk_debug_dir.mkdir(parents=True, exist_ok=True)
 
-            def _run_polish_async(idx, chunk, is_first):
-                import time
+            import contextvars
+            ctx = contextvars.copy_context()
 
-                t_chunk_start = time.time()
-                res = asyncio.run(
-                    self._polish_chunk(
-                        client, idx, chunk, is_first_chunk=is_first, debug_dir=chunk_debug_dir
+            def _run_polish_async(idx, chunk, is_first):
+                def _inner():
+                    import time
+                    t_chunk_start = time.time()
+                    res = asyncio.run(
+                        self._polish_chunk(
+                            client, idx, chunk, is_first_chunk=is_first, debug_dir=chunk_debug_dir
+                        )
                     )
-                )
-                self.timings[f"chunk_{idx}"] = time.time() - t_chunk_start
-                return res
+                    self.timings[f"chunk_{idx}"] = time.time() - t_chunk_start
+                    return res
+                return ctx.run(_inner)
 
             polished_chunks = [None] * num_chunks
             completed_chunks = 0

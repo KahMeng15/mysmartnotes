@@ -10,7 +10,7 @@ from app.logging_config import setup_logging
 from app.models.db import RateLimitConfig, Task
 from app.utils.db import SessionLocal
 from app.utils.tasks import ChatTask, EmbeddingsTask, NoteTask, OCRTask, TaskManager
-
+from app.logging_config import setup_logging, current_entity_id, current_user_id
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -88,11 +88,23 @@ async def process_next_task():
 
         TaskManager.update_task_progress(task_id, 10)
 
-        # Execute task (handle both sync and async)
-        if asyncio.iscoroutinefunction(handler):
-            result = await handler(**kwargs)
-        else:
-            result = handler(**kwargs)
+        # Extract entity ID for logging
+        entity_id = kwargs.get("resource_id") or kwargs.get("exercise_id") or kwargs.get("note_id")
+        
+        # Set context vars for process logging
+        token_entity = current_entity_id.set(entity_id)
+        token_user = current_user_id.set(task.user_id)
+
+        try:
+            # Execute task (handle both sync and async)
+            if asyncio.iscoroutinefunction(handler):
+                result = await handler(**kwargs)
+            else:
+                result = handler(**kwargs)
+        finally:
+            # Reset context vars
+            current_entity_id.reset(token_entity)
+            current_user_id.reset(token_user)
 
         # Mark complete or failed based on result
         if isinstance(result, dict) and result.get("status") in ("error", "failed"):

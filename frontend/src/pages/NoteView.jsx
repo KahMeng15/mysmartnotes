@@ -21,6 +21,7 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import { ResizableImageExtension } from '../lib/ResizableImageExtension';
 import { ImageUploadExtension, handleImageUploadFlow } from '../lib/tiptapImageUpload';
 import { LazyImage } from '../components/LazyImage';
+import ProcessLoggerModal from '../components/ProcessLoggerModal';
 
 export default function NoteView() {
   const { id } = useParams();
@@ -37,6 +38,7 @@ export default function NoteView() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [isRawMode, setIsRawMode] = useState(false);
+  const [showProcessLog, setShowProcessLog] = useState(false);
 
   const [taskStatus, setTaskStatus] = useState(null);
   const [chatOpened, setChatOpened] = useState(false);
@@ -57,6 +59,55 @@ export default function NoteView() {
     if (isNaN(pos) || pos < 0 || pos > content.length) return content;
     return content.slice(0, pos) + '<span id="ref-target"></span>' + content.slice(pos);
   }, [content, refPosition]);
+
+  const markdownComponents = useMemo(() => ({
+    pre(props) {
+      return <>{props.children}</>;
+    },
+    code(props) {
+      const {children, className, node, ...rest} = props;
+      const match = /language-(\w+)/.exec(className || '');
+      const isInline = !match && !String(children).includes('\n');
+      return !isInline ? (
+        <SyntaxHighlighter
+          {...rest}
+          PreTag="div"
+          children={String(children).replace(/\n$/, '')}
+          language={match ? match[1] : 'text'}
+          style={oneLight}
+          customStyle={{
+            margin: '1rem 0',
+            padding: '1rem',
+            borderRadius: '6px',
+            border: '1px solid #e9ecef',
+            backgroundColor: '#f8f9fa',
+            fontSize: '0.9em',
+            maxWidth: '100%',
+            overflowX: 'auto'
+          }}
+        />
+      ) : (
+        <code {...rest} className={className}>
+          {children}
+        </code>
+      );
+    },
+    img(props) {
+      if (!props.src) return null;
+      const src = props.src;
+      let maxWidth = '66%'; // default medium
+      if (src.endsWith('#small')) maxWidth = '33%';
+      if (src.endsWith('#large')) maxWidth = '100%';
+      return (
+        <LazyImage
+          src={src}
+          alt={props.alt}
+          title={props.title}
+          maxWidth={maxWidth}
+        />
+      );
+    }
+  }), []);
 
   const editor = useEditor({
     extensions: [
@@ -675,9 +726,16 @@ export default function NoteView() {
                 <Text c="dimmed" mb="xl" size="lg" maw={500} mx="auto">
                   Our AI is currently extracting text, analyzing the content, and preparing your smart notes. This usually takes a few seconds.
                 </Text>
-                <Box maw={400} mx="auto">
-                  <Progress value={processingProgress} animated striped size="xl" radius="xl" />
-                  <Text size="sm" c="dimmed" mt="xs" ta="right">{processingProgress}%</Text>
+                
+                <Box mx="auto" maw={400} mb="xl">
+                  <Group justify="space-between" mb={5}>
+                    <Text size="sm" fw={500}>Processing...</Text>
+                    <Text size="sm" fw={500}>{processingProgress}%</Text>
+                  </Group>
+                  <Progress value={processingProgress} size="xl" radius="xl" striped animated />
+                  <Button variant="subtle" mt="sm" onClick={() => setShowProcessLog(true)}>
+                    View Live Logs
+                  </Button>
                 </Box>
               </Box>
             ) : (
@@ -701,54 +759,7 @@ export default function NoteView() {
                         remarkPlugins={[remarkGfm, remarkUnwrapImages]}
                         rehypePlugins={[rehypeRaw]}
                         urlTransform={(uri) => uri}
-                        components={{
-                          pre(props) {
-                            return <>{props.children}</>;
-                          },
-                          code(props) {
-                            const {children, className, node, ...rest} = props;
-                            const match = /language-(\w+)/.exec(className || '');
-                            const isInline = !match && !String(children).includes('\n');
-                            return !isInline ? (
-                              <SyntaxHighlighter
-                                {...rest}
-                                PreTag="div"
-                                children={String(children).replace(/\n$/, '')}
-                                language={match ? match[1] : 'text'}
-                                style={oneLight}
-                                customStyle={{
-                                  margin: '1rem 0',
-                                  padding: '1rem',
-                                  borderRadius: '6px',
-                                  border: '1px solid #e9ecef',
-                                  backgroundColor: '#f8f9fa',
-                                  fontSize: '0.9em',
-                                  maxWidth: '100%',
-                                  overflowX: 'auto'
-                                }}
-                              />
-                            ) : (
-                              <code {...rest} className={className}>
-                                {children}
-                              </code>
-                            );
-                          },
-                          img(props) {
-                            if (!props.src) return null;
-                            const src = props.src;
-                            let maxWidth = '66%'; // default medium
-                            if (src.endsWith('#small')) maxWidth = '33%';
-                            if (src.endsWith('#large')) maxWidth = '100%';
-                            return (
-                              <LazyImage
-                                src={src}
-                                alt={props.alt}
-                                title={props.title}
-                                maxWidth={maxWidth}
-                              />
-                            );
-                          }
-                        }}
+                        components={markdownComponents}
                       >
                         {contentForRender || content}
                       </ReactMarkdown>
@@ -1146,6 +1157,11 @@ export default function NoteView() {
           <Text c="dimmed">Chat interface loading...</Text>
         </Center>
       </Drawer>
+      <ProcessLoggerModal
+        opened={showProcessLog}
+        onClose={() => setShowProcessLog(false)}
+        entityId={id}
+      />
     </Box>
   );
 }

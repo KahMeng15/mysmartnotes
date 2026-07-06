@@ -7,6 +7,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchApi, getAuthToken, notifyTaskStarted } from '../lib/api';
 import { useTaskContext } from '../lib/TaskContext';
 import { formatParams } from '../lib/formatters';
+import ProcessLoggerModal from '../components/ProcessLoggerModal';
 
 const MODE_ICONS = {
   quick: <IconBolt size={14} />,
@@ -562,6 +563,7 @@ export default function SubjectView() {
   const [deletingSummary, setDeletingSummary] = useState(null);
   const [infoModalSummary, setInfoModalSummary] = useState(null);
   const [newSummaryTitle, setNewSummaryTitle] = useState('');
+  const [processLogEntityId, setProcessLogEntityId] = useState(null);
 
   // Processing Logs
   const [processingLogsModalOpened, { open: openProcessingLogsModal, close: closeProcessingLogsModal }] = useDisclosure(false);
@@ -2121,25 +2123,14 @@ export default function SubjectView() {
           <Button
             variant="light"
             leftSection={<IconClipboardList size={16} />}
-            onClick={async () => { 
+            onClick={() => { 
               const exId = infoModalExercise.id;
               setInfoModalExercise(null);
-              setProcessingLogsNoteId(exId);
-              setProcessingLogsLoading(true);
-              setProcessingLogs(null);
-              openProcessingLogsModal();
-              try {
-                const data = await fetchApi(`/exercises/${exId}/processing-logs?limit=200`);
-                setProcessingLogs(data);
-              } catch (err) {
-                setProcessingLogs({ error: err.message });
-              } finally {
-                setProcessingLogsLoading(false);
-              }
+              setProcessLogEntityId(exId);
             }}
             fullWidth
           >
-            View Processing Logs
+            Technical Info: Live Logs
           </Button>
         </Stack>
       </Modal>
@@ -2302,10 +2293,10 @@ export default function SubjectView() {
             <Button
               variant="light"
               leftSection={<IconClipboardList size={16} />}
-              onClick={() => { setInfoModalNote(null); fetchProcessingLogs(infoModalNote.id); }}
+              onClick={() => { setInfoModalNote(null); setProcessLogEntityId(infoModalNote.id); }}
               fullWidth
             >
-              View Processing Logs
+              Technical Info: Live Logs
             </Button>
           </Stack>
         )}
@@ -2370,6 +2361,12 @@ export default function SubjectView() {
           </>
         )}
       </Modal>
+      
+      <ProcessLoggerModal
+        opened={!!processLogEntityId}
+        onClose={() => setProcessLogEntityId(null)}
+        entityId={processLogEntityId}
+      />
     </Box>
   );
 }

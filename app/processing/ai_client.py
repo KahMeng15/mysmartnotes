@@ -440,6 +440,8 @@ class AIClient:
         if tier.provider == "gemini":
             import google.generativeai as genai
 
+            logger.info(f"== AI REQUEST (Gemini - {tier.model_name}) ==\nSystem: {system_instruction}\nPrompt (first 1000 chars): {modified_prompt[:1000]}...\n")
+
             # CRITICAL: Re-configure with THIS tier's key to prevent leakage from other tiers
             if tier.api_key:
                 genai.configure(api_key=tier.api_key)
@@ -452,27 +454,36 @@ class AIClient:
             )
 
             async def _gemini_call():
-                return await asyncio.to_thread(
-                    active_model.generate_content, modified_prompt, generation_config=cfg
-                )
+                def _sync_stream():
+                    response = active_model.generate_content(
+                        modified_prompt, generation_config=cfg, stream=True
+                    )
+                    full_text = ""
+                    for chunk in response:
+                        if chunk.text:
+                            full_text += chunk.text
+                            logger.info(chunk.text, extra={"stream_token": True})
+                    return full_text
+                return await asyncio.to_thread(_sync_stream)
 
             res = await self._with_retries_and_timeout(f"gemini_{tier.model_name}", _gemini_call)
-            print(f"DEBUG GEMINI RES: {res}")
-            if res.candidates and res.candidates[0].content.parts:
-                parts = res.candidates[0].content.parts
-                text = "".join(p.text for p in parts if hasattr(p, "text"))
-                self.last_successful_tier = tier
-                logger.info(
-                    f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})"
-                )
-                return text if raw_output else self._extract_polished_answer(text)
+            
+            self.last_successful_tier = tier
+            logger.info("\n")
+            logger.info(
+                f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})"
+            )
+            
+            return res if raw_output else self._extract_polished_answer(res)
 
         elif tier.provider == "ollama":
+            logger.info(f"== AI REQUEST (Ollama - {tier.model_name}) ==\nSystem: {system_instruction}\nPrompt (first 1000 chars): {modified_prompt[:1000]}...\n")
 
             async def _ollama_call():
                 return await self._call_ollama(tier, modified_prompt, system_instruction)
 
             res = await self._with_retries_and_timeout(f"ollama_{tier.model_name}", _ollama_call)
+            logger.info(f"== AI RESPONSE (Ollama - {tier.model_name}) ==\n{res[:1000]}...\n")
             self.last_successful_tier = tier
             logger.info(
                 f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})"
@@ -497,6 +508,7 @@ class AIClient:
         elif tier.provider == "groq":
             if not tier.model:
                 raise ValueError(f"Groq model not initialized for {tier.model_name}")
+            logger.info(f"== AI REQUEST (Groq - {tier.model_name}) ==\nSystem: {system_instruction}\nPrompt (first 1000 chars): {modified_prompt[:1000]}...\n")
 
             async def _groq_call():
                 from groq import AsyncGroq
@@ -516,13 +528,22 @@ class AIClient:
                         messages=messages,
                         max_tokens=safe_max_tokens,
                         temperature=0.7,
+                        stream=True,
                     )
-                    return res.choices[0].message.content
+                    full_text = ""
+                    async for chunk in res:
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            text_chunk = chunk.choices[0].delta.content
+                            full_text += text_chunk
+                            logger.info(text_chunk, extra={"stream_token": True})
+                    return full_text
                 finally:
                     await client.close()
 
             res = await self._with_retries_and_timeout(f"groq_{tier.model_name}", _groq_call)
+            
             self.last_successful_tier = tier
+            logger.info("\n")
             logger.info(
                 f"SUCCESS: Generation completed using Tier {tier.provider} ({tier.model_name})"
             )
@@ -543,10 +564,9 @@ class AIClient:
 
         tiers_to_use = self.tiers
         if require_reasoning:
-            if len(self.tiers) == 3:
-                tiers_to_use = self.tiers[1:]
-            elif len(self.tiers) == 4:
-                tiers_to_use = [self.tiers[0]] + self.tiers[2:]
+            high_reasoning_tiers = [t for t in self.tiers if t.reasoning_level.lower() == "high"]
+            if high_reasoning_tiers:
+                tiers_to_use = high_reasoning_tiers
 
         for i, tier in enumerate(tiers_to_use):
             try:
@@ -582,10 +602,9 @@ class AIClient:
 
         tiers_to_use = self.tiers
         if require_reasoning:
-            if len(self.tiers) == 3:
-                tiers_to_use = self.tiers[1:]
-            elif len(self.tiers) == 4:
-                tiers_to_use = [self.tiers[0]] + self.tiers[2:]
+            high_reasoning_tiers = [t for t in self.tiers if t.reasoning_level.lower() == "high"]
+            if high_reasoning_tiers:
+                tiers_to_use = high_reasoning_tiers
 
         for i, tier in enumerate(tiers_to_use):
             try:

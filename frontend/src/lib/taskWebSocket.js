@@ -55,7 +55,9 @@ function connect() {
 
   socket.onmessage = (event) => {
     try {
-      emit(JSON.parse(event.data));
+      const parsed = JSON.parse(event.data);
+      emit(parsed);
+      window.dispatchEvent(new CustomEvent('ws_message', { detail: parsed }));
     } catch (err) {
       console.error('Failed to parse task WebSocket message', err);
     }

@@ -47,6 +47,7 @@ class ImageTextMapper:
         result = []
         current_slide = 0
         slide_images_placed = set()
+        all_placed = set()
 
         for line_idx, line in enumerate(lines):
             result.append(line)
@@ -66,6 +67,7 @@ class ImageTextMapper:
                     if self._text_matches_image(heading_text, img):
                         result.append(self._format_image_ref(img))
                         slide_images_placed.add(img_id)
+                        all_placed.add(img_id)
 
             is_last_line = (line_idx == len(lines) - 1) or (
                 line_idx < len(lines) - 1 and not lines[line_idx + 1].strip()
@@ -80,9 +82,9 @@ class ImageTextMapper:
                 ]
                 for img in unplaced:
                     result.append(self._format_image_ref(img))
+                    all_placed.add(img.get("id") if isinstance(img, dict) else getattr(img, "id", ""))
 
         # Ensure all images are placed even if no slides/headings were detected
-        all_placed = set(slide_images_placed)
         for s_num, s_images in images_by_slide.items():
             for img in s_images:
                 img_id = img.get("id") if isinstance(img, dict) else getattr(img, "id", "")
@@ -99,6 +101,7 @@ class ImageTextMapper:
         result = []
         current_page = 0
         page_images_placed = set()
+        all_placed = set()
 
         for line_idx, line in enumerate(lines):
             result.append(line)
@@ -119,11 +122,9 @@ class ImageTextMapper:
                 ]
                 if unplaced:
                     result.append(self._format_image_ref(unplaced[0]))
-                    page_images_placed.add(
-                        unplaced[0].get("id")
-                        if isinstance(unplaced[0], dict)
-                        else getattr(unplaced[0], "id", "")
-                    )
+                    img_id = unplaced[0].get("id") if isinstance(unplaced[0], dict) else getattr(unplaced[0], "id", "")
+                    page_images_placed.add(img_id)
+                    all_placed.add(img_id)
 
             is_page_end = self._is_page_boundary(line, lines, line_idx)
             if is_page_end and current_page > 0:
@@ -136,9 +137,9 @@ class ImageTextMapper:
                 ]
                 for img in unplaced:
                     result.append(self._format_image_ref(img))
+                    all_placed.add(img.get("id") if isinstance(img, dict) else getattr(img, "id", ""))
 
         # Ensure all images are placed even if no pages were detected
-        all_placed = set(page_images_placed)
         for p_num, p_images in images_by_page.items():
             for img in p_images:
                 img_id = img.get("id") if isinstance(img, dict) else getattr(img, "id", "")
