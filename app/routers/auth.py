@@ -242,7 +242,7 @@ def validate_invitation_token(db: Session, token: str | None, email: str) -> Use
 
     invitation = (
         db.query(UserInvitation)
-        .filter(UserInvitation.token == token, not UserInvitation.is_used)
+        .filter(UserInvitation.token == token, ~UserInvitation.is_used)
         .first()
     )
     if not invitation:
@@ -302,7 +302,7 @@ def get_invitation(token: str, db: Session = Depends(get_db)):
     """Return invitation details for a valid token (public, no auth required)"""
     invite = (
         db.query(UserInvitation)
-        .filter(UserInvitation.token == token, not UserInvitation.is_used)
+        .filter(UserInvitation.token == token, ~UserInvitation.is_used)
         .first()
     )
     if not invite:
