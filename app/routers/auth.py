@@ -127,6 +127,7 @@ def _prepare_user_for_response(user: User) -> dict:
         "conv_input_mode": getattr(user, "conv_input_mode", "push"),
         "conv_transcription_enabled": getattr(user, "conv_transcription_enabled", True),
         "conv_grading_mode": getattr(user, "conv_grading_mode", "lenient"),
+        "has_password": bool(user.hashed_password),
         "created_at": user.created_at,
     }
 
@@ -1412,7 +1413,7 @@ async def request_password_change(
         db.query(PasswordChangeConfirmation)
         .filter(
             PasswordChangeConfirmation.user_id == current_user.id,
-            not PasswordChangeConfirmation.is_used,
+            ~PasswordChangeConfirmation.is_used,
             PasswordChangeConfirmation.expires_at > datetime.utcnow(),
         )
         .all()
@@ -1484,7 +1485,7 @@ async def confirm_password_change(
         .filter(
             PasswordChangeConfirmation.user_id == current_user.id,
             PasswordChangeConfirmation.confirmation_code == request_data.confirmation_code,
-            not PasswordChangeConfirmation.is_used,
+            ~PasswordChangeConfirmation.is_used,
         )
         .first()
     )
@@ -1769,7 +1770,7 @@ def verify_email(verify_data: EmailVerifySubmit, request: Request, db: Session =
         update(EmailVerificationToken)
         .where(
             EmailVerificationToken.token == verify_data.token,
-            not EmailVerificationToken.is_used,
+            ~EmailVerificationToken.is_used,
         )
         .values(is_used=True)
     )
@@ -1878,7 +1879,7 @@ def resend_verification(
         db.query(EmailVerificationToken)
         .filter(
             EmailVerificationToken.email == email,
-            not EmailVerificationToken.is_used,
+            ~EmailVerificationToken.is_used,
             EmailVerificationToken.expires_at > datetime.utcnow(),
         )
         .all()

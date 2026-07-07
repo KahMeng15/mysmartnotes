@@ -6,6 +6,7 @@ import { fetchApi } from '../lib/api';
 export default function Settings() {
   
   const [profile, setProfile] = useState({ nickname: '', full_name: '', email: '' });
+  const [hasPassword, setHasPassword] = useState(true);
   const [quotas, setQuotas] = useState(null);
   
   const [loading, setLoading] = useState(true);
@@ -43,6 +44,7 @@ export default function Settings() {
           full_name: profileData.full_name || '',
           email: profileData.email || ''
         });
+        setHasPassword(profileData.has_password !== false);
         setQuotas(quotasData);
         setUserPrompts(promptsData || []);
       } catch (err) {
@@ -86,17 +88,22 @@ export default function Settings() {
   };
 
   const handlePasswordRequest = async () => {
-    if (!currentPassword || !newPassword) return;
+    if (!newPassword || (!hasPassword && !currentPassword)) return;
+    if (hasPassword && !currentPassword) return;
     setChangingPassword(true);
     setMessage(null);
     try {
+      const body = hasPassword
+        ? { current_password: currentPassword, new_password: newPassword }
+        : { current_password: '', new_password: newPassword };
       await fetchApi('/auth/request-password-change', {
         method: 'POST',
-        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
+        body: JSON.stringify(body)
       });
       setMessage({ type: 'success', text: 'Password changed successfully!' });
       setCurrentPassword('');
       setNewPassword('');
+      setHasPassword(true);
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Failed to change password' });
     } finally {
@@ -260,13 +267,15 @@ export default function Settings() {
         </Paper>
 
         <Paper withBorder p="xl" radius="md">
-          <Title order={4} mb="md">Change Password</Title>
+          <Title order={4} mb="md">{hasPassword ? 'Change Password' : 'Set Password'}</Title>
           <Stack>
-            <PasswordInput
-              label="Current Password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.currentTarget.value)}
-            />
+            {hasPassword && (
+              <PasswordInput
+                label="Current Password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.currentTarget.value)}
+              />
+            )}
             <PasswordInput
               label="New Password"
               value={newPassword}
@@ -277,9 +286,9 @@ export default function Settings() {
                 variant="light"
                 onClick={handlePasswordRequest}
                 loading={changingPassword}
-                disabled={!currentPassword || !newPassword}
+                disabled={hasPassword ? (!currentPassword || !newPassword) : !newPassword}
               >
-                Change Password
+                {hasPassword ? 'Change Password' : 'Set Password'}
               </Button>
             </Group>
           </Stack>

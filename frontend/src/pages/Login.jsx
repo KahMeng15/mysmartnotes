@@ -45,7 +45,7 @@ async function getFirebaseAuth() {
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [panel, setPanel] = useState('login'); // 'login' | 'register' | 'forgot' | 'google-complete' | 'verify'
+  const [panel, setPanel] = useState('login'); // 'login' | 'register' | 'forgot' | 'google-complete' | 'verify' | 'reset'
   const turnstile = useTurnstile();
 
   const [quote, setQuote] = useState(quotes[0]);
@@ -69,6 +69,11 @@ export default function Login() {
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeFairUse, setAgreeFairUse] = useState(false);
   const [googleApprovalSignup, setGoogleApprovalSignup] = useState(false);
+
+  // Password reset state
+  const [resetToken, setResetToken] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
 
   // Forgot password state
   const [forgotEmail, setForgotEmail] = useState('');
@@ -111,6 +116,26 @@ export default function Login() {
         setMaintenanceMode(data.maintenance_mode || false);
       }
     }).catch(() => {});
+
+    // Auto-handle password reset token in URL
+    const resetTokenParam = searchParams.get('reset_token');
+    if (resetTokenParam) {
+      setResetToken(resetTokenParam);
+      setPanel('reset');
+      fetch(`/api/auth/password-reset-token-valid?token=${encodeURIComponent(resetTokenParam)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.valid) {
+            setError(data.message || 'Invalid or expired reset link.');
+            setPanel('login');
+          }
+        })
+        .catch(() => {
+          setError('Failed to validate reset link.');
+          setPanel('login');
+        });
+      return;
+    }
 
     // Auto-handle email verification token in URL
     const verifyToken = searchParams.get('verify_token');
@@ -386,6 +411,44 @@ export default function Login() {
     }
   };
 
+  // ── RESET PASSWORD ──
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (resetNewPassword !== resetConfirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    if (resetNewPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    const cfToken = turnstile.getToken();
+    if (!cfToken) {
+      setError('Please complete the human verification.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, new_password: resetNewPassword, cf_turnstile_response: cfToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Password reset failed');
+      setSuccess(data.message || 'Password has been reset! You can now log in.');
+      setSearchParams({}, { replace: true });
+      setTimeout(() => switchPanel('login'), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      turnstile.reset();
+    }
+  };
+
   const PolicyCheckboxes = ({ agreeTos, setAgreeTos, agreePrivacy, setAgreePrivacy, agreeFairUse, setAgreeFairUse, prefix = '' }) => (
     <Box mt="md" p="md" bg="gray.0" style={{ border: '1px solid #ddd', borderRadius: '4px' }}>
       <Text fw={600} size="sm" mb="sm">I agree to:</Text>
@@ -572,7 +635,7 @@ export default function Login() {
 
               <Group mt="lg" gap="xs" justify="center">
                 {signupConfig === 'invite' ? (
-                  <Text size="sm" c="dimmed">Invite only system, contact the system administrator to sign up and use this app.</Text>
+                  <Text size="sm" c="dimmed" ta="center">Invite only system, contact the system administrator to sign up and use this app.</Text>
                 ) : maintenanceMode ? null : (
                   <>
                   <Text size="sm" c="dimmed">Don't have an account? </Text>
@@ -812,6 +875,44 @@ export default function Login() {
               <Box mt="md" ref={turnstile.containerRef} />
               <Group mt="lg" gap="xs" justify="center">
                 <Anchor component="button" type="button" size="sm" onClick={() => switchPanel('login')}>
+                  Back to Login
+                </Anchor>
+              </Group>
+            </form>
+          )}
+
+          {/* ── RESET PASSWORD ── */}
+          {panel === 'reset' && (
+            <form onSubmit={handleResetPassword}>
+              <Text size="md" c="dimmed" mb="lg">
+                Enter your new password.
+              </Text>
+              <Stack gap="md">
+                <PasswordInput
+                  id="reset-password"
+                  required
+                  label="New Password"
+                  placeholder="••••••••"
+                  size="md"
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.currentTarget.value)}
+                />
+                <PasswordInput
+                  id="reset-confirm"
+                  required
+                  label="Confirm Password"
+                  placeholder="••••••••"
+                  size="md"
+                  value={resetConfirmPassword}
+                  onChange={(e) => setResetConfirmPassword(e.currentTarget.value)}
+                />
+              </Stack>
+              <Button id="btn-reset-password" fullWidth size="md" type="submit" loading={loading} mt="xl" style={{ backgroundColor: '#171738' }}>
+                Reset Password
+              </Button>
+              <Box mt="md" ref={turnstile.containerRef} />
+              <Group mt="lg" gap="xs" justify="center">
+                <Anchor component="button" type="button" size="sm" onClick={() => { setSearchParams({}, { replace: true }); switchPanel('login'); }}>
                   Back to Login
                 </Anchor>
               </Group>
