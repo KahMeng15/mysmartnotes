@@ -81,6 +81,10 @@ class SmartPipeline:
             markdown = self._local_process(file_path, ext)
             self.timings["local_extraction"] = time.time() - t0
 
+            # Shared post-processing for all formats
+            markdown = self._normalize_bullets(markdown)
+            markdown = self._fix_punctuation_spacing(markdown)
+
             # Final AI Polish Pass
             if self.use_polish and markdown:
                 if progress_callback:
@@ -88,6 +92,9 @@ class SmartPipeline:
                 t1 = time.time()
                 markdown = self._ai_polish(markdown, progress_callback=progress_callback)
                 self.timings["ai_polish_total"] = time.time() - t1
+
+            # Final structural validation (shared across all formats)
+            markdown = self._validate_markdown_structure(markdown)
 
             if progress_callback:
                 progress_callback(100)  # 100%: All done
@@ -202,15 +209,13 @@ class SmartPipeline:
         markdown = blocks_to_markdown(merged_blocks)
 
         # Post-processing steps
-        markdown = self._normalize_pdf_bullets(markdown)
         markdown = self._deduplicate_pdf_blocks(markdown)
-        markdown = self._fix_punctuation_spacing(markdown)
 
-        # Remove "End of Topic/Chapter/Note" headings
+        # Remove "End of Topic" headings before H1 check to avoid false positives
         cleaned_lines = []
         for l in markdown.split("\n"):
             if re.match(
-                r"^#{1,3}\s+(End of|end of)\s+(Topic|Chapter|Note)", l, re.IGNORECASE
+                r"^#{1,6}\s+(End of|end of)\s+(Topic|Chapter|Note)", l, re.IGNORECASE
             ):
                 continue
             cleaned_lines.append(l)
@@ -225,6 +230,152 @@ class SmartPipeline:
                 logger.info(f"  Injected H1 title: '{title}'")
 
         return markdown
+
+    def _detect_document_title(self, markdown: str) -> str | None:
+        """Find the most likely document title from markdown content.
+        Looks for Topic/Chapter patterns in the first lines, or the first H1.
+        Strips prefixes like course codes, university names, etc."""
+        import re
+        lines = markdown.split("\n")
+
+        # First pass: look for Topic/Chapter pattern in the first 15 non-empty lines
+        for line in lines[:15]:
+            stripped = line.strip().lstrip("#").strip()
+            m = re.search(r"\b(Topic|Chapter)\s+\d+", stripped, re.IGNORECASE)
+            if m:
+                title = re.sub(
+                    r"^.*?\b((?:Topic|Chapter)\s+\d+.*)$",
+                    r"\1",
+                    stripped,
+                    flags=re.IGNORECASE,
+                )
+                title = re.sub(r"\s*[-–—]?\s*(AP\..*|Dr\.|Prof\.).*$", "", title).strip()
+                return title if title else stripped
+
+        # Second pass: use first H1 that doesn't look like a learning objective
+        for line in lines[:15]:
+            if line.strip().startswith("# "):
+                text = line.strip()[2:].strip()
+                if not re.search(r"\((P\d+|C\d)\)", text):
+                    return text
+        return None
+
+    def _validate_markdown_structure(self, markdown: str) -> str:
+        """Validate and fix common markdown structural issues across all formats.
+        Runs as the final cleanup step after all processing and AI polish."""
+        import re
+        if not markdown:
+            return markdown
+
+        lines = markdown.split("\n")
+
+        # --- Pass 1: Balance code blocks ---
+        code_fence_indices = [i for i, l in enumerate(lines) if l.strip().startswith("```")]
+        if len(code_fence_indices) % 2 != 0:
+            lines.append("```")
+
+        # --- Pass 2: Fix heading artefacts and enforce structure ---
+        result = []
+        seen_h1 = False
+        in_code_block = False
+
+        # Find the best document title
+        doc_title = self._detect_document_title(markdown)
+        # Check if there's already an H1 with the doc title in the original lines
+        has_topic_h1 = False
+        if doc_title:
+            for line in lines:
+                if line.strip().startswith(f"# {doc_title}"):
+                    has_topic_h1 = True
+                    break
+
+        prev_was_list = False
+        prev_was_blank = False
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+
+            # Track code block state (must happen before heading/list checks)
+            is_fence = stripped.startswith("```")
+            if is_fence:
+                in_code_block = not in_code_block
+                result.append(line)
+                continue
+
+            is_heading = bool(re.match(r"^#{1,6}\s+", stripped))
+
+            # If heading appears inside an open code block, close the code block first.
+            # This is a common AI-polish error where headings are placed between ``` fences.
+            if in_code_block and is_heading:
+                result.append("```")
+                in_code_block = False
+                # Fall through to heading handling below
+
+            # If heading follows a list item with no blank line between, it's an AI polish error.
+            # Convert the heading text to bold body text instead.
+            if is_heading and prev_was_list and not prev_was_blank:
+                level = len(stripped) - len(stripped.lstrip("#"))
+                content = stripped[level:].strip()
+                result.append(f"**{content}**")
+                result.append("")
+                prev_was_list = False
+                prev_was_blank = False
+                continue
+
+            # Update list/blank tracking for next iteration
+            if stripped.startswith("- ") or stripped.startswith("1. "):
+                prev_was_list = True
+            else:
+                prev_was_list = False
+            prev_was_blank = (stripped == "")
+
+            # Remove "End of Topic/Chapter/Note" headings
+            if re.match(r"^#{1,3}\s+(End of|end of)\s+(Topic|Chapter|Note)", stripped, re.IGNORECASE):
+                continue
+
+            # Remove empty headings (e.g. "# " or "## " with no text)
+            if re.match(r"^#{1,6}\s*$", line):
+                continue
+
+            # Handle heading lines
+            if is_heading:
+                level = len(stripped) - len(stripped.lstrip("#"))
+                content = stripped[level:].strip()
+
+                if level == 1:
+                    if seen_h1:
+                        line = "## " + content
+                    else:
+                        seen_h1 = True
+                        if doc_title and not has_topic_h1:
+                            # If the first H1 looks like a learning objective,
+                            # or doesn't contain the doc title, replace it
+                            if re.search(r"\((P\d+|C\d)\)", content) or doc_title.lower() not in content.lower():
+                                line = f"# {doc_title}"
+                                has_topic_h1 = True
+
+                result.append(line)
+                continue
+
+            result.append(line)
+
+        # Close any remaining open code block
+        if in_code_block:
+            result.append("```")
+            in_code_block = False
+
+        # If we have a Topic/Chapter title but no H1 for it, inject at the top
+        if doc_title and not has_topic_h1 and not seen_h1:
+            result.insert(0, "")
+            result.insert(0, f"# {doc_title}")
+            seen_h1 = True
+
+        output = "\n".join(result).strip()
+
+        # --- Pass 3: Remove runs of 3+ blank lines ---
+        output = re.sub(r"\n{4,}", "\n\n\n", output)
+
+        return output
 
     # Normalization map for logical symbols and common OCR/PPTX corruption
     NORMALIZATION_MAP = {
@@ -523,7 +674,7 @@ class SmartPipeline:
         text = re.sub(r"(?<![A-Z0-9\.])(\.)([A-ZÀ-ž][a-z])", r"\1 \2", text)
         return text
 
-    def _normalize_pdf_bullets(self, text: str) -> str:
+    def _normalize_bullets(self, text: str) -> str:
         """
         Normalize non-standard bullet characters used in note PDFs
         (e.g. Ø, q, n, v as line-start decorators) into proper Markdown list markers.
@@ -1062,6 +1213,11 @@ class SmartPipeline:
                         last_heading_level = level
                     except ValueError:
                         pass
+
+            # Inject slide marker for ImageTextMapper positioning (preserved by AI polish)
+            if slide_blocks:
+                md_parts.append(f"<!-- Slide {slide_num} -->")
+                md_parts.append("")
 
             # Inject a markdown divider between major topics (slides starting with an h2)
             if slide_num > 1 and slide_blocks and any(b["type"] == "h2" for b in slide_blocks[:2]):

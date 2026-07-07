@@ -211,6 +211,16 @@ class ImageTextMapper:
                 boundaries.append(i)
         return boundaries
 
+    def _detect_slide_number(self, line: str, line_idx: int, boundaries: list[int]) -> int | None:
+        m = re.match(r"<!--\s*Slide\s+(\d+)\s*-->", line)
+        if m:
+            return int(m.group(1))
+        if line_idx in boundaries:
+            for i, b in enumerate(boundaries):
+                if b == line_idx:
+                    return i + 1
+        return None
+
     def _group_images_by_slide(self, images: list) -> dict[int, list]:
         groups = {}
         for img in images:
@@ -236,13 +246,6 @@ class ImageTextMapper:
                 groups[page] = []
             groups[page].append(img)
         return groups
-
-    def _detect_slide_number(self, line: str, line_idx: int, boundaries: list[int]) -> int | None:
-        if line_idx in boundaries:
-            for i, b in enumerate(boundaries):
-                if b == line_idx:
-                    return i + 1
-        return None
 
     def _detect_page_number(self, line: str) -> int | None:
         m = re.match(r"<!--\s*Page\s+(\d+)\s*-->", line)

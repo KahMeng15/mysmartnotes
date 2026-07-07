@@ -159,8 +159,8 @@ def markdown_to_segments(markdown: str) -> list:
         elif stripped.startswith("|"):
             content_type = "table_row"
             content = stripped
-        elif stripped.startswith("---"):
-            continue  # Skip table separators
+        elif stripped.startswith("|---"):
+            continue  # Skip table separator rows
         else:
             content_type = "body"
             content = stripped
