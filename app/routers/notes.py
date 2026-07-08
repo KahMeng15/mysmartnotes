@@ -657,6 +657,76 @@ async def toggle_pin_note(
     return {"message": "Resource pin toggled", "is_pinned": summary.is_pinned}
 
 
+@router.post("/{note_id}/reprocess", response_model=dict)
+def reprocess_note(
+    note_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Reprocess a failed generated note, re-submitting the generation task."""
+    import json
+    import time
+
+    summary = (
+        db.query(Note)
+        .outerjoin(Resource, Note.resource_id == Resource.id)
+        .filter(
+            Note.id == note_id,
+            (Resource.user_id == current_user.id) | (Note.user_id == current_user.id),
+        )
+        .first()
+    )
+
+    if not summary:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
+
+    # Enforce tier quotas
+    enforce_quota_notes(current_user, db)
+
+    # Parse stored resource_ids / exercise_ids
+    r_ids = json.loads(summary.resource_ids) if summary.resource_ids else []
+    if not r_ids and summary.resource_id:
+        r_ids = [summary.resource_id]
+    e_ids = json.loads(summary.exercise_ids) if summary.exercise_ids else []
+
+    if not r_ids and not e_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot reprocess: missing resource or exercise references",
+        )
+
+    # Reset note state
+    StorageManager.delete_note_files(summary.id)
+    summary.file_path = ""
+    summary.processing_time_ms = 0
+    summary.model = None
+    db.commit()
+
+    task_id = f"summary_{current_user.id}_{r_ids[0] if r_ids else 'ex'}_{int(time.time())}"
+
+    TaskManager.submit_task(
+        task_id,
+        "note_generation",
+        current_user.id,
+        resource_id=r_ids[0] if r_ids else None,
+        resource_ids=r_ids,
+        exercise_ids=e_ids,
+        note_id=summary.id,
+        title=summary.title,
+        mode=summary.mode,
+        output_format=summary.output_format,
+        processing_method=summary.processing_method,
+        split_level=summary.split_level,
+        custom_prompt=summary.custom_prompt,
+        prompt_name=summary.prompt_name,
+        prompt_icon=summary.prompt_icon,
+    )
+
+    clear_cache_pattern_sync(f"cache_resp:/notes*:u{current_user.id}*")
+
+    return {"task_id": task_id, "note_id": summary.id, "status": "pending"}
+
+
 @router.post("/{note_id}/export", response_model=dict)
 async def export_note(
     note_id: str,

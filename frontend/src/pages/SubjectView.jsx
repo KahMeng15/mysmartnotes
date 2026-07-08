@@ -755,13 +755,19 @@ export default function SubjectView() {
           setGeneratedNoteProgress(prev => ({ ...prev, [nid]: t.progress }));
         }
         if (status === 'completed') {
+          setReprocessingGeneratedNoteIds(prev => prev.filter(id => id !== nid));
           fetchApi(`/notes/${nid}?t=${Date.now()}`).then(refreshed => {
             if (refreshed) setGeneratedNotes(prev => prev.map(item => item.id === nid ? refreshed : item));
           });
           setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
           setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
-        } else if (status === 'failed') {
-          setFailedGeneratedNoteIds(prev => prev.includes(nid) ? prev : [...prev, nid]);
+        } else if (status === 'failed' || status === 'cancelled') {
+          setReprocessingGeneratedNoteIds(prev => prev.filter(id => id !== nid));
+          if (t.error === 'Cancelled by user' || status === 'cancelled') {
+            setCancelledGeneratedNoteIds(prev => prev.includes(nid) ? prev : [...prev, nid]);
+          } else {
+            setFailedGeneratedNoteIds(prev => prev.includes(nid) ? prev : [...prev, nid]);
+          }
           setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[nid]; return n; });
           setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[nid]; return n; });
         }
@@ -906,6 +912,23 @@ export default function SubjectView() {
     } catch (err) {
       alert("Failed to reprocess note: " + err.message);
       setReprocessingNoteIds(prev => prev.filter(id => id !== noteIdToReprocess));
+    }
+  };
+
+  const reprocessGeneratedNote = async (gn) => {
+    const genId = gn.id;
+    setFailedGeneratedNoteIds(prev => prev.filter(id => id !== genId));
+    setCancelledGeneratedNoteIds(prev => prev.filter(id => id !== genId));
+    setReprocessingGeneratedNoteIds(prev => [...prev, genId]);
+    try {
+      const res = await fetchApi(`/notes/${genId}/reprocess`, { method: 'POST' });
+      notifyTaskStarted();
+      if (res && res.task_id) {
+        setPendingSummaryTasks(prev => ({ ...prev, [res.note_id]: res.task_id }));
+      }
+    } catch (err) {
+      alert("Failed to reprocess note: " + err.message);
+      setReprocessingGeneratedNoteIds(prev => prev.filter(id => id !== genId));
     }
   };
 
@@ -1519,7 +1542,7 @@ export default function SubjectView() {
                         </Group>
                       </Box>
                        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                         <Menu position="bottom-end">
+                          <Menu position="bottom-end" withinPortal>
                           <Menu.Target>
                             <ActionIcon variant="subtle" color="gray" onClick={(e) => e.stopPropagation()}>
                               <IconDotsVertical size={20} />
@@ -1529,6 +1552,9 @@ export default function SubjectView() {
                             <Menu.Item leftSection={<IconPencil size={14} />} onClick={() => { setEditingSummary(gn); setNewSummaryTitle(displayTitle); openRenameSummaryModal(); }}>
                               Rename
                             </Menu.Item>
+                            <Menu.Item leftSection={<IconRefresh size={14} />} onClick={(e) => { e.stopPropagation(); reprocessGeneratedNote(gn); }}>
+                              Reprocess
+                            </Menu.Item>
                             <Menu.Item leftSection={<IconInfoCircle size={14} />} onClick={() => setInfoModalSummary(gn)}>
                               System Info
                             </Menu.Item>
@@ -1537,7 +1563,9 @@ export default function SubjectView() {
                                 try {
                                   await fetchApi(`/search/tasks/${pendingSummaryTasks[gn.id]}/cancel`, { method: 'POST' });
                                   setCancelledGeneratedNoteIds(prev => [...prev, gn.id]);
+                                  setReprocessingGeneratedNoteIds(prev => prev.filter(id => id !== gn.id));
                                   setPendingSummaryTasks(prev => { const n = { ...prev }; delete n[gn.id]; return n; });
+                                  setGeneratedNoteProgress(prev => { const n = { ...prev }; delete n[gn.id]; return n; });
                                 } catch (e) {
                                   console.error("Failed to cancel task", e);
                                   alert("Failed to cancel task: " + e.message);
