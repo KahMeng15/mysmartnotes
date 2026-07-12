@@ -494,7 +494,7 @@ class UserInvitation(Base):
     __tablename__ = "user_invitations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    email = Column(String(255), nullable=False, unique=True, index=True)
+    email = Column(String(255), nullable=False, index=True)
     token = Column(String(100), nullable=False, unique=True, index=True)
     invited_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     used_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)

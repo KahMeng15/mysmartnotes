@@ -127,6 +127,7 @@ def init_db():
         apply_chat_exercise_id_migration()
         apply_exercise_marks_migration()
         apply_conversation_preferences_migration()
+        apply_invitation_email_unique_migration()
     except Exception as e:
         logger.error(f"Failed to apply PostgreSQL migrations: {e}")
 
@@ -699,3 +700,54 @@ def apply_exercise_marks_migration():
             conn.commit()
     except Exception as e:
         logger.error(f"Failed to apply exercise marks migration: {e}", exc_info=True)
+
+
+def apply_invitation_email_unique_migration():
+    """Drop global UNIQUE constraint on user_invitations.email.
+
+    Replaces it with a partial unique index that only enforces uniqueness for
+    active (unused) invites — allowing admins to re-invite the same email
+    address after their previous invite has already been used.
+    """
+    from sqlalchemy import text
+
+    try:
+        with engine.connect() as conn:
+            # 1. Drop the global unique constraint / index if it still exists.
+            #    PostgreSQL exposes unique constraints as indexes, so we try both
+            #    the constraint name and the auto-generated index name.
+            for obj_name in (
+                "user_invitations_email_key",  # auto-generated unique constraint
+                "ix_user_invitations_email",   # SQLAlchemy-generated unique index
+            ):
+                try:
+                    conn.execute(text(f"ALTER TABLE user_invitations DROP CONSTRAINT IF EXISTS {obj_name}"))
+                    conn.execute(text(f"DROP INDEX IF EXISTS {obj_name}"))
+                except Exception:
+                    pass  # constraint / index may not exist under this name
+
+            # 2. Re-create a non-unique plain index for lookup performance
+            #    (CREATE INDEX IF NOT EXISTS is idempotent).
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_user_invitations_email "
+                    "ON user_invitations (email)"
+                )
+            )
+
+            # 3. Add a partial unique index so that at most one *active* invite
+            #    can exist per email at any time.
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_invitations_email_active "
+                    "ON user_invitations (email) WHERE is_used = FALSE"
+                )
+            )
+
+            conn.commit()
+            logger.info(
+                "Replaced global UNIQUE on user_invitations.email with "
+                "a partial unique index (active invites only)"
+            )
+    except Exception as e:
+        logger.error(f"Failed to apply invitation email unique migration: {e}", exc_info=True)

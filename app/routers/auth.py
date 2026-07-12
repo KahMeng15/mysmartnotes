@@ -853,7 +853,11 @@ def google_login(
                 data={"sub": str(user.id), "tv": int(user.token_version or 0)},
                 expires_delta=timedelta(minutes=expire_minutes),
             )
+            refresh_token = create_refresh_token(
+                data={"sub": str(user.id), "tv": int(user.token_version or 0)}
+            )
             _set_auth_cookie(response, access_token, expire_minutes)
+            _set_refresh_cookie(response, refresh_token)
 
             # Log login
             ip_address = request.client.host if request.client else None
@@ -1029,7 +1033,11 @@ def google_complete(
                 data={"sub": str(existing_user.id), "tv": int(existing_user.token_version or 0)},
                 expires_delta=timedelta(minutes=expire_minutes),
             )
+            refresh_token = create_refresh_token(
+                data={"sub": str(existing_user.id), "tv": int(existing_user.token_version or 0)}
+            )
             _set_auth_cookie(response, access_token, expire_minutes)
+            _set_refresh_cookie(response, refresh_token)
             # Ensure user object is fresh with latest google_oauth_id
             db.refresh(existing_user)
             return {
@@ -1116,7 +1124,11 @@ def google_complete(
             data={"sub": str(user.id), "tv": int(user.token_version or 0)},
             expires_delta=timedelta(minutes=expire_minutes),
         )
+        refresh_token = create_refresh_token(
+            data={"sub": str(user.id), "tv": int(user.token_version or 0)}
+        )
         _set_auth_cookie(response, access_token, expire_minutes)
+        _set_refresh_cookie(response, refresh_token)
 
         return {
             "access_token": access_token,
@@ -1159,6 +1171,7 @@ async def logout(
 
     response.delete_cookie(key="access_token", path="/")
     response.delete_cookie(key=settings.CSRF_COOKIE_NAME, path="/")
+    response.delete_cookie(key="refresh_token", path="/auth/refresh")
     return {"message": "Logged out successfully"}
 
 
